@@ -107,12 +107,11 @@ class PurchaseOrder extends Model
 
         $this->db->beginTransaction();
         try {
-            $totalItems = 0;
             $totalAmount = 0;
             foreach ($items as $item) {
-                $totalItems += (float)($item['quantity'] ?? 1);
                 $totalAmount += (float)($item['total_price'] ?? 0);
             }
+            $totalItems = count($items);
 
             $referenceNo = $this->generateReferenceNo();
 
@@ -149,15 +148,13 @@ class PurchaseOrder extends Model
                 ]);
             }
 
-            $this->db->update(
-                'sellers',
-                [
-                    'total_transactions' => $this->db->fetchColumn("SELECT COALESCE(total_transactions,0)+1 FROM sellers WHERE id = ?", [$data['seller_id']]),
-                    'total_amount' => $this->db->fetchColumn("SELECT COALESCE(total_amount,0)+? FROM sellers WHERE id = ?", [$totalAmount, $data['seller_id']]),
-                    'last_transaction_at' => date('Y-m-d H:i:s'),
-                ],
-                ['id = ?'],
-                [$data['seller_id']]
+            $this->db->query(
+                "UPDATE sellers
+                 SET total_transactions = COALESCE(total_transactions, 0) + 1,
+                     total_amount       = COALESCE(total_amount, 0) + ?,
+                     last_transaction_at = NOW()
+                 WHERE id = ?",
+                [$totalAmount, $data['seller_id']]
             );
 
             $this->db->commit();

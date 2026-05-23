@@ -75,42 +75,65 @@ async function searchSellers() {
   const res = await apiRequest(`sellers/search?q=${encodeURIComponent(q)}`);
   if (res.status !== 'success') return;
   const items = res.data || [];
+  list.innerHTML = '';
   if (items.length === 0) {
-    list.innerHTML = '<div class="seller-item" style="color:#888">ไม่พบผู้ขาย — กดปุ่ม "+ ผู้ขายใหม่"</div>';
+    const empty = document.createElement('div');
+    empty.className = 'seller-item';
+    empty.style.color = '#888';
+    empty.textContent = 'ไม่พบผู้ขาย — กดปุ่ม "+ ผู้ขายใหม่"';
+    list.appendChild(empty);
   } else {
-    list.innerHTML = items.map(s => `
-      <div class="seller-item" onclick='selectSeller(${JSON.stringify(s).replace(/'/g, "&#39;")})'>
-        <strong>${escapeHtml(s.full_name)}</strong>
-        ${s.id_card ? `<span style="color:#888;margin-left:8px">${maskIdCard(s.id_card)}</span>` : ''}
-        ${s.phone ? `<span style="color:#888;margin-left:8px">${escapeHtml(s.phone)}</span>` : ''}
-        ${s.is_blacklisted == 1 ? '<span style="color:#d32f2f;font-weight:bold;margin-left:8px">[Blacklist]</span>' : ''}
-      </div>
-    `).join('');
+    items.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'seller-item';
+      const parts = [`<strong>${escapeHtml(s.full_name)}</strong>`];
+      if (s.id_card) parts.push(`<span style="color:#888;margin-left:8px">${maskIdCard(s.id_card)}</span>`);
+      if (s.phone) parts.push(`<span style="color:#888;margin-left:8px">${escapeHtml(s.phone)}</span>`);
+      if (s.is_blacklisted == 1) parts.push('<span style="color:#d32f2f;font-weight:bold;margin-left:8px">[Blacklist]</span>');
+      row.innerHTML = parts.join('');
+      row.addEventListener('click', () => selectSeller(s));
+      list.appendChild(row);
+    });
   }
   list.style.display = 'block';
 }
 
-window.selectSeller = function(s) {
+function selectSeller(s) {
   if (s.is_blacklisted == 1) {
     if (!confirm('ผู้ขายนี้ Blacklist ยืนยันรับซื้อหรือไม่?')) return;
   }
   selectedSeller = s;
-  document.getElementById('selectedSellerBox').innerHTML = `
-    <div class="selected-seller">
-      <div><strong>${escapeHtml(s.full_name)}</strong></div>
-      ${s.id_card ? `<div>เลขบัตร: ${maskIdCard(s.id_card)}</div>` : ''}
-      ${s.phone ? `<div>โทร: ${escapeHtml(s.phone)}</div>` : ''}
-      <button class="btn btn-sm btn-secondary" onclick="clearSeller()">เปลี่ยนผู้ขาย</button>
-    </div>
-  `;
+  const box = document.getElementById('selectedSellerBox');
+  box.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'selected-seller';
+  const name = document.createElement('div');
+  name.innerHTML = `<strong>${escapeHtml(s.full_name)}</strong>`;
+  wrap.appendChild(name);
+  if (s.id_card) {
+    const idLine = document.createElement('div');
+    idLine.textContent = `เลขบัตร: ${maskIdCard(s.id_card)}`;
+    wrap.appendChild(idLine);
+  }
+  if (s.phone) {
+    const phoneLine = document.createElement('div');
+    phoneLine.textContent = `โทร: ${s.phone}`;
+    wrap.appendChild(phoneLine);
+  }
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-sm btn-secondary';
+  btn.textContent = 'เปลี่ยนผู้ขาย';
+  btn.addEventListener('click', clearSeller);
+  wrap.appendChild(btn);
+  box.appendChild(wrap);
   document.getElementById('searchSellerInput').value = '';
   document.getElementById('sellerSearchResults').style.display = 'none';
-};
+}
 
-window.clearSeller = function() {
+function clearSeller() {
   selectedSeller = null;
   document.getElementById('selectedSellerBox').innerHTML = '<div style="color:#888">ยังไม่ได้เลือกผู้ขาย</div>';
-};
+}
 
 function openNewSellerModal() {
   document.getElementById('newSellerModal').classList.add('show');

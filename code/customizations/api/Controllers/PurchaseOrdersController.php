@@ -39,7 +39,7 @@ class PurchaseOrdersController extends Controller
             'payment_method' => $data['payment_method'] ?? 'cash',
             'payment_status' => $data['payment_status'] ?? 'paid',
             'status' => $data['status'] ?? 'completed',
-            'notes' => isset($data['notes']) ? htmlspecialchars(trim($data['notes'])) : null,
+            'notes' => isset($data['notes']) ? trim((string)$data['notes']) : null,
         ];
 
         $cleanItems = [];
@@ -48,14 +48,14 @@ class PurchaseOrdersController extends Controller
                 Response::error('แต่ละรายการต้องมีชื่อของและสภาพ', 400);
             }
             $cleanItems[] = [
-                'item_name' => htmlspecialchars(trim($item['item_name'])),
+                'item_name' => trim((string)$item['item_name']),
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 'condition_id' => intval($item['condition_id']),
                 'quantity' => floatval($item['quantity'] ?? 1),
                 'unit' => $item['unit'] ?? 'ชิ้น',
                 'unit_price' => floatval($item['unit_price'] ?? 0),
                 'total_price' => floatval($item['total_price'] ?? (floatval($item['quantity'] ?? 1) * floatval($item['unit_price'] ?? 0))),
-                'notes' => isset($item['notes']) ? htmlspecialchars(trim($item['notes'])) : null,
+                'notes' => isset($item['notes']) ? trim((string)$item['notes']) : null,
             ];
         }
 
