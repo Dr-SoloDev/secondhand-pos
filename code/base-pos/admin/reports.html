@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports - POS System</title>
+  <link rel="stylesheet" href="../assets/css/fonts.css">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <i class="icon-cart"></i>
+          <span>POS System</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li>
+          <a href="index.html">
+            <i class="icon-dashboard"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="inventory.html">
+            <i class="icon-product"></i>
+            <span>Inventory</span>
+          </a>
+        </li>
+        <li>
+          <a href="../pos/index.html">
+            <i class="icon-cart"></i>
+            <span>POS</span>
+          </a>
+        </li>
+        <li>
+          <a href="sales.html">
+            <i class="icon-stats"></i>
+            <span>Sales</span>
+          </a>
+        </li>
+        <li>
+          <a href="reports.html" class="active">
+            <i class="icon-report"></i>
+            <span>Reports</span>
+          </a>
+        </li>
+        <li>
+          <a href="users.html">
+            <i class="icon-users"></i>
+            <span>Users</span>
+          </a>
+        </li>
+        <li>
+          <a href="settings.html">
+            <i class="icon-settings"></i>
+            <span>Settings</span>
+          </a>
+        </li>
+      </ul>
+    </aside>
+
+    <main class="content-area">
+      <div class="topbar">
+        <button class="toggle-sidebar">
+          <i class="icon-bars"></i>
+        </button>
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar">
+              <i class="icon-user"></i>
+            </div>
+            <span class="user-name">Admin</span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#"><i class="icon-user"></i> Profile</a>
+            <a href="../admin/settings.html"><i class="icon-settings"></i> Settings</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-header">
+        <h1>Reports</h1>
+        <div>
+          <button class="btn btn-secondary" id="exportReportBtn">
+            <i class="icon-download"></i> Export
+          </button>
+          <button class="btn btn-primary" id="printReportBtn">
+            <i class="icon-print"></i> Print
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Report Type</h2>
+        </div>
+        <div class="card-body">
+          <div class="report-types">
+            <div class="report-type-item active" data-report="sales">
+              <i class="icon-stats"></i>
+              <span>Sales Report</span>
+            </div>
+            <div class="report-type-item" data-report="products">
+              <i class="icon-product"></i>
+              <span>Product Sales</span>
+            </div>
+            <div class="report-type-item" data-report="inventory">
+              <i class="icon-product"></i>
+              <span>Inventory Status</span>
+            </div>
+            <div class="report-type-item" data-report="cashier">
+              <i class="icon-user"></i>
+              <span>Cashier Performance</span>
+            </div>
+            <div class="report-type-item" data-report="tax">
+              <i class="icon-billing"></i>
+              <span>Tax Report</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sales Report -->
+      <div class="report-section" id="salesReport">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Sales Report</h2>
+          </div>
+          <div class="card-body">
+            <div class="filters">
+              <div class="date-range">
+                <div class="form-group">
+                  <label for="salesDateFrom">From</label>
+                  <input type="date" id="salesDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="salesDateTo">To</label>
+                  <input type="date" id="salesDateTo" class="form-control">
+                </div>
+              </div>
+              <select id="salesGroupBy" class="form-control">
+                <option value="day">Group by Day</option>
+                <option value="month">Group by Month</option>
+                <option value="year">Group by Year</option>
+              </select>
+              <button class="btn btn-primary" id="generateSalesReport">Generate Report</button>
+            </div>
+
+            <div class="report-summary">
+              <div class="summary-item">
+                <div class="summary-label">Total Orders</div>
+                <div class="summary-value" id="totalOrders">0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Sales</div>
+                <div class="summary-value" id="totalSales">฿0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Discounts</div>
+                <div class="summary-value" id="totalDiscounts">฿0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Tax</div>
+                <div class="summary-value" id="totalTax">฿0.00</div>
+              </div>
+            </div>
+
+            <div class="chart-container" id="salesChart">
+              <!-- Sales chart will be rendered here -->
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="salesReportTable">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>Orders</th>
+                    <th>Sales</th>
+                    <th>Discounts</th>
+                    <th>Tax</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Sales report data will be loaded here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product Sales Report -->
+      <div class="report-section" id="productsReport" style="display: none;">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Product Sales Report</h2>
+          </div>
+          <div class="card-body">
+            <div class="filters">
+              <div class="date-range">
+                <div class="form-group">
+                  <label for="productsDateFrom">From</label>
+                  <input type="date" id="productsDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="productsDateTo">To</label>
+                  <input type="date" id="productsDateTo" class="form-control">
+                </div>
+              </div>
+              <select id="productsCategory" class="form-control">
+                <option value="">All Categories</option>
+                <!-- Categories will be loaded here -->
+              </select>
+              <button class="btn btn-primary" id="generateProductsReport">Generate Report</button>
+            </div>
+
+            <div class="report-summary">
+              <div class="summary-item">
+                <div class="summary-label">Top Product</div>
+                <div class="summary-value" id="topProduct">-</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Qty Sold</div>
+                <div class="summary-value" id="totalQuantity">0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Revenue</div>
+                <div class="summary-value" id="totalRevenue">฿0.00</div>
+              </div>
+            </div>
+
+            <div class="chart-container" id="productsChart">
+              <!-- Products chart will be rendered here -->
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="productsReportTable">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Qty Sold</th>
+                    <th>Revenue</th>
+                    <th>Orders</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Product sales data will be loaded here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inventory Report -->
+      <div class="report-section" id="inventoryReport" style="display: none;">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Inventory Status Report</h2>
+          </div>
+          <div class="card-body">
+            <div class="filters">
+              <select id="inventoryCategory" class="form-control">
+                <option value="">All Categories</option>
+                <!-- Categories will be loaded here -->
+              </select>
+              <select id="inventoryStatus" class="form-control">
+                <option value="all">All Status</option>
+                <option value="low">Low Stock</option>
+                <option value="out">Out of Stock</option>
+              </select>
+              <button class="btn btn-primary" id="generateInventoryReport">Generate Report</button>
+            </div>
+
+            <div class="report-summary">
+              <div class="summary-item">
+                <div class="summary-label">Total Products</div>
+                <div class="summary-value" id="totalProducts">0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Quantity</div>
+                <div class="summary-value" id="inventoryQuantity">0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Inventory Value</div>
+                <div class="summary-value" id="inventoryValue">฿0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Low Stock Items</div>
+                <div class="summary-value" id="lowStockCount">0</div>
+              </div>
+            </div>
+
+            <div class="chart-container" id="inventoryChart">
+              <!-- Inventory chart will be rendered here -->
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="inventoryReportTable">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Quantity</th>
+                    <th>Low Stock Threshold</th>
+                    <th>Unit Cost</th>
+                    <th>Value</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Inventory data will be loaded here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cashier Report -->
+      <div class="report-section" id="cashierReport" style="display: none;">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Cashier Performance Report</h2>
+          </div>
+          <div class="card-body">
+            <div class="filters">
+              <div class="date-range">
+                <div class="form-group">
+                  <label for="cashierDateFrom">From</label>
+                  <input type="date" id="cashierDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="cashierDateTo">To</label>
+                  <input type="date" id="cashierDateTo" class="form-control">
+                </div>
+              </div>
+              <select id="cashierUser" class="form-control">
+                <option value="">All Cashiers</option>
+                <!-- Cashiers will be loaded here -->
+              </select>
+              <button class="btn btn-primary" id="generateCashierReport">Generate Report</button>
+            </div>
+
+            <div class="chart-container" id="cashierChart">
+              <!-- Cashier chart will be rendered here -->
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="cashierReportTable">
+                <thead>
+                  <tr>
+                    <th>Cashier</th>
+                    <th>Orders</th>
+                    <th>Items Sold</th>
+                    <th>Total Sales</th>
+                    <th>Avg Order Value</th>
+                    <th>Cancelled Orders</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Cashier performance data will be loaded here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tax Report -->
+      <div class="report-section" id="taxReport" style="display: none;">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Tax Report</h2>
+          </div>
+          <div class="card-body">
+            <div class="filters">
+              <div class="date-range">
+                <div class="form-group">
+                  <label for="taxDateFrom">From</label>
+                  <input type="date" id="taxDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="taxDateTo">To</label>
+                  <input type="date" id="taxDateTo" class="form-control">
+                </div>
+              </div>
+              <select id="taxPeriod" class="form-control">
+                <option value="daily">Daily</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+              </select>
+              <button class="btn btn-primary" id="generateTaxReport">Generate Report</button>
+            </div>
+
+            <div class="report-summary">
+              <div class="summary-item">
+                <div class="summary-label">Total Sales</div>
+                <div class="summary-value" id="taxableSales">฿0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Total Tax</div>
+                <div class="summary-value" id="taxCollected">฿0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Average Tax Rate</div>
+                <div class="summary-value" id="taxRate">0%</div>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="taxReportTable">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>Taxable Sales</th>
+                    <th>Tax Collected</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Tax data will be loaded here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="notification-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/reports.js"></script>
+</body>
+
+</html>

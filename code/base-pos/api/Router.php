@@ -1,0 +1,192 @@
+<?php
+class Router
+{
+    /**
+     * @var array
+     */
+    private $routes = [];
+    /**
+     * @var mixed
+     */
+    private $user = null;
+
+    public function __construct()
+    {
+        // Get base path
+        $basePath = str_replace($_SERVER['DOCUMENT_ROOT'], '', __DIR__);
+        define('BASE_PATH', $basePath);
+
+        // Check authentication
+        $this->checkAuth();
+    }
+
+    private function checkAuth()
+    {
+        // Public routes - no authentication required
+        $publicRoutes = [
+            'auth/login' => true,
+            'auth/verify' => true
+        ];
+
+        // Get request URI and method
+        $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        if (strpos($requestUri, BASE_PATH) === 0) {
+            $requestUri = substr($requestUri, strlen(BASE_PATH));
+        }
+        $requestUri = str_replace('index.php', '', $requestUri);
+
+        // Parse the URI
+        $uriParts = explode('/', trim($requestUri, '/'));
+        $module = $uriParts[0] ?? '';
+        $action = $uriParts[1] ?? '';
+
+        if (!isset($publicRoutes["$module/$action"])) {
+            $headers = getallheaders();
+            $authHeader = $headers['Authorization'] ?? '';
+
+            if (empty($authHeader) || strpos($authHeader, 'Bearer ') !== 0) {
+                Response::error('Authentication required', 401);
+                exit;
+            }
+
+            $token = substr($authHeader, 7);
+            $decoded = TokenService::validate($token);
+
+            if (!$decoded) {
+                Response::error('Invalid or expired token', 401);
+                exit;
+            }
+
+            // Store user data
+            $this->user = $decoded;
+        }
+    }
+
+    public function registerRoutes()
+    {
+        // Auth routes
+        $this->routes[] = ['route' => 'auth/login', 'controller' => 'AuthController', 'method' => 'login'];
+        $this->routes[] = ['route' => 'auth/verify', 'controller' => 'AuthController', 'method' => 'verify'];
+
+        // Inventory routes
+        $this->routes[] = ['route' => 'inventory/categories', 'controller' => 'InventoryController', 'method' => 'getCategories', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'inventory/categories', 'controller' => 'InventoryController', 'method' => 'createCategory', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'getCategory', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'updateCategory', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'deleteCategory', 'verb' => 'DELETE'];
+
+        // Product routes
+        $this->routes[] = ['route' => 'inventory/products', 'controller' => 'InventoryController', 'method' => 'getProducts', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'inventory/products', 'controller' => 'InventoryController', 'method' => 'createProduct', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'inventory/product', 'controller' => 'InventoryController', 'method' => 'getProduct', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'inventory/product', 'controller' => 'InventoryController', 'method' => 'updateProduct', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'inventory/product', 'controller' => 'InventoryController', 'method' => 'deleteProduct', 'verb' => 'DELETE'];
+        $this->routes[] = ['route' => 'inventory/low-stock', 'controller' => 'InventoryController', 'method' => 'getLowStock', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'inventory/transactions', 'controller' => 'InventoryController', 'method' => 'getTransactions', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'inventory/transactions', 'controller' => 'InventoryController', 'method' => 'createTransaction', 'verb' => 'POST'];
+
+        // Sales routes
+        $this->routes[] = ['route' => 'sales/create', 'controller' => 'SalesController', 'method' => 'createSale', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sales/list', 'controller' => 'SalesController', 'method' => 'getSales', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sales/details', 'controller' => 'SalesController', 'method' => 'getSaleDetails', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sales/void', 'controller' => 'SalesController', 'method' => 'voidSale', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sales/export', 'controller' => 'SalesController', 'method' => 'exportSales', 'verb' => 'GET'];
+
+        // Reports routes
+        $this->routes[] = ['route' => 'reports/dashboard-stats', 'controller' => 'ReportsController', 'method' => 'getDashboardStats', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/sales-chart', 'controller' => 'ReportsController', 'method' => 'getSalesChart', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/recent-sales', 'controller' => 'ReportsController', 'method' => 'getRecentSales', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/sales-report', 'controller' => 'ReportsController', 'method' => 'getSalesReport', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/product-sales', 'controller' => 'ReportsController', 'method' => 'getProductSales', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/inventory-report', 'controller' => 'ReportsController', 'method' => 'getInventoryReport', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/cashier-performance', 'controller' => 'ReportsController', 'method' => 'getCashierPerformance', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/tax-report', 'controller' => 'ReportsController', 'method' => 'getTaxReport', 'verb' => 'GET'];
+
+        // Users routes
+        $this->routes[] = ['route' => 'users/all', 'controller' => 'UsersController', 'method' => 'getAllUsers', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'users', 'controller' => 'UsersController', 'method' => 'createUser', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'users/user', 'controller' => 'UsersController', 'method' => 'getUser', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'users/user', 'controller' => 'UsersController', 'method' => 'updateUser', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'users/user', 'controller' => 'UsersController', 'method' => 'deleteUser', 'verb' => 'DELETE'];
+        $this->routes[] = ['route' => 'users/change-password', 'controller' => 'UsersController', 'method' => 'changePassword', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'users/activity-log', 'controller' => 'UsersController', 'method' => 'getActivityLog', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'users/profile', 'controller' => 'UsersController', 'method' => 'getProfile', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'users/profile', 'controller' => 'UsersController', 'method' => 'updateProfile', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'users/change-own-password', 'controller' => 'UsersController', 'method' => 'changeOwnPassword', 'verb' => 'POST'];
+
+        // Settings routes
+        $this->routes[] = ['route' => 'settings/store', 'controller' => 'SettingsController', 'method' => 'getStoreSettings', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'settings/store', 'controller' => 'SettingsController', 'method' => 'saveStoreSettings', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'settings/system', 'controller' => 'SettingsController', 'method' => 'getSystemSettings', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'settings/system', 'controller' => 'SettingsController', 'method' => 'saveSystemSettings', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'settings/backup/create', 'controller' => 'SettingsController', 'method' => 'createBackup', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'settings/backup/restore', 'controller' => 'SettingsController', 'method' => 'restoreBackup', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'settings/backup/history', 'controller' => 'SettingsController', 'method' => 'getBackupHistory', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'settings/backup/download', 'controller' => 'SettingsController', 'method' => 'downloadBackup', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'settings/backup/delete', 'controller' => 'SettingsController', 'method' => 'deleteBackup', 'verb' => 'POST'];
+
+        // Customers routes
+        $this->routes[] = ['route' => 'customers', 'controller' => 'CustomersController', 'method' => 'getCustomers', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'customers', 'controller' => 'CustomersController', 'method' => 'createCustomer', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'customers/customer', 'controller' => 'CustomersController', 'method' => 'getCustomer', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'customers/customer', 'controller' => 'CustomersController', 'method' => 'updateCustomer', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'customers/customer', 'controller' => 'CustomersController', 'method' => 'deleteCustomer', 'verb' => 'DELETE'];
+    }
+
+    public function dispatch()
+    {
+        // Get request URI and method
+        $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        $requestMethod = $_SERVER['REQUEST_METHOD'];
+        if (strpos($requestUri, BASE_PATH) === 0) {
+            $requestUri = substr($requestUri, strlen(BASE_PATH));
+        }
+        $requestUri = str_replace('index.php', '', $requestUri);
+
+        // Parse the URI
+        $routeKey = trim($requestUri, '/');
+
+        // Find matching route with correct HTTP verb
+        $matchedRoute = null;
+        foreach ($this->routes as $config) {
+            if ($config['route'] === $routeKey &&
+                (!isset($config['verb']) || $config['verb'] === $requestMethod)) {
+                $matchedRoute = $config;
+                break;
+            }
+        }
+
+        if (!$matchedRoute) {
+            Response::error('Endpoint not found or method not allowed', 404);
+            exit;
+        }
+
+        // Get ID from query string or URL path
+        $pathId = $uriParts[2] ?? null;
+        $queryId = isset($_GET['id']) ? $_GET['id'] : null;
+        $id = $pathId ?? $queryId;
+
+        // Convert ID to integer if numeric
+        if ($id !== null && is_numeric($id)) {
+            $id = intval($id);
+        }
+
+        // Instantiate controller and execute method
+        $controllerName = $matchedRoute['controller'];
+        $methodName = $matchedRoute['method'];
+
+        if (!class_exists($controllerName)) {
+            Response::error("Controller not found", 500);
+            exit;
+        }
+
+        $controller = new $controllerName($this->user);
+
+        if (!method_exists($controller, $methodName)) {
+            Response::error("Method not found in controller", 500);
+            exit;
+        }
+
+        $controller->$methodName($id);
+    }
+}

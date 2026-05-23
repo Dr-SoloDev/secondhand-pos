@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sales Management - POS System</title>
+  <link rel="stylesheet" href="../assets/css/fonts.css">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <i class="icon-cart"></i>
+          <span>POS System</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li>
+          <a href="index.html">
+            <i class="icon-dashboard"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="inventory.html">
+            <i class="icon-product"></i>
+            <span>Inventory</span>
+          </a>
+        </li>
+        <li>
+          <a href="../pos/index.html">
+            <i class="icon-cart"></i>
+            <span>POS</span>
+          </a>
+        </li>
+        <li>
+          <a href="sales.html" class="active">
+            <i class="icon-stats"></i>
+            <span>Sales</span>
+          </a>
+        </li>
+        <li>
+          <a href="reports.html">
+            <i class="icon-report"></i>
+            <span>Reports</span>
+          </a>
+        </li>
+        <li>
+          <a href="users.html">
+            <i class="icon-users"></i>
+            <span>Users</span>
+          </a>
+        </li>
+        <li>
+          <a href="settings.html">
+            <i class="icon-settings"></i>
+            <span>Settings</span>
+          </a>
+        </li>
+      </ul>
+    </aside>
+
+    <main class="content-area">
+      <div class="topbar">
+        <button class="toggle-sidebar">
+          <i class="icon-bars"></i>
+        </button>
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar">
+              <i class="icon-user"></i>
+            </div>
+            <span class="user-name">Admin</span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#"><i class="icon-user"></i> Profile</a>
+            <a href="../admin/settings.html"><i class="icon-settings"></i> Settings</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-header">
+        <h1>Sales Management</h1>
+        <div>
+          <button class="btn btn-secondary" id="exportSalesBtn">
+            <i class="icon-download"></i> Export
+          </button>
+          <a href="../pos/index.html" class="btn btn-primary">
+            <i class="icon-additem"></i> New Sale
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Sales List</h2>
+          <div class="card-tools">
+            <input type="text" id="saleSearch" class="form-control" placeholder="Search by reference or customer...">
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="filters">
+            <div class="date-range">
+              <div class="form-group">
+                <label for="dateFrom">From</label>
+                <input type="date" id="dateFrom" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="dateTo">To</label>
+                <input type="date" id="dateTo" class="form-control">
+              </div>
+            </div>
+            <select id="paymentStatusFilter" class="form-control">
+              <option value="">All Status</option>
+              <option value="paid">Paid</option>
+              <option value="partial">Partial</option>
+              <option value="pending">Pending</option>
+              <option value="voided">Voided</option>
+            </select>
+            <select id="paymentMethodFilter" class="form-control">
+              <option value="">All Payment Methods</option>
+              <option value="cash">Cash</option>
+              <option value="card">Credit/Debit Card</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="other">Other</option>
+            </select>
+            <button class="btn btn-primary" id="filterSalesBtn">
+              <i class="icon-search"></i> Filter
+            </button>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table" id="salesTable">
+              <thead>
+                <tr>
+                  <th>Reference #</th>
+                  <th>Date</th>
+                  <th>Customer</th>
+                  <th>Items</th>
+                  <th>Amount</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Sales data will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="salesPagination">
+            <!-- Pagination will be added here -->
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Sale Detail Modal -->
+  <div class="modal" id="saleDetailModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Sale Details</h2>
+        <button class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="sale-header">
+          <div class="sale-info">
+            <p><strong>Reference #:</strong> <span id="saleReference"></span></p>
+            <p><strong>Date:</strong> <span id="saleDate"></span></p>
+            <p><strong>Customer:</strong> <span id="saleCustomer"></span></p>
+            <p><strong>Cashier:</strong> <span id="saleCashier"></span></p>
+          </div>
+          <div class="sale-status">
+            <p><strong>Status:</strong> <span id="saleStatus"></span></p>
+            <p><strong>Payment Method:</strong> <span id="salePaymentMethod"></span></p>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="saleItemsTable">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>SKU</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Discount</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Sale items will be loaded here -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sale-summary">
+          <div class="summary-row">
+            <div class="summary-label">Subtotal</div>
+            <div class="summary-value" id="saleSubtotal">฿0.00</div>
+          </div>
+          <div class="summary-row">
+            <div class="summary-label">Discount</div>
+            <div class="summary-value" id="saleDiscount">฿0.00</div>
+          </div>
+          <div class="summary-row">
+            <div class="summary-label">Tax</div>
+            <div class="summary-value" id="saleTax">฿0.00</div>
+          </div>
+          <div class="summary-row total-row">
+            <div class="summary-label">Total</div>
+            <div class="summary-value" id="saleTotal">฿0.00</div>
+          </div>
+        </div>
+
+        <div class="sale-notes">
+          <p><strong>Notes:</strong></p>
+          <p id="saleNotes">-</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="voidSaleBtn">
+          <i class="icon-ban"></i> Void Sale
+        </button>
+        <button class="btn btn-secondary" id="printReceiptBtn">
+          <i class="icon-print"></i> Print Receipt
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Void Sale Modal -->
+  <div class="modal" id="voidSaleModal">
+    <div class="modal-content modal-sm">
+      <div class="modal-header">
+        <h2>Void Sale</h2>
+        <button class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to void this sale?</p>
+        <p class="text-danger"><strong>Warning:</strong> This action cannot be undone and will return all items to inventory.</p>
+        <input type="hidden" id="voidSaleId">
+        <div class="form-group">
+          <label for="voidReason">Reason for Voiding</label>
+          <textarea id="voidReason" class="form-control" required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancelVoidBtn">Cancel</button>
+        <button class="btn btn-danger" id="confirmVoidBtn">Void Sale</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notification-container"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/sales.js"></script>
+</body>
+
+</html>

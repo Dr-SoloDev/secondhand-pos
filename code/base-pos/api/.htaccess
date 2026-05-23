@@ -1,0 +1,33 @@
+# Enable rewrite engine
+RewriteEngine On
+
+
+# Prevent direct access to PHP files other than index.php
+#RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s([^.]+)\.php [NC]
+#RewriteCond %{REQUEST_URI} !^/index\.php [NC]
+#RewriteRule ^ - [F]
+
+# Deny access to .htaccess file
+<Files .htaccess>
+Order Allow,Deny
+Deny from all
+</Files>
+
+# Deny access to files with sensitive extensions
+<FilesMatch "\.(ini|log|sh|inc|bak)$">
+Order Allow,Deny
+Deny from all
+</FilesMatch>
+
+# Disable directory listing
+#Options -Indexes
+
+# Set default charset
+#AddDefaultCharset UTF-8
+
+# Enable Cross-Origin Resource Sharing (CORS)
+#Header set Access-Control-Allow-Origin "*"
+#Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+#Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+
+RewriteRule .* - [env=HTTP_AUTHORIZATION:%{HTTP:Authorization},last]
