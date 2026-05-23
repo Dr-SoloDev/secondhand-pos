@@ -96,8 +96,8 @@
             <i class="icon-money"></i>
           </div>
           <div class="stat-details">
-            <div class="stat-title">ยอดขายวันนี้</div>
-            <div class="stat-value" id="todaySales">฿0.00</div>
+            <div class="stat-title">ยอดรับซื้อวันนี้</div>
+            <div class="stat-value" id="todayPurchases">฿0.00</div>
           </div>
         </div>
         <div class="stat-card">
@@ -105,17 +105,8 @@
             <i class="icon-cart"></i>
           </div>
           <div class="stat-details">
-            <div class="stat-title">ออเดอร์วันนี้</div>
-            <div class="stat-value" id="todayOrders">0</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">
-            <i class="icon-product"></i>
-          </div>
-          <div class="stat-details">
-            <div class="stat-title">สินค้าใกล้หมด</div>
-            <div class="stat-value" id="lowStockItems">0</div>
+            <div class="stat-title">ใบรับซื้อวันนี้</div>
+            <div class="stat-value" id="todayPO">0</div>
           </div>
         </div>
         <div class="stat-card">
@@ -123,8 +114,17 @@
             <i class="icon-users"></i>
           </div>
           <div class="stat-details">
-            <div class="stat-title">ลูกค้าทั้งหมด</div>
-            <div class="stat-value" id="totalCustomers">0</div>
+            <div class="stat-title">ผู้ขายทั้งหมด</div>
+            <div class="stat-value" id="totalSellers">0</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="icon-product"></i>
+          </div>
+          <div class="stat-details">
+            <div class="stat-title">รอตรวจสอบ</div>
+            <div class="stat-value" id="pendingPO">0</div>
           </div>
         </div>
       </div>
@@ -133,9 +133,9 @@
         <div class="col">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">ภาพรวมยอดขาย</h2>
+              <h2 class="card-title">ภาพรวมการรับซื้อ</h2>
               <div class="card-tools">
-                <select id="salesPeriod">
+                <select id="purchasePeriod">
                   <option value="week">7 วันที่ผ่านมา</option>
                   <option value="month">เดือนนี้</option>
                   <option value="year">ปีนี้</option>
@@ -143,7 +143,7 @@
               </div>
             </div>
             <div class="card-body">
-              <div class="chart-container" id="salesChart">
+              <div class="chart-container" id="purchaseChart">
                 <!-- Chart will be rendered here -->
               </div>
             </div>
@@ -155,24 +155,24 @@
         <div class="col">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">รายการขายล่าสุด</h2>
+              <h2 class="card-title">รายการรับซื้อล่าสุด</h2>
               <a href="sales.html" class="btn btn-sm btn-primary">ดูทั้งหมด</a>
             </div>
             <div class="card-body">
               <div class="table-container">
-                <table class="data-table" id="recentSalesTable">
+                <table class="data-table" id="recentPOTable">
                   <thead>
                     <tr>
-                      <th>เลขที่อ้างอิง</th>
+                      <th>เลขที่ใบรับซื้อ</th>
                       <th>วันที่</th>
-                      <th>ลูกค้า</th>
-                      <th>รายการ</th>
+                      <th>ผู้ขาย</th>
+                      <th>สาขา</th>
                       <th>จำนวนเงิน</th>
                       <th>สถานะ</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <!-- Sales data will be populated here -->
+                    <!-- Purchase data will be populated here -->
                   </tbody>
                 </table>
               </div>

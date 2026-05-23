@@ -96,6 +96,8 @@ class Router
         $this->routes[] = ['route' => 'reports/dashboard-stats', 'controller' => 'ReportsController', 'method' => 'getDashboardStats', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/sales-chart', 'controller' => 'ReportsController', 'method' => 'getSalesChart', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/recent-sales', 'controller' => 'ReportsController', 'method' => 'getRecentSales', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/purchase-chart', 'controller' => 'ReportsController', 'method' => 'getPurchaseChart', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/recent-purchases', 'controller' => 'ReportsController', 'method' => 'getRecentPurchases', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/sales-report', 'controller' => 'ReportsController', 'method' => 'getSalesReport', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/product-sales', 'controller' => 'ReportsController', 'method' => 'getProductSales', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/inventory-report', 'controller' => 'ReportsController', 'method' => 'getInventoryReport', 'verb' => 'GET'];

@@ -1,59 +1,48 @@
 document.addEventListener('DOMContentLoaded', function() {
-  // Fetch dashboard data
   fetchDashboardData();
 
-  // Event listeners for filter changes
-  document.getElementById('salesPeriod').addEventListener('change', function() {
-    fetchSalesChartData(this.value);
+  document.getElementById('purchasePeriod').addEventListener('change', function() {
+    fetchPurchaseChartData(this.value);
   });
 });
 
-// Fetch all dashboard data
 async function fetchDashboardData() {
-  // Fetch summary statistics
   const statsResponse = await apiRequest('reports/dashboard-stats');
   if (statsResponse.status === 'success') {
     updateDashboardStats(statsResponse.data);
   }
 
-  // Fetch sales chart data (default: week)
-  fetchSalesChartData('week');
+  fetchPurchaseChartData('week');
 
-  // Fetch recent sales
-  const salesResponse = await apiRequest('reports/recent-sales');
-  if (salesResponse.status === 'success') {
-    renderRecentSales(salesResponse.data);
+  const purchaseResponse = await apiRequest('reports/recent-purchases');
+  if (purchaseResponse.status === 'success') {
+    renderRecentPurchases(purchaseResponse.data);
   }
 
-  // Fetch low stock items
   const stockResponse = await apiRequest('inventory/low-stock');
   if (stockResponse.status === 'success') {
     renderLowStockItems(stockResponse.data);
   }
 }
 
-// Update dashboard statistics
 function updateDashboardStats(stats) {
-  document.getElementById('todaySales').textContent = formatCurrency(stats.today_sales);
-  document.getElementById('todayOrders').textContent = stats.today_orders;
-  document.getElementById('lowStockItems').textContent = stats.low_stock_count;
-  document.getElementById('totalCustomers').textContent = stats.total_customers;
+  document.getElementById('todayPurchases').textContent = formatCurrency(stats.today_purchases);
+  document.getElementById('todayPO').textContent = stats.today_po_count;
+  document.getElementById('totalSellers').textContent = stats.total_sellers;
+  document.getElementById('pendingPO').textContent = stats.pending_po;
 }
 
-// Fetch sales chart data based on period
-async function fetchSalesChartData(period) {
-  const chartResponse = await apiRequest(`reports/sales-chart?period=${period}`);
+async function fetchPurchaseChartData(period) {
+  const chartResponse = await apiRequest(`reports/purchase-chart?period=${period}`);
   if (chartResponse.status === 'success') {
-    renderSalesChart(chartResponse.data, period);
+    renderPurchaseChart(chartResponse.data, period);
   }
 }
 
-// Render sales chart
-function renderSalesChart(data, period) {
-  const chartContainer = document.getElementById('salesChart');
+function renderPurchaseChart(data, period) {
+  const chartContainer = document.getElementById('purchaseChart');
   const canvas = chartContainer.querySelector('canvas');
 
-  // If canvas already exists, destroy previous chart
   if (canvas) {
     const chartInstance = Chart.getChart(canvas);
     if (chartInstance) {
@@ -61,39 +50,33 @@ function renderSalesChart(data, period) {
     }
   }
 
-  // Create new canvas
   const newCanvas = document.createElement('canvas');
   chartContainer.innerHTML = '';
   chartContainer.appendChild(newCanvas);
 
-  // Format labels based on period
   let labels = data.labels;
   if (period === 'week') {
-    // Convert to day names
     labels = data.labels.map(date => {
-      const day = new Date(date).toLocaleDateString('en-US', {weekday: 'short'});
+      const day = new Date(date).toLocaleDateString('th-TH', {weekday: 'short'});
       return day;
     });
   } else if (period === 'month') {
-    // Use day of month
     labels = data.labels.map(date => {
       return new Date(date).getDate();
     });
   } else if (period === 'year') {
-    // Use month names
     labels = data.labels.map(date => {
-      return new Date(date).toLocaleDateString('en-US', {month: 'short'});
+      return new Date(date).toLocaleDateString('th-TH', {month: 'short'});
     });
   }
 
-  // Create chart
   new Chart(newCanvas, {
     type: 'line',
     data: {
       labels: labels,
       datasets: [{
-        label: 'Sales',
-        data: data.sales,
+        label: 'ยอดรับซื้อ',
+        data: data.purchases,
         backgroundColor: 'rgba(37, 117, 252, 0.1)',
         borderColor: '#2575fc',
         borderWidth: 2,
@@ -118,7 +101,7 @@ function renderSalesChart(data, period) {
         tooltip: {
           callbacks: {
             label: function(context) {
-              return 'Sales: ' + formatCurrency(context.raw);
+              return 'ยอดรับซื้อ: ' + formatCurrency(context.raw);
             }
           }
         }
@@ -127,31 +110,43 @@ function renderSalesChart(data, period) {
   });
 }
 
-// Render recent sales table
-function renderRecentSales(sales) {
-  const tableBody = document.querySelector('#recentSalesTable tbody');
+function renderRecentPurchases(purchases) {
+  const tableBody = document.querySelector('#recentPOTable tbody');
   tableBody.innerHTML = '';
 
-  if (sales.length === 0) {
+  if (purchases.length === 0) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="6" class="text-center">No recent sales found</td>';
+    row.innerHTML = '<td colspan="6" class="text-center">ยังไม่มีรายการรับซื้อ</td>';
     tableBody.appendChild(row);
     return;
   }
 
-  sales.forEach(sale => {
+  purchases.forEach(po => {
     const row = document.createElement('tr');
 
-    const date = new Date(sale.created_at).toLocaleDateString();
-    const time = new Date(sale.created_at).toLocaleTimeString();
+    const date = new Date(po.created_at).toLocaleDateString('th-TH');
+    const time = new Date(po.created_at).toLocaleTimeString('th-TH');
+
+    let badgeClass = 'badge-secondary';
+    let statusText = po.status;
+    if (po.status === 'completed') {
+      badgeClass = 'badge-success';
+      statusText = 'สำเร็จ';
+    } else if (po.status === 'draft') {
+      badgeClass = 'badge-warning';
+      statusText = 'ร่าง';
+    } else if (po.status === 'cancelled') {
+      badgeClass = 'badge-danger';
+      statusText = 'ยกเลิก';
+    }
 
     row.innerHTML = `
-            <td>${sale.reference_no}</td>
+            <td>${po.reference_no}</td>
             <td>${date} ${time}</td>
-            <td>${sale.customer_name || 'Walk-in Customer'}</td>
-            <td>${sale.item_count}</td>
-            <td>${formatCurrency(sale.grand_total)}</td>
-            <td><span class="badge ${sale.payment_status === 'paid' ? 'badge-success' : 'badge-warning'}">${sale.payment_status}</span></td>
+            <td>${po.seller_name || '-'}</td>
+            <td>${po.branch_name || '-'}</td>
+            <td>${formatCurrency(po.total_amount)}</td>
+            <td><span class="badge ${badgeClass}">${statusText}</span></td>
         `;
 
     tableBody.appendChild(row);

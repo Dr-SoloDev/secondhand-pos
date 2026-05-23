@@ -19,6 +19,26 @@ class ReportsController extends Controller
         Response::success('Sales chart data retrieved', $chartData);
     }
 
+    public function getPurchaseChart()
+    {
+        $period = isset($_GET['period']) ? $this->sanitizeInput($_GET['period']) : 'week';
+
+        $reportService = new ReportService();
+        $chartData = $reportService->getPurchaseChartData($period);
+
+        Response::success('Purchase chart data retrieved', $chartData);
+    }
+
+    public function getRecentPurchases()
+    {
+        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+
+        $reportService = new ReportService();
+        $purchases = $reportService->getRecentPurchases($limit);
+
+        Response::success('Recent purchases retrieved', $purchases);
+    }
+
     public function getRecentSales()
     {
         $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;

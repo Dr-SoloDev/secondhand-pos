@@ -13,17 +13,37 @@ class ReportService
 
     public function getDashboardStats()
     {
-        // Today's sales total
-        $todaySales = $this->db->fetchColumn(
-            "SELECT COALESCE(SUM(grand_total), 0) as total
-              FROM sales
+        // Today's purchase total (รับซื้อวันนี้)
+        $todayPurchases = $this->db->fetchColumn(
+            "SELECT COALESCE(SUM(total_amount), 0) as total
+              FROM purchase_orders
               WHERE DATE(created_at) = CURDATE()
-              AND payment_status != 'voided'"
+              AND status != 'cancelled'"
         );
 
-        // Today's orders count
-        $todayOrders = $this->db->fetchColumn(
+        // Today's purchase orders count (ใบรับซื้อวันนี้)
+        $todayPO = $this->db->fetchColumn(
             "SELECT COUNT(*)
+              FROM purchase_orders
+              WHERE DATE(created_at) = CURDATE()
+              AND status != 'cancelled'"
+        );
+
+        // Total sellers (ผู้ขายทั้งหมด)
+        $totalSellers = $this->db->fetchColumn(
+            "SELECT COUNT(*) FROM sellers WHERE is_blacklisted = 0"
+        );
+
+        // Pending purchase orders (ใบรับซื้อรอตรวจสอบ)
+        $pendingPO = $this->db->fetchColumn(
+            "SELECT COUNT(*)
+              FROM purchase_orders
+              WHERE status = 'draft'"
+        );
+
+        // Also keep sales stats for reference
+        $todaySales = $this->db->fetchColumn(
+            "SELECT COALESCE(SUM(grand_total), 0) as total
               FROM sales
               WHERE DATE(created_at) = CURDATE()
               AND payment_status != 'voided'"
@@ -37,16 +57,127 @@ class ReportService
               AND status = 'active'"
         );
 
-        // Total customers
-        $totalCustomers = $this->db->fetchColumn(
-            "SELECT COUNT(*) FROM customers"
+        return [
+            'today_purchases' => floatval($todayPurchases),
+            'today_po_count' => intval($todayPO),
+            'total_sellers' => intval($totalSellers),
+            'pending_po' => intval($pendingPO),
+            'today_sales' => floatval($todaySales),
+            'low_stock_count' => intval($lowStockCount)
+        ];
+    }
+
+    public function getRecentPurchases($limit = 10)
+    {
+        return $this->db->fetchAll(
+            "SELECT
+                po.*,
+                s.full_name as seller_name,
+                u.full_name as user_name,
+                b.name as branch_name
+            FROM purchase_orders po
+            LEFT JOIN sellers s ON po.seller_id = s.id
+            LEFT JOIN users u ON po.user_id = u.id
+            LEFT JOIN branches b ON po.branch_id = b.id
+            ORDER BY po.created_at DESC
+            LIMIT ?",
+            [$limit]
         );
+    }
+
+    public function getPurchaseChartData($period = 'week')
+    {
+        $labels = [];
+        $purchaseData = [];
+
+        switch ($period) {
+            case 'week':
+                $result = $this->db->fetchAll(
+                    "SELECT
+                        DATE(created_at) as po_date,
+                        COALESCE(SUM(total_amount), 0) as total
+                    FROM purchase_orders
+                    WHERE
+                        created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+                        AND status != 'cancelled'
+                    GROUP BY DATE(created_at)
+                    ORDER BY po_date ASC"
+                );
+
+                for ($i = 6; $i >= 0; $i--) {
+                    $date = date('Y-m-d', strtotime("-$i days"));
+                    $labels[] = $date;
+                    $purchaseData[] = 0;
+                }
+
+                foreach ($result as $row) {
+                    $dateIndex = array_search($row['po_date'], $labels);
+                    if ($dateIndex !== false) {
+                        $purchaseData[$dateIndex] = floatval($row['total']);
+                    }
+                }
+                break;
+
+            case 'month':
+                $result = $this->db->fetchAll(
+                    "SELECT
+                        DATE(created_at) as po_date,
+                        COALESCE(SUM(total_amount), 0) as total
+                    FROM purchase_orders
+                    WHERE
+                        MONTH(created_at) = MONTH(CURDATE())
+                        AND YEAR(created_at) = YEAR(CURDATE())
+                        AND status != 'cancelled'
+                    GROUP BY DATE(created_at)
+                    ORDER BY po_date ASC"
+                );
+
+                $daysInMonth = date('t');
+                for ($i = 1; $i <= $daysInMonth; $i++) {
+                    $date = date('Y-m-').sprintf('%02d', $i);
+                    $labels[] = $date;
+                    $purchaseData[] = 0;
+                }
+
+                foreach ($result as $row) {
+                    $dateIndex = array_search($row['po_date'], $labels);
+                    if ($dateIndex !== false) {
+                        $purchaseData[$dateIndex] = floatval($row['total']);
+                    }
+                }
+                break;
+
+            case 'year':
+                $result = $this->db->fetchAll(
+                    "SELECT
+                        DATE_FORMAT(created_at, '%Y-%m-01') as po_month,
+                        COALESCE(SUM(total_amount), 0) as total
+                    FROM purchase_orders
+                    WHERE
+                        YEAR(created_at) = YEAR(CURDATE())
+                        AND status != 'cancelled'
+                    GROUP BY po_month
+                    ORDER BY po_month ASC"
+                );
+
+                for ($i = 1; $i <= 12; $i++) {
+                    $month = date('Y-').sprintf('%02d', $i).'-01';
+                    $labels[] = $month;
+                    $purchaseData[] = 0;
+                }
+
+                foreach ($result as $row) {
+                    $dateIndex = array_search($row['po_month'], $labels);
+                    if ($dateIndex !== false) {
+                        $purchaseData[$dateIndex] = floatval($row['total']);
+                    }
+                }
+                break;
+        }
 
         return [
-            'today_sales' => floatval($todaySales),
-            'today_orders' => intval($todayOrders),
-            'low_stock_count' => intval($lowStockCount),
-            'total_customers' => intval($totalCustomers)
+            'labels' => $labels,
+            'purchases' => $purchaseData
         ];
     }
 
