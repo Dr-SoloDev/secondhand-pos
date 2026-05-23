@@ -16,7 +16,7 @@ if [ -d "$MIGRATIONS_DIR" ]; then
         if [ -f "$migration" ]; then
             filename=$(basename "$migration")
             echo "  → Running: $filename"
-            mysql -uroot -p"$MYSQL_ROOT_PASSWORD" pos_system < "$migration"
+            mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 pos_system < "$migration"
         fi
     done
     echo "  ✅ Migrations เสร็จสมบูรณ์"

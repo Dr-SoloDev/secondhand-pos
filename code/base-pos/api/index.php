@@ -4,7 +4,7 @@ require_once 'config.php';
 require_once 'autoload.php';
 
 // Set content type header
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // Allow CORS
 header('Access-Control-Allow-Origin: *');
