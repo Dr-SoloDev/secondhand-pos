@@ -288,7 +288,7 @@ async function saveProduct() {
     }
 
     if (response.status === 'success') {
-      showNotification(productId ? 'Product updated successfully' : 'Product created successfully', 'success');
+      showNotification(productId ? 'อัปเดตสินค้าสำเร็จ' : 'เพิ่มสินค้าสำเร็จ', 'success');
       hideProductModal();
 
       // Refresh product list
@@ -308,12 +308,12 @@ async function saveProduct() {
 
 // Delete product
 async function deleteProduct(productId) {
-  if (confirm('Are you sure you want to delete this product?')) {
+  if (confirm('แน่ใจหรือไม่ที่จะลบสินค้านี้?')) {
     try {
       const response = await apiRequest(`inventory/product?id=${productId}`, 'DELETE');
 
       if (response.status === 'success') {
-        showNotification('Product deleted successfully', 'success');
+        showNotification('ลบสินค้าสำเร็จ', 'success');
 
         // Refresh product list
         const productResponse = await apiRequest('inventory/products');
@@ -505,7 +505,7 @@ async function saveCategory() {
     }
 
     if (response.status === 'success') {
-      showNotification(categoryId ? 'Category updated successfully' : 'Category created successfully', 'success');
+      showNotification(categoryId ? 'อัปเดตหมวดหมู่สำเร็จ' : 'เพิ่มหมวดหมู่สำเร็จ', 'success');
       resetCategoryForm();
 
       // Refresh category list
@@ -526,12 +526,12 @@ async function saveCategory() {
 
 // Delete category
 async function deleteCategory(categoryId) {
-  if (confirm('Are you sure you want to delete this category?')) {
+  if (confirm('แน่ใจหรือไม่ที่จะลบหมวดหมู่นี้?')) {
     try {
       const response = await apiRequest(`inventory/category?id=${categoryId}`, 'DELETE');
 
       if (response.status === 'success') {
-        showNotification('Category deleted successfully', 'success');
+        showNotification('ลบหมวดหมู่สำเร็จ', 'success');
 
         // Refresh category list
         const categoryResponse = await apiRequest('inventory/categories');

@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       })
       .catch(error => {
-        loginMessage.innerHTML = 'An error occurred. Please try again.';
+        loginMessage.innerHTML = 'เกิดข้อผิดพลาด กรุณาลองอีกครั้ง';
         loginMessage.className = 'login-message error';
         console.error('Login error:', error);
       });
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.href = `${basePath}/pos/index.html`;
         break;
       default:
-        loginMessage.innerHTML = 'Unknown user role';
+        loginMessage.innerHTML = 'บทบาทผู้ใช้ไม่ถูกต้อง';
         loginMessage.className = 'login-message error';
         break;
     }

@@ -275,7 +275,7 @@ async function saveUser() {
       const confirmPassword = document.getElementById('confirmPassword').value;
 
       if (password !== confirmPassword) {
-        showNotification('Passwords do not match', 'error');
+        showNotification('รหัสผ่านไม่ตรงกัน', 'error');
         return;
       }
     }
@@ -305,7 +305,7 @@ async function saveUser() {
     }
 
     if (response.status === 'success') {
-      showNotification(isNewUser ? 'User created successfully' : 'User updated successfully', 'success');
+      showNotification(isNewUser ? 'เพิ่มผู้ใช้สำเร็จ' : 'อัปเดตผู้ใช้สำเร็จ', 'success');
       hideUserModal();
       await loadUsers(); // Reload users
     } else {
@@ -329,15 +329,15 @@ async function deleteUser(userId) {
     }
   }
 
-  if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+  if (confirm('แน่ใจหรือไม่ที่จะลบผู้ใช้นี้?')) {
     try {
       const response = await apiRequest(`users/user?id=${userId}`, 'DELETE');
 
       if (response.status === 'success') {
-        showNotification('User deleted successfully', 'success');
+        showNotification('ลบผู้ใช้สำเร็จ', 'success');
         await loadUsers(); // Reload users
       } else {
-        showNotification(response.message || 'Failed to delete user', 'error');
+        showNotification(response.message || 'ลบผู้ใช้ไม่สำเร็จ', 'error');
       }
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -374,7 +374,7 @@ async function changePassword() {
 
     // Validate passwords match
     if (newPassword !== confirmNewPassword) {
-      showNotification('Passwords do not match', 'error');
+      showNotification('รหัสผ่านไม่ตรงกัน', 'error');
       return;
     }
 
@@ -384,10 +384,10 @@ async function changePassword() {
     });
 
     if (response.status === 'success') {
-      showNotification('Password changed successfully', 'success');
+      showNotification('เปลี่ยนรหัสผ่านสำเร็จ', 'success');
       hidePasswordModal();
     } else {
-      showNotification(response.message || 'Failed to change password', 'error');
+      showNotification(response.message || 'เปลี่ยนรหัสผ่านไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error changing password:', error);

@@ -1,3 +1,4 @@
 // Set base path and API path
-window.basePath = '/pos-system';
-window.apiPath = `${basePath}/api/index.php`;
+// NOTE: Patched for Docker deployment — base-pos is at web root, not /pos-system
+window.basePath = '';
+window.apiPath = `/api/index.php`;

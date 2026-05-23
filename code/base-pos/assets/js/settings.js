@@ -99,9 +99,9 @@ async function saveStoreSettings() {
     const response = await apiRequest('settings/store', 'POST', settingsData);
 
     if (response.status === 'success') {
-      showNotification('Store settings saved successfully', 'success');
+      showNotification('บันทึกข้อมูลร้านค้าสำเร็จ', 'success');
     } else {
-      showNotification(response.message || 'Failed to save store settings', 'error');
+      showNotification(response.message || 'บันทึกข้อมูลร้านค้าไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error saving store settings:', error);
@@ -125,9 +125,9 @@ async function saveSystemSettings() {
     const response = await apiRequest('settings/system', 'POST', settingsData);
 
     if (response.status === 'success') {
-      showNotification('System settings saved successfully', 'success');
+      showNotification('บันทึกค่าระบบสำเร็จ', 'success');
     } else {
-      showNotification(response.message || 'Failed to save system settings', 'error');
+      showNotification(response.message || 'บันทึกค่าระบบไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error saving system settings:', error);
@@ -143,10 +143,10 @@ async function createBackup() {
     const response = await apiRequest('settings/backup/create', 'POST');
 
     if (response.status === 'success') {
-      showNotification('Backup created successfully', 'success');
+      showNotification('สร้างข้อมูลสำรองสำเร็จ', 'success');
       loadBackupHistory();
     } else {
-      showNotification(response.message || 'Failed to create backup', 'error');
+      showNotification(response.message || 'สร้างข้อมูลสำรองไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error creating backup:', error);
@@ -186,7 +186,7 @@ async function restoreBackup() {
     const result = await response.json();
 
     if (result.status === 'success') {
-      showNotification('Backup restored successfully', 'success');
+      showNotification('กู้คืนข้อมูลสำเร็จ', 'success');
       // Hide modal
       document.getElementById('restoreConfirmModal').classList.remove('show');
       // Reset file input
@@ -197,7 +197,7 @@ async function restoreBackup() {
         window.location.reload();
       }, 2000);
     } else {
-      showNotification(result.message || 'Failed to restore backup', 'error');
+      showNotification(result.message || 'กู้คืนข้อมูลไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error restoring backup:', error);
@@ -325,15 +325,15 @@ async function downloadBackup(filename) {
 
 // Delete a backup file
 async function deleteBackup(filename) {
-  if (confirm('Are you sure you want to delete this backup file?')) {
+  if (confirm('แน่ใจหรือไม่ที่จะลบข้อมูลสำรองนี้?')) {
     try {
       const response = await apiRequest('settings/backup/delete', 'POST', {filename});
 
       if (response.status === 'success') {
-        showNotification('Backup deleted successfully', 'success');
+        showNotification('ลบข้อมูลสำรองสำเร็จ', 'success');
         loadBackupHistory();
       } else {
-        showNotification(response.message || 'Failed to delete backup', 'error');
+        showNotification(response.message || 'ลบข้อมูลสำรองไม่สำเร็จ', 'error');
       }
     } catch (error) {
       console.error('Error deleting backup:', error);

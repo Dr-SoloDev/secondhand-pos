@@ -210,7 +210,7 @@ function addToCart(product) {
   // Update UI
   renderCart();
   updateOrderSummary();
-  showNotification(`${product.name} added to cart`, 'success');
+  showNotification(`${product.name} เพิ่มในตะกร้าแล้ว`, 'success');
 }
 
 // Render cart items
@@ -350,7 +350,7 @@ function renderCustomers() {
 // Show payment modal
 function showPaymentModal() {
   if (cart.length === 0) {
-    showNotification('Add items to cart before checkout', 'error');
+    showNotification('กรุณาเพิ่มสินค้าก่อนชำระเงิน', 'error');
     return;
   }
 
@@ -438,7 +438,7 @@ async function processPayment() {
     if (response.status === 'success') {
       hidePaymentModal();
       showReceipt(response.data);
-      showNotification('Payment completed successfully', 'success');
+      showNotification('รายการขายสำเร็จ', 'success');
     } else {
       showNotification(response.message || 'Payment processing failed', 'error');
     }
@@ -535,7 +535,7 @@ function printReceipt() {
       <!DOCTYPE html>
       <html>
       <head>
-          <title>Receipt</title>
+          <title>ใบเสร็จ</title>
           <style>
               body { font-family: 'Courier New', monospace; font-size: 12px; }
               .receipt-header { text-align: center; margin-bottom: 20px; }

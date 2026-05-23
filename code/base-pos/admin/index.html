@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - POS System</title>
+  <title>หน้าหลัก - ระบบขายหน้าร้าน</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
 </head>
@@ -15,20 +15,20 @@
       <div class="sidebar-header">
         <a href="index.html" class="sidebar-brand">
           <i class="icon-cart"></i>
-          <span>POS System</span>
+          <span>ระบบขายหน้าร้าน</span>
         </a>
       </div>
       <ul class="sidebar-menu">
         <li>
           <a href="index.html" class="active">
             <i class="icon-dashboard"></i>
-            <span>Dashboard</span>
+            <span>หน้าหลัก</span>
           </a>
         </li>
         <li>
           <a href="inventory.html">
             <i class="icon-product"></i>
-            <span>Inventory</span>
+            <span>สินค้าคงคลัง</span>
           </a>
         </li>
         <li>
@@ -40,25 +40,25 @@
         <li>
           <a href="sales.html">
             <i class="icon-stats"></i>
-            <span>Sales</span>
+            <span>ประวัติการขาย</span>
           </a>
         </li>
         <li>
           <a href="reports.html">
             <i class="icon-report"></i>
-            <span>Reports</span>
+            <span>รายงาน</span>
           </a>
         </li>
         <li>
           <a href="users.html">
             <i class="icon-users"></i>
-            <span>Users</span>
+            <span>ผู้ใช้งาน</span>
           </a>
         </li>
         <li>
           <a href="settings.html">
             <i class="icon-settings"></i>
-            <span>Settings</span>
+            <span>ตั้งค่า</span>
           </a>
         </li>
       </ul>
@@ -78,16 +78,16 @@
             <i class="icon-down"></i>
           </button>
           <div class="user-dropdown-menu">
-            <a href="#"><i class="icon-user"></i> Profile</a>
-            <a href="../admin/settings.html"><i class="icon-settings"></i> Settings</a>
-            <a href="#" id="logoutBtn"><i class="icon-signout"></i> Logout</a>
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="../admin/settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
           </div>
         </div>
       </div>
 
       <div class="page-header">
-        <h1>Dashboard</h1>
-        <p>Overview of your business performance</p>
+        <h1>หน้าหลัก</h1>
+        <p>ภาพรวมการดำเนินงาน</p>
       </div>
 
       <div class="stats-grid">
@@ -96,7 +96,7 @@
             <i class="icon-money"></i>
           </div>
           <div class="stat-details">
-            <div class="stat-title">Today's Sales</div>
+            <div class="stat-title">ยอดขายวันนี้</div>
             <div class="stat-value" id="todaySales">฿0.00</div>
           </div>
         </div>
@@ -105,7 +105,7 @@
             <i class="icon-cart"></i>
           </div>
           <div class="stat-details">
-            <div class="stat-title">Today's Orders</div>
+            <div class="stat-title">ออเดอร์วันนี้</div>
             <div class="stat-value" id="todayOrders">0</div>
           </div>
         </div>
@@ -114,7 +114,7 @@
             <i class="icon-product"></i>
           </div>
           <div class="stat-details">
-            <div class="stat-title">Low Stock Items</div>
+            <div class="stat-title">สินค้าใกล้หมด</div>
             <div class="stat-value" id="lowStockItems">0</div>
           </div>
         </div>
@@ -123,7 +123,7 @@
             <i class="icon-users"></i>
           </div>
           <div class="stat-details">
-            <div class="stat-title">Total Customers</div>
+            <div class="stat-title">ลูกค้าทั้งหมด</div>
             <div class="stat-value" id="totalCustomers">0</div>
           </div>
         </div>
@@ -133,12 +133,12 @@
         <div class="col">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Sales Overview</h2>
+              <h2 class="card-title">ภาพรวมยอดขาย</h2>
               <div class="card-tools">
                 <select id="salesPeriod">
-                  <option value="week">Last 7 days</option>
-                  <option value="month">This Month</option>
-                  <option value="year">This Year</option>
+                  <option value="week">7 วันที่ผ่านมา</option>
+                  <option value="month">เดือนนี้</option>
+                  <option value="year">ปีนี้</option>
                 </select>
               </div>
             </div>
@@ -155,20 +155,20 @@
         <div class="col">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Recent Sales</h2>
-              <a href="sales.html" class="btn btn-sm btn-primary">View All</a>
+              <h2 class="card-title">รายการขายล่าสุด</h2>
+              <a href="sales.html" class="btn btn-sm btn-primary">ดูทั้งหมด</a>
             </div>
             <div class="card-body">
               <div class="table-container">
                 <table class="data-table" id="recentSalesTable">
                   <thead>
                     <tr>
-                      <th>Reference</th>
-                      <th>Date</th>
-                      <th>Customer</th>
-                      <th>Items</th>
-                      <th>Amount</th>
-                      <th>Status</th>
+                      <th>เลขที่อ้างอิง</th>
+                      <th>วันที่</th>
+                      <th>ลูกค้า</th>
+                      <th>รายการ</th>
+                      <th>จำนวนเงิน</th>
+                      <th>สถานะ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -185,20 +185,20 @@
         <div class="col">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Low Stock Items</h2>
-              <a href="inventory.html" class="btn btn-sm btn-primary">View All</a>
+              <h2 class="card-title">สินค้าใกล้หมด</h2>
+              <a href="inventory.html" class="btn btn-sm btn-primary">ดูทั้งหมด</a>
             </div>
             <div class="card-body">
               <div class="table-container">
                 <table class="data-table" id="lowStockTable">
                   <thead>
                     <tr>
-                      <th>SKU</th>
-                      <th>Product</th>
-                      <th>Category</th>
-                      <th>Current Stock</th>
-                      <th>Threshold</th>
-                      <th>Action</th>
+                      <th>รหัสสินค้า</th>
+                      <th>สินค้า</th>
+                      <th>หมวดหมู่</th>
+                      <th>สต็อกปัจจุบัน</th>
+                      <th>เกณฑ์ขั้นต่ำ</th>
+                      <th>ดำเนินการ</th>
                     </tr>
                   </thead>
                   <tbody>

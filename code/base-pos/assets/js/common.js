@@ -179,17 +179,17 @@ function openProfileModal() {
     profileModal.innerHTML = `
       <div class="modal-content modal-sm">
         <div class="modal-header">
-          <h2>Edit Profile</h2>
+          <h2>แก้ไขโปรไฟล์</h2>
           <button class="close-modal">&times;</button>
         </div>
         <div class="modal-body">
           <form id="profileForm">
             <div class="form-group">
-              <label for="profileUsername">Username</label>
+              <label for="profileUsername">ชื่อผู้ใช้</label>
               <input type="text" id="profileUsername" class="form-control" disabled>
             </div>
             <div class="form-group">
-              <label for="profileFullName">Full Name</label>
+              <label for="profileFullName">ชื่อ-นามสกุล</label>
               <input type="text" id="profileFullName" class="form-control" required>
             </div>
             <div class="form-group">
@@ -197,14 +197,14 @@ function openProfileModal() {
               <input type="email" id="profileEmail" class="form-control" required>
             </div>
             <div class="form-group">
-              <label for="profileRole">Role</label>
+              <label for="profileRole">บทบาท</label>
               <input type="text" id="profileRole" class="form-control" disabled>
             </div>
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" id="cancelProfileBtn">Cancel</button>
-          <button class="btn btn-primary" id="saveProfileBtn">Save Changes</button>
+          <button class="btn btn-secondary" id="cancelProfileBtn">ยกเลิก</button>
+          <button class="btn btn-primary" id="saveProfileBtn">บันทึกการเปลี่ยนแปลง</button>
         </div>
       </div>
     `;
@@ -247,7 +247,7 @@ async function saveProfileChanges() {
     const email = document.getElementById('profileEmail').value;
 
     if (!fullName || !email) {
-      showNotification('Please fill in all required fields', 'error');
+      showNotification('กรุณากรอกข้อมูลให้ครบ', 'error');
       return;
     }
 
@@ -272,13 +272,13 @@ async function saveProfileChanges() {
         }
       }
 
-      showNotification('Profile updated successfully', 'success');
+      showNotification('อัปเดตโปรไฟล์สำเร็จ', 'success');
       document.getElementById('profileModal').classList.remove('show');
     } else {
-      showNotification(response.message || 'Failed to update profile', 'error');
+      showNotification(response.message || 'อัปเดตโปรไฟล์ไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error updating profile:', error);
-    showNotification('Error updating profile: ' + error.message, 'error');
+    showNotification('เกิดข้อผิดพลาด: ' + error.message, 'error');
   }
 }

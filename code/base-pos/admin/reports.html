@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reports - POS System</title>
+  <title>รายงาน - ระบบขายหน้าร้าน</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
 </head>
@@ -15,20 +15,20 @@
       <div class="sidebar-header">
         <a href="index.html" class="sidebar-brand">
           <i class="icon-cart"></i>
-          <span>POS System</span>
+          <span>ระบบขายหน้าร้าน</span>
         </a>
       </div>
       <ul class="sidebar-menu">
         <li>
           <a href="index.html">
             <i class="icon-dashboard"></i>
-            <span>Dashboard</span>
+            <span>หน้าหลัก</span>
           </a>
         </li>
         <li>
           <a href="inventory.html">
             <i class="icon-product"></i>
-            <span>Inventory</span>
+            <span>สินค้าคงคลัง</span>
           </a>
         </li>
         <li>
@@ -40,25 +40,25 @@
         <li>
           <a href="sales.html">
             <i class="icon-stats"></i>
-            <span>Sales</span>
+            <span>ประวัติการขาย</span>
           </a>
         </li>
         <li>
           <a href="reports.html" class="active">
             <i class="icon-report"></i>
-            <span>Reports</span>
+            <span>รายงาน</span>
           </a>
         </li>
         <li>
           <a href="users.html">
             <i class="icon-users"></i>
-            <span>Users</span>
+            <span>ผู้ใช้งาน</span>
           </a>
         </li>
         <li>
           <a href="settings.html">
             <i class="icon-settings"></i>
-            <span>Settings</span>
+            <span>ตั้งค่า</span>
           </a>
         </li>
       </ul>
@@ -78,50 +78,50 @@
             <i class="icon-down"></i>
           </button>
           <div class="user-dropdown-menu">
-            <a href="#"><i class="icon-user"></i> Profile</a>
-            <a href="../admin/settings.html"><i class="icon-settings"></i> Settings</a>
-            <a href="#" id="logoutBtn"><i class="icon-signout"></i> Logout</a>
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="../admin/settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
           </div>
         </div>
       </div>
 
       <div class="page-header">
-        <h1>Reports</h1>
+        <h1>รายงาน</h1>
         <div>
           <button class="btn btn-secondary" id="exportReportBtn">
-            <i class="icon-download"></i> Export
+            <i class="icon-download"></i> ส่งออก
           </button>
           <button class="btn btn-primary" id="printReportBtn">
-            <i class="icon-print"></i> Print
+            <i class="icon-print"></i> พิมพ์
           </button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Report Type</h2>
+          <h2 class="card-title">ประเภทรายงาน</h2>
         </div>
         <div class="card-body">
           <div class="report-types">
             <div class="report-type-item active" data-report="sales">
               <i class="icon-stats"></i>
-              <span>Sales Report</span>
+              <span>รายงานการขาย</span>
             </div>
             <div class="report-type-item" data-report="products">
               <i class="icon-product"></i>
-              <span>Product Sales</span>
+              <span>รายงานสินค้า</span>
             </div>
             <div class="report-type-item" data-report="inventory">
               <i class="icon-product"></i>
-              <span>Inventory Status</span>
+              <span>สถานะสินค้าคงคลัง</span>
             </div>
             <div class="report-type-item" data-report="cashier">
               <i class="icon-user"></i>
-              <span>Cashier Performance</span>
+              <span>ประสิทธิภาพพนักงาน</span>
             </div>
             <div class="report-type-item" data-report="tax">
               <i class="icon-billing"></i>
-              <span>Tax Report</span>
+              <span>รายงานภาษี</span>
             </div>
           </div>
         </div>
@@ -131,43 +131,43 @@
       <div class="report-section" id="salesReport">
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Sales Report</h2>
+            <h2 class="card-title">รายงานการขาย</h2>
           </div>
           <div class="card-body">
             <div class="filters">
               <div class="date-range">
                 <div class="form-group">
-                  <label for="salesDateFrom">From</label>
+                  <label for="salesDateFrom">จากวันที่</label>
                   <input type="date" id="salesDateFrom" class="form-control">
                 </div>
                 <div class="form-group">
-                  <label for="salesDateTo">To</label>
+                  <label for="salesDateTo">ถึงวันที่</label>
                   <input type="date" id="salesDateTo" class="form-control">
                 </div>
               </div>
               <select id="salesGroupBy" class="form-control">
-                <option value="day">Group by Day</option>
-                <option value="month">Group by Month</option>
-                <option value="year">Group by Year</option>
+                <option value="day">รายวัน</option>
+                <option value="month">รายเดือน</option>
+                <option value="year">รายปี</option>
               </select>
-              <button class="btn btn-primary" id="generateSalesReport">Generate Report</button>
+              <button class="btn btn-primary" id="generateSalesReport">สร้างรายงาน</button>
             </div>
 
             <div class="report-summary">
               <div class="summary-item">
-                <div class="summary-label">Total Orders</div>
+                <div class="summary-label">ออเดอร์ทั้งหมด</div>
                 <div class="summary-value" id="totalOrders">0</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Total Sales</div>
+                <div class="summary-label">ยอดขายรวม</div>
                 <div class="summary-value" id="totalSales">฿0.00</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Total Discounts</div>
+                <div class="summary-label">ส่วนลดรวม</div>
                 <div class="summary-value" id="totalDiscounts">฿0.00</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Total Tax</div>
+                <div class="summary-label">ภาษีรวม</div>
                 <div class="summary-value" id="totalTax">฿0.00</div>
               </div>
             </div>
@@ -180,12 +180,12 @@
               <table class="data-table" id="salesReportTable">
                 <thead>
                   <tr>
-                    <th>Period</th>
-                    <th>Orders</th>
-                    <th>Sales</th>
-                    <th>Discounts</th>
-                    <th>Tax</th>
-                    <th>Total</th>
+                    <th>รอบระยะเวลา</th>
+                    <th>ออเดอร์</th>
+                    <th>ยอดขาย</th>
+                    <th>ส่วนลด</th>
+                    <th>ภาษี</th>
+                    <th>รวม</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -201,38 +201,38 @@
       <div class="report-section" id="productsReport" style="display: none;">
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Product Sales Report</h2>
+            <h2 class="card-title">รายงานสินค้า</h2>
           </div>
           <div class="card-body">
             <div class="filters">
               <div class="date-range">
                 <div class="form-group">
-                  <label for="productsDateFrom">From</label>
+                  <label for="productsDateFrom">จากวันที่</label>
                   <input type="date" id="productsDateFrom" class="form-control">
                 </div>
                 <div class="form-group">
-                  <label for="productsDateTo">To</label>
+                  <label for="productsDateTo">ถึงวันที่</label>
                   <input type="date" id="productsDateTo" class="form-control">
                 </div>
               </div>
               <select id="productsCategory" class="form-control">
-                <option value="">All Categories</option>
+                <option value="">ทุกหมวดหมู่</option>
                 <!-- Categories will be loaded here -->
               </select>
-              <button class="btn btn-primary" id="generateProductsReport">Generate Report</button>
+              <button class="btn btn-primary" id="generateProductsReport">สร้างรายงาน</button>
             </div>
 
             <div class="report-summary">
               <div class="summary-item">
-                <div class="summary-label">Top Product</div>
+                <div class="summary-label">สินค้าขายดี</div>
                 <div class="summary-value" id="topProduct">-</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Total Qty Sold</div>
+                <div class="summary-label">จำนวนที่ขายได้</div>
                 <div class="summary-value" id="totalQuantity">0</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Total Revenue</div>
+                <div class="summary-label">รายได้รวม</div>
                 <div class="summary-value" id="totalRevenue">฿0.00</div>
               </div>
             </div>
@@ -245,12 +245,12 @@
               <table class="data-table" id="productsReportTable">
                 <thead>
                   <tr>
-                    <th>SKU</th>
-                    <th>Product</th>
-                    <th>Category</th>
-                    <th>Qty Sold</th>
-                    <th>Revenue</th>
-                    <th>Orders</th>
+                    <th>รหัสสินค้า</th>
+                    <th>สินค้า</th>
+                    <th>หมวดหมู่</th>
+                    <th>จำนวนที่ขาย</th>
+                    <th>รายได้</th>
+                    <th>ออเดอร์</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,37 +266,37 @@
       <div class="report-section" id="inventoryReport" style="display: none;">
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Inventory Status Report</h2>
+            <h2 class="card-title">สถานะสินค้าคงคลัง</h2>
           </div>
           <div class="card-body">
             <div class="filters">
               <select id="inventoryCategory" class="form-control">
-                <option value="">All Categories</option>
+                <option value="">ทุกหมวดหมู่</option>
                 <!-- Categories will be loaded here -->
               </select>
               <select id="inventoryStatus" class="form-control">
-                <option value="all">All Status</option>
-                <option value="low">Low Stock</option>
-                <option value="out">Out of Stock</option>
+                <option value="all">ทุกสถานะ</option>
+                <option value="low">สินค้าใกล้หมด</option>
+                <option value="out">หมดสต็อก</option>
               </select>
-              <button class="btn btn-primary" id="generateInventoryReport">Generate Report</button>
+              <button class="btn btn-primary" id="generateInventoryReport">สร้างรายงาน</button>
             </div>
 
             <div class="report-summary">
               <div class="summary-item">
-                <div class="summary-label">Total Products</div>
+                <div class="summary-label">สินค้าทั้งหมด</div>
                 <div class="summary-value" id="totalProducts">0</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Total Quantity</div>
+                <div class="summary-label">จำนวนรวม</div>
                 <div class="summary-value" id="inventoryQuantity">0</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Inventory Value</div>
+                <div class="summary-label">มูลค่าสินค้าคงคลัง</div>
                 <div class="summary-value" id="inventoryValue">฿0.00</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Low Stock Items</div>
+                <div class="summary-label">สินค้าใกล้หมด</div>
                 <div class="summary-value" id="lowStockCount">0</div>
               </div>
             </div>
@@ -309,14 +309,14 @@
               <table class="data-table" id="inventoryReportTable">
                 <thead>
                   <tr>
-                    <th>SKU</th>
-                    <th>Product</th>
-                    <th>Category</th>
-                    <th>Quantity</th>
-                    <th>Low Stock Threshold</th>
-                    <th>Unit Cost</th>
-                    <th>Value</th>
-                    <th>Status</th>
+                    <th>รหัสสินค้า</th>
+                    <th>สินค้า</th>
+                    <th>หมวดหมู่</th>
+                    <th>จำนวน</th>
+                    <th>เกณฑ์สต็อกขั้นต่ำ</th>
+                    <th>ราคาทุนต่อหน่วย</th>
+                    <th>มูลค่า</th>
+                    <th>สถานะ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -332,25 +332,25 @@
       <div class="report-section" id="cashierReport" style="display: none;">
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Cashier Performance Report</h2>
+            <h2 class="card-title">ประสิทธิภาพพนักงาน</h2>
           </div>
           <div class="card-body">
             <div class="filters">
               <div class="date-range">
                 <div class="form-group">
-                  <label for="cashierDateFrom">From</label>
+                  <label for="cashierDateFrom">จากวันที่</label>
                   <input type="date" id="cashierDateFrom" class="form-control">
                 </div>
                 <div class="form-group">
-                  <label for="cashierDateTo">To</label>
+                  <label for="cashierDateTo">ถึงวันที่</label>
                   <input type="date" id="cashierDateTo" class="form-control">
                 </div>
               </div>
               <select id="cashierUser" class="form-control">
-                <option value="">All Cashiers</option>
+                <option value="">พนักงานทั้งหมด</option>
                 <!-- Cashiers will be loaded here -->
               </select>
-              <button class="btn btn-primary" id="generateCashierReport">Generate Report</button>
+              <button class="btn btn-primary" id="generateCashierReport">สร้างรายงาน</button>
             </div>
 
             <div class="chart-container" id="cashierChart">
@@ -361,12 +361,12 @@
               <table class="data-table" id="cashierReportTable">
                 <thead>
                   <tr>
-                    <th>Cashier</th>
-                    <th>Orders</th>
-                    <th>Items Sold</th>
-                    <th>Total Sales</th>
-                    <th>Avg Order Value</th>
-                    <th>Cancelled Orders</th>
+                    <th>พนักงานขาย</th>
+                    <th>ออเดอร์</th>
+                    <th>สินค้าที่ขาย</th>
+                    <th>ยอดขายรวม</th>
+                    <th>มูลค่าออเดอร์เฉลี่ย</th>
+                    <th>ออเดอร์ที่ยกเลิก</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -382,39 +382,39 @@
       <div class="report-section" id="taxReport" style="display: none;">
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Tax Report</h2>
+            <h2 class="card-title">รายงานภาษี</h2>
           </div>
           <div class="card-body">
             <div class="filters">
               <div class="date-range">
                 <div class="form-group">
-                  <label for="taxDateFrom">From</label>
+                  <label for="taxDateFrom">จากวันที่</label>
                   <input type="date" id="taxDateFrom" class="form-control">
                 </div>
                 <div class="form-group">
-                  <label for="taxDateTo">To</label>
+                  <label for="taxDateTo">ถึงวันที่</label>
                   <input type="date" id="taxDateTo" class="form-control">
                 </div>
               </div>
               <select id="taxPeriod" class="form-control">
-                <option value="daily">Daily</option>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
+                <option value="daily">รายวัน</option>
+                <option value="monthly">รายเดือน</option>
+                <option value="quarterly">รายไตรมาส</option>
               </select>
-              <button class="btn btn-primary" id="generateTaxReport">Generate Report</button>
+              <button class="btn btn-primary" id="generateTaxReport">สร้างรายงาน</button>
             </div>
 
             <div class="report-summary">
               <div class="summary-item">
-                <div class="summary-label">Total Sales</div>
+                <div class="summary-label">ยอดขายรวม</div>
                 <div class="summary-value" id="taxableSales">฿0.00</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Total Tax</div>
+                <div class="summary-label">ภาษีรวม</div>
                 <div class="summary-value" id="taxCollected">฿0.00</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Average Tax Rate</div>
+                <div class="summary-label">อัตราภาษีเฉลี่ย</div>
                 <div class="summary-value" id="taxRate">0%</div>
               </div>
             </div>
@@ -423,10 +423,10 @@
               <table class="data-table" id="taxReportTable">
                 <thead>
                   <tr>
-                    <th>Period</th>
-                    <th>Taxable Sales</th>
-                    <th>Tax Collected</th>
-                    <th>Total</th>
+                    <th>รอบระยะเวลา</th>
+                    <th>ยอดขายที่ต้องเสียภาษี</th>
+                    <th>ภาษีที่เก็บ</th>
+                    <th>รวม</th>
                   </tr>
                 </thead>
                 <tbody>

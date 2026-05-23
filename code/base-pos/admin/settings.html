@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings - POS System</title>
+  <title>ตั้งค่า - ระบบขายหน้าร้าน</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
 </head>
@@ -15,20 +15,20 @@
       <div class="sidebar-header">
         <a href="index.html" class="sidebar-brand">
           <i class="icon-cart"></i>
-          <span>POS System</span>
+          <span>ระบบขายหน้าร้าน</span>
         </a>
       </div>
       <ul class="sidebar-menu">
         <li>
           <a href="index.html">
             <i class="icon-dashboard"></i>
-            <span>Dashboard</span>
+            <span>หน้าหลัก</span>
           </a>
         </li>
         <li>
           <a href="inventory.html">
             <i class="icon-product"></i>
-            <span>Inventory</span>
+            <span>สินค้าคงคลัง</span>
           </a>
         </li>
         <li>
@@ -40,25 +40,25 @@
         <li>
           <a href="sales.html">
             <i class="icon-stats"></i>
-            <span>Sales</span>
+            <span>ประวัติการขาย</span>
           </a>
         </li>
         <li>
           <a href="reports.html">
             <i class="icon-report"></i>
-            <span>Reports</span>
+            <span>รายงาน</span>
           </a>
         </li>
         <li>
           <a href="users.html">
             <i class="icon-users"></i>
-            <span>Users</span>
+            <span>ผู้ใช้งาน</span>
           </a>
         </li>
         <li>
           <a href="settings.html" class="active">
             <i class="icon-settings"></i>
-            <span>Settings</span>
+            <span>ตั้งค่า</span>
           </a>
         </li>
       </ul>
@@ -78,56 +78,56 @@
             <i class="icon-down"></i>
           </button>
           <div class="user-dropdown-menu">
-            <a href="#"><i class="icon-user"></i> Profile</a>
-            <a href="../admin/settings.html"><i class="icon-settings"></i> Settings</a>
-            <a href="#" id="logoutBtn"><i class="icon-signout"></i> Logout</a>
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="../admin/settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
           </div>
         </div>
       </div>
 
       <div class="page-header">
-        <h1>System Settings</h1>
-        <p>Configure your POS system settings</p>
+        <h1>ตั้งค่าระบบ</h1>
+        <p>กำหนดค่าระบบ POS</p>
       </div>
 
       <div class="row">
         <div class="col">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Store Information</h2>
+              <h2 class="card-title">ข้อมูลร้านค้า</h2>
             </div>
             <div class="card-body">
               <form id="storeSettingsForm">
                 <div class="form-row">
                   <div class="form-col">
-                    <label for="storeName">Store Name</label>
-                    <input type="text" id="storeName" name="store_name" class="form-control" placeholder="Your Store Name">
+                    <label for="storeName">ชื่อร้าน</label>
+                    <input type="text" id="storeName" name="store_name" class="form-control" placeholder="ชื่อร้านค้า">
                   </div>
                   <div class="form-col">
-                    <label for="storePhone">Store Phone</label>
+                    <label for="storePhone">เบอร์โทรร้าน</label>
                     <input type="text" id="storePhone" name="store_phone" class="form-control" placeholder="+1 (123) 456-7890">
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="storeAddress">Store Address</label>
-                  <textarea id="storeAddress" name="store_address" class="form-control" placeholder="123 Main St, City, Country"></textarea>
+                  <label for="storeAddress">ที่อยู่ร้าน</label>
+                  <textarea id="storeAddress" name="store_address" class="form-control" placeholder="123 ถนนหลัก, เมือง, ประเทศ"></textarea>
                 </div>
                 <div class="form-row">
                   <div class="form-col">
-                    <label for="taxRate">Default Tax Rate (%)</label>
+                    <label for="taxRate">อัตราภาษีเริ่มต้น (%)</label>
                     <input type="number" id="taxRate" name="tax_rate" class="form-control" min="0" max="100" step="0.01" placeholder="7.00">
                   </div>
                   <div class="form-col">
-                    <label for="currencySymbol">Currency Symbol</label>
+                    <label for="currencySymbol">สัญลักษณ์สกุลเงิน</label>
                     <input type="text" id="currencySymbol" name="currency_symbol" class="form-control" placeholder="฿">
                   </div>
                 </div>
                 <div class="form-group">
-                  <label for="receiptFooter">Receipt Footer</label>
-                  <textarea id="receiptFooter" name="receipt_footer" class="form-control" placeholder="Thank you for shopping with us!"></textarea>
+                  <label for="receiptFooter">ข้อความท้ายใบเสร็จ</label>
+                  <textarea id="receiptFooter" name="receipt_footer" class="form-control" placeholder="ขอบคุณที่ใช้บริการ!"></textarea>
                 </div>
                 <div class="form-actions">
-                  <button type="submit" class="btn btn-primary" id="saveStoreSettings">Save Changes</button>
+                  <button type="submit" class="btn btn-primary" id="saveStoreSettings">บันทึกการเปลี่ยนแปลง</button>
                 </div>
               </form>
             </div>
@@ -139,17 +139,17 @@
         <div class="col">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">System Configuration</h2>
+              <h2 class="card-title">ค่าระบบ</h2>
             </div>
             <div class="card-body">
               <form id="systemSettingsForm">
                 <div class="form-row">
                   <div class="form-col">
-                    <label for="lowStockThreshold">Default Low Stock Threshold</label>
+                    <label for="lowStockThreshold">เกณฑ์สต็อกขั้นต่ำเริ่มต้น</label>
                     <input type="number" id="lowStockThreshold" name="low_stock_threshold" class="form-control" min="0" placeholder="10">
                   </div>
                   <div class="form-col">
-                    <label for="dateFormat">Date Format</label>
+                    <label for="dateFormat">รูปแบบวันที่</label>
                     <select id="dateFormat" name="date_format" class="form-control">
                       <option value="Y-m-d">YYYY-MM-DD</option>
                       <option value="d/m/Y">DD/MM/YYYY</option>
@@ -161,7 +161,7 @@
                 </div>
                 <div class="form-row">
                   <div class="form-col">
-                    <label for="timeZone">Time Zone</label>
+                    <label for="timeZone">เขตเวลา</label>
                     <select id="timeZone" name="time_zone" class="form-control">
                       <option value="Asia/Bangkok">Asia/Bangkok</option>
                       <option value="America/New_York">America/New_York</option>
@@ -172,7 +172,7 @@
                     </select>
                   </div>
                   <div class="form-col">
-                    <label for="language">Default Language</label>
+                    <label for="language">ภาษาเริ่มต้น</label>
                     <select id="language" name="language" class="form-control">
                       <option value="en">English</option>
                       <option value="th">Thai</option>
@@ -184,7 +184,7 @@
                   </div>
                 </div>
                 <div class="form-actions">
-                  <button type="submit" class="btn btn-primary" id="saveSystemSettings">Save Changes</button>
+                  <button type="submit" class="btn btn-primary" id="saveSystemSettings">บันทึกการเปลี่ยนแปลง</button>
                 </div>
               </form>
             </div>
@@ -196,26 +196,26 @@
         <div class="col">
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Database Backup</h2>
+              <h2 class="card-title">สำรองข้อมูลฐานข้อมูล</h2>
             </div>
             <div class="card-body">
               <div class="backup-actions">
                 <button class="btn btn-primary" id="createBackup">
-                  <i class="icon-download"></i> Create Backup
+                  <i class="icon-download"></i> สร้างข้อมูลสำรอง
                 </button>
                 <button class="btn btn-secondary" id="restoreBackup">
-                  <i class="icon-upload"></i> Restore Backup
+                  <i class="icon-upload"></i> กู้คืนข้อมูล
                 </button>
               </div>
               <div class="backup-history">
-                <h3>Recent Backups</h3>
+                <h3>ข้อมูลสำรองล่าสุด</h3>
                 <table class="data-table" id="backupsTable">
                   <thead>
                     <tr>
-                      <th>Filename</th>
-                      <th>Date Created</th>
-                      <th>Size</th>
-                      <th>Actions</th>
+                      <th>ชื่อไฟล์</th>
+                      <th>วันที่สร้าง</th>
+                      <th>ขนาด</th>
+                      <th>จัดการ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -239,16 +239,16 @@
   <div class="modal" id="restoreConfirmModal">
     <div class="modal-content modal-sm">
       <div class="modal-header">
-        <h2>Confirm Restore</h2>
+        <h2>ยืนยันการกู้คืน</h2>
         <button class="close-modal">&times;</button>
       </div>
       <div class="modal-body">
-        <p>Are you sure you want to restore the database from this backup?</p>
-        <p class="text-danger"><strong>Warning:</strong> This will replace your current data and cannot be undone.</p>
+        <p>แน่ใจหรือไม่ที่จะกู้คืนฐานข้อมูลจากไฟล์สำรองนี้?</p>
+        <p class="text-danger"><strong>คำเตือน:</strong> การดำเนินการนี้จะแทนที่ข้อมูลปัจจุบันและไม่สามารถยกเลิกได้</p>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelRestore">Cancel</button>
-        <button class="btn btn-danger" id="confirmRestore">Yes, Restore</button>
+        <button class="btn btn-secondary" id="cancelRestore">ยกเลิก</button>
+        <button class="btn btn-danger" id="confirmRestore">ใช่, กู้คืน</button>
       </div>
     </div>
   </div>

@@ -104,7 +104,7 @@ function renderSalesTable(sales) {
 
   if (sales.length === 0) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="8" class="text-center">No sales found</td>';
+    row.innerHTML = '<td colspan="8" class="text-center">ไม่พบรายการขาย</td>';
     tableBody.appendChild(row);
     return;
   }
@@ -336,19 +336,19 @@ async function voidSale() {
     const reason = document.getElementById('voidReason').value.trim();
 
     if (!reason) {
-      showNotification('Please provide a reason for voiding this sale', 'error');
+      showNotification('กรุณาระบุเหตุผลในการยกเลิก', 'error');
       return;
     }
 
     const response = await apiRequest(`sales/void?id=${saleId}`, 'POST', {reason});
 
     if (response.status === 'success') {
-      showNotification('Sale voided successfully', 'success');
+      showNotification('ยกเลิกรายการขายสำเร็จ', 'success');
       hideVoidSaleModal();
       document.getElementById('saleDetailModal').classList.remove('show');
       loadSales(); // Reload sales table
     } else {
-      showNotification(response.message || 'Failed to void sale', 'error');
+      showNotification(response.message || 'ยกเลิกรายการขายไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error voiding sale:', error);
@@ -434,7 +434,7 @@ function exportSales() {
           document.body.removeChild(link);
 
           // แสดง notification เมื่อสำเร็จ
-          showNotification('Sales data exported successfully', 'success');
+          showNotification('ส่งออกรายการขายสำเร็จ', 'success');
         } else {
           showNotification(response.message || 'Failed to retrieve sales data', 'error');
         }

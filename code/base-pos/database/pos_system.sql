@@ -144,17 +144,17 @@ CREATE TABLE IF NOT EXISTS backup_history (
     created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
--- Insert admin user with password 'admin123'
+-- Insert admin user with password 'admin'
 INSERT INTO users (username, password, full_name, email, role)
-VALUES ('admin', '$2y$10$8zUlMG4AyOiHQbJpUJHznuVwjBEqQnHhE9HHvgKqk8vGdHJCIjlAa', 'Administrator', 'admin@example.com', 'admin');
+VALUES ('admin', '$2y$10$Ze69xx0dmcFDLZlBlIah6.oZtEl6g6Cme5i2/o8O1VP0Obj3Ya0Gy', 'Administrator', 'admin@example.com', 'admin');
 
 -- Insert categories
 INSERT INTO categories (name, description) VALUES
-('Beverages', 'Drinks, coffee, tea, and other beverages'),
-('Snacks', 'Chips, candies, and other snack items'),
-('Fresh Produce', 'Fruits, vegetables, and other fresh items'),
-('Bakery', 'Bread, cakes, and other baked goods'),
-('Dairy', 'Milk, cheese, and other dairy products');
+('เครื่องดื่ม', 'น้ำดื่ม, น้ำอัดลม, ชา กาแฟ'),
+('ขนมขบเคี้ยว', 'มันฝรั่งทอด, ขนมขบเคี้ยวต่างๆ'),
+('ผลไม้สด', 'ผลไม้ตามฤดูกาล'),
+('เบเกอรี่', 'ขนมปัง, เค้ก'),
+('ผลิตภัณฑ์นม', 'นม, ชีส, ผลิตภัณฑ์จากนม');
 
 -- Insert products
 INSERT INTO products (sku, barcode, name, description, category_id, price, cost, quantity, low_stock_threshold) VALUES
@@ -182,11 +182,11 @@ INSERT INTO suppliers (name, contact_person, email, phone, address) VALUES
 
 -- Insert settings
 INSERT INTO settings (setting_key, setting_value) VALUES
-('store_name', 'My POS Store'),
-('store_address', '123 Shop Street, Bangkok 10300'),
+('store_name', 'ร้านรับซื้อของเก่า สุริยะช้อป'),
+('store_address', 'จ.สุรินทร์'),
 ('store_phone', '0299887766'),
-('store_email', 'contact@myposstore.com'),
+('store_email', 'contact@suriyashop.com'),
 ('tax_percentage', '7'),
-('receipt_footer', 'Thank you for shopping with us!'),
+('receipt_footer', 'ขอบคุณที่มาใช้บริการครับ'),
 ('currency_symbol', '฿'),
 ('currency_code', 'THB');

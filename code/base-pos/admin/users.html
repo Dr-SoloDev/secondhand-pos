@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Management - POS System</title>
+  <title>จัดการผู้ใช้งาน - ระบบขายหน้าร้าน</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
 </head>
@@ -15,20 +15,20 @@
       <div class="sidebar-header">
         <a href="index.html" class="sidebar-brand">
           <i class="icon-cart"></i>
-          <span>POS System</span>
+          <span>ระบบขายหน้าร้าน</span>
         </a>
       </div>
       <ul class="sidebar-menu">
         <li>
           <a href="index.html">
             <i class="icon-dashboard"></i>
-            <span>Dashboard</span>
+            <span>หน้าหลัก</span>
           </a>
         </li>
         <li>
           <a href="inventory.html">
             <i class="icon-product"></i>
-            <span>Inventory</span>
+            <span>สินค้าคงคลัง</span>
           </a>
         </li>
         <li>
@@ -40,25 +40,25 @@
         <li>
           <a href="sales.html">
             <i class="icon-stats"></i>
-            <span>Sales</span>
+            <span>ประวัติการขาย</span>
           </a>
         </li>
         <li>
           <a href="reports.html">
             <i class="icon-report"></i>
-            <span>Reports</span>
+            <span>รายงาน</span>
           </a>
         </li>
         <li>
           <a href="users.html" class="active">
             <i class="icon-users"></i>
-            <span>Users</span>
+            <span>ผู้ใช้งาน</span>
           </a>
         </li>
         <li>
           <a href="settings.html">
             <i class="icon-settings"></i>
-            <span>Settings</span>
+            <span>ตั้งค่า</span>
           </a>
         </li>
       </ul>
@@ -78,39 +78,39 @@
             <i class="icon-down"></i>
           </button>
           <div class="user-dropdown-menu">
-            <a href="#"><i class="icon-user"></i> Profile</a>
-            <a href="../admin/settings.html"><i class="icon-settings"></i> Settings</a>
-            <a href="#" id="logoutBtn"><i class="icon-signout"></i> Logout</a>
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="../admin/settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
           </div>
         </div>
       </div>
 
       <div class="page-header">
-        <h1>User Management</h1>
+        <h1>จัดการผู้ใช้งาน</h1>
         <button class="btn btn-primary" id="addUserBtn">
-          <i class="icon-additem"></i> Add User
+          <i class="icon-additem"></i> เพิ่มผู้ใช้งาน
         </button>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Users List</h2>
+          <h2 class="card-title">รายชื่อผู้ใช้</h2>
           <div class="card-tools">
-            <input type="text" id="userSearch" class="form-control" placeholder="Search users...">
+            <input type="text" id="userSearch" class="form-control" placeholder="ค้นหาผู้ใช้...">
           </div>
         </div>
         <div class="card-body">
           <div class="filters">
             <select id="roleFilter" class="form-control">
-              <option value="">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
-              <option value="cashier">Cashier</option>
+              <option value="">ทุกบทบาท</option>
+              <option value="admin">ผู้ดูแลระบบ</option>
+              <option value="manager">ผู้จัดการ</option>
+              <option value="cashier">พนักงานขาย</option>
             </select>
             <select id="statusFilter" class="form-control">
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="">ทุกสถานะ</option>
+              <option value="active">เปิดใช้งาน</option>
+              <option value="inactive">ปิดใช้งาน</option>
             </select>
           </div>
 
@@ -118,13 +118,13 @@
             <table class="data-table" id="usersTable">
               <thead>
                 <tr>
-                  <th>Username</th>
-                  <th>Full Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Last Login</th>
-                  <th>Actions</th>
+                  <th>ชื่อผู้ใช้</th>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>อีเมล</th>
+                  <th>บทบาท</th>
+                  <th>สถานะ</th>
+                  <th>เข้าใช้ล่าสุด</th>
+                  <th>จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -137,10 +137,10 @@
 
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">User Activity Log</h2>
+          <h2 class="card-title">บันทึกการใช้งาน</h2>
           <div class="card-tools">
             <select id="userActivityFilter" class="form-control">
-              <option value="">All Users</option>
+              <option value="">ผู้ใช้ทั้งหมด</option>
               <!-- Users will be loaded here -->
             </select>
           </div>
@@ -150,11 +150,11 @@
             <table class="data-table" id="activityLogTable">
               <thead>
                 <tr>
-                  <th>User</th>
-                  <th>Action</th>
-                  <th>Description</th>
-                  <th>IP Address</th>
-                  <th>Date/Time</th>
+                  <th>ผู้ใช้</th>
+                  <th>การกระทำ</th>
+                  <th>รายละเอียด</th>
+                  <th>ที่อยู่ IP</th>
+                  <th>วันที่/เวลา</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,7 +174,7 @@
   <div class="modal" id="userModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 id="userModalTitle">Add User</h2>
+        <h2 id="userModalTitle">เพิ่มผู้ใช้</h2>
         <button class="close-modal">&times;</button>
       </div>
       <div class="modal-body">
@@ -182,55 +182,55 @@
           <input type="hidden" id="userId">
           <div class="form-row">
             <div class="form-col">
-              <label for="username">Username*</label>
+              <label for="username">ชื่อผู้ใช้*</label>
               <input type="text" id="username" class="form-control" required>
-              <div class="form-hint">Username cannot be changed later</div>
+              <div class="form-hint">ชื่อผู้ใช้ไม่สามารถเปลี่ยนได้ภายหลัง</div>
             </div>
             <div class="form-col">
-              <label for="email">Email*</label>
+              <label for="email">อีเมล*</label>
               <input type="email" id="email" class="form-control" required>
             </div>
           </div>
           <div class="form-row">
             <div class="form-col">
-              <label for="fullName">Full Name*</label>
+              <label for="fullName">ชื่อ-นามสกุล*</label>
               <input type="text" id="fullName" class="form-control" required>
             </div>
             <div class="form-col">
-              <label for="role">Role*</label>
+              <label for="role">บทบาท*</label>
               <select id="role" class="form-control" required>
-                <option value="">Select Role</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="cashier">Cashier</option>
+                <option value="">เลือกบทบาท</option>
+                <option value="admin">ผู้ดูแลระบบ</option>
+                <option value="manager">ผู้จัดการ</option>
+                <option value="cashier">พนักงานขาย</option>
               </select>
             </div>
           </div>
           <div class="form-row password-fields">
             <div class="form-col">
-              <label for="password">Password*</label>
+              <label for="password">รหัสผ่าน*</label>
               <input type="password" id="password" class="form-control">
-              <div class="form-hint">Leave empty to keep current password</div>
+              <div class="form-hint">เว้นว่างไว้หากไม่ต้องการเปลี่ยน</div>
             </div>
             <div class="form-col">
-              <label for="confirmPassword">Confirm Password*</label>
+              <label for="confirmPassword">ยืนยันรหัสผ่าน*</label>
               <input type="password" id="confirmPassword" class="form-control">
             </div>
           </div>
           <div class="form-row">
             <div class="form-col">
-              <label for="status">Status</label>
+              <label for="status">สถานะ</label>
               <select id="status" class="form-control">
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="active">เปิดใช้งาน</option>
+                <option value="inactive">ปิดใช้งาน</option>
               </select>
             </div>
           </div>
         </form>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelUser">Cancel</button>
-        <button class="btn btn-primary" id="saveUser">Save User</button>
+        <button class="btn btn-secondary" id="cancelUser">ยกเลิก</button>
+        <button class="btn btn-primary" id="saveUser">บันทึกผู้ใช้</button>
       </div>
     </div>
   </div>
@@ -239,25 +239,25 @@
   <div class="modal" id="passwordModal">
     <div class="modal-content modal-sm">
       <div class="modal-header">
-        <h2>Change Password</h2>
+        <h2>เปลี่ยนรหัสผ่าน</h2>
         <button class="close-modal">&times;</button>
       </div>
       <div class="modal-body">
         <form id="passwordForm">
           <input type="hidden" id="passwordUserId">
           <div class="form-group">
-            <label for="newPassword">New Password*</label>
+            <label for="newPassword">รหัสผ่านใหม่*</label>
             <input type="password" id="newPassword" class="form-control" required>
           </div>
           <div class="form-group">
-            <label for="confirmNewPassword">Confirm New Password*</label>
+            <label for="confirmNewPassword">ยืนยันรหัสผ่านใหม่*</label>
             <input type="password" id="confirmNewPassword" class="form-control" required>
           </div>
         </form>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelPassword">Cancel</button>
-        <button class="btn btn-primary" id="savePassword">Change Password</button>
+        <button class="btn btn-secondary" id="cancelPassword">ยกเลิก</button>
+        <button class="btn btn-primary" id="savePassword">เปลี่ยนรหัสผ่าน</button>
       </div>
     </div>
   </div>

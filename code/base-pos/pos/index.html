@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Point of Sale - POS System</title>
+  <title>จุดขายหน้าร้าน - ระบบขายหน้าร้าน</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
 </head>
@@ -14,7 +14,7 @@
     <div>
       <div class="topbar">
         <div class="pos-header">
-          <h1><i class="icon-cart"></i> Point of Sale</h1>
+          <h1><i class="icon-cart"></i> จุดขายหน้าร้าน</h1>
         </div>
         <div class="user-dropdown">
           <button class="user-dropdown-toggle">
@@ -25,8 +25,8 @@
             <i class="icon-down"></i>
           </button>
           <div class="user-dropdown-menu">
-            <a href="../admin/index.html"><i class="icon-dashboard"></i> Dashboard</a>
-            <a href="#" id="logoutBtn"><i class="icon-signout"></i> Logout</a>
+            <a href="../admin/index.html"><i class="icon-dashboard"></i> หน้าหลัก</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
           </div>
         </div>
       </div>
@@ -34,14 +34,14 @@
     <div class="pos-container">
       <div class="pos-products">
         <div class="search-bar">
-          <input type="text" id="productSearch" class="form-control" placeholder="Search products...">
+          <input type="text" id="productSearch" class="form-control" placeholder="ค้นหาสินค้าด้วยชื่อ, รหัส หรือบาร์โค้ด...">
           <button class="btn" id="scanBarcode">
             <i class="icon-barcode"></i> Scan
           </button>
         </div>
 
         <div class="category-filter">
-          <button class="btn btn-sm active" data-category="all">All</button>
+          <button class="btn btn-sm active" data-category="all">ทั้งหมด</button>
           <!-- Categories will be added here -->
         </div>
 
@@ -52,10 +52,10 @@
 
       <div class="pos-order">
         <div class="order-header">
-          <h2 class="order-title">Current Order</h2>
+          <h2 class="order-title">ออเดอร์ปัจจุบัน</h2>
           <div class="order-info">
             <select id="customerSelect" class="form-control">
-              <option value="1">Walk-in Customer</option>
+              <option value="1">ลูกค้าทั่วไป</option>
               <!-- More customers will be loaded here -->
             </select>
           </div>
@@ -65,37 +65,37 @@
           <!-- Order items will appear here -->
           <div class="empty-order">
             <i class="icon-cart"></i>
-            <p>No items in cart</p>
+            <p>ไม่มีสินค้าในตะกร้า</p>
           </div>
         </div>
 
         <div class="order-summary">
           <div class="summary-row">
-            <div class="summary-label">Subtotal</div>
+            <div class="summary-label">ยอดรวม</div>
             <div class="summary-value" id="subtotal">฿0.00</div>
           </div>
           <div class="summary-row">
-            <div class="summary-label">Tax (7%)</div>
+            <div class="summary-label">ภาษี (7%)</div>
             <div class="summary-value" id="tax">฿0.00</div>
           </div>
           <div class="summary-row">
-            <div class="summary-label">Discount</div>
+            <div class="summary-label">ส่วนลด</div>
             <div class="summary-value">
               <input type="number" id="discountInput" class="form-control" value="0" min="0">
             </div>
           </div>
           <div class="summary-row total-row">
-            <div class="summary-label">Total</div>
+            <div class="summary-label">รวมทั้งสิ้น</div>
             <div class="summary-value" id="total">฿0.00</div>
           </div>
         </div>
 
         <div class="order-actions">
           <button class="btn btn-danger" id="cancelOrder">
-            <i class="icon-invalid"></i> Cancel
+            <i class="icon-invalid"></i> ยกเลิก
           </button>
           <button class="btn btn-primary" id="checkoutBtn">
-            <i class="icon-cart"></i> Checkout
+            <i class="icon-cart"></i> ชำระเงิน
           </button>
         </div>
       </div>
@@ -105,39 +105,39 @@
     <div class="modal" id="paymentModal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Payment</h2>
+          <h2>ชำระเงิน</h2>
           <button class="close-modal">&times;</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label>Total Amount</label>
+            <label>ยอดรวมทั้งสิ้น</label>
             <h3 id="paymentTotal">฿0.00</h3>
           </div>
           <div class="form-group">
-            <label for="paymentMethod">Payment Method</label>
+            <label for="paymentMethod">วิธีชำระ</label>
             <select id="paymentMethod" class="form-control">
-              <option value="cash">Cash</option>
-              <option value="card">Credit/Debit Card</option>
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="other">Other</option>
+              <option value="cash">เงินสด</option>
+              <option value="card">บัตรเครดิต/เดบิต</option>
+              <option value="bank_transfer">โอนธนาคาร</option>
+              <option value="other">อื่นๆ</option>
             </select>
           </div>
           <div class="form-group" id="cashPaymentGroup">
-            <label for="amountPaid">Amount Paid</label>
+            <label for="amountPaid">จำนวนเงินที่รับ</label>
             <input type="number" id="amountPaid" class="form-control" min="0" step="0.01">
             <div class="change-calculation">
-              <span>Change:</span>
+              <span>เงินทอน:</span>
               <span id="changeAmount">฿0.00</span>
             </div>
           </div>
           <div class="form-group">
-            <label for="paymentNotes">Notes</label>
+            <label for="paymentNotes">หมายเหตุ</label>
             <textarea id="paymentNotes" class="form-control"></textarea>
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" id="cancelPayment">Cancel</button>
-          <button class="btn btn-primary" id="completePayment">Complete Payment</button>
+          <button class="btn btn-secondary" id="cancelPayment">ยกเลิก</button>
+          <button class="btn btn-primary" id="completePayment">ยืนยันการชำระ</button>
         </div>
       </div>
     </div>
@@ -146,7 +146,7 @@
     <div class="modal" id="receiptModal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Receipt</h2>
+          <h2>ใบเสร็จ</h2>
           <button class="close-modal">&times;</button>
         </div>
         <div class="modal-body">
@@ -155,8 +155,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" id="newOrderBtn">New Order</button>
-          <button class="btn btn-primary" id="printReceiptBtn">Print Receipt</button>
+          <button class="btn btn-secondary" id="newOrderBtn">ออเดอร์ใหม่</button>
+          <button class="btn btn-primary" id="printReceiptBtn">พิมพ์ใบเสร็จ</button>
         </div>
       </div>
     </div>
