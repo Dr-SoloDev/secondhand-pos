@@ -133,6 +133,29 @@ class Router
         $this->routes[] = ['route' => 'customers/customer', 'controller' => 'CustomersController', 'method' => 'getCustomer', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'customers/customer', 'controller' => 'CustomersController', 'method' => 'updateCustomer', 'verb' => 'PUT'];
         $this->routes[] = ['route' => 'customers/customer', 'controller' => 'CustomersController', 'method' => 'deleteCustomer', 'verb' => 'DELETE'];
+
+        // Branches routes
+        $this->routes[] = ['route' => 'branches', 'controller' => 'BranchesController', 'method' => 'getBranches', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'branches', 'controller' => 'BranchesController', 'method' => 'createBranch', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'branches/active', 'controller' => 'BranchesController', 'method' => 'getActiveBranches', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'branches/summary', 'controller' => 'BranchesController', 'method' => 'getBranchSummary', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'branches/branch', 'controller' => 'BranchesController', 'method' => 'getBranch', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'branches/branch', 'controller' => 'BranchesController', 'method' => 'updateBranch', 'verb' => 'PUT'];
+
+        // Sellers routes
+        $this->routes[] = ['route' => 'sellers', 'controller' => 'SellersController', 'method' => 'getSellers', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sellers', 'controller' => 'SellersController', 'method' => 'createSeller', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sellers/search', 'controller' => 'SellersController', 'method' => 'searchSellers', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sellers/seller', 'controller' => 'SellersController', 'method' => 'getSeller', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sellers/seller', 'controller' => 'SellersController', 'method' => 'updateSeller', 'verb' => 'PUT'];
+
+        // Purchase Orders routes
+        $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrders', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'createPurchaseOrder', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'purchase-orders/order', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrder', 'verb' => 'GET'];
+
+        // Item Conditions routes
+        $this->routes[] = ['route' => 'item-conditions', 'controller' => 'ItemConditionsController', 'method' => 'getConditions', 'verb' => 'GET'];
     }
 
     public function dispatch()

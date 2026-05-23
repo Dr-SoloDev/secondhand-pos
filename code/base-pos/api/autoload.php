@@ -5,12 +5,16 @@ spl_autoload_register(function ($className) {
     $className = str_replace('\\', DIRECTORY_SEPARATOR, $className);
 
     // Define base directories to search for classes
+    $customizations = __DIR__.'/../../customizations/api';
     $directories = [
         __DIR__.'/Core/',
         __DIR__.'/Controllers/',
         __DIR__.'/Models/',
         __DIR__.'/Services/',
-        __DIR__.'/'
+        __DIR__.'/',
+        $customizations.'/Controllers/',
+        $customizations.'/Models/',
+        $customizations.'/Services/',
     ];
 
     // Check each directory
