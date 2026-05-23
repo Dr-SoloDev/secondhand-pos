@@ -41,7 +41,7 @@ async function initReports() {
     }
 
     // Load users for cashier dropdown
-    const userResponse = await apiRequest('users');
+    const userResponse = await apiRequest('users/all');
     if (userResponse.status === 'success') {
       users = userResponse.data.filter(user => ['cashier', 'manager', 'admin'].includes(user.role));
       populateUserDropdown();

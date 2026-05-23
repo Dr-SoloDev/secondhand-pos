@@ -164,6 +164,7 @@ class Router
         }
 
         // Get ID from query string or URL path
+        $uriParts = explode('/', trim($requestUri, '/'));
         $pathId = $uriParts[2] ?? null;
         $queryId = isset($_GET['id']) ? $_GET['id'] : null;
         $id = $pathId ?? $queryId;
