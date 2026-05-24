@@ -1,73 +1,201 @@
 <?php
 class SellersController extends Controller
 {
+    /**
+     * GET /api/sellers - ดึงรายการผู้ขายทั้งหมด
+     */
     public function getSellers()
     {
-        $pagination = $this->getPaginationParams();
-        $search = isset($_GET['search']) ? $this->sanitizeInput($_GET['search']) : null;
-        $model = new Seller();
-        $result = $model->getPaginated($pagination['page'], $pagination['limit'], $search);
-        Response::success('Sellers retrieved', $result);
+        $sellerModel = new Seller();
+        $includeBlacklisted = isset($_GET['include_blacklisted']) && $_GET['include_blacklisted'] === 'true';
+        
+        $sellers = $sellerModel->getAll($includeBlacklisted);
+        Response::success('ดึงข้อมูลผู้ขายสำเร็จ', $sellers);
     }
 
+    /**
+     * GET /api/sellers/seller?id=X - ดึงข้อมูลผู้ขายตาม ID
+     */
+    public function getSeller()
+    {
+        $id = $_GET['id'] ?? null;
+        
+        if (!$id) {
+            Response::error('กรุณาระบุ ID ผู้ขาย', 400);
+        }
+
+        $sellerModel = new Seller();
+        $seller = $sellerModel->getById($id);
+
+        if (!$seller) {
+            Response::error('ไม่พบผู้ขายนี้', 404);
+        }
+
+        Response::success('ดึงข้อมูลผู้ขายสำเร็จ', $seller);
+    }
+
+    /**
+     * GET /api/sellers/search?q=keyword - ค้นหาผู้ขาย
+     */
     public function searchSellers()
     {
-        $search = isset($_GET['q']) ? $this->sanitizeInput($_GET['q']) : null;
-        $model = new Seller();
-        $sellers = $model->getAll($search, false);
-        Response::success('Sellers retrieved', array_slice($sellers, 0, 20));
+        $keyword = $_GET['q'] ?? '';
+        
+        if (empty($keyword)) {
+            Response::error('กรุณาระบุคำค้นหา', 400);
+        }
+
+        $sellerModel = new Seller();
+        $results = $sellerModel->search($keyword);
+
+        Response::success('ค้นหาสำเร็จ', $results);
     }
 
-    public function getSeller($id)
-    {
-        if (!$id) Response::error('Seller ID is required', 400);
-        $model = new Seller();
-        $seller = $model->findById($id);
-        if (!$seller) Response::error('Seller not found', 404);
-        Response::success('Seller retrieved', $seller);
-    }
-
+    /**
+     * POST /api/sellers - เพิ่มผู้ขายใหม่
+     */
     public function createSeller()
     {
-        $data = $this->getRequestData();
-        $this->validateRequiredFields($data, ['full_name']);
-        $data = $this->sanitizeInput($data);
+        $this->requireAuth(); // ต้อง login
 
+        $data = $this->getRequestData();
+
+        // Validate required fields
+        if (empty($data['full_name'])) {
+            Response::error('กรุณาระบุชื่อ-นามสกุล', 400);
+        }
+
+        if (empty($data['phone']) && empty($data['id_card'])) {
+            Response::error('กรุณาระบุเบอร์โทรศัพท์ หรือ เลขบัตรประชาชน', 400);
+        }
+
+        // Validate เลขบัตรประชาชน (ถ้ามี)
         if (!empty($data['id_card'])) {
-            $idCard = preg_replace('/\D/', '', $data['id_card']);
+            $idCard = preg_replace('/[^0-9]/', '', $data['id_card']);
             if (strlen($idCard) !== 13) {
-                Response::error('เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก', 400);
+                Response::error('เลขบัตรประชาชนต้องเป็น 13 หลัก', 400);
             }
             $data['id_card'] = $idCard;
         }
 
-        $model = new Seller();
+        $sellerModel = new Seller();
+        
         try {
-            $id = $model->create($data);
-            Logger::logActivity($this->user['user_id'], 'create_seller', "Created seller: {$data['full_name']}");
-            Response::success('Seller created', ['id' => $id]);
+            $sellerId = $sellerModel->create($data);
+            
+            // Log activity
+            Logger::logActivity(
+                $this->user['user_id'],
+                'create_seller',
+                "เพิ่มผู้ขาย: {$data['full_name']}"
+            );
+
+            Response::success('เพิ่มผู้ขายสำเร็จ', ['id' => $sellerId]);
         } catch (Exception $e) {
-            Response::error('Failed to create seller: ' . $e->getMessage());
+            Response::error($e->getMessage(), 400);
         }
     }
 
-    public function updateSeller($id)
+    /**
+     * PUT /api/sellers/seller - แก้ไขข้อมูลผู้ขาย
+     */
+    public function updateSeller()
     {
-        if (!$id) Response::error('Seller ID is required', 400);
+        $this->requireAuth();
+
         $data = $this->getRequestData();
-        $data = $this->sanitizeInput($data);
-        $model = new Seller();
-        $seller = $model->findById($id);
-        if (!$seller) Response::error('Seller not found', 404);
+        $id = $data['id'] ?? null;
+
+        if (!$id) {
+            Response::error('กรุณาระบุ ID ผู้ขาย', 400);
+        }
+
+        // Validate เลขบัตรประชาชน (ถ้ามี)
+        if (!empty($data['id_card'])) {
+            $idCard = preg_replace('/[^0-9]/', '', $data['id_card']);
+            if (strlen($idCard) !== 13) {
+                Response::error('เลขบัตรประชาชนต้องเป็น 13 หลัก', 400);
+            }
+            $data['id_card'] = $idCard;
+        }
+
+        $sellerModel = new Seller();
 
         try {
-            $allowed = ['full_name', 'phone', 'address', 'notes', 'is_blacklisted'];
-            $update = array_intersect_key($data, array_flip($allowed));
-            $model->update($id, $update);
-            Logger::logActivity($this->user['user_id'], 'update_seller', "Updated seller ID: {$id}");
-            Response::success('Seller updated');
+            $sellerModel->update($id, $data);
+
+            Logger::logActivity(
+                $this->user['user_id'],
+                'update_seller',
+                "แก้ไขผู้ขาย ID: {$id}"
+            );
+
+            Response::success('แก้ไขข้อมูลผู้ขายสำเร็จ');
         } catch (Exception $e) {
-            Response::error('Failed to update seller: ' . $e->getMessage());
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    /**
+     * POST /api/sellers/blacklist - Blacklist ผู้ขาย
+     */
+    public function blacklistSeller()
+    {
+        $this->requireAuth(['admin', 'manager']); // เฉพาะ admin/manager
+
+        $data = $this->getRequestData();
+        $id = $data['id'] ?? null;
+        $reason = $data['reason'] ?? null;
+
+        if (!$id) {
+            Response::error('กรุณาระบุ ID ผู้ขาย', 400);
+        }
+
+        $sellerModel = new Seller();
+
+        try {
+            $sellerModel->blacklist($id, $reason);
+
+            Logger::logActivity(
+                $this->user['user_id'],
+                'blacklist_seller',
+                "Blacklist ผู้ขาย ID: {$id} เหตุผล: {$reason}"
+            );
+
+            Response::success('Blacklist ผู้ขายสำเร็จ');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    /**
+     * POST /api/sellers/unblacklist - ยกเลิก Blacklist
+     */
+    public function unblacklistSeller()
+    {
+        $this->requireAuth(['admin', 'manager']);
+
+        $data = $this->getRequestData();
+        $id = $data['id'] ?? null;
+
+        if (!$id) {
+            Response::error('กรุณาระบุ ID ผู้ขาย', 400);
+        }
+
+        $sellerModel = new Seller();
+
+        try {
+            $sellerModel->unblacklist($id);
+
+            Logger::logActivity(
+                $this->user['user_id'],
+                'unblacklist_seller',
+                "ยกเลิก Blacklist ผู้ขาย ID: {$id}"
+            );
+
+            Response::success('ยกเลิก Blacklist สำเร็จ');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
         }
     }
 }
