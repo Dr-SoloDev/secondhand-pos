@@ -4,6 +4,7 @@ let lots = [];
 let lineItems = [];
 let editId = null;
 let confirmCallback = null;
+let expenses = [];
 
 function escapeHtml(s) {
   if (s == null) return '';
@@ -193,6 +194,51 @@ function calcTotal() {
   document.getElementById('totalAmountDisplay').textContent = formatCurrency(total);
 }
 
+// Expense functions
+function addExpense() {
+  expenses.push({ key: Date.now() + Math.random(), description: '', amount: '' });
+  renderExpenses();
+}
+
+function removeExpense(idx) {
+  expenses.splice(idx, 1);
+  renderExpenses();
+}
+
+function updateExpense(idx, field, value) {
+  expenses[idx] = { ...expenses[idx], [field]: field === 'amount' ? parseFloat(value) || 0 : value };
+  renderExpenses();
+}
+
+function renderExpenses() {
+  const container = document.getElementById('expensesContainer');
+  if (!container) return;
+  if (expenses.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--color-text-lighter);border:2px dashed #ddd;border-radius:8px;font-size:13px">ยังไม่มีค่าใช้จ่าย</div>';
+    calcExpensesTotal();
+    return;
+  }
+  container.innerHTML = expenses.map((item, idx) => {
+    return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <input type="text" class="form-control" value="${escapeHtml(item.description || '')}"
+        onchange="updateExpense(${idx}, 'description', this.value)"
+        placeholder="รายการค่าใช้จ่าย" style="flex:1;padding:8px 12px;font-size:13px">
+      <input type="number" class="form-control" min="0" step="0.01" value="${item.amount || ''}"
+        onchange="updateExpense(${idx}, 'amount', this.value)"
+        placeholder="จำนวนเงิน" style="width:150px;padding:8px 12px;font-size:13px">
+      <button class="btn btn-sm btn-danger" onclick="removeExpense(${idx})" style="padding:2px 10px;font-size:13px">ลบ</button>
+    </div>`;
+  }).join('');
+  calcExpensesTotal();
+}
+
+function calcExpensesTotal() {
+  const el = document.getElementById('totalExpensesDisplay');
+  if (!el) return;
+  const total = expenses.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+  el.textContent = formatCurrency(total);
+}
+
 function resetForm() {
   document.getElementById('modalTitle').textContent = 'ขาย Lot ใหม่';
   document.getElementById('buyerName').value = '';
@@ -202,8 +248,10 @@ function resetForm() {
   document.getElementById('saveError').style.display = 'none';
   document.getElementById('saveError').textContent = '';
   lineItems = [];
+  expenses = [];
   editId = null;
   renderLineItems();
+  renderExpenses();
 }
 
 async function openModal(id) {
@@ -237,6 +285,13 @@ async function openModal(id) {
       unit_price: it.unit_price ?? '',
     }));
     renderLineItems();
+
+    expenses = (d.expenses || []).map(it => ({
+      key: Date.now() + Math.random(),
+      description: it.description || '',
+      amount: it.amount || '',
+    }));
+    renderExpenses();
   }
 
   document.getElementById('saleLotModal').classList.add('show');
@@ -261,11 +316,17 @@ async function saveLot() {
     return;
   }
 
+  const validExpenses = expenses.filter(it => it.description && parseFloat(it.amount) > 0);
+
   const payload = {
     buyer_name: buyerName,
     sale_date: saleDate,
     branch_id: parseInt(branchId),
     notes: notes || null,
+    expenses: validExpenses.length > 0 ? validExpenses.map(it => ({
+      description: it.description.trim(),
+      amount: parseFloat(it.amount) || 0,
+    })) : null,
     items: validItems.map(it => ({
       ...(it.id ? { id: it.id } : {}),
       category_id: parseInt(it.category_id),
@@ -346,6 +407,10 @@ async function viewLot(id) {
   const profit = parseFloat(lot.total_amount || 0) - parseFloat(lot.total_cost || 0);
   const marginPct = lot.total_amount > 0 ? ((profit / lot.total_amount) * 100).toFixed(1) : '0.0';
 
+  const lotExpenses = lot.expenses || [];
+  const totalExpenses = lot.profit_breakdown?.total_expenses || lotExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const netProfit = lot.profit_breakdown?.net_profit || profit - totalExpenses;
+
   const html = `
     <div class="receipt">
       <h3 style="text-align:center;margin:0">รายละเอียด Lot ขาย</h3>
@@ -381,13 +446,36 @@ async function viewLot(id) {
           <div style="font-size:18px;font-weight:700">${formatCurrency(lot.total_cost)}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:13px;color:#888">กำไร</div>
+          <div style="font-size:13px;color:#888">กำไรขั้นต้น</div>
           <div style="font-size:18px;font-weight:700;${profit >= 0 ? 'color:var(--color-success)' : 'color:var(--color-danger)'}">
             ${profit >= 0 ? '+' : ''}${formatCurrency(profit)}
             <span style="font-size:13px;font-weight:400">(${marginPct}%)</span>
           </div>
         </div>
       </div>
+      ${lotExpenses.length > 0 ? `
+      <hr>
+      <div style="font-size:14px;font-weight:500;margin-bottom:6px">ค่าใช้จ่าย</div>
+      ${lotExpenses.map(e => `
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">
+          <span style="color:var(--color-text-light)">${escapeHtml(e.description)}</span>
+          <span>${formatCurrency(e.amount)}</span>
+        </div>
+      `).join('')}
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-top:1px solid #ddd;margin-top:3px">
+        <span style="font-weight:500">รวมค่าใช้จ่าย</span>
+        <span style="font-weight:500;color:var(--color-danger)">-${formatCurrency(totalExpenses)}</span>
+      </div>
+      <hr>
+      <div style="display:flex;justify-content:space-between">
+        <div>
+          <div style="font-size:13px;color:#888">กำไรสุทธิ</div>
+          <div style="font-size:18px;font-weight:700;${netProfit >= 0 ? 'color:var(--color-success)' : 'color:var(--color-danger)'}">
+            ${netProfit >= 0 ? '+' : ''}${formatCurrency(netProfit)}
+          </div>
+        </div>
+      </div>
+      ` : ''}
       ${lot.notes ? `<div style="margin-top:8px"><strong>หมายเหตุ:</strong> ${escapeHtml(lot.notes)}</div>` : ''}
     </div>
   `;

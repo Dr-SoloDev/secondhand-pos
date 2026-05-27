@@ -20,6 +20,10 @@ Thumbs.db
 /tmp/
 temp/
 
+# Backups & runtime data (outside web root + legacy in-tree path)
+code/data/
+code/base-pos/backups/
+
 # Docker volumes (not the files, just runtime data)
 # db_data is a docker volume, not in filesystem
 

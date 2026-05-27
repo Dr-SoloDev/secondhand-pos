@@ -1,0 +1,2 @@
+ALTER TABLE sale_lots
+  ADD COLUMN expenses JSON DEFAULT NULL AFTER notes;

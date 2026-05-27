@@ -13,7 +13,7 @@
       <div class="sidebar-header">
         <a href="index.html" class="sidebar-brand">
           <i class="icon-cart"></i>
-          <span>ระบบขายหน้าร้าน</span>
+          <span>รับซื้อของเก่า</span>
         </a>
       </div>
       <ul class="sidebar-menu">
@@ -49,24 +49,25 @@
       </div>
 
       <div class="page-header">
-        <h1>ตั้งค่าราคา Tier</h1>
-        <p>กำหนดราคารับซื้อ 3 ระดับ ต่อหมวดหมู่สินค้า</p>
+        <h1>ตั้งค่าราคา ระดับ</h1>
+        <p>กำหนดราคารับซื้อหลายระดับ ต่อรายการสินค้าในแคตตาล็อก (เพิ่ม/ลดได้)</p>
       </div>
 
       <div class="card" style="margin-bottom: 1rem; background: #f0f9ff; border-left: 4px solid #0284c7;">
         <div class="card-body" style="padding: 1rem;">
           <p style="margin: 0; color: #0369a1;">
             <strong>💡 คำอธิบาย:</strong>
-            Tier 1 (ปกติ/ขายน้อย) = ราคาต่ำสุด |
-            Tier 2 (สูงขึ้น) = ราคากลาง |
-            Tier 3 (สูงสุด/ขายเยอะ) = ราคาสูงสุด
+            กำหนดราคารับซื้อหลายระดับ ต่อรายการสินค้าในแคตตาล็อก |
+            กด "+ เพิ่มระดับ" เพื่อเพิ่มระดับราคา |
+            กด "ลบ" เพื่อลบระดับที่ไม่ต้องการ |
+            แต่ละรายการต้องมีอย่างน้อย 1 ระดับ
           </p>
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">ตั้งค่าราคา Tier</h2>
+          <h2 class="card-title">ตั้งค่าราคา ระดับ</h2>
         </div>
         <div class="card-body">
           <div id="accessDenied" style="display: none; text-align: center; padding: 2rem; color: #dc2626;">
@@ -77,17 +78,16 @@
             <table class="data-table" id="priceTiersTable">
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>รหัส</th>
+                  <th>ชื่อสินค้า</th>
                   <th>หมวดหมู่</th>
-                  <th>Tier 1 (ปกติ/ขายน้อย)</th>
-                  <th>Tier 2 (สูงขึ้น)</th>
-                  <th>Tier 3 (สูงสุด/ขายเยอะ)</th>
+                  <th>ระดับราคา</th>
                   <th>จัดการ</th>
                 </tr>
               </thead>
               <tbody id="priceTiersTableBody">
                 <tr>
-                  <td colspan="6" class="text-center">กำลังโหลด...</td>
+                  <td colspan="5" class="text-center">กำลังโหลด...</td>
                 </tr>
               </tbody>
             </table>

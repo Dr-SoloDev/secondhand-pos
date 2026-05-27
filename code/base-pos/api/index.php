@@ -13,9 +13,19 @@ if (($_SERVER['CONTENT_LENGTH'] ?? 0) > 10 * 1024 * 1024) {
     exit;
 }
 
-// Allow CORS - restrict to origin if sent
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
-header('Access-Control-Allow-Origin: ' . $origin);
+// Allow CORS - restrict to known origins (env-driven for production)
+// ALLOWED_ORIGINS = comma-separated list, e.g. "https://pos.example.com,https://admin.example.com"
+$envOrigins = getenv('ALLOWED_ORIGINS');
+if ($envOrigins !== false && trim($envOrigins) !== '') {
+    $allowedOrigins = array_filter(array_map('trim', explode(',', $envOrigins)));
+} else {
+    $allowedOrigins = ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost', 'http://127.0.0.1'];
+}
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowedOrigins, true)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+    header('Vary: Origin');
+}
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Max-Age: 86400');

@@ -15,9 +15,6 @@ class SalesController extends Controller
         $saleModel = new Sale();
 
         try {
-            $this->db->beginTransaction();
-
-            // Create sale
             $saleData = [
                 'customer_id' => $data['customer_id'] ?? 1, // Default to walk-in customer
                 'user_id' => $this->user['user_id'],
@@ -28,8 +25,6 @@ class SalesController extends Controller
             ];
 
             $saleId = $saleModel->create($saleData, $data['items']);
-
-            $this->db->commit();
 
             // Get sale details for receipt
             $sale = $saleModel->getDetailsForReceipt($saleId);
@@ -43,8 +38,8 @@ class SalesController extends Controller
 
             Response::success('Sale created successfully', $sale);
         } catch (Exception $e) {
-            $this->db->rollBack();
-            Response::error('Sale creation failed: '.$e->getMessage());
+            error_log('Sale creation failed: ' . $e->getMessage());
+            Response::error('Sale creation failed', 500);
         }
     }
 
@@ -112,23 +107,16 @@ class SalesController extends Controller
         $saleModel = new Sale();
 
         try {
-            $this->db->beginTransaction();
-
-            // Check if sale exists
             $sale = $saleModel->findById($saleId);
             if (!$sale) {
                 throw new Exception('Sale not found');
             }
 
-            // Check if already voided
             if ($sale['payment_status'] === 'voided') {
                 throw new Exception('Sale is already voided');
             }
 
-            // Void sale and return items to inventory
             $saleModel->voidSale($saleId, $reason, $this->user['user_id']);
-
-            $this->db->commit();
 
             // Log activity
             Logger::logActivity(
@@ -139,8 +127,8 @@ class SalesController extends Controller
 
             Response::success('Sale voided successfully');
         } catch (Exception $e) {
-            $this->db->rollBack();
-            Response::error('Failed to void sale: '.$e->getMessage());
+            error_log('Sale void failed: ' . $e->getMessage());
+            Response::error('Failed to void sale', 500);
         }
     }
 

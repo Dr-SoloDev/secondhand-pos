@@ -10,6 +10,71 @@ class InventoryController extends Controller
         Response::success('Categories retrieved', $categories);
     }
 
+    public function getProducts()
+    {
+        $categoryId = isset($_GET['category_id']) ? intval($_GET['category_id']) : null;
+
+        $productModel = new Product();
+        $products = $productModel->getAll($categoryId);
+
+        Response::success('Products retrieved', $products);
+    }
+
+    public function createProduct()
+    {
+        $this->requireAuth(['admin', 'manager']);
+
+        $data = $this->getRequestData();
+        $this->validateRequiredFields($data, ['name']);
+
+        $data = $this->sanitizeInput($data);
+
+        // M1: ตรวจค่าตัวเลขให้ไม่ติดลบ (negative price/cost/quantity ไม่ make sense)
+        foreach (['price', 'cost', 'quantity', 'low_stock_threshold'] as $f) {
+            if (isset($data[$f]) && (!is_numeric($data[$f]) || (float)$data[$f] < 0)) {
+                Response::error("Field '$f' must be a non-negative number", 400);
+            }
+        }
+
+        $name = trim((string)$data['name']);
+        if ($name === '') {
+            Response::error('Field name must not be empty', 400);
+        }
+
+        $productModel = new Product();
+        try {
+            $productId = $productModel->create([
+                'name' => $name,
+                'sku' => trim((string)($data['sku'] ?? '')),
+                'barcode' => trim((string)($data['barcode'] ?? '')),
+                'description' => $data['description'] ?? '',
+                'category_id' => $data['category_id'] ?? null,
+                'price' => $data['price'] ?? 0,
+                'cost' => $data['cost'] ?? 0,
+                'quantity' => $data['quantity'] ?? 0,
+                'unit' => $data['unit'] ?? 'ชิ้น',
+                'low_stock_threshold' => $data['low_stock_threshold'] ?? 5,
+                'status' => 'active',
+                'user_id' => $this->user['user_id'] ?? null,
+            ]);
+
+            try {
+                Logger::logActivity(
+                    $this->user['user_id'] ?? 0,
+                    'create_product',
+                    "Created product: {$name}"
+                );
+            } catch (Exception $logErr) {
+                error_log('Product create log failed: ' . $logErr->getMessage());
+            }
+
+            Response::success('Product created', ['id' => $productId]);
+        } catch (Exception $e) {
+            error_log('Product create failed: ' . $e->getMessage());
+            Response::error('Failed to create product', 400);
+        }
+    }
+
     public function createCategory()
     {
         // Check permissions
@@ -39,7 +104,8 @@ class InventoryController extends Controller
                 'name' => $data['name']
             ]);
         } catch (Exception $e) {
-            Response::error('Failed to create category: '.$e->getMessage());
+            error_log('Category create failed: ' . $e->getMessage());
+            Response::error('Failed to create category', 500);
         }
     }
 
@@ -102,7 +168,8 @@ class InventoryController extends Controller
 
             Response::success('Category updated');
         } catch (Exception $e) {
-            Response::error('Failed to update category: '.$e->getMessage());
+            error_log('Category update failed: ' . $e->getMessage());
+            Response::error('Failed to update category', 500);
         }
     }
 
@@ -137,49 +204,8 @@ class InventoryController extends Controller
 
             Response::success('Category deleted');
         } catch (Exception $e) {
-            Response::error('Failed to delete category: '.$e->getMessage());
-        }
-    }
-
-    // Product methods
-    public function getProducts()
-    {
-        $categoryId = isset($_GET['category']) ? intval($_GET['category']) : null;
-
-        $productModel = new Product();
-        $products = $productModel->getAll($categoryId);
-
-        Response::success('Products retrieved', $products);
-    }
-
-    public function createProduct()
-    {
-        // Check permissions
-        $this->requireAuth(['admin', 'manager']);
-
-        // Get and validate request data
-        $data = $this->getRequestData();
-        $this->validateRequiredFields($data, ['name', 'sku', 'price', 'cost']);
-
-        // Sanitize input
-        $data = $this->sanitizeInput($data);
-
-        // Create product
-        $productModel = new Product();
-
-        try {
-            $productId = $productModel->create($data);
-
-            // Log activity
-            Logger::logActivity(
-                $this->user['user_id'],
-                'create_product',
-                "Created product: {$data['name']} (SKU: {$data['sku']})"
-            );
-
-            Response::success('Product created', ['id' => $productId]);
-        } catch (Exception $e) {
-            Response::error('Failed to create product: '.$e->getMessage());
+            error_log('Category delete failed: ' . $e->getMessage());
+            Response::error('Failed to delete category', 500);
         }
     }
 
@@ -235,7 +261,8 @@ class InventoryController extends Controller
 
             Response::success('Product updated');
         } catch (Exception $e) {
-            Response::error('Failed to update product: '.$e->getMessage());
+            error_log('Product update failed: ' . $e->getMessage());
+            Response::error('Failed to update product', 500);
         }
     }
 
@@ -269,7 +296,8 @@ class InventoryController extends Controller
                 Response::success('Product deactivated due to existing transactions');
             }
         } catch (Exception $e) {
-            Response::error('Failed to delete product: '.$e->getMessage());
+            error_log('Product delete failed: ' . $e->getMessage());
+            Response::error('Failed to delete product', 500);
         }
     }
 
@@ -376,7 +404,8 @@ class InventoryController extends Controller
             Response::success('Inventory transaction created', ['id' => $transactionId]);
         } catch (Exception $e) {
             $this->db->rollBack();
-            Response::error('Failed to create transaction: '.$e->getMessage());
+            error_log('Inventory transaction create failed: ' . $e->getMessage());
+            Response::error('Failed to create transaction', 500);
         }
     }
 }

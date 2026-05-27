@@ -88,19 +88,24 @@ class SellersController extends Controller
 
             Response::success('เพิ่มผู้ขายสำเร็จ', ['id' => $sellerId]);
         } catch (Exception $e) {
-            Response::error($e->getMessage(), 400);
+            error_log('Seller create failed: ' . $e->getMessage());
+            Response::error('ไม่สามารถเพิ่มผู้ขายได้', 400);
         }
     }
 
     /**
      * PUT /api/sellers/seller - แก้ไขข้อมูลผู้ขาย
      */
-    public function updateSeller()
+    public function updateSeller($id = null)
     {
         $this->requireAuth();
 
-        $data = $this->getRequestData();
-        $id = $data['id'] ?? null;
+        if (!$id) {
+            $data = $this->getRequestData();
+            $id = $data['id'] ?? null;
+        } else {
+            $data = $this->getRequestData();
+        }
 
         if (!$id) {
             Response::error('กรุณาระบุ ID ผู้ขาย', 400);
@@ -128,7 +133,8 @@ class SellersController extends Controller
 
             Response::success('แก้ไขข้อมูลผู้ขายสำเร็จ');
         } catch (Exception $e) {
-            Response::error($e->getMessage(), 400);
+            error_log('Seller update failed: ' . $e->getMessage());
+            Response::error('ไม่สามารถแก้ไขผู้ขายได้', 400);
         }
     }
 
@@ -160,7 +166,8 @@ class SellersController extends Controller
 
             Response::success('Blacklist ผู้ขายสำเร็จ');
         } catch (Exception $e) {
-            Response::error($e->getMessage(), 400);
+            error_log('Seller blacklist failed: ' . $e->getMessage());
+            Response::error('ไม่สามารถ Blacklist ผู้ขายได้', 400);
         }
     }
 
@@ -191,7 +198,8 @@ class SellersController extends Controller
 
             Response::success('ยกเลิก Blacklist สำเร็จ');
         } catch (Exception $e) {
-            Response::error($e->getMessage(), 400);
+            error_log('Seller unblacklist failed: ' . $e->getMessage());
+            Response::error('ไม่สามารถยกเลิก Blacklist ได้', 400);
         }
     }
 }

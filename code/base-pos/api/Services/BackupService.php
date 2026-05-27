@@ -4,7 +4,7 @@ class BackupService
     public static function createBackup()
     {
         if (!file_exists(BACKUP_DIR)) {
-            mkdir(BACKUP_DIR, 0755, true);
+            mkdir(BACKUP_DIR, 0750, true);
         }
 
         $timestamp = date('Y-m-d_H-i-s');
@@ -56,7 +56,7 @@ class BackupService
         }
 
         if (!file_exists(TEMP_DIR)) {
-            mkdir(TEMP_DIR, 0755, true);
+            mkdir(TEMP_DIR, 0750, true);
         }
 
         $tempFile = TEMP_DIR . '/' . basename($uploadedFile['name']);
@@ -90,7 +90,19 @@ class BackupService
                 }
 
                 $extractPath = TEMP_DIR . '/extract_' . time();
-                mkdir($extractPath, 0755, true);
+                mkdir($extractPath, 0750, true);
+
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $name = $zip->getNameIndex($i);
+                    if (strpos($name, '..') !== false || strpos($name, '/') === 0) {
+                        $zip->close();
+                        array_map('unlink', glob($extractPath . '/*'));
+                        rmdir($extractPath);
+                        unlink($tempFile);
+                        return ['success' => false, 'message' => 'Invalid archive entry'];
+                    }
+                }
+
                 $zip->extractTo($extractPath);
                 $zip->close();
 
@@ -126,7 +138,7 @@ class BackupService
         } catch (Exception $e) {
             error_log('Backup restore failed: ' . $e->getMessage());
             unlink($tempFile);
-            return ['success' => false, 'message' => 'Restore failed: ' . $e->getMessage()];
+            return ['success' => false, 'message' => 'Restore failed']; // details logged server-side
         }
 
         if (pathinfo($tempFile, PATHINFO_EXTENSION) === 'zip') {

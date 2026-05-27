@@ -23,9 +23,9 @@ define('JWT_SECRET', getenv('JWT_SECRET') ?: (function() {
 define('JWT_EXPIRY', 86400); // 24 hours
 define('API_URL', '/api');
 
-// Backup settings
-define('BACKUP_DIR', __DIR__.'/../backups');
-define('TEMP_DIR', __DIR__.'/../temp');
+// Backup settings - outside web root for security
+define('BACKUP_DIR', __DIR__.'/../../data/backups');
+define('TEMP_DIR', __DIR__.'/../../data/temp');
 
 // Error reporting
 error_reporting(E_ALL);

@@ -1,82 +1,86 @@
 <?php
 class PriceTiersController extends Controller
 {
-    /**
-     * GET /api/price-tiers - ดึงรายการหมวดหมู่พร้อมราคาแต่ละ Tier
-     */
     public function getPriceTiers()
     {
         $this->requireAuth();
-
         $db = Database::getInstance();
-        $stmt = $db->query("SELECT id, name, price_tier1, price_tier2, price_tier3 FROM categories ORDER BY name ASC");
-        $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        Response::success('ดึงข้อมูลราคา Tier สำเร็จ', $categories);
+        $stmt = $db->query(
+            "SELECT c.id, c.code, c.name, c.category_id, c.default_unit, c.default_price,
+                    c.tier_prices,
+                    cat.name AS category_name
+             FROM purchase_item_catalog c
+             LEFT JOIN categories cat ON cat.id = c.category_id
+             WHERE c.is_active = 1
+             ORDER BY cat.name ASC, c.code ASC"
+        );
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($items as &$item) {
+            $item['tier_prices'] = json_decode($item['tier_prices'] ?? '[]', true) ?: [];
+        }
+        Response::success('ok', $items);
     }
 
-    /**
-     * PUT /api/price-tiers/category - อัปเดตราคา Tier ของหมวดหมู่
-     * เฉพาะ admin/manager เท่านั้น
-     */
     public function updatePriceTiers()
     {
         $this->requireAuth(['admin', 'manager']);
-
         $data = $this->getRequestData();
-
         $id = $data['id'] ?? null;
-        $priceTier1 = $data['price_tier1'] ?? null;
-        $priceTier2 = $data['price_tier2'] ?? null;
-        $priceTier3 = $data['price_tier3'] ?? null;
+        $tiers = $data['tiers'] ?? null;
 
         if (!$id) {
-            Response::error('กรุณาระบุ ID หมวดหมู่', 400);
+            Response::error('กรุณาระบุ ID รายการ', 400);
         }
-
-        // Validate prices are numeric and non-negative
-        if ($priceTier1 === null || $priceTier2 === null || $priceTier3 === null) {
-            Response::error('กรุณาระบุราคาทั้ง 3 Tier', 400);
-        }
-
-        if (!is_numeric($priceTier1) || !is_numeric($priceTier2) || !is_numeric($priceTier3)) {
-            Response::error('ราคาต้องเป็นตัวเลขเท่านั้น', 400);
-        }
-
-        if ($priceTier1 < 0 || $priceTier2 < 0 || $priceTier3 < 0) {
-            Response::error('ราคาต้องไม่ติดลบ', 400);
+        if (!is_array($tiers) || count($tiers) === 0) {
+            Response::error('กรุณาระบุราคาอย่างน้อย 1 ระดับ', 400);
         }
 
         $db = Database::getInstance();
-
-        // Check if category exists
-        $stmt = $db->prepare("SELECT id, name FROM categories WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, name FROM purchase_item_catalog WHERE id = ?");
         $stmt->execute([$id]);
-        $category = $stmt->fetch(PDO::FETCH_ASSOC);
+        $item = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$item) {
+            Response::error('ไม่พบรายการสินค้า', 404);
+        }
 
-        if (!$category) {
-            Response::error('ไม่พบหมวดหมู่นี้', 404);
+        // M4/M5: whitelist + sanitize tiers ก่อน json_encode (กัน stored XSS + bloat)
+        $cleanTiers = [];
+        foreach ($tiers as $i => $t) {
+            if (empty($t['label'])) {
+                Response::error("กรุณาระบุชื่อ ระดับ ที่ {$i}", 400);
+            }
+            if (!isset($t['price']) || !is_numeric($t['price'])) {
+                Response::error("ราคา ระดับ ที่ {$i} ({$t['label']}) ไม่ถูกต้อง", 400);
+            }
+            if ((float)$t['price'] < 0) {
+                Response::error("ราคา ระดับ ที่ {$i} ({$t['label']}) ต้องไม่ติดลบ", 400);
+            }
+            $label = trim((string)$t['label']);
+            if (mb_strlen($label) > 50) {
+                $label = mb_substr($label, 0, 50);
+            }
+            $cleanTiers[] = [
+                'label' => $label,
+                'price' => (float)$t['price'],
+            ];
         }
 
         try {
-            $stmt = $db->prepare("UPDATE categories SET price_tier1 = ?, price_tier2 = ?, price_tier3 = ? WHERE id = ?");
+            $stmt = $db->prepare("UPDATE purchase_item_catalog SET tier_prices = ? WHERE id = ?");
             $stmt->execute([
-                floatval($priceTier1),
-                floatval($priceTier2),
-                floatval($priceTier3),
+                json_encode($cleanTiers, JSON_UNESCAPED_UNICODE),
                 $id
             ]);
-
-            // Log activity
+            $tierLabels = array_map(fn($t) => "{$t['label']}: {$t['price']}", $cleanTiers);
             Logger::logActivity(
                 $this->user['user_id'],
                 'update_price_tiers',
-                "อัปเดตราคา Tier หมวดหมู่: {$category['name']} (Tier1: {$priceTier1}, Tier2: {$priceTier2}, Tier3: {$priceTier3})"
+                "อัปเดตราคา ระดับ สินค้า: {$item['name']} (" . implode(', ', $tierLabels) . ")"
             );
-
-            Response::success('อัปเดตราคา Tier สำเร็จ');
+            Response::success('บันทึกราคา ระดับ สำเร็จ');
         } catch (Exception $e) {
-            Response::error('เกิดข้อผิดพลาดในการอัปเดต: ' . $e->getMessage(), 500);
+            error_log('PriceTier update failed: ' . $e->getMessage());
+            Response::error('เกิดข้อผิดพลาดในการอัปเดต', 500);
         }
     }
 }

@@ -6,8 +6,12 @@ class SaleLot extends Model
     // ดึงรายการ Sale Lots ทั้งหมด รองรับกรองตาม branch, status และช่วงวันที่
     public function getAll($branch_id, $filters = [])
     {
-        $where = ["sl.branch_id = ?"];
-        $params = [$branch_id];
+        $where = [];
+        $params = [];
+        if ($branch_id) {
+            $where[] = "sl.branch_id = ?";
+            $params[] = $branch_id;
+        }
 
         if (!empty($filters['status'])) {
             $where[] = "sl.status = ?";
@@ -21,7 +25,7 @@ class SaleLot extends Model
             $where[] = "DATE(sl.sale_date) <= ?";
             $params[] = $filters['date_to'];
         }
-        $whereSql = implode(' AND ', $where);
+        $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
         $items = $this->db->fetchAll(
             "SELECT sl.*,
@@ -31,10 +35,18 @@ class SaleLot extends Model
              FROM {$this->table} sl
              LEFT JOIN branches b ON sl.branch_id = b.id
              LEFT JOIN users u ON sl.created_by = u.id
-             WHERE {$whereSql}
+             {$whereSql}
              ORDER BY sl.created_at DESC",
             $params
         );
+
+        foreach ($items as &$row) {
+            $expenses = json_decode($row['expenses'] ?? '[]', true) ?: [];
+            $row['expenses'] = $expenses;
+            $totalExpenses = array_sum(array_column($expenses, 'amount'));
+            $row['total_expenses'] = $totalExpenses;
+            $row['net_profit'] = (float)$row['total_amount'] - (float)$row['total_cost'] - $totalExpenses;
+        }
 
         return $items;
     }
@@ -55,6 +67,10 @@ class SaleLot extends Model
         );
         if (!$lot) return null;
 
+        $expenses = json_decode($lot['expenses'] ?? '[]', true) ?: [];
+        $lot['expenses'] = $expenses;
+        $totalExpenses = array_sum(array_column($expenses, 'amount'));
+
         $lot['items'] = $this->db->fetchAll(
             "SELECT sli.*,
                     c.name AS category_name
@@ -66,12 +82,18 @@ class SaleLot extends Model
         );
 
         // สรุปกำไรแยกรายหมวดหมู่
+        $netProfit = (float)$lot['total_amount'] - (float)$lot['total_cost'] - $totalExpenses;
         $lot['profit_breakdown'] = [
-            'total_amount' => (float)$lot['total_amount'],
-            'total_cost'   => (float)$lot['total_cost'],
-            'profit'       => (float)$lot['total_amount'] - (float)$lot['total_cost'],
-            'margin_pct'   => $lot['total_amount'] > 0
+            'total_amount'   => (float)$lot['total_amount'],
+            'total_cost'     => (float)$lot['total_cost'],
+            'total_expenses' => $totalExpenses,
+            'profit'         => (float)$lot['total_amount'] - (float)$lot['total_cost'],
+            'net_profit'     => $netProfit,
+            'margin_pct'     => $lot['total_amount'] > 0
                 ? round((((float)$lot['total_amount'] - (float)$lot['total_cost']) / (float)$lot['total_amount']) * 100, 2)
+                : 0,
+            'net_margin_pct' => $lot['total_amount'] > 0
+                ? round(($netProfit / (float)$lot['total_amount']) * 100, 2)
                 : 0,
         ];
 
@@ -110,7 +132,12 @@ class SaleLot extends Model
                 }
 
                 $subtotal  = $qty * $unitPrice;
-                $fifoCost  = $this->calculateFifoCost($branchId, $catId, $qty);
+                // C3 FIX: draft อนุญาตให้บันทึกได้แม้สต็อกไม่พอ — fifo จะถูกคำนวณใหม่ตอน confirm
+                try {
+                    $fifoCost = $this->calculateFifoCost($branchId, $catId, $qty);
+                } catch (Exception $e) {
+                    $fifoCost = 0;
+                }
 
                 $totalAmount += $subtotal;
                 $totalCost   += $fifoCost;
@@ -119,7 +146,6 @@ class SaleLot extends Model
                     'category_id'  => $catId,
                     'quantity_kg'  => $qty,
                     'unit_price'   => $unitPrice,
-                    'subtotal'     => $subtotal,
                     'fifo_cost'    => $fifoCost,
                 ];
             }
@@ -135,6 +161,7 @@ class SaleLot extends Model
                 'total_cost'   => $totalCost,
                 'status'       => $data['status'] ?? 'draft',
                 'notes'        => isset($data['notes']) ? trim((string)$data['notes']) : null,
+                'expenses'     => isset($data['expenses']) ? json_encode($data['expenses']) : null,
                 'created_by'   => $data['created_by'] ?? null,
             ]);
 
@@ -144,7 +171,6 @@ class SaleLot extends Model
                     'category_id'  => $item['category_id'],
                     'quantity_kg'  => $item['quantity_kg'],
                     'unit_price'   => $item['unit_price'],
-                    'subtotal'     => $item['subtotal'],
                     'fifo_cost'    => $item['fifo_cost'],
                 ]);
             }
@@ -176,8 +202,6 @@ class SaleLot extends Model
             $branchId    = intval($lot['branch_id']);
             $totalAmount = 0;
             $totalCost   = 0;
-            $status      = $data['status'] ?? 'draft';
-            $isConfirming = ($status === 'confirmed');
 
             // ลบรายการเดิมก่อนบันทึกใหม่
             $this->db->query("DELETE FROM sale_lot_items WHERE sale_lot_id = ?", [$id]);
@@ -193,7 +217,12 @@ class SaleLot extends Model
                 }
 
                 $subtotal = $qty * $unitPrice;
-                $fifoCost = $isConfirming ? $this->calculateFifoCost($branchId, $catId, $qty) : 0;
+                // C3 FIX: draft อนุญาตให้บันทึกได้แม้สต็อกไม่พอ — fifo จะถูกคำนวณใหม่ตอน confirm
+                try {
+                    $fifoCost = $this->calculateFifoCost($branchId, $catId, $qty);
+                } catch (Exception $e) {
+                    $fifoCost = 0;
+                }
 
                 $totalAmount += $subtotal;
                 $totalCost   += $fifoCost;
@@ -202,14 +231,15 @@ class SaleLot extends Model
                     'category_id' => $catId,
                     'quantity_kg' => $qty,
                     'unit_price'  => $unitPrice,
-                    'subtotal'    => $subtotal,
                     'fifo_cost'   => $fifoCost,
                 ];
             }
 
+            // SECURITY: บังคับ status='draft' — ห้ามให้ client flip เป็น confirmed ผ่าน update()
+            // การเปลี่ยนสถานะต้องผ่าน updateStatus() ที่ตัดสต็อกถูกต้อง
             $this->db->query(
                 "UPDATE {$this->table}
-                 SET buyer_name = ?, sale_date = ?, total_amount = ?, total_cost = ?, notes = ?, status = ?, updated_at = NOW()
+                 SET buyer_name = ?, sale_date = ?, total_amount = ?, total_cost = ?, notes = ?, expenses = ?, status = 'draft', updated_at = NOW()
                  WHERE id = ?",
                 [
                     trim((string)($data['buyer_name'] ?? $lot['buyer_name'] ?? '')),
@@ -217,7 +247,7 @@ class SaleLot extends Model
                     $totalAmount,
                     $totalCost,
                     isset($data['notes']) ? trim((string)$data['notes']) : null,
-                    $status,
+                    isset($data['expenses']) ? json_encode($data['expenses']) : null,
                     $id,
                 ]
             );
@@ -228,7 +258,6 @@ class SaleLot extends Model
                     'category_id' => $item['category_id'],
                     'quantity_kg' => $item['quantity_kg'],
                     'unit_price'  => $item['unit_price'],
-                    'subtotal'    => $item['subtotal'],
                     'fifo_cost'   => $item['fifo_cost'],
                 ]);
             }
@@ -263,6 +292,12 @@ class SaleLot extends Model
 
         $this->db->beginTransaction();
         try {
+            // C3 FIX: draft→confirmed ต้องคำนวณ fifo_cost ใหม่จากสต็อกปัจจุบัน
+            // (update() อาจบันทึก fifo=0 ถ้าสต็อกไม่พอตอนเป็น draft)
+            if ($status === 'confirmed' && $lot['status'] === 'draft') {
+                $this->recomputeFifoCost($id);
+            }
+
             $this->db->query(
                 "UPDATE {$this->table} SET status = ?, updated_at = NOW() WHERE id = ?",
                 [$status, $id]
@@ -280,6 +315,39 @@ class SaleLot extends Model
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    // คำนวณ fifo_cost ใหม่สำหรับทุกรายการของ sale_lot และอัปเดต total_cost
+    // จะ throw ถ้าสต็อกไม่พอ (ใช้ตอน confirm)
+    private function recomputeFifoCost($sale_lot_id)
+    {
+        $lot = $this->db->fetch(
+            "SELECT branch_id FROM {$this->table} WHERE id = ?",
+            [$sale_lot_id]
+        );
+        $items = $this->db->fetchAll(
+            "SELECT id, category_id, quantity_kg FROM sale_lot_items WHERE sale_lot_id = ?",
+            [$sale_lot_id]
+        );
+
+        $totalCost = 0.0;
+        foreach ($items as $item) {
+            $fifo = $this->calculateFifoCost(
+                (int)$lot['branch_id'],
+                (int)$item['category_id'],
+                (float)$item['quantity_kg']
+            );
+            $this->db->query(
+                "UPDATE sale_lot_items SET fifo_cost = ? WHERE id = ?",
+                [$fifo, $item['id']]
+            );
+            $totalCost += $fifo;
+        }
+
+        $this->db->query(
+            "UPDATE {$this->table} SET total_cost = ? WHERE id = ?",
+            [$totalCost, $sale_lot_id]
+        );
     }
 
     // คำนวณต้นทุน FIFO สำหรับหมวดหมู่และปริมาณที่ต้องการ

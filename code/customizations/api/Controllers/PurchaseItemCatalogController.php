@@ -54,18 +54,23 @@ class PurchaseItemCatalogController extends Controller
             $id = $model->create($data);
             Response::success('เพิ่มรายการสำเร็จ', ['id' => $id]);
         } catch (Exception $e) {
-            Response::error($e->getMessage(), 400);
+            error_log('Catalog create failed: ' . $e->getMessage());
+            Response::error('ไม่สามารถเพิ่มรายการได้', 400);
         }
     }
 
     /**
      * PUT /api/purchase-catalog/item
      */
-    public function updateItem()
+    public function updateItem($id = null)
     {
         $this->requireAuth(['admin', 'manager']);
-        $data = $this->getRequestData();
-        $id = $data['id'] ?? null;
+        if (!$id) {
+            $data = $this->getRequestData();
+            $id = $data['id'] ?? null;
+        } else {
+            $data = $this->getRequestData();
+        }
         if (!$id) {
             Response::error('กรุณาระบุ ID', 400);
         }
@@ -74,7 +79,8 @@ class PurchaseItemCatalogController extends Controller
             $model->update($id, $data);
             Response::success('แก้ไขสำเร็จ');
         } catch (Exception $e) {
-            Response::error($e->getMessage(), 400);
+            error_log('Catalog update failed: ' . $e->getMessage());
+            Response::error('ไม่สามารถแก้ไขรายการได้', 400);
         }
     }
 }

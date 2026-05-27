@@ -42,7 +42,8 @@ class BranchesController extends Controller
             Logger::logActivity($this->user['user_id'], 'create_branch', "Created branch: {$data['name']}");
             Response::success('Branch created', ['id' => $id]);
         } catch (Exception $e) {
-            Response::error('Failed to create branch: ' . $e->getMessage());
+            error_log('Branch create failed: ' . $e->getMessage());
+            Response::error('Failed to create branch', 500);
         }
     }
 
@@ -58,7 +59,8 @@ class BranchesController extends Controller
             Logger::logActivity($this->user['user_id'], 'update_branch', "Updated branch ID: {$id}");
             Response::success('Branch updated');
         } catch (Exception $e) {
-            Response::error('Failed to update branch: ' . $e->getMessage());
+            error_log('Branch update failed: ' . $e->getMessage());
+            Response::error('Failed to update branch', 500);
         }
     }
 }

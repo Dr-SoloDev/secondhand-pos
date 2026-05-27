@@ -88,14 +88,14 @@ class PurchaseOrder extends Model
         return $po;
     }
 
-    public function generateReferenceNo()
+    public function generateReferenceNo($branch_id)
     {
-        $prefix = 'PO' . date('Ymd');
+        $prefix = 'PO-B' . (int)$branch_id . '-' . date('Ymd');
         $last = $this->db->fetchColumn(
             "SELECT MAX(CAST(SUBSTRING_INDEX(reference_no, '-', -1) AS UNSIGNED))
              FROM {$this->table}
-             WHERE reference_no LIKE ?",
-            [$prefix . '-%']
+             WHERE reference_no LIKE ? AND branch_id = ?",
+            [$prefix . '-%', $branch_id]
         );
         $next = ($last ?? 0) + 1;
         return $prefix . '-' . str_pad($next, 3, '0', STR_PAD_LEFT);
@@ -124,7 +124,7 @@ class PurchaseOrder extends Model
             }
             $totalItems = count($items);
 
-            $referenceNo = $this->generateReferenceNo();
+            $referenceNo = $this->generateReferenceNo($data['branch_id']);
 
             $poId = $this->insert([
                 'reference_no' => $referenceNo,

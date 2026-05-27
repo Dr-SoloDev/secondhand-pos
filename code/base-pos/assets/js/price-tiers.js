@@ -1,9 +1,3 @@
-/**
- * Price Tiers Management
- * ตั้งค่าราคารับซื้อ 3 ระดับ ต่อหมวดหมู่สินค้า
- */
-
-// Escape HTML to prevent XSS
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -11,27 +5,21 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Check if user has permission (admin/manager only)
 function checkPermission() {
     const userJson = localStorage.getItem('posUser');
     if (!userJson) return false;
-
     const user = JSON.parse(userJson);
     return user.role === 'admin' || user.role === 'manager';
 }
 
-// Load price tiers data
 async function loadPriceTiers() {
     const hasPermission = checkPermission();
-
     if (!hasPermission) {
         document.getElementById('accessDenied').style.display = 'block';
         document.getElementById('priceTiersTable').style.display = 'none';
         return;
     }
-
     const result = await apiRequest('price-tiers', 'GET');
-
     if (result.status === 'success') {
         renderPriceTiersTable(result.data);
     } else {
@@ -39,88 +27,132 @@ async function loadPriceTiers() {
     }
 }
 
-// Render the price tiers table
-function renderPriceTiersTable(categories) {
+function renderPriceTiersTable(items) {
     const tbody = document.getElementById('priceTiersTableBody');
-
-    if (!categories || categories.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">ไม่พบหมวดหมู่สินค้า</td></tr>';
+    if (!items || items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">ไม่พบรายการสินค้าในแคตตาล็อก</td></tr>';
         return;
     }
 
-    tbody.innerHTML = categories.map(cat => `
-        <tr id="row-${cat.id}">
-            <td>${escapeHtml(String(cat.id))}</td>
-            <td>${escapeHtml(cat.name)}</td>
-            <td>
-                <input type="number" 
-                    id="tier1-${cat.id}" 
-                    class="form-control tier-input" 
-                    value="${parseFloat(cat.price_tier1 || 0).toFixed(2)}" 
-                    min="0" 
-                    step="0.01"
-                    placeholder="0.00">
-            </td>
-            <td>
-                <input type="number" 
-                    id="tier2-${cat.id}" 
-                    class="form-control tier-input" 
-                    value="${parseFloat(cat.price_tier2 || 0).toFixed(2)}" 
-                    min="0" 
-                    step="0.01"
-                    placeholder="0.00">
-            </td>
-            <td>
-                <input type="number" 
-                    id="tier3-${cat.id}" 
-                    class="form-control tier-input" 
-                    value="${parseFloat(cat.price_tier3 || 0).toFixed(2)}" 
-                    min="0" 
-                    step="0.01"
-                    placeholder="0.00">
-            </td>
-            <td>
-                <button class="btn-primary btn-sm" onclick="savePriceTier(${cat.id})">💾 บันทึก</button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = items.map(item => {
+        const tiers = item.tier_prices || [];
+        const tiersHtml = tiers.map((t, i) => `
+            <div class="tier-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+                <input type="text" class="form-control tier-label-input"
+                    data-item="${item.id}" data-idx="${i}"
+                    value="${escapeHtml(t.label)}"
+                    style="width:150px" placeholder="ชื่อระดับ">
+                <input type="number" class="form-control tier-price-input"
+                    data-item="${item.id}" data-idx="${i}"
+                    value="${parseFloat(t.price || 0).toFixed(2)}"
+                    min="0" step="0.01" style="width:110px" placeholder="0.00">
+                ${tiers.length > 1 ? `<button class="btn btn-sm btn-danger" onclick="removeTier(${item.id}, ${i})" style="padding:2px 8px;font-size:12px">ลบ</button>` : ''}
+            </div>
+        `).join('');
+
+        return `
+            <tr id="row-${item.id}">
+                <td>${escapeHtml(item.code)}</td>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${escapeHtml(item.category_name || '—')}</td>
+                <td>
+                    <div id="tiersContainer-${item.id}">
+                        ${tiersHtml}
+                    </div>
+                    <button class="btn btn-sm btn-secondary" onclick="addTier(${item.id})" style="margin-top:4px;font-size:12px">
+                        + เพิ่มระดับ
+                    </button>
+                </td>
+                <td>
+                    <button class="btn-primary btn-sm" onclick="savePriceTier(${item.id})">💾 บันทึก</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
-// Save price tier for a specific category
-async function savePriceTier(categoryId) {
-    const tier1Input = document.getElementById(`tier1-${categoryId}`);
-    const tier2Input = document.getElementById(`tier2-${categoryId}`);
-    const tier3Input = document.getElementById(`tier3-${categoryId}`);
+function getTiersForItem(itemId) {
+    const container = document.getElementById(`tiersContainer-${itemId}`);
+    const labelInputs = container.querySelectorAll('.tier-label-input');
+    const priceInputs = container.querySelectorAll('.tier-price-input');
+    const tiers = [];
+    labelInputs.forEach((labelInput, i) => {
+        const priceInput = priceInputs[i];
+        if (!priceInput) return;
+        const label = labelInput.value.trim();
+        const price = parseFloat(priceInput.value) || 0;
+        if (!label) return;
+        tiers.push({ label, price });
+    });
+    return tiers;
+}
 
-    const priceTier1 = parseFloat(tier1Input.value) || 0;
-    const priceTier2 = parseFloat(tier2Input.value) || 0;
-    const priceTier3 = parseFloat(tier3Input.value) || 0;
+function addTier(itemId) {
+    const container = document.getElementById(`tiersContainer-${itemId}`);
+    const idx = container.querySelectorAll('.tier-row').length;
+    const row = document.createElement('div');
+    row.className = 'tier-row';
+    row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:4px';
+    row.innerHTML = `
+        <input type="text" class="form-control tier-label-input"
+            data-item="${itemId}" data-idx="${idx}"
+            value="บิล${idx + 1}"
+            style="width:150px" placeholder="ชื่อระดับ">
+        <input type="number" class="form-control tier-price-input"
+            data-item="${itemId}" data-idx="${idx}"
+            value="0.00" min="0" step="0.01"
+            style="width:110px" placeholder="0.00">
+        <button class="btn btn-sm btn-danger" onclick="removeTier(${itemId}, ${idx})" style="padding:2px 8px;font-size:12px">ลบ</button>
+    `;
+    container.appendChild(row);
 
-    // Validate non-negative
-    if (priceTier1 < 0 || priceTier2 < 0 || priceTier3 < 0) {
-        showNotification('ราคาต้องไม่ติดลบ', 'error');
+    const saveBtn = document.querySelector(`#row-${itemId} .btn-primary`);
+    if (saveBtn) saveBtn.style.display = 'inline-block';
+}
+
+function removeTier(itemId, idx) {
+    const container = document.getElementById(`tiersContainer-${itemId}`);
+    const rows = container.querySelectorAll('.tier-row');
+    if (rows.length <= 1) return;
+    rows[idx].remove();
+
+    const remaining = container.querySelectorAll('.tier-row');
+    if (remaining.length <= 1) {
+        remaining.forEach(r => {
+            const delBtn = r.querySelector('.btn-danger');
+            if (delBtn) delBtn.style.display = 'none';
+        });
+    }
+}
+
+async function savePriceTier(itemId) {
+    const tiers = getTiersForItem(itemId);
+    if (tiers.length === 0) {
+        showNotification('กรุณาเพิ่มอย่างน้อย 1 ระดับ', 'error');
         return;
     }
-
+    for (const t of tiers) {
+        if (!t.label) {
+            showNotification('กรุณากรอกชื่อทุกระดับ', 'error');
+            return;
+        }
+        if (t.price < 0) {
+            showNotification(`ราคา "${t.label}" ต้องไม่ติดลบ`, 'error');
+            return;
+        }
+    }
     const result = await apiRequest('price-tiers/category', 'PUT', {
-        id: categoryId,
-        price_tier1: priceTier1,
-        price_tier2: priceTier2,
-        price_tier3: priceTier3
+        id: itemId,
+        tiers: tiers
     });
-
     if (result.status === 'success') {
-        showNotification('บันทึกราคา Tier สำเร็จ', 'success');
-        // Update input values to formatted version
-        tier1Input.value = priceTier1.toFixed(2);
-        tier2Input.value = priceTier2.toFixed(2);
-        tier3Input.value = priceTier3.toFixed(2);
+        showNotification('บันทึกราคา ระดับ สำเร็จ', 'success');
+        loadPriceTiers();
     } else {
         showNotification(result.message || 'ไม่สามารถบันทึกได้', 'error');
     }
 }
 
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadPriceTiers();
 });

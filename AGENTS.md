@@ -1,7 +1,7 @@
 # Secondhand POS — AI Agent Context
 
 > ระบบจัดการร้านรับซื้อของเก่า (Junk Shop POS)
-> Owner: Dr.solodev | Last Updated: 2026-05-27
+> Owner: Dr.solodev | Last Updated: 2026-05-28
 
 ---
 
@@ -75,6 +75,8 @@ code/
 | 010 | — | ADD consumed_qty / fifo_cost to purchase_order_items |
 | 012 | `purchase_item_catalog` | Master catalog — code, name, category_id, default_price, default_unit |
 | 013 | — | REPLACE condition_id with weight_deduction in purchase_order_items |
+| 015 | `purchase_item_catalog` | ADD price_tier1/2/3 columns (fixed 3 tiers) |
+| 016 | `purchase_item_catalog` | ADD tier_prices JSON column (dynamic tiers, replaces price_tier1/2/3) |
 
 ### Sale Lot Tables
 
@@ -193,7 +195,7 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 1. Select branch → search/select seller (or create new)
 2. Search catalog item by code/name → auto-fill category + unit
 3. Enter: weight (kg), weight deduction (kg), unit price
-4. Optional: select price tier (tier-1/2/3 buttons)
+4. Optional: select price tier (dynamic buttons from catalog tiers)
 5. Click "เพิ่มรายการ" → item added to cart table
 6. Repeat steps 2-5 for multiple items
 7. Set payment method + notes
@@ -238,13 +240,13 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 ## Development State
 
 ### ✅ Completed
-- All 13 database migrations created and documented
+- All 16 database migrations created and documented
 - All custom Models + Controllers built
 - Router has ALL routes registered
-- Purchase Orders page (PHP): catalog autocomplete, seller search, item row + cart table, tier buttons
+- Purchase Orders page (PHP): catalog autocomplete, seller search, item row + cart table, dynamic tier buttons
 - Sale Lots page (PHP): full CRUD with modal, line items, confirm/delete, profit display
 - Sidebar: "ขาย Lot" link added to all admin pages
-- Price Tiers: category-level tier pricing (3 tiers)
+- Price Tiers: dynamic tier pricing (add/remove levels per catalog item, stored as JSON)
 - Purchase Item Catalog: master catalog management
 - Build: passes, no errors
 

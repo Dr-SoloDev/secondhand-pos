@@ -49,7 +49,8 @@ class CustomersController extends Controller
 
             Response::success('Customer created', ['id' => $customerId]);
         } catch (Exception $e) {
-            Response::error('Failed to create customer: '.$e->getMessage());
+            error_log('Customer create failed: ' . $e->getMessage());
+            Response::error('Failed to create customer', 500);
         }
     }
 
@@ -114,7 +115,8 @@ class CustomersController extends Controller
 
             Response::success('Customer updated');
         } catch (Exception $e) {
-            Response::error('Failed to update customer: '.$e->getMessage());
+            error_log('Customer update failed: ' . $e->getMessage());
+            Response::error('Failed to update customer', 500);
         }
     }
 
@@ -158,7 +160,8 @@ class CustomersController extends Controller
 
             Response::success('Customer deleted');
         } catch (Exception $e) {
-            Response::error('Failed to delete customer: '.$e->getMessage());
+            error_log('Customer delete failed: ' . $e->getMessage());
+            Response::error('Failed to delete customer', 500);
         }
     }
 }

@@ -73,7 +73,7 @@ class AuthController extends Controller
         $this->clearRateLimit($username);
 
         // Generate token
-        $token = TokenService::generate($user['id'], $user['username'], $user['role']);
+        $token = TokenService::generate($user['id'], $user['username'], $user['role'], $user['branch_id'] ?? null);
 
         // Log activity
         Logger::logActivity($user['id'], 'login', 'User logged in successfully');

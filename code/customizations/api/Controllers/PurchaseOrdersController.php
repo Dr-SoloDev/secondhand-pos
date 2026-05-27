@@ -24,11 +24,13 @@ class PurchaseOrdersController extends Controller
         Response::success('Purchase order retrieved', $po);
     }
 
-    public function cancelPurchaseOrder()
+    public function cancelPurchaseOrder($id = null)
     {
         $this->requireAuth(['admin', 'manager']);
-        $data = $this->getRequestData();
-        $id = isset($data['id']) ? intval($data['id']) : 0;
+        if (!$id) {
+            $data = $this->getRequestData();
+            $id = isset($data['id']) ? intval($data['id']) : 0;
+        }
         if (!$id) Response::error('ต้องระบุรหัสใบรับซื้อ', 400);
 
         $model = new PurchaseOrder();
@@ -45,7 +47,8 @@ class PurchaseOrdersController extends Controller
             );
             Response::success('ยกเลิกใบรับซื้อสำเร็จ');
         } catch (Exception $e) {
-            Response::error('ยกเลิกใบรับซื้อไม่สำเร็จ: ' . $e->getMessage());
+            error_log('PurchaseOrder cancel failed: ' . $e->getMessage());
+            Response::error('ยกเลิกใบรับซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 
@@ -69,13 +72,14 @@ class PurchaseOrdersController extends Controller
 
         $cleanItems = [];
         foreach ($data['items'] as $item) {
-            if (empty($item['item_name']) || empty($item['condition_id'])) {
-                Response::error('แต่ละรายการต้องมีชื่อของและสภาพ', 400);
+            if (empty($item['item_name'])) {
+                Response::error('แต่ละรายการต้องมีชื่อของ', 400);
             }
             $cleanItems[] = [
                 'item_name' => trim((string)$item['item_name']),
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
-                'condition_id' => intval($item['condition_id']),
+                'condition_id' => !empty($item['condition_id']) ? intval($item['condition_id']) : null,
+                'weight_deduction' => floatval($item['weight_deduction'] ?? 0),
                 'quantity' => floatval($item['quantity'] ?? 1),
                 'unit' => $item['unit'] ?? 'ชิ้น',
                 'unit_price' => floatval($item['unit_price'] ?? 0),
@@ -95,7 +99,8 @@ class PurchaseOrdersController extends Controller
             );
             Response::success('สร้างใบรับซื้อสำเร็จ', $result);
         } catch (Exception $e) {
-            Response::error('สร้างใบรับซื้อไม่สำเร็จ: ' . $e->getMessage());
+            error_log('PurchaseOrder create failed: ' . $e->getMessage());
+            Response::error('สร้างใบรับซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 }

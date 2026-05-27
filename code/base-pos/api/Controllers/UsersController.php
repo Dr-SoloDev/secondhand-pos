@@ -52,7 +52,8 @@ class UsersController extends Controller
 
             Response::success('User created', ['id' => $userId]);
         } catch (Exception $e) {
-            Response::error('Failed to create user: '.$e->getMessage());
+            error_log('User create failed: ' . $e->getMessage());
+            Response::error('Failed to create user', 500);
         }
     }
 
@@ -147,7 +148,8 @@ class UsersController extends Controller
 
             Response::success('User updated');
         } catch (Exception $e) {
-            Response::error('Failed to update user: '.$e->getMessage());
+            error_log('User update failed: ' . $e->getMessage());
+            Response::error('Failed to update user', 500);
         }
     }
 
@@ -188,7 +190,8 @@ class UsersController extends Controller
 
             Response::success('User deleted');
         } catch (Exception $e) {
-            Response::error('Failed to delete user: '.$e->getMessage());
+            error_log('User delete failed: ' . $e->getMessage());
+            Response::error('Failed to delete user', 500);
         }
     }
 
@@ -230,7 +233,8 @@ class UsersController extends Controller
 
             Response::success('Password changed successfully');
         } catch (Exception $e) {
-            Response::error('Failed to change password: '.$e->getMessage());
+            error_log('Password change failed: ' . $e->getMessage());
+            Response::error('Failed to change password', 500);
         }
     }
 
@@ -314,7 +318,8 @@ class UsersController extends Controller
 
             Response::success('Profile updated');
         } catch (Exception $e) {
-            Response::error('Failed to update profile: '.$e->getMessage());
+            error_log('Profile update failed: ' . $e->getMessage());
+            Response::error('Failed to update profile', 500);
         }
     }
 
@@ -354,7 +359,8 @@ class UsersController extends Controller
 
             Response::success('Password changed successfully');
         } catch (Exception $e) {
-            Response::error('Failed to change password: '.$e->getMessage());
+            error_log('Own password change failed: ' . $e->getMessage());
+            Response::error('Failed to change password', 500);
         }
-    }
+}
 }

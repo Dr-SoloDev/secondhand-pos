@@ -50,7 +50,8 @@ class SettingsController extends Controller
 
             Response::success('Store settings updated successfully');
         } catch (Exception $e) {
-            Response::error('Failed to update store settings: '.$e->getMessage());
+            error_log('Store settings update failed: ' . $e->getMessage());
+            Response::error('Failed to update store settings', 500);
         }
     }
 
@@ -99,7 +100,8 @@ class SettingsController extends Controller
 
             Response::success('System settings updated successfully');
         } catch (Exception $e) {
-            Response::error('Failed to update system settings: '.$e->getMessage());
+            error_log('System settings update failed: ' . $e->getMessage());
+            Response::error('Failed to update system settings', 500);
         }
     }
 
@@ -127,7 +129,8 @@ class SettingsController extends Controller
                 Response::error('Failed to create backup: '.$result['message']);
             }
         } catch (Exception $e) {
-            Response::error('Error creating backup: '.$e->getMessage());
+            error_log('Backup create failed: ' . $e->getMessage());
+            Response::error('Error creating backup', 500);
         }
     }
 
@@ -156,7 +159,8 @@ class SettingsController extends Controller
                 Response::error('Failed to restore backup: '.$result['message']);
             }
         } catch (Exception $e) {
-            Response::error('Error restoring backup: '.$e->getMessage());
+            error_log('Backup restore failed: ' . $e->getMessage());
+            Response::error('Error restoring backup', 500);
         }
     }
 
@@ -169,7 +173,8 @@ class SettingsController extends Controller
             $backups = BackupService::getBackupHistory();
             Response::success('Backup history retrieved', $backups);
         } catch (Exception $e) {
-            Response::error('Error retrieving backup history: '.$e->getMessage());
+            error_log('Backup history retrieval failed: ' . $e->getMessage());
+            Response::error('Error retrieving backup history', 500);
         }
     }
 
@@ -190,7 +195,8 @@ class SettingsController extends Controller
             }
             // Note: downloadBackup will handle the file download and exit
         } catch (Exception $e) {
-            Response::error('Error downloading backup: '.$e->getMessage());
+            error_log('Backup download failed: ' . $e->getMessage());
+            Response::error('Error downloading backup', 500);
         }
     }
 
@@ -219,7 +225,8 @@ class SettingsController extends Controller
                 Response::error('Failed to delete backup file');
             }
         } catch (Exception $e) {
-            Response::error('Error deleting backup: '.$e->getMessage());
+            error_log('Backup delete failed: ' . $e->getMessage());
+            Response::error('Error deleting backup', 500);
         }
     }
 }

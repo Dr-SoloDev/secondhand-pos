@@ -1,11 +1,10 @@
 let branches = [];
-let categories = [];
 let cart = [];
 let selectedSeller = null;
 let recentPOs = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await Promise.all([loadBranches(), loadCategories()]);
+  await loadBranches();
   await loadRecentPOs();
 
   document.getElementById('searchSellerInput').addEventListener('input', debounce(searchSellers, 300));
@@ -62,13 +61,6 @@ async function loadBranches() {
   }
 }
 
-async function loadCategories() {
-  const res = await apiRequest('inventory/categories');
-  if (res.status === 'success') {
-    categories = res.data || [];
-  }
-}
-
 function updateItemTotal() {
   const q = parseFloat(document.getElementById('itemQuantity').value || 0);
   const d = parseFloat(document.getElementById('itemWeightDeduct').value || 0);
@@ -111,6 +103,7 @@ async function searchCatalog() {
       price: exact.default_price || 0,
       cat: exact.category_id || '',
       catName: exact.category_name || '',
+      tierprices: JSON.stringify(exact.tier_prices || []),
     });
     return;
   }
@@ -121,6 +114,7 @@ async function searchCatalog() {
          data-name="${escapeHtml(it.name)}" data-unit="${escapeHtml(it.default_unit || '')}"
          data-price="${it.default_price || 0}" data-cat="${it.category_id || ''}"
          data-catname="${escapeHtml(it.category_name || '')}"
+         data-tierprices='${escapeHtml(JSON.stringify(it.tier_prices || []))}'
          style="cursor:pointer">
       <strong>${escapeHtml(it.code)}</strong> \u2014 ${escapeHtml(it.name)}
       <span style="color:#888;font-size:12px">
@@ -170,27 +164,23 @@ function selectCatalogItem(d) {
   document.getElementById('itemQuantity').value = '1';
   document.getElementById('itemWeightDeduct').value = '0';
 
-  // Build tier buttons
-  buildTierButtons(d.cat || '');
+  // Build tier buttons from catalog item's tier prices
+  const tierPrices = d.tierprices ? JSON.parse(d.tierprices) : [];
+  buildTierButtons(tierPrices);
 
   updateItemTotal();
 }
 
-function buildTierButtons(catId) {
+function buildTierButtons(tierPrices) {
   const group = document.getElementById('tierSelectionGroup');
   const container = document.getElementById('tierButtons');
   container.innerHTML = '';
 
-  if (!catId) { group.style.display = 'none'; return; }
-
-  const cat = categories.find(c => String(c.id) === String(catId));
-  if (!cat) { group.style.display = 'none'; return; }
-
-  const tiers = [
-    { level: 1, price: parseFloat(cat.price_tier1 || 0), label: '\u0e23\u0e32\u0e04\u0e32\u0e1b\u0e01\u0e15\u0e34', color: '#17a2b8' },
-    { level: 2, price: parseFloat(cat.price_tier2 || 0), label: '\u0e23\u0e32\u0e04\u0e32\u0e01\u0e25\u0e32\u0e07', color: '#ffc107' },
-    { level: 3, price: parseFloat(cat.price_tier3 || 0), label: '\u0e23\u0e32\u0e04\u0e32\u0e2a\u0e39\u0e07', color: '#28a745' },
-  ];
+  const tiers = (tierPrices || []).map((t, i) => ({
+    level: i + 1,
+    price: parseFloat(t.price || 0),
+    label: t.label || '\u0e1a\u0e34\u0e25' + (i + 1),
+  }));
 
   const hasPrice = tiers.some(t => t.price > 0);
   if (!hasPrice) { group.style.display = 'none'; return; }

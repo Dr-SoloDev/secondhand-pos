@@ -4,6 +4,8 @@ class SaleLotsController extends Controller
     // ดึงรายการ Sale Lots ทั้งหมด รองรับกรองตาม branch, status และช่วงวันที่
     public function index()
     {
+        $this->requireAuth();
+
         $filters = [
             'branch_id' => isset($_GET['branch_id']) ? intval($_GET['branch_id']) : null,
             'status'    => isset($_GET['status'])    ? $this->sanitizeInput($_GET['status'])    : null,
@@ -11,12 +13,12 @@ class SaleLotsController extends Controller
             'date_to'   => isset($_GET['date_to'])   ? $this->sanitizeInput($_GET['date_to'])   : null,
         ];
 
-        // BUG-01 FIX: ถ้าไม่ส่ง branch_id ให้ใช้ branch ของ user ที่ login
-        if (!$filters['branch_id']) {
+        // SECURITY: non-admin บังคับ scope ที่ branch ของตัวเองเสมอ — ห้าม query สาขาอื่น
+        if (($this->user['role'] ?? '') !== 'admin') {
             $filters['branch_id'] = $this->user['branch_id'] ?? null;
-        }
-        if (!$filters['branch_id']) {
-            Response::error('ต้องระบุ branch_id', 400);
+            if (!$filters['branch_id']) {
+                Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+            }
         }
 
         $model  = new SaleLot();
@@ -27,11 +29,20 @@ class SaleLotsController extends Controller
     // ดึง Sale Lot เดียวพร้อมรายการสินค้าและข้อมูลกำไร
     public function show($id)
     {
+        $this->requireAuth();
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
         $lot   = $model->getById($id);
         if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+
+        // SECURITY: non-admin ดูได้เฉพาะ Sale Lot ของสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์เข้าถึง Sale Lot นี้', 403);
+            }
+        }
 
         Response::success('ดึงข้อมูล Sale Lot สำเร็จ', $lot);
     }
@@ -39,6 +50,7 @@ class SaleLotsController extends Controller
     // สร้าง Sale Lot ใหม่ (draft) พร้อมรายการสินค้า
     public function store()
     {
+        $this->requireAuth(['admin', 'manager']);
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['branch_id', 'buyer_name', 'sale_date', 'items']);
 
@@ -52,6 +64,7 @@ class SaleLotsController extends Controller
             'sale_date'  => $this->sanitizeInput($data['sale_date']),
             'status'     => $data['status'] ?? 'draft',
             'notes'      => isset($data['notes']) ? trim((string)$data['notes']) : null,
+            'expenses'   => $data['expenses'] ?? null,
             'created_by' => $this->user['user_id'] ?? null,
         ];
 
@@ -79,13 +92,15 @@ class SaleLotsController extends Controller
             );
             Response::success('สร้าง Sale Lot สำเร็จ', $result);
         } catch (Exception $e) {
-            Response::error('สร้าง Sale Lot ไม่สำเร็จ: ' . $e->getMessage());
+            error_log('SaleLot store failed: ' . $e->getMessage());
+            Response::error('สร้าง Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 
     // อัปเดต Sale Lot ได้เฉพาะสถานะ draft เท่านั้น
     public function update($id)
     {
+        $this->requireAuth(['admin', 'manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $data = $this->getRequestData();
@@ -99,6 +114,7 @@ class SaleLotsController extends Controller
             'buyer_name' => trim((string)$data['buyer_name']),
             'sale_date'  => $this->sanitizeInput($data['sale_date']),
             'notes'      => isset($data['notes']) ? trim((string)$data['notes']) : null,
+            'expenses'   => $data['expenses'] ?? null,
         ];
 
         $cleanItems = [];
@@ -125,13 +141,15 @@ class SaleLotsController extends Controller
             );
             Response::success('อัปเดต Sale Lot สำเร็จ', null);
         } catch (Exception $e) {
-            Response::error('อัปเดต Sale Lot ไม่สำเร็จ: ' . $e->getMessage());
+            error_log('SaleLot update failed: ' . $e->getMessage());
+            Response::error('อัปเดต Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 
     // ยืนยัน Sale Lot เปลี่ยนสถานะเป็น confirmed และตัดสต็อก
     public function confirm($id)
     {
+        $this->requireAuth(['admin', 'manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -144,13 +162,15 @@ class SaleLotsController extends Controller
             );
             Response::success('ยืนยัน Sale Lot สำเร็จ', null);
         } catch (Exception $e) {
-            Response::error('ยืนยัน Sale Lot ไม่สำเร็จ: ' . $e->getMessage());
+            error_log('SaleLot confirm failed: ' . $e->getMessage());
+            Response::error('ยืนยัน Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 
     // ยกเลิก Sale Lot เปลี่ยนสถานะเป็น cancelled และคืนสต็อก (BUG-05 FIX)
     public function cancel($id)
     {
+        $this->requireAuth(['admin', 'manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -163,13 +183,15 @@ class SaleLotsController extends Controller
             );
             Response::success('ยกเลิก Sale Lot สำเร็จ', null);
         } catch (Exception $e) {
-            Response::error('ยกเลิก Sale Lot ไม่สำเร็จ: ' . $e->getMessage());
+            error_log('SaleLot cancel failed: ' . $e->getMessage());
+            Response::error('ยกเลิก Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 
     // ลบ Sale Lot ได้เฉพาะสถานะ draft เท่านั้น
     public function destroy($id)
     {
+        $this->requireAuth(['admin', 'manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -182,7 +204,8 @@ class SaleLotsController extends Controller
             );
             Response::success('ลบ Sale Lot สำเร็จ', null);
         } catch (Exception $e) {
-            Response::error('ลบ Sale Lot ไม่สำเร็จ: ' . $e->getMessage());
+            error_log('SaleLot destroy failed: ' . $e->getMessage());
+            Response::error('ลบ Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 }
