@@ -6,22 +6,6 @@
   <title>รับซื้อของ - ระบบรับซื้อของเก่า</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
-  <style>
-    .po-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    @media (max-width: 1100px) { .po-grid { grid-template-columns: 1fr; } }
-    .seller-search-box { position: relative; }
-    .seller-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; border-top: 0; z-index: 10; max-height: 300px; overflow-y: auto; display: none; }
-    .seller-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
-    .seller-item:hover { background: #f5f7fa; }
-    .selected-seller { padding: 12px; background: #e8f5e9; border-radius: 6px; }
-    .selected-seller > div { margin-bottom: 4px; }
-    .cart-summary { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff8e1; border-radius: 6px; margin-top: 12px; font-size: 18px; }
-    .receipt { background: #fff; padding: 20px; max-width: 600px; }
-    .receipt hr { border: none; border-top: 1px dashed #ccc; margin: 12px 0; }
-    .item-form-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 8px; align-items: end; }
-    @media (max-width: 900px) { .item-form-grid { grid-template-columns: 1fr 1fr; } }
-    .total-preview { font-size: 16px; padding: 6px; background: #f0f4f8; border-radius: 4px; text-align: center; }
-  </style>
 </head>
 <body>
   <div class="app-container">
@@ -37,12 +21,14 @@
         <li><a href="purchase-orders.html" class="active"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
         <li><a href="sellers.html"><i class="icon-users"></i><span>ผู้ขาย</span></a></li>
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
-        <li><a href="../pos/index.html"><i class="icon-cart"></i><span>POS</span></a></li>
+        <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
         <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
         <li><a href="branches.html"><i class="icon-tagss"></i><span>สาขา</span></a></li>
         <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
         <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+        <li><a href="price-tiers.html"><i class="icon-tagss"></i><span>ตั้งค่าราคา</span></a></li>
       </ul>
     </aside>
 
@@ -106,57 +92,50 @@
             </div>
             <div class="card-body">
               <div class="form-group">
-                <label for="itemName">ชื่อของ*</label>
-                <input type="text" id="itemName" class="form-control" placeholder="เช่น เครื่องซักผ้า, เหล็ก, มือถือ Samsung">
+                <label for="itemName">รหัส/ชื่อสินค้า* <span style="font-weight:400;color:#999">(auto-fill เมื่อตรง)</span></label>
+                <div class="seller-search-box" style="position:relative">
+                  <input type="text" id="itemName" class="form-control" autocomplete="off"
+                         placeholder="พิมพ์รหัสหรือชื่อ เช่น WM01, เครื่องซักผ้า">
+                  <input type="hidden" id="itemCatalogId" value="">
+                  <input type="hidden" id="itemCategoryId" value="">
+                  <input type="hidden" id="itemUnit" value="ชิ้น">
+                  <div id="itemCatalogResults" class="seller-results"></div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>หมวดหมู่</label>
+                <div id="itemCategoryDisplay" style="padding:8px 0;font-size:13px;color:#999">
+                  — รอเลือกสินค้าจากแคตตาล็อก —
+                </div>
               </div>
 
               <div class="form-row">
                 <div class="form-col">
-                  <label for="itemCategoryId">หมวด</label>
-                  <select id="itemCategoryId" class="form-control"></select>
+                  <label for="itemUnitPrice">ราคา/หน่วย (฿)</label>
+                  <input type="number" id="itemUnitPrice" class="form-control" min="0" step="0.01" value="0">
                 </div>
                 <div class="form-col">
-                  <label for="itemConditionId">สภาพ*</label>
-                  <select id="itemConditionId" class="form-control"></select>
+                  <label for="itemQuantity">น้ำหนัก (กก.)</label>
+                  <input type="number" id="itemQuantity" class="form-control" min="0" step="0.01" value="1">
+                </div>
+                <div class="form-col">
+                  <label for="itemWeightDeduct">หักน้ำหนัก (กก.)</label>
+                  <input type="number" id="itemWeightDeduct" class="form-control" min="0" step="0.01" value="0">
                 </div>
               </div>
 
-              <div class="item-form-grid">
-                <div>
-                  <label for="itemBasePrice">ราคาตั้งต้น</label>
-                  <input type="number" id="itemBasePrice" class="form-control" min="0" step="0.01" placeholder="ใส่ราคาก่อนคูณสภาพ">
-                </div>
-                <div>
-                  <label for="itemQuantity">จำนวน*</label>
-                  <input type="number" id="itemQuantity" class="form-control" min="0" step="0.001" value="1">
-                </div>
-                <div>
-                  <label for="itemUnit">หน่วย</label>
-                  <select id="itemUnit" class="form-control">
-                    <option value="ชิ้น">ชิ้น</option>
-                    <option value="กก.">กก.</option>
-                    <option value="เมตร">เมตร</option>
-                    <option value="ตัน">ตัน</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="itemUnitPrice">ราคา/หน่วย*</label>
-                  <input type="number" id="itemUnitPrice" class="form-control" min="0" step="0.01">
-                </div>
-                <div>
-                  <label>รวม</label>
-                  <div class="total-preview" id="itemTotalPreview">฿0.00</div>
-                </div>
+              <div id="tierSelectionGroup" style="display:none">
+                <label style="font-size:12px;color:#888;display:block;margin-bottom:6px">ระดับราคา</label>
+                <div id="tierButtons" style="display:flex;gap:6px;flex-wrap:wrap"></div>
               </div>
 
-              <div class="form-group" style="margin-top:8px">
-                <label for="itemNotes">หมายเหตุ</label>
-                <input type="text" id="itemNotes" class="form-control" placeholder="เช่น มีรอยขีด, ไม่มีรีโมท">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:2px solid #eee">
+                <div id="itemTotalPreview" style="font-size:14px;color:#999">เลือกสินค้าจากแคตตาล็อก</div>
+                <button class="btn btn-primary" id="addItemBtn">
+                  <i class="icon-additem"></i> เพิ่มรายการ
+                </button>
               </div>
-
-              <button class="btn btn-primary" id="addItemBtn" style="width:100%">
-                <i class="icon-additem"></i> เพิ่มเข้ารายการ
-              </button>
             </div>
           </div>
         </div>
@@ -172,12 +151,14 @@
                 <table class="data-table" id="cartTable">
                   <thead>
                     <tr>
+                      <th style="width:32px">#</th>
                       <th>สินค้า</th>
-                      <th>สภาพ</th>
-                      <th>จำนวน</th>
-                      <th>ราคา/หน่วย</th>
-                      <th>รวม</th>
-                      <th></th>
+                      <th class="text-right">น้ำหนัก</th>
+                      <th class="text-right">หัก</th>
+                      <th class="text-right">สุทธิ</th>
+                      <th class="text-right">ราคา/หน่วย</th>
+                      <th class="text-right">รวม</th>
+                      <th style="width:40px;text-align:center"></th>
                     </tr>
                   </thead>
                   <tbody></tbody>
@@ -250,6 +231,9 @@
         <button class="close-modal">&times;</button>
       </div>
       <div class="modal-body">
+        <div style="background:#fff8e1;border-left:3px solid #f59e0b;padding:8px 12px;margin-bottom:12px;font-size:13px;color:#92400e;border-radius:4px">
+          ชื่อ-นามสกุลจำเป็น — ส่วนช่องอื่นกรอกตามดุลพินิจของแอดมิน
+        </div>
         <div class="form-group">
           <label for="newFullName">ชื่อ-นามสกุล*</label>
           <input type="text" id="newFullName" class="form-control" required>
@@ -261,6 +245,14 @@
         <div class="form-group">
           <label for="newPhone">เบอร์โทรศัพท์</label>
           <input type="text" id="newPhone" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="newAddress">ที่อยู่</label>
+          <textarea id="newAddress" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="newVehiclePlate">ทะเบียนรถ</label>
+          <input type="text" id="newVehiclePlate" class="form-control" maxlength="20" placeholder="เช่น กข-1234 สุรินทร์">
         </div>
       </div>
       <div class="modal-footer">

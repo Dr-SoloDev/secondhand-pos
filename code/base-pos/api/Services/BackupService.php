@@ -3,37 +3,31 @@ class BackupService
 {
     public static function createBackup()
     {
-        // Create backup directory if it doesn't exist
         if (!file_exists(BACKUP_DIR)) {
             mkdir(BACKUP_DIR, 0755, true);
         }
 
-        // Generate backup filename
         $timestamp = date('Y-m-d_H-i-s');
         $filename = "backup_{$timestamp}.sql";
         $filePath = BACKUP_DIR.'/'.$filename;
 
-        // Build mysqldump command
-        $command = sprintf(
-            "mysqldump --host=%s --user=%s --password=%s %s > %s 2>&1",
-            DB_HOST,
-            DB_USER,
-            DB_PASS,
-            DB_NAME,
-            $filePath
-        );
+        $host = escapeshellarg(DB_HOST);
+        $user = escapeshellarg(DB_USER);
+        $pass = escapeshellarg(DB_PASS);
+        $dbName = escapeshellarg(DB_NAME);
+        $fileArg = escapeshellarg($filePath);
 
-        // Execute command
+        $command = "mysqldump --host={$host} --user={$user} --password={$pass} {$dbName} > {$fileArg} 2>&1";
+
         exec($command, $output, $returnVar);
 
         if ($returnVar !== 0) {
             return [
                 'success' => false,
-                'message' => implode("\n", $output)
+                'message' => 'Backup failed'
             ];
         }
 
-        // Log backup in database
         $db = Database::getInstance();
         $fileSize = filesize($filePath);
 
@@ -41,7 +35,9 @@ class BackupService
             "INSERT INTO backup_history (filename, file_size, created_by) VALUES (?, ?, ?)"
         );
 
-        $userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1;
+        $userId = $db->fetchColumn(
+            "SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1"
+        ) ?: 1;
         $db->execute($stmt, [$filename, $fileSize, $userId]);
 
         return [
@@ -50,27 +46,21 @@ class BackupService
         ];
     }
 
-    /**
-     * @param $uploadedFile
-     */
     public static function restoreBackup($uploadedFile)
     {
-        // Check for upload errors
         if ($uploadedFile['error'] !== UPLOAD_ERR_OK) {
             return [
                 'success' => false,
-                'message' => 'Upload failed with error code: '.$uploadedFile['error']
+                'message' => 'Upload failed'
             ];
         }
 
-        // Create temp directory if it doesn't exist
         if (!file_exists(TEMP_DIR)) {
             mkdir(TEMP_DIR, 0755, true);
         }
 
-        $tempFile = TEMP_DIR.'/'.basename($uploadedFile['name']);
+        $tempFile = TEMP_DIR . '/' . basename($uploadedFile['name']);
 
-        // Move uploaded file to temp directory
         if (!move_uploaded_file($uploadedFile['tmp_name'], $tempFile)) {
             return [
                 'success' => false,
@@ -78,65 +68,74 @@ class BackupService
             ];
         }
 
-        // Extract zip file if necessary
         $filePath = $tempFile;
         if (pathinfo($tempFile, PATHINFO_EXTENSION) === 'zip') {
             $zip = new ZipArchive;
             if ($zip->open($tempFile) === true) {
-                $extractPath = TEMP_DIR.'/extract_'.time();
-                mkdir($extractPath, 0755, true);
+                if ($zip->numFiles > 100) {
+                    $zip->close();
+                    unlink($tempFile);
+                    return ['success' => false, 'message' => 'Archive too many files'];
+                }
 
+                $totalSize = 0;
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $stat = $zip->statIndex($i);
+                    $totalSize += $stat['size'];
+                    if ($totalSize > 500 * 1024 * 1024) {
+                        $zip->close();
+                        unlink($tempFile);
+                        return ['success' => false, 'message' => 'Archive too large'];
+                    }
+                }
+
+                $extractPath = TEMP_DIR . '/extract_' . time();
+                mkdir($extractPath, 0755, true);
                 $zip->extractTo($extractPath);
                 $zip->close();
 
-                // Find SQL file in extracted files
-                $sqlFiles = glob($extractPath.'/*.sql');
+                $sqlFiles = glob($extractPath . '/*.sql');
                 if (empty($sqlFiles)) {
-                    return [
-                        'success' => false,
-                        'message' => 'No SQL files found in the ZIP archive'
-                    ];
+                    array_map('unlink', glob($extractPath . '/*'));
+                    rmdir($extractPath);
+                    unlink($tempFile);
+                    return ['success' => false, 'message' => 'No SQL files found in archive'];
                 }
-
-                $filePath = $sqlFiles[0]; // Use the first SQL file found
+                $filePath = $sqlFiles[0];
             } else {
-                return [
-                    'success' => false,
-                    'message' => 'Failed to open ZIP archive'
-                ];
+                unlink($tempFile);
+                return ['success' => false, 'message' => 'Failed to open archive'];
             }
         }
 
-        // Build mysql command
-        $command = sprintf(
-            "mysql --host=%s --user=%s --password=%s %s < %s 2>&1",
-            DB_HOST,
-            DB_USER,
-            DB_PASS,
-            DB_NAME,
-            $filePath
-        );
+        $sql = file_get_contents($filePath);
+        if ($sql === false || trim($sql) === '') {
+            unlink($tempFile);
+            return ['success' => false, 'message' => 'Invalid SQL file'];
+        }
 
-        // Execute command
-        exec($command, $output, $returnVar);
+        try {
+            $db = Database::getInstance();
+            $statements = explode(';', $sql);
+            foreach ($statements as $statement) {
+                $statement = trim($statement);
+                if (!empty($statement)) {
+                    $db->getConnection()->exec($statement);
+                }
+            }
+        } catch (Exception $e) {
+            error_log('Backup restore failed: ' . $e->getMessage());
+            unlink($tempFile);
+            return ['success' => false, 'message' => 'Restore failed: ' . $e->getMessage()];
+        }
 
-        // Clean up temp files
         if (pathinfo($tempFile, PATHINFO_EXTENSION) === 'zip') {
-            array_map('unlink', glob($extractPath.'/*'));
+            array_map('unlink', glob($extractPath . '/*'));
             rmdir($extractPath);
         }
         unlink($tempFile);
 
-        if ($returnVar !== 0) {
-            return [
-                'success' => false,
-                'message' => implode("\n", $output)
-            ];
-        }
-
-        return [
-            'success' => true
-        ];
+        return ['success' => true];
     }
 
     /**
@@ -159,32 +158,34 @@ class BackupService
      */
     public static function downloadBackup($filename)
     {
-        $filePath = BACKUP_DIR.'/'.$filename;
+        $safeName = basename($filename);
+        $filePath = BACKUP_DIR.'/'.$safeName;
 
-        // Validate filename to prevent directory traversal
-        if (strpos($filename, '/') !== false || strpos($filename, '\\') !== false) {
+        if ($safeName !== $filename || !file_exists($filePath)) {
             return false;
         }
 
-        if (!file_exists($filePath)) {
+        $realPath = realpath($filePath);
+        $realBackup = realpath(BACKUP_DIR);
+        if (!$realPath || !$realBackup || strpos($realPath, $realBackup) !== 0) {
             return false;
         }
 
         // Set headers for file download
         header('Content-Description: File Transfer');
         header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename="'.$filename.'"');
+        header('Content-Disposition: attachment; filename="'.$safeName.'"');
         header('Expires: 0');
         header('Cache-Control: must-revalidate');
         header('Pragma: public');
-        header('Content-Length: '.filesize($filePath));
+        header('Content-Length: '.filesize($realPath));
 
         // Clear output buffer
         ob_clean();
         flush();
 
         // Read file and output to browser
-        readfile($filePath);
+        readfile($realPath);
         return true;
     }
 
@@ -194,24 +195,30 @@ class BackupService
     public static function deleteBackup($filename)
     {
         $db = Database::getInstance();
-        $filePath = BACKUP_DIR.'/'.$filename;
+        $safeName = basename($filename);
 
-        // Validate filename to prevent directory traversal
-        if (strpos($filename, '/') !== false || strpos($filename, '\\') !== false) {
+        if ($safeName !== $filename) {
             return false;
         }
 
-        if (!file_exists($filePath)) {
+        $filePath = BACKUP_DIR.'/'.$safeName;
+        $realPath = realpath($filePath);
+        $realBackup = realpath(BACKUP_DIR);
+        if (!$realPath || !$realBackup || strpos($realPath, $realBackup) !== 0) {
+            return false;
+        }
+
+        if (!file_exists($realPath)) {
             return false;
         }
 
         // Delete file from disk
-        if (!unlink($filePath)) {
+        if (!unlink($realPath)) {
             return false;
         }
 
         // Delete record from database
-        $db->delete('backup_history', ['filename = ?'], [$filename]);
+        $db->delete('backup_history', ['filename = ?'], [$safeName]);
 
         return true;
     }

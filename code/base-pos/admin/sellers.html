@@ -1,173 +1,154 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการผู้ขาย - Secondhand POS</title>
-    <link rel="stylesheet" href="../assets/css/styles.css">
-    <link rel="stylesheet" href="../assets/css/fonts.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>จัดการผู้ขาย - ระบบขายหน้าร้าน</title>
+  <link rel="stylesheet" href="../assets/css/fonts.css">
+  <link rel="stylesheet" href="../assets/css/styles.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="logo">
-                <h2>🏪 Secondhand POS</h2>
-            </div>
-            <nav class="nav-menu">
-                <a href="index.html" class="nav-item">
-                    <span class="icon">📊</span>
-                    <span>Dashboard</span>
-                </a>
-                <a href="purchase-orders.html" class="nav-item">
-                    <span class="icon">📋</span>
-                    <span>รับซื้อของ</span>
-                </a>
-                <a href="sellers.html" class="nav-item active">
-                    <span class="icon">👥</span>
-                    <span>ผู้ขาย</span>
-                </a>
-                <a href="inventory.html" class="nav-item">
-                    <span class="icon">📦</span>
-                    <span>สต็อกสินค้า</span>
-                </a>
-                <a href="sales.html" class="nav-item">
-                    <span class="icon">💰</span>
-                    <span>ขายสินค้า</span>
-                </a>
-                <a href="reports.html" class="nav-item">
-                    <span class="icon">📈</span>
-                    <span>รายงาน</span>
-                </a>
-                <a href="users.html" class="nav-item">
-                    <span class="icon">👤</span>
-                    <span>ผู้ใช้งาน</span>
-                </a>
-                <a href="settings.html" class="nav-item">
-                    <span class="icon">⚙️</span>
-                    <span>ตั้งค่า</span>
-                </a>
-            </nav>
-            <div class="sidebar-footer">
-                <a href="#" class="nav-item" onclick="logout()">
-                    <span class="icon">🚪</span>
-                    <span>ออกจากระบบ</span>
-                </a>
-            </div>
-        </aside>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <i class="icon-cart"></i>
+          <span>ระบบขายหน้าร้าน</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="sellers.html" class="active"><i class="icon-users"></i><span>ผู้ขาย</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
+        <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+        <li><a href="price-tiers.html"><i class="icon-tagss"></i><span>ตั้งค่าราคา</span></a></li>
+      </ul>
+    </aside>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Header -->
-            <header class="page-header">
-                <div class="header-left">
-                    <h1>จัดการผู้ขาย</h1>
-                    <p class="subtitle">รายชื่อผู้ที่นำของมาขาย</p>
-                </div>
-                <div class="header-right">
-                    <span id="currentUser"></span>
-                    <span id="currentBranch"></span>
-                </div>
-            </header>
-
-            <!-- Toolbar -->
-            <div class="toolbar">
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="ค้นหา: ชื่อ, เบอร์โทร, บัตรประชาชน..." />
-                    <button onclick="searchSellers()">🔍 ค้นหา</button>
-                </div>
-                <div class="toolbar-actions">
-                    <label>
-                        <input type="checkbox" id="showBlacklisted" onchange="loadSellers()">
-                        แสดง Blacklist
-                    </label>
-                    <button class="btn-primary" onclick="openAddSellerModal()">➕ เพิ่มผู้ขาย</button>
-                </div>
-            </div>
-
-            <!-- Sellers Table -->
-            <div class="card">
-                <div class="card-body">
-                    <table class="data-table" id="sellersTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>ชื่อ-นามสกุล</th>
-                                <th>เบอร์โทร</th>
-                                <th>บัตรประชาชน</th>
-                                <th>ครั้งที่ขาย</th>
-                                <th>ยอดรวม (฿)</th>
-                                <th>ขายล่าสุด</th>
-                                <th>สถานะ</th>
-                                <th>จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sellersTableBody">
-                            <tr>
-                                <td colspan="9" class="text-center">กำลังโหลด...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <!-- Modal: Add/Edit Seller -->
-    <div id="sellerModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">เพิ่มผู้ขาย</h2>
-                <span class="close" onclick="closeSellerModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <form id="sellerForm">
-                    <input type="hidden" id="sellerId">
-                    
-                    <div class="form-group">
-                        <label for="fullName">ชื่อ-นามสกุล <span class="required">*</span></label>
-                        <input type="text" id="fullName" required>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="phone">เบอร์โทรศัพท์ <span class="required">*</span></label>
-                            <input type="tel" id="phone" placeholder="08X-XXX-XXXX" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="idCard">เลขบัตรประชาชน <span class="required">*</span></label>
-                            <input type="text" id="idCard" placeholder="X-XXXX-XXXXX-XX-X" maxlength="17" required>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="address">ที่อยู่</label>
-                        <textarea id="address" rows="3"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="notes">หมายเหตุ</label>
-                        <textarea id="notes" rows="2" placeholder="เช่น ลักษณะพิเศษ, ประวัติ"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="isBlacklisted">
-                            <span class="text-danger">Blacklist (ห้ามรับซื้อ)</span>
-                        </label>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeSellerModal()">ยกเลิก</button>
-                <button class="btn-primary" onclick="saveSeller()">บันทึก</button>
-            </div>
+    <main class="content-area">
+      <div class="topbar">
+        <button class="toggle-sidebar"><i class="icon-bars"></i></button>
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="currentUser"></span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
         </div>
-    </div>
+      </div>
 
-    <!-- Scripts -->
-    <script src="../assets/js/config.js"></script>
-    <script src="../assets/js/common.js"></script>
-    <script src="../assets/js/sellers.js"></script>
+      <div class="page-header">
+        <h1>จัดการผู้ขาย</h1>
+        <div>
+          <button class="btn btn-primary" onclick="openAddSellerModal()">
+            <i class="icon-additem"></i> เพิ่มผู้ขาย
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">รายชื่อผู้ขาย</h2>
+          <div class="card-tools">
+            <input type="text" id="searchInput" class="form-control" placeholder="ค้นหา: ชื่อ, เบอร์โทร, บัตรประชาชน...">
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="filters">
+            <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" id="showBlacklisted" onchange="loadSellers()">
+              แสดง Blacklist
+            </label>
+          </div>
+          <div class="table-container">
+            <table class="data-table" id="sellersTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>เบอร์โทร</th>
+                  <th>บัตรประชาชน</th>
+                  <th>ครั้งที่ขาย</th>
+                  <th>ยอดรวม (฿)</th>
+                  <th>ขายล่าสุด</th>
+                  <th>สถานะ</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="sellersTableBody">
+                <tr>
+                  <td colspan="9" class="text-center">กำลังโหลด...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Add/Edit Seller -->
+  <div class="modal" id="sellerModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">เพิ่มผู้ขาย</h2>
+        <button class="close-modal" onclick="closeSellerModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="sellerForm">
+          <input type="hidden" id="sellerId">
+          <div class="form-group">
+            <label for="fullName">ชื่อ-นามสกุล <span class="required">*</span></label>
+            <input type="text" id="fullName" required>
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label for="phone">เบอร์โทรศัพท์ <span class="required">*</span></label>
+              <input type="tel" id="phone" placeholder="08X-XXX-XXXX" required>
+            </div>
+            <div class="form-col">
+              <label for="idCard">เลขบัตรประชาชน <span class="required">*</span></label>
+              <input type="text" id="idCard" placeholder="X-XXXX-XXXXX-XX-X" maxlength="17" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="address">ที่อยู่</label>
+            <textarea id="address" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="notes">หมายเหตุ</label>
+            <textarea id="notes" rows="2" placeholder="เช่น ลักษณะพิเศษ, ประวัติ"></textarea>
+          </div>
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="isBlacklisted">
+              <span class="text-danger">Blacklist (ห้ามรับซื้อ)</span>
+            </label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeSellerModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveSeller()">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notification-container"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/sellers.js"></script>
 </body>
 </html>

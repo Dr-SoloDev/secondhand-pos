@@ -60,13 +60,9 @@ class SellersController extends Controller
 
         $data = $this->getRequestData();
 
-        // Validate required fields
+        // ต้องระบุชื่อ-นามสกุล
         if (empty($data['full_name'])) {
             Response::error('กรุณาระบุชื่อ-นามสกุล', 400);
-        }
-
-        if (empty($data['phone']) && empty($data['id_card'])) {
-            Response::error('กรุณาระบุเบอร์โทรศัพท์ หรือ เลขบัตรประชาชน', 400);
         }
 
         // Validate เลขบัตรประชาชน (ถ้ามี)

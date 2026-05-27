@@ -8,8 +8,8 @@ class Seller extends Model
      */
     public function getAll($includeBlacklisted = false)
     {
-        $query = "SELECT 
-                    id, id_card, full_name, phone, address,
+        $query = "SELECT
+                    id, id_card, full_name, phone, address, vehicle_plate,
                     is_blacklisted, total_transactions, total_amount,
                     last_transaction_at, created_at, updated_at
                   FROM {$this->table}";
@@ -92,6 +92,7 @@ class Seller extends Model
             'full_name' => $data['full_name'],
             'phone' => $data['phone'] ?? null,
             'address' => $data['address'] ?? null,
+            'vehicle_plate' => $data['vehicle_plate'] ?? null,
             'notes' => $data['notes'] ?? null,
             'is_blacklisted' => $data['is_blacklisted'] ?? 0,
         ]);
@@ -128,6 +129,7 @@ class Seller extends Model
         if (isset($data['full_name'])) $updateData['full_name'] = $data['full_name'];
         if (isset($data['phone'])) $updateData['phone'] = $data['phone'];
         if (isset($data['address'])) $updateData['address'] = $data['address'];
+        if (isset($data['vehicle_plate'])) $updateData['vehicle_plate'] = $data['vehicle_plate'];
         if (isset($data['notes'])) $updateData['notes'] = $data['notes'];
         if (isset($data['is_blacklisted'])) $updateData['is_blacklisted'] = $data['is_blacklisted'];
 

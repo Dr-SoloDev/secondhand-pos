@@ -24,6 +24,31 @@ class PurchaseOrdersController extends Controller
         Response::success('Purchase order retrieved', $po);
     }
 
+    public function cancelPurchaseOrder()
+    {
+        $this->requireAuth(['admin', 'manager']);
+        $data = $this->getRequestData();
+        $id = isset($data['id']) ? intval($data['id']) : 0;
+        if (!$id) Response::error('ต้องระบุรหัสใบรับซื้อ', 400);
+
+        $model = new PurchaseOrder();
+        $po = $model->getById($id);
+        if (!$po) Response::error('ไม่พบใบรับซื้อ', 404);
+        if ($po['status'] === 'cancelled') Response::error('ใบรับซื้อยกเลิกไปแล้ว', 400);
+
+        try {
+            $model->updateStatus($id, 'cancelled');
+            Logger::logActivity(
+                $this->user['user_id'],
+                'cancel_purchase_order',
+                "Cancelled PO: {$po['reference_no']} (ID: {$id})"
+            );
+            Response::success('ยกเลิกใบรับซื้อสำเร็จ');
+        } catch (Exception $e) {
+            Response::error('ยกเลิกใบรับซื้อไม่สำเร็จ: ' . $e->getMessage());
+        }
+    }
+
     public function createPurchaseOrder()
     {
         $data = $this->getRequestData();
@@ -55,6 +80,7 @@ class PurchaseOrdersController extends Controller
                 'unit' => $item['unit'] ?? 'ชิ้น',
                 'unit_price' => floatval($item['unit_price'] ?? 0),
                 'total_price' => floatval($item['total_price'] ?? (floatval($item['quantity'] ?? 1) * floatval($item['unit_price'] ?? 0))),
+                'price_tier' => !empty($item['price_tier']) ? intval($item['price_tier']) : null,
                 'notes' => isset($item['notes']) ? trim((string)$item['notes']) : null,
             ];
         }

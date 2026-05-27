@@ -155,9 +155,30 @@ class Router
         $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrders', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'createPurchaseOrder', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'purchase-orders/order', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrder', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-orders/cancel', 'controller' => 'PurchaseOrdersController', 'method' => 'cancelPurchaseOrder', 'verb' => 'POST'];
 
         // Item Conditions routes
         $this->routes[] = ['route' => 'item-conditions', 'controller' => 'ItemConditionsController', 'method' => 'getConditions', 'verb' => 'GET'];
+
+        // Price Tiers routes
+        $this->routes[] = ['route' => 'price-tiers', 'controller' => 'PriceTiersController', 'method' => 'getPriceTiers', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'price-tiers/category', 'controller' => 'PriceTiersController', 'method' => 'updatePriceTiers', 'verb' => 'PUT'];
+
+        // Purchase Item Catalog routes
+        $this->routes[] = ['route' => 'purchase-catalog', 'controller' => 'PurchaseItemCatalogController', 'method' => 'getCatalog', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-catalog', 'controller' => 'PurchaseItemCatalogController', 'method' => 'createItem', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'purchase-catalog/search', 'controller' => 'PurchaseItemCatalogController', 'method' => 'searchCatalog', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-catalog/item', 'controller' => 'PurchaseItemCatalogController', 'method' => 'getItem', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-catalog/item', 'controller' => 'PurchaseItemCatalogController', 'method' => 'updateItem', 'verb' => 'PUT'];
+
+        // Sale Lots routes
+        $this->routes[] = ['route' => 'sale-lots', 'controller' => 'SaleLotsController', 'method' => 'index', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sale-lots', 'controller' => 'SaleLotsController', 'method' => 'store', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sale-lots/sale-lot', 'controller' => 'SaleLotsController', 'method' => 'show', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sale-lots/sale-lot', 'controller' => 'SaleLotsController', 'method' => 'update', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'sale-lots/sale-lot', 'controller' => 'SaleLotsController', 'method' => 'destroy', 'verb' => 'DELETE'];
+        $this->routes[] = ['route' => 'sale-lots/confirm', 'controller' => 'SaleLotsController', 'method' => 'confirm', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sale-lots/cancel', 'controller' => 'SaleLotsController', 'method' => 'cancel', 'verb' => 'POST'];
     }
 
     public function dispatch()

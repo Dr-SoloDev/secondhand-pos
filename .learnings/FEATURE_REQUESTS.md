@@ -2,6 +2,8 @@
 
 Capabilities requested by the user (Dr.Solodev) or end customer (ร้านรับซื้อของเก่า).
 
+> **Progress Update (2026-05-23):** Demo dashboard complete — cards/chart/table เปลี่ยนเป็น purchase data หมดแล้ว, purchase_orders + sellers + item_conditions tables สร้างพร้อม, PHP backend พร้อม API endpoints, Thai localization + UTF-8 fixes เสร็จ ยังไม่ได้ implement backend CRUD สำหรับ sellers/purchase_orders/item_conditions และฟีเจอร์ลูกค้าด้านล่าง
+
 ---
 
 ## จากลูกค้า (ร้านรับซื้อของเก่า, สุรินทร์)

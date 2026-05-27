@@ -6,12 +6,12 @@
 USE pos_system;
 
 -- ------------------------------------------------------------
--- อัปเดตชื่อสาขาให้เป็นข้อมูลสุรินทร์ (placeholder จนกว่าจะลงสำรวจจริง)
+-- อัปเดตข้อมูลสาขา (placeholder จนกว่าจะลงสำรวจจริง — คงชื่อ "สาขา 1-4" ไว้)
 -- ------------------------------------------------------------
-UPDATE branches SET name = 'สาขาเมืองสุรินทร์ (สำนักงานใหญ่)', address = 'อ.เมืองสุรินทร์ จ.สุรินทร์', phone = '044-xxx-xxx', manager_name = 'คุณสมชาย' WHERE code = 'BR01';
-UPDATE branches SET name = 'สาขาปราสาท', address = 'อ.ปราสาท จ.สุรินทร์', phone = '044-xxx-xxx', manager_name = 'คุณวิทยา' WHERE code = 'BR02';
-UPDATE branches SET name = 'สาขาศีขรภูมิ', address = 'อ.ศีขรภูมิ จ.สุรินทร์', phone = '044-xxx-xxx', manager_name = 'คุณอำนาจ' WHERE code = 'BR03';
-UPDATE branches SET name = 'สาขาสังขะ', address = 'อ.สังขะ จ.สุรินทร์', phone = '044-xxx-xxx', manager_name = 'คุณประยุทธ' WHERE code = 'BR04';
+UPDATE branches SET address = 'อ.เมืองสุรินทร์ จ.สุรินทร์', phone = '044-xxx-xxx', manager_name = 'คุณสมชาย' WHERE code = 'BR01';
+UPDATE branches SET address = 'อ.ปราสาท จ.สุรินทร์',      phone = '044-xxx-xxx', manager_name = 'คุณวิทยา'  WHERE code = 'BR02';
+UPDATE branches SET address = 'อ.ศีขรภูมิ จ.สุรินทร์',     phone = '044-xxx-xxx', manager_name = 'คุณอำนาจ' WHERE code = 'BR03';
+UPDATE branches SET address = 'อ.สังขะ จ.สุรินทร์',        phone = '044-xxx-xxx', manager_name = 'คุณประยุทธ' WHERE code = 'BR04';
 
 -- ------------------------------------------------------------
 -- ผู้ขายตัวอย่าง 8 ราย

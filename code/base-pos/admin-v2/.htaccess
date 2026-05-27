@@ -1,0 +1,18 @@
+# React SPA — fallback all routes to index.html for client-side routing
+RewriteEngine On
+RewriteBase /admin-v2/
+
+# If the request is not for an existing file or directory, serve index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# Cache static assets aggressively
+<FilesMatch "\.(js|css|png|jpg|svg|woff|woff2)$">
+    Header set Cache-Control "max-age=31536000, public, immutable"
+</FilesMatch>
+
+# index.html — no cache so updates are seen immediately
+<Files "index.html">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+</Files>

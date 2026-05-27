@@ -31,7 +31,6 @@ class PurchaseOrder extends Model
 
         $total = $this->db->fetchColumn(
             "SELECT COUNT(*) FROM {$this->table} po
-             LEFT JOIN sellers s ON po.seller_id = s.id
              WHERE {$whereSql}",
             $params
         );
@@ -39,7 +38,7 @@ class PurchaseOrder extends Model
         $items = $this->db->fetchAll(
             "SELECT po.*, s.full_name AS seller_name, s.id_card AS seller_id_card,
                     b.name AS branch_name, b.code AS branch_code,
-                    u.name AS user_name
+                    u.full_name AS user_name
              FROM {$this->table} po
              LEFT JOIN sellers s ON po.seller_id = s.id
              LEFT JOIN branches b ON po.branch_id = b.id
@@ -67,7 +66,7 @@ class PurchaseOrder extends Model
             "SELECT po.*, s.full_name AS seller_name, s.id_card AS seller_id_card,
                     s.phone AS seller_phone, s.address AS seller_address,
                     b.name AS branch_name, b.code AS branch_code,
-                    u.name AS user_name
+                    u.full_name AS user_name
              FROM {$this->table} po
              LEFT JOIN sellers s ON po.seller_id = s.id
              LEFT JOIN branches b ON po.branch_id = b.id
@@ -92,11 +91,23 @@ class PurchaseOrder extends Model
     public function generateReferenceNo()
     {
         $prefix = 'PO' . date('Ymd');
-        $count = $this->db->fetchColumn(
-            "SELECT COUNT(*) FROM {$this->table} WHERE reference_no LIKE ?",
-            [$prefix . '%']
+        $last = $this->db->fetchColumn(
+            "SELECT MAX(CAST(SUBSTRING_INDEX(reference_no, '-', -1) AS UNSIGNED))
+             FROM {$this->table}
+             WHERE reference_no LIKE ?",
+            [$prefix . '-%']
         );
-        return $prefix . '-' . str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+        $next = ($last ?? 0) + 1;
+        return $prefix . '-' . str_pad($next, 3, '0', STR_PAD_LEFT);
+    }
+
+    public function updateStatus($id, $status)
+    {
+        $this->db->query(
+            "UPDATE {$this->table} SET status = ?, updated_at = NOW() WHERE id = ?",
+            [$status, $id]
+        );
+        return true;
     }
 
     public function createWithItems($data, $items, $userId)
@@ -130,19 +141,23 @@ class PurchaseOrder extends Model
 
             foreach ($items as $item) {
                 $qty = (float)($item['quantity'] ?? 1);
+                $deduct = (float)($item['weight_deduction'] ?? 0);
+                $netQty = max(0, $qty - $deduct);
                 $unitPrice = (float)($item['unit_price'] ?? 0);
-                $totalPrice = (float)($item['total_price'] ?? ($qty * $unitPrice));
+                $totalPrice = (float)($item['total_price'] ?? ($netQty * $unitPrice));
 
                 $this->db->insert('purchase_order_items', [
                     'purchase_order_id' => $poId,
                     'product_id' => $item['product_id'] ?? null,
                     'item_name' => $item['item_name'],
                     'category_id' => $item['category_id'] ?? null,
-                    'condition_id' => $item['condition_id'],
+                    'condition_id' => $item['condition_id'] ?? null,
                     'quantity' => $qty,
+                    'weight_deduction' => $deduct,
                     'unit' => $item['unit'] ?? 'ชิ้น',
                     'unit_price' => $unitPrice,
                     'total_price' => $totalPrice,
+                    'price_tier' => $item['price_tier'] ?? null,
                     'photo_path' => $item['photo_path'] ?? null,
                     'notes' => $item['notes'] ?? null,
                 ]);

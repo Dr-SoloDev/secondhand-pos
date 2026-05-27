@@ -57,8 +57,13 @@ class Response
         // Add BOM to fix UTF-8 in Excel
         fputs($output, "\xEF\xBB\xBF");
 
-        // Output rows
+        // Output rows with CSV injection protection
         foreach ($data as $row) {
+            foreach ($row as $i => $value) {
+                if (is_string($value) && preg_match('/^[=+\-@]/', $value)) {
+                    $row[$i] = "'" . $value;
+                }
+            }
             fputcsv($output, $row);
         }
 
@@ -66,17 +71,20 @@ class Response
         exit;
     }
 
-    /**
-     * @param $path
-     * @param $filename
-     */
-    public static function file($path, $filename = null)
+    public static function file($path, $filename = null, $allowedDir = null)
     {
-        if (!file_exists($path)) {
+        $realPath = realpath($path);
+        $realAllowed = realpath($allowedDir ?: BACKUP_DIR);
+
+        if (!$realPath || !$realAllowed || strpos($realPath, $realAllowed) !== 0) {
+            self::error('Invalid file path', 403);
+        }
+
+        if (!file_exists($realPath)) {
             self::error('File not found', 404);
         }
 
-        $filename = $filename ?? basename($path);
+        $filename = $filename ?? basename($realPath);
 
         header('Content-Description: File Transfer');
         header('Content-Type: application/octet-stream');
@@ -84,10 +92,10 @@ class Response
         header('Expires: 0');
         header('Cache-Control: must-revalidate');
         header('Pragma: public');
-        header('Content-Length: '.filesize($path));
+        header('Content-Length: '.filesize($realPath));
         ob_clean();
         flush();
-        readfile($path);
+        readfile($realPath);
         exit;
     }
 }

@@ -57,23 +57,21 @@ class Controller
         return true;
     }
 
-    /**
-     * @param $data
-     * @return mixed
-     */
-    protected function sanitizeInput($data)
+    protected function sanitizeInput($data, $maxLength = 1000)
     {
         if (is_array($data)) {
             foreach ($data as $key => $value) {
-                $data[$key] = $this->sanitizeInput($value);
+                $data[$key] = $this->sanitizeInput($value, $maxLength);
             }
             return $data;
         }
 
         if (is_string($data)) {
+            $data = strip_tags($data);
             $data = trim($data);
-            $data = stripslashes($data);
-            $data = htmlspecialchars($data);
+            if (mb_strlen($data) > $maxLength) {
+                $data = mb_substr($data, 0, $maxLength);
+            }
         }
 
         return $data;

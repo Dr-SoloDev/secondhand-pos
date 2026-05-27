@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ขาย Lot - ระบบรับซื้อของเก่า</title>
+  <link rel="stylesheet" href="../assets/css/fonts.css">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <style>
+    .page-header {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    .filter-search { max-width: 400px; }
+    .profit-positive { color: var(--color-success); font-weight: 600; }
+    .profit-negative { color: var(--color-danger); font-weight: 600; }
+    .action-cell { white-space: nowrap; display: flex; gap: 4px; align-items: center; }
+    .action-cell .btn { padding: 3px 10px; font-size: 11px; }
+    .item-row-card { background: var(--color-bg); border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; margin-bottom: 8px; }
+    .item-row-card .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .item-row-card .item-fields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+    .item-row-card .item-subtotal { text-align: right; font-size: 13px; color: var(--color-text-light); margin-top: 6px; }
+    .item-row-card .item-subtotal strong { color: var(--color-text); }
+    .modal-content { max-width: 700px; }
+    .total-footer { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; }
+    .total-footer .total-amount { font-size: 24px; font-weight: 700; color: var(--color-success); }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <i class="icon-cart"></i>
+          <span>รับซื้อของเก่า</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>ผู้ขาย</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
+        <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
+        <li><a href="sale-lots.html" class="active"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li><a href="branches.html"><i class="icon-tagss"></i><span>สาขา</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+        <li><a href="price-tiers.html"><i class="icon-tagss"></i><span>ตั้งค่าราคา</span></a></li>
+      </ul>
+    </aside>
+
+    <main class="content-area">
+      <div class="topbar">
+        <button class="toggle-sidebar"><i class="icon-bars"></i></button>
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name">Admin</span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-header">
+        <h1>ขาย Lot</h1>
+        <button class="btn btn-primary" id="newSaleLotBtn">
+          + ขาย Lot ใหม่
+        </button>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-body">
+          <div class="filters" style="margin-bottom:12px">
+            <div class="filter-search">
+              <input type="text" id="searchInput" class="form-control" placeholder="ค้นหาเลขที่ Lot, ผู้ซื้อ...">
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table" id="lotTable">
+              <thead>
+                <tr>
+                  <th>เลขที่</th>
+                  <th>วันที่ขาย</th>
+                  <th>ผู้ซื้อ</th>
+                  <th class="text-right">ยอดขาย</th>
+                  <th class="text-right">ต้นทุน</th>
+                  <th class="text-right">กำไร</th>
+                  <th>สถานะ</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="lotTableBody">
+                <tr><td colspan="8" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Sale Lot Modal -->
+  <div class="modal" id="saleLotModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">ขาย Lot ใหม่</h2>
+        <button class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row" style="margin-bottom:12px">
+          <div class="form-col" style="flex:2">
+            <label for="buyerName">ชื่อผู้ซื้อ *</label>
+            <input type="text" id="buyerName" class="form-control" placeholder="ชื่อผู้ซื้อ / บริษัท">
+          </div>
+          <div class="form-col">
+            <label for="saleDate">วันที่ขาย *</label>
+            <input type="date" id="saleDate" class="form-control">
+          </div>
+          <div class="form-col">
+            <label for="branchSelect">สาขา *</label>
+            <select id="branchSelect" class="form-control">
+              <option value="">— เลือกสาขา —</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <label style="font-weight:500;font-size:14px">รายการสินค้า (<span id="itemCount">0</span>)</label>
+            <button class="btn btn-sm btn-secondary" id="addLineItemBtn">
+              + เพิ่มรายการ
+            </button>
+          </div>
+          <div id="lineItemsContainer"></div>
+        </div>
+
+        <div class="form-group" style="margin-top:12px">
+          <label for="lotNotes">หมายเหตุ</label>
+          <textarea id="lotNotes" class="form-control" rows="2" placeholder="ข้อมูลเพิ่มเติม (ถ้ามี)"></textarea>
+        </div>
+
+        <div id="saveError" style="display:none;color:var(--color-danger);background:#fff0f0;border:1px solid #ffc0c0;border-radius:4px;padding:8px 12px;margin-top:8px;font-size:13px"></div>
+      </div>
+      <div class="modal-footer" style="flex-direction:column;gap:12px">
+        <div class="total-footer" style="width:100%">
+          <div style="font-size:13px;color:var(--color-text-light)">ยอดขายรวม</div>
+          <div class="total-amount" id="totalAmountDisplay">฿0.00</div>
+        </div>
+        <div style="display:flex;gap:8px;width:100%;justify-content:flex-end">
+          <button class="btn btn-secondary close-modal">ยกเลิก</button>
+          <button class="btn btn-primary" id="saveLotBtn">
+            บันทึก Lot ขาย
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Dialog -->
+  <div class="modal" id="confirmModal">
+    <div class="modal-content" style="max-width:400px">
+      <div class="modal-header">
+        <h2 id="confirmTitle">ยืนยัน</h2>
+        <button class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage" style="font-size:14px;color:var(--color-text);margin:0"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary close-modal" id="confirmCancelBtn">ยกเลิก</button>
+        <button class="btn btn-primary" id="confirmOkBtn">ยืนยัน</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Lot Modal -->
+  <div class="modal" id="viewLotModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>รายละเอียด Lot ขาย</h2>
+        <button class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body" id="viewLotContent"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary close-modal">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notification-container"></div>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/sale-lots.js"></script>
+</body>
+</html>

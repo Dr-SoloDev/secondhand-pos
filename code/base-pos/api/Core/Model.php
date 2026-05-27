@@ -27,6 +27,7 @@ class Model
         $query = "SELECT * FROM {$this->table}";
 
         if ($orderBy) {
+            $orderBy = preg_replace('/[^a-zA-Z0-9_\s,.]/', '', $orderBy);
             $query .= " ORDER BY {$orderBy}";
         }
 
@@ -85,14 +86,15 @@ class Model
         }
 
         if ($orderBy) {
+            $orderBy = preg_replace('/[^a-zA-Z0-9_\s,.]/', '', $orderBy);
             $query .= " ORDER BY ".$orderBy;
         }
 
         if ($limit) {
-            $query .= " LIMIT ".$limit;
+            $query .= " LIMIT ".intval($limit);
 
             if ($offset) {
-                $query .= " OFFSET ".$offset;
+                $query .= " OFFSET ".intval($offset);
             }
         }
 

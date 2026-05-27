@@ -1,6 +1,16 @@
 <?php
 class TokenService
 {
+    private static function base64urlEncode($data)
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
+    private static function base64urlDecode($data)
+    {
+        return base64_decode(strtr($data, '-_', '+/'));
+    }
+
     /**
      * @param $userId
      * @param $username
@@ -11,19 +21,23 @@ class TokenService
         $issuedAt = time();
         $expiryTime = $issuedAt + JWT_EXPIRY;
 
+        $header = self::base64urlEncode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
+
         $payload = [
             'iat' => $issuedAt,
+            'nbf' => $issuedAt,
             'exp' => $expiryTime,
             'user_id' => $userId,
             'username' => $username,
             'role' => $role
         ];
+        $payloadEncoded = self::base64urlEncode(json_encode($payload));
 
-        $header = base64_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
-        $payload = base64_encode(json_encode($payload));
-        $signature = base64_encode(hash_hmac('sha256', "$header.$payload", JWT_SECRET, true));
+        $signature = self::base64urlEncode(
+            hash_hmac('sha256', "$header.$payloadEncoded", JWT_SECRET, true)
+        );
 
-        return "$header.$payload.$signature";
+        return "$header.$payloadEncoded.$signature";
     }
 
     /**
@@ -38,14 +52,34 @@ class TokenService
         }
 
         list($header, $payload, $signature) = $parts;
-        $verifySignature = base64_encode(hash_hmac('sha256', "$header.$payload", JWT_SECRET, true));
 
-        if ($signature !== $verifySignature) {
+        // Verify signature
+        $expectedSig = self::base64urlEncode(
+            hash_hmac('sha256', "$header.$payload", JWT_SECRET, true)
+        );
+
+        if (!hash_equals($expectedSig, $signature)) {
             return false;
         }
 
-        $decoded = json_decode(base64_decode($payload), true);
+        // Verify algorithm to prevent alg confusion
+        $headerDecoded = json_decode(self::base64urlDecode($header), true);
+        if (!$headerDecoded || ($headerDecoded['alg'] ?? '') !== 'HS256') {
+            return false;
+        }
+
+        $decoded = json_decode(self::base64urlDecode($payload), true);
+        if (!$decoded) {
+            return false;
+        }
+
+        // Check expiry
         if ($decoded['exp'] < time()) {
+            return false;
+        }
+
+        // Check "not before"
+        if (isset($decoded['nbf']) && $decoded['nbf'] > time()) {
             return false;
         }
 

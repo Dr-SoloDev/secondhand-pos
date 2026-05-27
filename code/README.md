@@ -7,125 +7,117 @@
 
 ```
 code/
-├── base-pos/                       # ฐาน goragodwiriya/pos-system (ห้ามแก้ไขโดยตรง)
+├── base-pos/                       # ฐาน goragodwiriya/pos-system (แก้ไขตรงเมื่อจำเป็น)
 │   ├── api/                        # Backend PHP
-│   ├── admin/                      # Admin pages
+│   │   ├── Router.php              # ALL routes registered (core + custom)
+│   │   ├── config.php              # DB config, JWT secret
+│   │   └── autoload.php            # PSR-4 autoloader (base-pos + customizations)
+│   ├── admin/                      # Admin pages (PHP) — active delivery target
+│   │   ├── index.html              # Dashboard
+│   │   ├── purchase-orders.html    # รับซื้อของ
+│   │   ├── sale-lots.html          # ขาย Lot
+│   │   ├── sellers.html            # ผู้ขาย
+│   │   └── ...                     # inventory, sales, reports, settings, users, price-tiers
 │   ├── pos/                        # POS terminal
-│   ├── assets/                     # CSS, JS
-│   └── database/pos_system.sql     # Base schema
+│   └── assets/                     # CSS, JS (common.js, config.js)
 │
-├── customizations/                 # ส่วนที่เราพัฒนาเพิ่มสำหรับร้านของเก่า
-│   ├── database/
-│   │   ├── migrations/             # SQL migrations (เรียงตามลำดับ)
-│   │   │   ├── 001_add_branches.sql
-│   │   │   ├── 002_add_sellers.sql
-│   │   │   ├── 003_add_item_conditions.sql
-│   │   │   ├── 004_add_purchase_orders.sql
-│   │   │   └── 005_seed_categories.sql
-│   │   └── run-migrations.sh       # สคริปต์รัน migration
-│   ├── api/
-│   │   ├── Models/                 # Branch.php, Seller.php, PurchaseOrder.php
-│   │   └── Controllers/            # BranchesController, SellersController, ...
-│   ├── admin/                      # หน้า admin ใหม่ (branches, sellers, purchase-orders)
-│   └── assets/images/              # ที่เก็บรูปสินค้าที่รับซื้อ
-│
-└── docs/                           # เอกสารทาง technical
+└── customizations/                 # Custom overlay (mounted via autoloader)
+    ├── api/
+    │   ├── Models/                 # Branch, Seller, PurchaseOrder, SaleLot, PurchaseItemCatalog
+    │   └── Controllers/            # Branches, Sellers, PurchaseOrders, SaleLots, PriceTiers, etc.
+    ├── database/
+    │   ├── migrations/             # 013 migrations (001-013)
+    │   └── run-migrations.sh
+    └── frontend-react/             # DEPRECATED — React v2 app, no longer active
 ```
+
+---
+
+## Key Design Points
+
+### Two-layer Architecture
+- **base-pos:** Core system files (goragodwiriya/pos-system) — files here are edited in-place
+- **customizations:** Custom PHP code loaded by autoloader — Models, Controllers, migrations
+- **Autoloader** (`base-pos/api/autoload.php`) scans both `base-pos/` and `customizations/`
+
+### Delivery Target
+- **PHP base-pos** (`code/base-pos/admin/`) = active target (Vanilla PHP + Vanilla JS)
+- **React v2** (`code/customizations/frontend-react/`) = DEPRECATED, no longer maintained
+
+### Business Flows
+| Flow | Page | Purpose |
+|------|------|---------|
+| รับซื้อ | `purchase-orders.html` | Buy scrap from individual sellers |
+| ขาย Lot | `sale-lots.html` | Sell bulk lots to collection centers |
+| ขายปลีก | `pos/index.html` + `sales.html` | Retail sales (minor flow) |
 
 ---
 
 ## ขั้นตอนการ Setup Dev Environment
 
-### 1. ติดตั้ง dependencies
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update
-sudo apt install -y apache2 php php-mysql php-mbstring php-json php-curl mysql-server
-```
-
-**เริ่ม services:**
-```bash
-sudo systemctl start apache2 mysql
-sudo systemctl enable apache2 mysql
-```
-
-### 2. สร้าง database และรัน migration
-
+### 1. สร้าง database และรัน migration
 ```bash
 cd /home/drsolodev/projects/secondhand-pos/code/customizations/database
 ./run-migrations.sh root yourpassword
 ```
 
-### 3. ตั้งค่า base-pos config
-
-แก้ไข `base-pos/api/config.php`:
+### 2. ตั้งค่า base-pos config
 ```php
+// base-pos/api/config.php
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'pos_system');
 define('DB_USER', 'root');
 define('DB_PASS', 'yourpassword');
 ```
 
-### 4. Symlink เข้า web root
-
+### 3. Symlink เข้า web root
 ```bash
 sudo ln -s /home/drsolodev/projects/secondhand-pos/code/base-pos /var/www/html/pos
 sudo chown -R www-data:www-data /home/drsolodev/projects/secondhand-pos/code
 ```
 
-### 5. เปิดทดสอบ
-
+### 4. เปิดทดสอบ
 - Admin: http://localhost/pos/admin/
-- POS: http://localhost/pos/pos/
-- Default login: ดูใน `base-pos/database/pos_system.sql` (ส่วน INSERT INTO users)
+- API: http://localhost/pos/api/index.php/
+- Default login: admin / admin
 
 ---
 
 ## Migration Strategy
 
-**หลักการ: ไม่แก้ไข base-pos โดยตรง**
+- **DO NOT** modify `base-pos/database/pos_system.sql`
+- All changes → `customizations/database/migrations/NNN_description.sql`
+- Run in numerical order via `run-migrations.sh`
 
-- Schema เพิ่มเติม → `customizations/database/migrations/`
-- Models ใหม่ → `customizations/api/Models/`
-- Controllers ใหม่ → `customizations/api/Controllers/`
-- Pages ใหม่ → `customizations/admin/`
+## Tables ที่เพิ่ม (13 migrations)
 
-**เมื่อต้องแก้ไฟล์ใน base-pos** (เช่น Router.php) — ทำ patch + comment บอกว่าทำไม
-
----
-
-## Tables ที่เพิ่มเข้ามา
-
-| ตาราง | หน้าที่ |
-|---|---|
-| `branches` | สาขา 4 สาขา |
-| `sellers` | คนเอาของมาขาย (เก็บบัตรประชาชน) |
-| `item_conditions` | สภาพสินค้า (ดี/พอใช้/ชำรุด) |
-| `purchase_orders` | ใบรับซื้อ |
-| `purchase_order_items` | รายการของในใบรับซื้อ |
-| `purchase_order_photos` | รูปถ่ายของ |
-
-**Tables เดิมที่ถูก ALTER:**
-- `users` — เพิ่ม `branch_id`
-- `products` — เพิ่ม `branch_id`, `condition_id`
-- `sales` — เพิ่ม `branch_id`
-- `inventory_transactions` — เพิ่ม `branch_id`
+| Migration | Table(s) | Purpose |
+|---|---|---|
+| 001 | `branches` | สาขา |
+| 002 | `sellers` | ผู้ขาย |
+| 003 | `item_conditions` | (deprecated) |
+| 004 | `purchase_orders`, `purchase_order_items` | ใบรับซื้อ |
+| 005 | — | Seed categories |
+| 006 | — | Demo data |
+| 007 | `price_tiers` | ราคา 3 ระดับ |
+| 008 | ALTER `purchase_order_items` | ADD price_tier |
+| 009 | `sale_lots`, `sale_lot_items` | ขาย Lot |
+| 010 | ALTER `purchase_order_items` | ADD consumed_qty, fifo_cost |
+| 011 | ALTER `sellers` | ADD vehicle_plate |
+| 012 | `purchase_item_catalog` | Master catalog |
+| 013 | ALTER `purchase_order_items` | REPLACE condition_id → weight_deduction |
 
 ---
 
-## Roadmap (ตาม 06-implementation-roadmap.md)
+## Quick Reference
 
-| Phase | Week | งาน | Status |
-|---|---|---|---|
-| 1 | 1-2 | DB schema + Branch model | 🟡 In Progress |
-| 2 | 2-3 | Seller + PurchaseOrder system | ⏳ Pending |
-| 3 | 3-4 | Frontend + Reports | ⏳ Pending |
-| 4 | 4 | Testing + Deployment | ⏳ Pending |
+### API Pattern
+```javascript
+const res = await apiRequest('sale-lots', 'POST', payload);
+// res = { status: 'success'|'error', data: {...}, message: '...' }
+```
 
----
-
-## License
-
-ฐาน goragodwiriya/pos-system อยู่ภายใต้ license ของผู้พัฒนาเดิม
-ส่วน customizations เป็นของ Dr.SoloDev และลูกค้า (ตามสัญญา CT-2569-001)
+### Route Registration
+```php
+$this->routes[] = ['route' => 'resource/action', 'controller' => 'FooController', 'method' => 'bar', 'verb' => 'GET'];
+```

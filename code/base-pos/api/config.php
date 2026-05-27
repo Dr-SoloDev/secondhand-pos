@@ -14,7 +14,12 @@ define('DB_PASS', getenv('DB_PASS') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
 // API settings
-define('JWT_SECRET', 'your-secret-key-change-this-in-production');
+define('JWT_SECRET', getenv('JWT_SECRET') ?: (function() {
+    error_log('CRITICAL: JWT_SECRET environment variable is not set');
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Server configuration error']);
+    exit;
+})());
 define('JWT_EXPIRY', 86400); // 24 hours
 define('API_URL', '/api');
 
