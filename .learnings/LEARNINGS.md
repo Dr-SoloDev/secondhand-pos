@@ -6,6 +6,28 @@ Corrections, insights, and knowledge gaps captured during development.
 
 ---
 
+## 2026-05-28 — Static review มองไม่เห็น runtime state — smoke test สำคัญ
+
+**Category:** best_practice
+**Context:** Review opencode changes 33 ไฟล์ — แก้ครบตามที่ subagent reviewer ชี้ (C1/C2/C3/H1/H4) แต่รัน smoke test แล้วเจอว่า C2 ยังไม่ทำงาน
+
+**Pattern-Key:** static-review-misses-cross-file-runtime-deps
+
+**Learning:**
+Subagent อ่านโค้ดเฉพาะไฟล์ที่ diff ครอบคลุม — มองไม่เห็น `TokenService::generate()` ที่ encode JWT payload (อยู่ในไฟล์ที่ไม่ได้เปลี่ยน). มันรับแค่ `(userId, username, role)` ไม่มี `branch_id` ทำให้ทุก fix ที่พึ่ง `$this->user['branch_id']` ได้ null silently — ไม่มี error, แค่ไม่ทำงาน
+
+**Why it worked (วิธีจับ):**
+1. รัน smoke test end-to-end ด้วย curl: login เป็น manager → call sale-lots → ได้ `403 ไม่มีสาขาที่ผูกกับผู้ใช้นี้` ทันที
+2. Decode JWT payload (base64 segment 2) เพื่อดู → ไม่มี `branch_id` field → root cause ชัด
+3. แก้ TokenService + AuthController → รันเทสซ้ำ → ผ่าน
+
+**How to apply:**
+- หลัง code review เสร็จ **เสมอ** รัน end-to-end smoke ก่อนปิด session (ไม่ใช่แค่ assume ว่า fix ตามรีวิวแล้วจะ work)
+- Auth/permission fix ต้องเทสด้วย **multi-role login** (admin + manager + cashier) — bug แบบนี้ admin มองไม่เห็นเพราะ admin scope กว้าง
+- เมื่อ subagent review บอกว่า "fix ตรงนี้พึ่ง field X ของ user" → verify ทันทีว่า X อยู่ใน JWT payload จริงหรือไม่ ก่อน trust
+
+---
+
 ## 2026-05-18 — ขายคุณค่าได้ผลกว่าขายราคา
 
 **Category:** best_practice
