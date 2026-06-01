@@ -77,10 +77,10 @@ class PurchaseOrder extends Model
         if (!$po) return null;
         $po['items'] = $this->db->fetchAll(
             "SELECT poi.*, ic.name AS condition_name, ic.code AS condition_code,
-                    c.name AS category_name
-             FROM purchase_order_items poi
-             LEFT JOIN item_conditions ic ON poi.condition_id = ic.id
-             LEFT JOIN categories c ON poi.category_id = c.id
+                     c.name AS category_name
+              FROM purchase_order_items poi
+              LEFT JOIN item_conditions ic ON poi.condition_id = ic.id /* DEPRECATED — legacy PO view only */
+              LEFT JOIN categories c ON poi.category_id = c.id
              WHERE poi.purchase_order_id = ?
              ORDER BY poi.id ASC",
             [$id]
@@ -101,13 +101,58 @@ class PurchaseOrder extends Model
         return $prefix . '-' . str_pad($next, 3, '0', STR_PAD_LEFT);
     }
 
-    public function updateStatus($id, $status)
+    public function cancel($id)
     {
-        $this->db->query(
-            "UPDATE {$this->table} SET status = ?, updated_at = NOW() WHERE id = ?",
-            [$status, $id]
+        $po = $this->db->fetch(
+            "SELECT id, status, seller_id, total_amount FROM {$this->table} WHERE id = ?",
+            [$id]
         );
-        return true;
+        if (!$po) {
+            throw new Exception('ไม่พบใบรับซื้อ');
+        }
+        if ($po['status'] === 'cancelled') {
+            throw new Exception('ใบรับซื้อถูกยกเลิกไปแล้ว');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            // STOCK FIX: Restore stock when PO is cancelled
+            $items = $this->db->fetchAll(
+                "SELECT category_id, (quantity - weight_deduction) as net_qty
+                 FROM purchase_order_items
+                 WHERE purchase_order_id = ? AND category_id IS NOT NULL",
+                [$id]
+            );
+            foreach ($items as $item) {
+                $netQty = max(0, (float)$item['net_qty']);
+                if ($netQty > 0) {
+                    $this->db->query(
+                        "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",
+                        [$netQty, $item['category_id']]
+                    );
+                }
+            }
+
+            $this->db->query(
+                "UPDATE {$this->table} SET status = 'cancelled', updated_at = NOW() WHERE id = ?",
+                [$id]
+            );
+
+            // Also revert seller stats
+            $this->db->query(
+                "UPDATE sellers
+                 SET total_transactions = GREATEST(0, COALESCE(total_transactions, 0) - 1),
+                     total_amount = GREATEST(0, COALESCE(total_amount, 0) - ?)
+                 WHERE id = ?",
+                [$po['total_amount'], $po['seller_id']]
+            );
+
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function createWithItems($data, $items, $userId)
@@ -145,13 +190,14 @@ class PurchaseOrder extends Model
                 $netQty = max(0, $qty - $deduct);
                 $unitPrice = (float)($item['unit_price'] ?? 0);
                 $totalPrice = (float)($item['total_price'] ?? ($netQty * $unitPrice));
+                $categoryId = $item['category_id'] ?? null;
 
                 $this->db->insert('purchase_order_items', [
                     'purchase_order_id' => $poId,
                     'product_id' => $item['product_id'] ?? null,
                     'item_name' => $item['item_name'],
-                    'category_id' => $item['category_id'] ?? null,
-                    'condition_id' => $item['condition_id'] ?? null,
+                    'category_id' => $categoryId,
+                    'condition_id' => null, // DEPRECATED — ใช้ weight_deduction แทน
                     'quantity' => $qty,
                     'weight_deduction' => $deduct,
                     'unit' => $item['unit'] ?? 'ชิ้น',
@@ -161,6 +207,14 @@ class PurchaseOrder extends Model
                     'photo_path' => $item['photo_path'] ?? null,
                     'notes' => $item['notes'] ?? null,
                 ]);
+
+                // STOCK FIX: Update category stock when PO item is created
+                if ($categoryId) {
+                    $this->db->query(
+                        "UPDATE categories SET stock_kg = stock_kg + ? WHERE id = ?",
+                        [$netQty, $categoryId]
+                    );
+                }
             }
 
             $this->db->query(

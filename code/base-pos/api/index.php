@@ -45,14 +45,12 @@ try {
 
     // Process the request
     $router->dispatch();
-} catch (Exception $e) {
-    // Log the error
+} catch (\Throwable $e) {
     error_log('API Error: '.$e->getMessage());
 
-    // Send error response
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Internal server error'
+        'message' => $e->getMessage()
     ]);
 }

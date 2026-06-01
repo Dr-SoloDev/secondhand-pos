@@ -89,7 +89,7 @@ class SellersController extends Controller
             Response::success('เพิ่มผู้ขายสำเร็จ', ['id' => $sellerId]);
         } catch (Exception $e) {
             error_log('Seller create failed: ' . $e->getMessage());
-            Response::error('ไม่สามารถเพิ่มผู้ขายได้', 400);
+            Response::error($e->getMessage(), 400);
         }
     }
 
@@ -134,7 +134,7 @@ class SellersController extends Controller
             Response::success('แก้ไขข้อมูลผู้ขายสำเร็จ');
         } catch (Exception $e) {
             error_log('Seller update failed: ' . $e->getMessage());
-            Response::error('ไม่สามารถแก้ไขผู้ขายได้', 400);
+            Response::error($e->getMessage(), 400);
         }
     }
 

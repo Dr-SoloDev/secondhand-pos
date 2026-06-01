@@ -28,15 +28,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Toggle sidebar (responsive)
-  const toggleSidebar = document.querySelector('.toggle-sidebar');
-  if (toggleSidebar) {
-    toggleSidebar.addEventListener('click', function() {
-      document.querySelector('.sidebar').classList.toggle('collapsed');
-      document.querySelector('.content-area').classList.toggle('expanded');
-    });
-  }
-
   // Setup profile link
   const profileLink = document.querySelector('.user-dropdown-menu a[href="#"]:first-child');
   if (profileLink) {
@@ -97,12 +88,8 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
   }
 
   try {
-    console.log(`API Request to: ${apiPath}/${endpoint}`, options); // Debug line
-
     const response = await fetch(`${apiPath}/${endpoint}`, options);
     const result = await response.json();
-
-    console.log('API Response:', result); // Debug line
 
     if (!response.ok) {
       // Handle unauthorized (token expired)

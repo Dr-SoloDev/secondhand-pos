@@ -21,6 +21,19 @@ class PriceTiersController extends Controller
         Response::success('ok', $items);
     }
 
+    public function createCatalogItem()
+    {
+        $this->requireAuth(['admin', 'manager']);
+        $data = $this->getRequestData();
+        try {
+            $model = new PurchaseItemCatalog();
+            $id = $model->create($data);
+            Response::success('เพิ่มรายการสำเร็จ', ['id' => $id]);
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
     public function updatePriceTiers()
     {
         $this->requireAuth(['admin', 'manager']);

@@ -2,10 +2,13 @@ let branches = [];
 let cart = [];
 let selectedSeller = null;
 let recentPOs = [];
+let globalTier = { level: null, price: null, label: null };
+let currentCatalogItem = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadBranches();
   await loadRecentPOs();
+  buildGlobalTierButtons();
 
   document.getElementById('searchSellerInput').addEventListener('input', debounce(searchSellers, 300));
   document.getElementById('createNewSellerBtn').addEventListener('click', () => openNewSellerModal());
@@ -29,10 +32,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('itemUnit').value = 'ชิ้น';
   document.getElementById('itemTotalPreview').textContent = '\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e08\u0e32\u0e01\u0e41\u0e04\u0e15\u0e15\u0e32\u0e25\u0e47\u0e2d\u0e01';
   document.getElementById('itemTotalPreview').style.color = '#999';
-  document.getElementById('tierSelectionGroup').style.display = 'none';
-    document.getElementById('tierButtons').innerHTML = '';
+  currentCatalogItem = null;
     document.getElementById('itemUnitPrice').value = '0';
     document.getElementById('itemCategoryId').value = '';
+    buildGlobalTierButtons();
   });
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#itemName') && !e.target.closest('#itemCatalogResults')) {
@@ -160,60 +163,99 @@ function selectCatalogItem(d) {
     document.getElementById('itemUnitPrice').value = '0';
   }
 
+  // Store current catalog item for tier price auto-apply
+  currentCatalogItem = { ...d };
+
+  // Refresh tier buttons with actual prices from this catalog item
+  buildGlobalTierButtons(d.tierprices);
+
+  // Set unit price - apply global tier if set
+  const tierPrices = d.tierprices ? JSON.parse(d.tierprices) : [];
+  if (globalTier.level && tierPrices[globalTier.level - 1]) {
+    const tp = tierPrices[globalTier.level - 1];
+    document.getElementById('itemUnitPrice').value = parseFloat(tp.price || 0).toFixed(2);
+  } else {
+    const basePrice = parseFloat(d.price || 0);
+    document.getElementById('itemUnitPrice').value = basePrice > 0 ? basePrice.toFixed(2) : '0';
+  }
+
   // Reset weight/deduction
   document.getElementById('itemQuantity').value = '1';
   document.getElementById('itemWeightDeduct').value = '0';
 
-  // Build tier buttons from catalog item's tier prices
-  const tierPrices = d.tierprices ? JSON.parse(d.tierprices) : [];
-  buildTierButtons(tierPrices);
-
   updateItemTotal();
 }
 
-function buildTierButtons(tierPrices) {
-  const group = document.getElementById('tierSelectionGroup');
-  const container = document.getElementById('tierButtons');
+function buildGlobalTierButtons(tierPrices) {
+  const container = document.getElementById('globalTierButtons');
+  let prices = [];
+  if (tierPrices) {
+    try { prices = JSON.parse(tierPrices); } catch(e) {}
+  }
+  const colors = [
+    { color: '#22c55e', bg: '#dcfce7' },
+    { color: '#f59e0b', bg: '#fef3c7' },
+    { color: '#ef4444', bg: '#fee2e2' },
+  ];
   container.innerHTML = '';
-
-  const tiers = (tierPrices || []).map((t, i) => ({
-    level: i + 1,
-    price: parseFloat(t.price || 0),
-    label: t.label || '\u0e1a\u0e34\u0e25' + (i + 1),
-  }));
-
-  const hasPrice = tiers.some(t => t.price > 0);
-  if (!hasPrice) { group.style.display = 'none'; return; }
-
-  group.style.display = 'block';
-
-  tiers.forEach(t => {
-    if (t.price <= 0) return;
+  for (let idx = 0; idx < 3; idx++) {
+    const c = colors[idx];
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `tier-btn tier-${t.level}`;
-    btn.dataset.tier = t.level;
-    btn.dataset.price = t.price;
-    btn.innerHTML = `
-      <div style="font-size:13px;font-weight:600">${escapeHtml(t.label)}</div>
-      <div style="font-size:11px;opacity:0.85">${formatCurrency(t.price)}</div>
-    `;
-    btn.addEventListener('click', () => selectTier(btn, t.level, t.price));
+    btn.className = 'global-tier-btn';
+    btn.dataset.level = idx + 1;
+    btn.dataset.color = c.color;
+    btn.dataset.bg = c.bg;
+    const p = prices[idx];
+    const label = p && p.label ? p.label.trim() : `บิล${idx + 1}`;
+    const priceStr = p && p.price > 0 ? `\n${parseFloat(p.price).toFixed(2)} ฿` : '';
+    btn.innerText = `${label}${priceStr}`;
+    btn.style.cssText = `padding:10px 20px;border:2px solid ${c.color};border-radius:10px;background:#fff;color:${c.color};cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;white-space:pre;transition:all 0.15s;box-shadow:0 1px 3px rgba(0,0,0,0.1);`;
+    btn.addEventListener('click', () => selectGlobalTier(btn, idx + 1));
     container.appendChild(btn);
-  });
+  }
+  // Re-apply active state if tier was previously selected
+  if (globalTier.level) {
+    const btns = container.querySelectorAll('.global-tier-btn');
+    const activeIdx = globalTier.level - 1;
+    if (btns[activeIdx]) {
+      selectGlobalTier(btns[activeIdx], globalTier.level);
+    }
+  }
 }
 
-let activeTierBtn = null;
-
-function selectTier(btn, level, price) {
-  if (activeTierBtn) {
-    activeTierBtn.classList.remove('active');
-  }
+function selectGlobalTier(btn, level) {
+  // Unselect all
+  document.querySelectorAll('.global-tier-btn').forEach(b => {
+    const c = b.dataset.color;
+    b.style.background = '#fff';
+    b.style.color = c;
+    b.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+    b.classList.remove('active');
+  });
+  // Select this
+  const c = btn.dataset.color;
+  btn.style.background = c;
+  btn.style.color = '#fff';
+  btn.style.boxShadow = `0 2px 8px ${c}66`;
   btn.classList.add('active');
-  activeTierBtn = btn;
+  globalTier.level = level;
+  const tierLabel = btn.innerText.split('\n')[0] || `ระดับ ${level}`;
+  document.getElementById('globalTierInfo').innerHTML = `<span style="color:${c};font-weight:600">${tierLabel}</span> — ราคาจะถูกใช้กับทุกรายการในใบนี้อัตโนมัติ`;
+  // If catalog item already selected, update price immediately
+  if (currentCatalogItem && currentCatalogItem.tierprices) {
+    applyTierPrice(currentCatalogItem.tierprices);
+  }
+}
 
-  document.getElementById('itemUnitPrice').value = parseFloat(price).toFixed(2);
-  updateItemTotal();
+function applyTierPrice(tierPrices) {
+  if (!globalTier.level || !tierPrices) return;
+  const tiers = JSON.parse(tierPrices || '[]');
+  const selected = tiers[globalTier.level - 1];
+  if (selected && selected.price > 0) {
+    document.getElementById('itemUnitPrice').value = parseFloat(selected.price).toFixed(2);
+    updateItemTotal();
+  }
 }
 
 function addItemToCart() {
@@ -233,7 +275,7 @@ function addItemToCart() {
   if (price <= 0) { showNotification('\u0e23\u0e32\u0e04\u0e32\u0e15\u0e49\u0e2d\u0e07\u0e21\u0e32\u0e01\u0e01\u0e27\u0e48\u0e32 0', 'error'); return; }
 
   const netQty = Math.max(0, qty - deduct);
-  const tierEl = activeTierBtn ? parseInt(activeTierBtn.dataset.tier) : null;
+  const tierLevel = globalTier.level || null;
 
   cart.push({
     catalog_id: parseInt(catalogId),
@@ -245,7 +287,7 @@ function addItemToCart() {
     unit: unit,
     unit_price: price,
     total_price: netQty * price,
-    price_tier: tierEl,
+    price_tier: tierLevel,
     notes: '',
   });
 
@@ -261,11 +303,8 @@ function addItemToCart() {
   document.getElementById('itemTotalPreview').textContent = '\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e08\u0e32\u0e01\u0e41\u0e04\u0e15\u0e15\u0e32\u0e25\u0e47\u0e2d\u0e01';
   document.getElementById('itemTotalPreview').style.color = '#999';
   document.getElementById('itemUnit').value = 'ชิ้น';
-  document.getElementById('tierSelectionGroup').style.display = 'none';
-  document.getElementById('tierButtons').innerHTML = '';
-  if (activeTierBtn) {
-    activeTierBtn = null;
-  }
+  currentCatalogItem = null;
+  buildGlobalTierButtons();
 
   renderCart();
 }
@@ -351,6 +390,8 @@ async function savePurchaseOrder() {
 function clearAll() {
   cart = [];
   selectedSeller = null;
+  globalTier = { level: null, price: null, label: null };
+  currentCatalogItem = null;
   document.getElementById('selectedSellerBox').innerHTML = '<div style="color:#888">\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e1c\u0e39\u0e49\u0e02\u0e32\u0e22</div>';
   document.getElementById('poNotes').value = '';
   document.getElementById('itemName').value = '';
@@ -361,9 +402,9 @@ function clearAll() {
   document.getElementById('itemUnitPrice').value = '0';
   document.getElementById('itemQuantity').value = '1';
   document.getElementById('itemWeightDeduct').value = '0';
-  document.getElementById('tierSelectionGroup').style.display = 'none';
-  document.getElementById('tierButtons').innerHTML = '';
-  if (activeTierBtn) { activeTierBtn = null; }
+  document.getElementById('globalTierInfo').textContent = '\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e40\u0e25\u0e37\u0e2d\u0e01 \u2014 \u0e08\u0e30\u0e43\u0e0a\u0e49\u0e23\u0e32\u0e04\u0e32\u0e1b\u0e01\u0e15\u0e34';
+  // Reset tier buttons to placeholder
+  buildGlobalTierButtons();
   renderCart();
 }
 

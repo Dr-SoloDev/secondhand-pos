@@ -101,6 +101,50 @@ class ReportsController extends Controller
         Response::success('Cashier performance data retrieved', $reportData);
     }
 
+    public function getRecentSaleLots()
+    {
+        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
+
+        $reportService = new ReportService();
+        $lots = $reportService->getRecentSaleLots($limit);
+
+        Response::success('Recent sale lots retrieved', $lots);
+    }
+
+    public function getPurchaseReport()
+    {
+        $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
+        $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
+        $groupBy = isset($_GET['group_by']) ? $this->sanitizeInput($_GET['group_by']) : 'day';
+
+        $reportService = new ReportService();
+        $reportData = $reportService->getPurchaseReport($dateFrom, $dateTo, $groupBy);
+
+        Response::success('Purchase report data retrieved', $reportData);
+    }
+
+    public function getSaleLotReport()
+    {
+        $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
+        $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
+        $groupBy = isset($_GET['group_by']) ? $this->sanitizeInput($_GET['group_by']) : 'day';
+
+        $reportService = new ReportService();
+        $reportData = $reportService->getSaleLotReport($dateFrom, $dateTo, $groupBy);
+
+        Response::success('Sale lot report data retrieved', $reportData);
+    }
+
+    public function getSaleLotChart()
+    {
+        $period = isset($_GET['period']) ? $this->sanitizeInput($_GET['period']) : 'week';
+
+        $reportService = new ReportService();
+        $chartData = $reportService->getSaleLotChartData($period);
+
+        Response::success('Sale lot chart data retrieved', $chartData);
+    }
+
     public function getTaxReport()
     {
         // Get filter params

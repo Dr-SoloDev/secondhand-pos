@@ -153,6 +153,54 @@ async function savePriceTier(itemId) {
     }
 }
 
+async function loadCategories() {
+    const result = await apiRequest('inventory/categories', 'GET');
+    if (result.status !== 'success') return;
+    const sel = document.getElementById('newCategory');
+    result.data.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        sel.appendChild(opt);
+    });
+}
+
+function openAddModal() {
+    document.getElementById('newCode').value = '';
+    document.getElementById('newName').value = '';
+    document.getElementById('newUnit').value = 'กก.';
+    document.getElementById('newCategory').value = '';
+    document.getElementById('addModal').classList.add('show');
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').classList.remove('show');
+}
+
+async function submitAddItem() {
+    const code = document.getElementById('newCode').value.trim();
+    const name = document.getElementById('newName').value.trim();
+    if (!code || !name) {
+        showNotification('กรุณากรอกรหัสและชื่อสินค้า', 'error');
+        return;
+    }
+    const result = await apiRequest('price-tiers', 'POST', {
+        code,
+        name,
+        category_id: document.getElementById('newCategory').value || null,
+        default_unit: document.getElementById('newUnit').value.trim() || 'กก.',
+        tiers: [{ label: 'บิล1', price: 0 }]
+    });
+    if (result.status === 'success') {
+        showNotification('เพิ่มรายการสำเร็จ', 'success');
+        closeAddModal();
+        loadPriceTiers();
+    } else {
+        showNotification(result.message || 'ไม่สามารถเพิ่มได้', 'error');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     loadPriceTiers();
+    loadCategories();
 });

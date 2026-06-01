@@ -83,4 +83,23 @@ class PurchaseItemCatalogController extends Controller
             Response::error('ไม่สามารถแก้ไขรายการได้', 400);
         }
     }
+
+    /**
+     * DELETE /api/purchase-catalog/item?id=X
+     */
+    public function deleteItem($id = null)
+    {
+        $this->requireAuth(['admin']);
+        if (!$id) {
+            Response::error('กรุณาระบุ ID', 400);
+        }
+        $model = new PurchaseItemCatalog();
+        try {
+            $model->delete($id);
+            Response::success('ลบรายการสำเร็จ');
+        } catch (Exception $e) {
+            error_log('Catalog delete failed: ' . $e->getMessage());
+            Response::error('ไม่สามารถลบรายการได้', 400);
+        }
+    }
 }

@@ -3,6 +3,8 @@ class PurchaseOrdersController extends Controller
 {
     public function getPurchaseOrders()
     {
+        $this->requireAuth();
+
         $pagination = $this->getPaginationParams();
         $filters = [
             'branch_id' => isset($_GET['branch_id']) ? intval($_GET['branch_id']) : null,
@@ -10,6 +12,15 @@ class PurchaseOrdersController extends Controller
             'date_to' => isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : null,
             'search' => isset($_GET['search']) ? $this->sanitizeInput($_GET['search']) : null,
         ];
+
+        // SECURITY: non-admin บังคับ scope ที่ branch ของตัวเองเสมอ
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $filters['branch_id'] = $this->user['branch_id'] ?? null;
+            if (!$filters['branch_id']) {
+                Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+            }
+        }
+
         $model = new PurchaseOrder();
         $result = $model->getPaginated($pagination['page'], $pagination['limit'], $filters);
         Response::success('Purchase orders retrieved', $result);
@@ -17,10 +28,21 @@ class PurchaseOrdersController extends Controller
 
     public function getPurchaseOrder($id)
     {
+        $this->requireAuth();
         if (!$id) Response::error('Purchase order ID is required', 400);
+
         $model = new PurchaseOrder();
         $po = $model->getById($id);
         if (!$po) Response::error('Purchase order not found', 404);
+
+        // SECURITY: non-admin ดูได้เฉพาะ PO ของสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$po['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์เข้าถึงใบรับซื้อนี้', 403);
+            }
+        }
+
         Response::success('Purchase order retrieved', $po);
     }
 
@@ -39,7 +61,7 @@ class PurchaseOrdersController extends Controller
         if ($po['status'] === 'cancelled') Response::error('ใบรับซื้อยกเลิกไปแล้ว', 400);
 
         try {
-            $model->updateStatus($id, 'cancelled');
+            $model->cancel($id);
             Logger::logActivity(
                 $this->user['user_id'],
                 'cancel_purchase_order',
@@ -48,7 +70,7 @@ class PurchaseOrdersController extends Controller
             Response::success('ยกเลิกใบรับซื้อสำเร็จ');
         } catch (Exception $e) {
             error_log('PurchaseOrder cancel failed: ' . $e->getMessage());
-            Response::error('ยกเลิกใบรับซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
+            Response::error('ยกเลิกใบรับซื้อไม่สำเร็จ: ' . $e->getMessage(), 500);
         }
     }
 
@@ -56,6 +78,15 @@ class PurchaseOrdersController extends Controller
     {
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['branch_id', 'seller_id', 'items']);
+
+        // SECURITY: non-admin สร้างได้เฉพาะสาขาตัวเอง
+        $branchId = intval($data['branch_id']);
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || $branchId !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์สร้างใบรับซื้อในสาขานี้', 403);
+            }
+        }
 
         if (!is_array($data['items']) || count($data['items']) === 0) {
             Response::error('ต้องระบุรายการสินค้าอย่างน้อย 1 รายการ', 400);
@@ -78,7 +109,7 @@ class PurchaseOrdersController extends Controller
             $cleanItems[] = [
                 'item_name' => trim((string)$item['item_name']),
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
-                'condition_id' => !empty($item['condition_id']) ? intval($item['condition_id']) : null,
+                // DEPRECATED — condition_id ไม่ใช้แล้ว ใช้ weight_deduction แทน
                 'weight_deduction' => floatval($item['weight_deduction'] ?? 0),
                 'quantity' => floatval($item['quantity'] ?? 1),
                 'unit' => $item['unit'] ?? 'ชิ้น',

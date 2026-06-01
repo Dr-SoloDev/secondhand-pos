@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('generateInventoryReport').addEventListener('click', generateInventoryReport);
   document.getElementById('generateCashierReport').addEventListener('click', generateCashierReport);
   document.getElementById('generateTaxReport').addEventListener('click', generateTaxReport);
+  document.getElementById('generatePurchaseReport').addEventListener('click', generatePurchaseReport);
+  document.getElementById('generateSalelotReport').addEventListener('click', generateSalelotReport);
 
   // Export and print buttons
   document.getElementById('exportReportBtn').addEventListener('click', exportCurrentReport);
@@ -78,6 +80,14 @@ function setDefaultDates() {
   // Set tax report dates
   document.getElementById('taxDateFrom').value = firstDayStr;
   document.getElementById('taxDateTo').value = todayStr;
+
+  // Set purchase report dates
+  document.getElementById('purchaseDateFrom').value = firstDayStr;
+  document.getElementById('purchaseDateTo').value = todayStr;
+
+  // Set sale lot report dates
+  document.getElementById('salelotDateFrom').value = firstDayStr;
+  document.getElementById('salelotDateTo').value = todayStr;
 }
 
 // Format date for input fields (YYYY-MM-DD)
@@ -172,6 +182,12 @@ function switchReportType(reportType) {
       break;
     case 'tax':
       generateTaxReport();
+      break;
+    case 'purchase':
+      generatePurchaseReport();
+      break;
+    case 'salelot':
+      generateSalelotReport();
       break;
   }
 }
@@ -768,6 +784,218 @@ function renderCashierChart(data) {
   });
 }
 
+// Generate purchase report
+async function generatePurchaseReport() {
+  try {
+    const dateFrom = document.getElementById('purchaseDateFrom').value;
+    const dateTo = document.getElementById('purchaseDateTo').value;
+    const groupBy = document.getElementById('purchaseGroupBy').value;
+
+    if (!dateFrom || !dateTo) {
+      showNotification('Please select date range', 'error');
+      return;
+    }
+
+    showNotification('Generating purchase report...', 'info');
+
+    const response = await apiRequest(`reports/purchase-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
+
+    if (response.status === 'success') {
+      currentReportData = response.data;
+      renderPurchaseReport(response.data);
+    } else {
+      showNotification(response.message || 'Failed to generate purchase report', 'error');
+    }
+  } catch (error) {
+    console.error('Error generating purchase report:', error);
+    showNotification('Error generating purchase report', 'error');
+  }
+}
+
+function renderPurchaseReport(data) {
+  document.getElementById('purchaseTotalOrders').textContent = data.totals.total_orders;
+  document.getElementById('purchaseTotalAmount').textContent = formatCurrency(data.totals.total_amount);
+  const avgAmount = data.totals.total_orders > 0 ? data.totals.total_amount / data.totals.total_orders : 0;
+  document.getElementById('purchaseAvgAmount').textContent = formatCurrency(avgAmount);
+
+  const tableBody = document.querySelector('#purchaseReportTable tbody');
+  tableBody.innerHTML = '';
+
+  if (data.report_data.length === 0) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="4" class="text-center">No data available for the selected period</td>';
+    tableBody.appendChild(row);
+  } else {
+    data.report_data.forEach(row => {
+      const tr = document.createElement('tr');
+      const avg = row.order_count > 0 ? row.total_amount / row.order_count : 0;
+      tr.innerHTML = `
+        <td>${row.label}</td>
+        <td>${row.order_count}</td>
+        <td>${formatCurrency(row.total_amount)}</td>
+        <td>${formatCurrency(avg)}</td>
+      `;
+      tableBody.appendChild(tr);
+    });
+  }
+
+  renderPurchaseReportChart(data);
+  showNotification('Purchase report generated successfully', 'success');
+}
+
+function renderPurchaseReportChart(data) {
+  const chartContainer = document.getElementById('purchaseReportChart');
+  const canvas = chartContainer.querySelector('canvas');
+  if (canvas) {
+    const chartInstance = Chart.getChart(canvas);
+    if (chartInstance) chartInstance.destroy();
+  }
+  const newCanvas = document.createElement('canvas');
+  chartContainer.innerHTML = '';
+  chartContainer.appendChild(newCanvas);
+
+  const labels = data.report_data.map(row => row.label);
+  const values = data.report_data.map(row => row.total_amount);
+
+  new Chart(newCanvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'ยอดรับซื้อ',
+        data: values,
+        backgroundColor: 'rgba(37, 117, 252, 0.7)',
+        borderColor: '#2575fc',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: { label: ctx => 'ยอดรับซื้อ: ' + formatCurrency(ctx.raw) }
+        }
+      }
+    }
+  });
+}
+
+// Generate sale lot report
+async function generateSalelotReport() {
+  try {
+    const dateFrom = document.getElementById('salelotDateFrom').value;
+    const dateTo = document.getElementById('salelotDateTo').value;
+    const groupBy = document.getElementById('salelotGroupBy').value;
+
+    if (!dateFrom || !dateTo) {
+      showNotification('Please select date range', 'error');
+      return;
+    }
+
+    showNotification('Generating sale lot report...', 'info');
+
+    const response = await apiRequest(`reports/sale-lot-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
+
+    if (response.status === 'success') {
+      currentReportData = response.data;
+      renderSalelotReport(response.data);
+    } else {
+      showNotification(response.message || 'Failed to generate sale lot report', 'error');
+    }
+  } catch (error) {
+    console.error('Error generating sale lot report:', error);
+    showNotification('Error generating sale lot report', 'error');
+  }
+}
+
+function renderSalelotReport(data) {
+  document.getElementById('salelotTotalLots').textContent = data.totals.total_lots;
+  document.getElementById('salelotTotalAmount').textContent = formatCurrency(data.totals.total_amount);
+  document.getElementById('salelotTotalCost').textContent = formatCurrency(data.totals.total_cost);
+  document.getElementById('salelotTotalProfit').textContent = formatCurrency(data.totals.total_profit);
+
+  const tableBody = document.querySelector('#salelotReportTable tbody');
+  tableBody.innerHTML = '';
+
+  if (data.report_data.length === 0) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="6" class="text-center">No data available for the selected period</td>';
+    tableBody.appendChild(row);
+  } else {
+    data.report_data.forEach(row => {
+      const tr = document.createElement('tr');
+      const margin = row.total_amount > 0 ? ((row.profit / row.total_amount) * 100).toFixed(1) : '0.0';
+      tr.innerHTML = `
+        <td>${row.label}</td>
+        <td>${row.lot_count}</td>
+        <td>${formatCurrency(row.total_amount)}</td>
+        <td>${formatCurrency(row.total_cost)}</td>
+        <td>${formatCurrency(row.profit)}</td>
+        <td>${margin}%</td>
+      `;
+      tableBody.appendChild(tr);
+    });
+  }
+
+  renderSalelotReportChart(data);
+  showNotification('Sale lot report generated successfully', 'success');
+}
+
+function renderSalelotReportChart(data) {
+  const chartContainer = document.getElementById('salelotReportChart');
+  const canvas = chartContainer.querySelector('canvas');
+  if (canvas) {
+    const chartInstance = Chart.getChart(canvas);
+    if (chartInstance) chartInstance.destroy();
+  }
+  const newCanvas = document.createElement('canvas');
+  chartContainer.innerHTML = '';
+  chartContainer.appendChild(newCanvas);
+
+  const labels = data.report_data.map(row => row.label);
+  const amounts = data.report_data.map(row => row.total_amount);
+  const profits = data.report_data.map(row => row.profit);
+
+  new Chart(newCanvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'ยอดขาย',
+          data: amounts,
+          backgroundColor: 'rgba(52, 152, 219, 0.7)',
+          borderColor: '#3498db',
+          borderWidth: 1
+        },
+        {
+          label: 'กำไร',
+          data: profits,
+          backgroundColor: 'rgba(46, 204, 113, 0.7)',
+          borderColor: '#2ecc71',
+          borderWidth: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: { label: ctx => ctx.dataset.label + ': ' + formatCurrency(ctx.raw) }
+        }
+      }
+    }
+  });
+}
+
 // Generate tax report
 async function generateTaxReport() {
   try {
@@ -865,6 +1093,14 @@ function exportCurrentReport() {
     case 'tax':
       filename = `tax_report_${formatDateForFilename(new Date())}.csv`;
       csvContent = generateTaxReportCSV(currentReportData);
+      break;
+    case 'purchase':
+      filename = `purchase_report_${formatDateForFilename(new Date())}.csv`;
+      csvContent = generatePurchaseReportCSV(currentReportData);
+      break;
+    case 'salelot':
+      filename = `salelot_report_${formatDateForFilename(new Date())}.csv`;
+      csvContent = generateSalelotReportCSV(currentReportData);
       break;
   }
 
@@ -1010,6 +1246,26 @@ function generateTaxReportCSV(data) {
   // Add totals row
   csvContent += `Total,${data.totals.taxable_sales},${data.totals.tax_collected},${data.totals.taxable_sales + data.totals.tax_collected}\n`;
 
+  return csvContent;
+}
+
+function generatePurchaseReportCSV(data) {
+  let csvContent = 'Period,Orders,Total Amount,Average Amount\n';
+  data.report_data.forEach(row => {
+    const avg = row.order_count > 0 ? (row.total_amount / row.order_count).toFixed(2) : '0.00';
+    csvContent += `${row.label},${row.order_count},${row.total_amount},${avg}\n`;
+  });
+  csvContent += `Total,${data.totals.total_orders},${data.totals.total_amount},${data.totals.total_orders > 0 ? (data.totals.total_amount / data.totals.total_orders).toFixed(2) : '0.00'}\n`;
+  return csvContent;
+}
+
+function generateSalelotReportCSV(data) {
+  let csvContent = 'Period,Lots,Amount,Cost,Profit,Margin\n';
+  data.report_data.forEach(row => {
+    const margin = row.total_amount > 0 ? ((row.profit / row.total_amount) * 100).toFixed(1) : '0.0';
+    csvContent += `${row.label},${row.lot_count},${row.total_amount},${row.total_cost},${row.profit},${margin}%\n`;
+  });
+  csvContent += `Total,${data.totals.total_lots},${data.totals.total_amount},${data.totals.total_cost},${data.totals.total_profit},${data.totals.total_amount > 0 ? ((data.totals.total_profit / data.totals.total_amount) * 100).toFixed(1) : '0.0'}%\n`;
   return csvContent;
 }
 

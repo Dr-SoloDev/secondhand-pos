@@ -21,21 +21,20 @@
       <ul class="sidebar-menu">
         <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
         <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
-        <li><a href="sellers.html"><i class="icon-users"></i><span>ผู้ขาย</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
         <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html" class="active"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
         <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
         <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
-        <li><a href="price-tiers.html"><i class="icon-tagss"></i><span>ตั้งค่าราคา</span></a></li>
       </ul>
     </aside>
 
     <main class="content-area">
       <div class="topbar">
-        <button class="toggle-sidebar"><i class="icon-bars"></i></button>
         <div class="user-dropdown">
           <button class="user-dropdown-toggle">
             <div class="user-avatar"><i class="icon-user"></i></div>
@@ -87,6 +86,14 @@
             <div class="report-type-item" data-report="tax">
               <i class="icon-billing"></i>
               <span>รายงานภาษี</span>
+            </div>
+            <div class="report-type-item" data-report="purchase">
+              <i class="icon-cart"></i>
+              <span>รายงานรับซื้อ</span>
+            </div>
+            <div class="report-type-item" data-report="salelot">
+              <i class="icon-stats"></i>
+              <span>รายงานขาย Lot</span>
             </div>
           </div>
         </div>
@@ -336,6 +343,140 @@
                 </thead>
                 <tbody>
                   <!-- Cashier performance data will be loaded here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchase Report -->
+      <div class="report-section" id="purchaseReport" style="display: none;">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">รายงานการรับซื้อ</h2>
+          </div>
+          <div class="card-body">
+            <div class="filters">
+              <div class="date-range">
+                <div class="form-group">
+                  <label for="purchaseDateFrom">จากวันที่</label>
+                  <input type="date" id="purchaseDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="purchaseDateTo">ถึงวันที่</label>
+                  <input type="date" id="purchaseDateTo" class="form-control">
+                </div>
+              </div>
+              <select id="purchaseGroupBy" class="form-control">
+                <option value="day">รายวัน</option>
+                <option value="month">รายเดือน</option>
+                <option value="year">รายปี</option>
+              </select>
+              <button class="btn btn-primary" id="generatePurchaseReport">สร้างรายงาน</button>
+            </div>
+
+            <div class="report-summary">
+              <div class="summary-item">
+                <div class="summary-label">ออเดอร์ทั้งหมด</div>
+                <div class="summary-value" id="purchaseTotalOrders">0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">ยอดรับซื้อรวม</div>
+                <div class="summary-value" id="purchaseTotalAmount">฿0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">เฉลี่ย/ออเดอร์</div>
+                <div class="summary-value" id="purchaseAvgAmount">฿0.00</div>
+              </div>
+            </div>
+
+            <div class="chart-container" id="purchaseReportChart">
+              <!-- Purchase chart will be rendered here -->
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="purchaseReportTable">
+                <thead>
+                  <tr>
+                    <th>รอบระยะเวลา</th>
+                    <th>ออเดอร์</th>
+                    <th>ยอดรับซื้อ</th>
+                    <th>เฉลี่ย/ออเดอร์</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Purchase report data will be loaded here -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sale Lot Report -->
+      <div class="report-section" id="salelotReport" style="display: none;">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">รายงานการขาย Lot</h2>
+          </div>
+          <div class="card-body">
+            <div class="filters">
+              <div class="date-range">
+                <div class="form-group">
+                  <label for="salelotDateFrom">จากวันที่</label>
+                  <input type="date" id="salelotDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="salelotDateTo">ถึงวันที่</label>
+                  <input type="date" id="salelotDateTo" class="form-control">
+                </div>
+              </div>
+              <select id="salelotGroupBy" class="form-control">
+                <option value="day">รายวัน</option>
+                <option value="month">รายเดือน</option>
+                <option value="year">รายปี</option>
+              </select>
+              <button class="btn btn-primary" id="generateSalelotReport">สร้างรายงาน</button>
+            </div>
+
+            <div class="report-summary">
+              <div class="summary-item">
+                <div class="summary-label">Lot ทั้งหมด</div>
+                <div class="summary-value" id="salelotTotalLots">0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">ยอดขายรวม</div>
+                <div class="summary-value" id="salelotTotalAmount">฿0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">ต้นทุนรวม</div>
+                <div class="summary-value" id="salelotTotalCost">฿0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">กำไรขั้นต้น</div>
+                <div class="summary-value" id="salelotTotalProfit">฿0.00</div>
+              </div>
+            </div>
+
+            <div class="chart-container" id="salelotReportChart">
+              <!-- Sale lot chart will be rendered here -->
+            </div>
+
+            <div class="table-container">
+              <table class="data-table" id="salelotReportTable">
+                <thead>
+                  <tr>
+                    <th>รอบระยะเวลา</th>
+                    <th>จำนวน Lot</th>
+                    <th>ยอดขาย</th>
+                    <th>ต้นทุน</th>
+                    <th>กำไรขั้นต้น</th>
+                    <th>อัตรากำไร</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Sale lot report data will be loaded here -->
                 </tbody>
               </table>
             </div>

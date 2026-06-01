@@ -1,0 +1,55 @@
+# Auth API Tests
+test_auth() {
+  test_section "Authentication"
+
+  # Ensure token is initialized by using the helper
+  local token
+  token=$(get_token)
+
+  # 1. Login with valid credentials (via helper)
+  local res
+  res=$(curl -s "$API_BASE/auth/login" \
+    -X POST \
+    -H 'Content-Type: application/json' \
+    -d "{\"username\":\"$TEST_USER\",\"password\":\"$TEST_PASS\"}")
+  assert_contains "$res" '"status":"success"' "Login with valid credentials"
+  assert_contains "$res" '"token"' "Login returns token"
+  token=$(echo "$res" | sed 's/.*"token":"\([^"]*\)".*/\1/')
+
+  # 2. Login with invalid password
+  local res_fail
+  res_fail=$(curl -s "$API_BASE/auth/login" \
+    -X POST \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"wrong"}')
+  assert_contains "$res_fail" '"status":"error"' "Login with invalid password fails"
+
+  # 3. Login with empty username
+  local res_empty
+  res_empty=$(curl -s "$API_BASE/auth/login" \
+    -X POST \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"","password":"admin"}')
+  assert_contains "$res_empty" '"status":"error"' "Login with empty username fails"
+
+  # 4. Verify token (POST with token in JSON body)
+  local res_verify
+  res_verify=$(curl -s "$API_BASE/auth/verify" \
+    -X POST \
+    -H 'Content-Type: application/json' \
+    -d "{\"token\":\"$token\"}")
+  assert_contains "$res_verify" '"status":"success"' "Verify valid token"
+
+  # 5. Verify with invalid token
+  local res_bad
+  res_bad=$(curl -s "$API_BASE/auth/verify" \
+    -X POST \
+    -H 'Content-Type: application/json' \
+    -d '{"token":"invalid-token"}')
+  assert_contains "$res_bad" '"status":"error"' "Verify with invalid token fails"
+
+  # 6. Access without token returns error
+  local res_noauth
+  res_noauth=$(curl -s "$API_BASE/branches")
+  assert_contains "$res_noauth" '"status":"error"' "Access without token rejected"
+}

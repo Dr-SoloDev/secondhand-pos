@@ -40,6 +40,19 @@ class Product extends Model
     }
 
     /**
+     * Get last product (for auto-generating SKU)
+     */
+    public function getLastProduct()
+    {
+        // หา SKU ที่เป็นตัวเลขล่าสุด (เรียงจากมากไปน้อย)
+        $query = "SELECT * FROM {$this->table}
+                  WHERE sku REGEXP '^[0-9]+$'
+                  ORDER BY CAST(sku AS UNSIGNED) DESC
+                  LIMIT 1";
+        return $this->db->fetch($query);
+    }
+
+    /**
      * @param $data
      */
     public function create($data)
@@ -74,6 +87,18 @@ class Product extends Model
 
         if (isset($data['category_id'])) {
             $insertData['category_id'] = $data['category_id'];
+        }
+
+        if (isset($data['price_tier1'])) {
+            $insertData['price_tier1'] = $data['price_tier1'];
+        }
+
+        if (isset($data['price_tier2'])) {
+            $insertData['price_tier2'] = $data['price_tier2'];
+        }
+
+        if (isset($data['price_tier3'])) {
+            $insertData['price_tier3'] = $data['price_tier3'];
         }
 
         if (isset($data['quantity'])) {

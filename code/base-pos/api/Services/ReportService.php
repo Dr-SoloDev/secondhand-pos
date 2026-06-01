@@ -57,13 +57,38 @@ class ReportService
               AND status = 'active'"
         );
 
+        // Sale lot stats
+        $todaySaleLotAmount = $this->db->fetchColumn(
+            "SELECT COALESCE(SUM(total_amount), 0)
+              FROM sale_lots
+              WHERE DATE(sale_date) = CURDATE()
+              AND status = 'confirmed'"
+        );
+
+        $monthSaleLotProfit = $this->db->fetchColumn(
+            "SELECT COALESCE(SUM(total_amount - total_cost), 0)
+              FROM sale_lots
+              WHERE MONTH(sale_date) = MONTH(CURDATE())
+              AND YEAR(sale_date) = YEAR(CURDATE())
+              AND status = 'confirmed'"
+        );
+
+        $pendingSaleLots = $this->db->fetchColumn(
+            "SELECT COUNT(*)
+              FROM sale_lots
+              WHERE status = 'draft'"
+        );
+
         return [
             'today_purchases' => floatval($todayPurchases),
             'today_po_count' => intval($todayPO),
             'total_sellers' => intval($totalSellers),
             'pending_po' => intval($pendingPO),
             'today_sales' => floatval($todaySales),
-            'low_stock_count' => intval($lowStockCount)
+            'low_stock_count' => intval($lowStockCount),
+            'today_salelot_amount' => floatval($todaySaleLotAmount),
+            'month_salelot_profit' => floatval($monthSaleLotProfit),
+            'pending_salelots' => intval($pendingSaleLots)
         ];
     }
 
@@ -563,6 +588,249 @@ class ReportService
                 'date_to' => $dateTo,
                 'user_id' => $userId
             ]
+        ];
+    }
+
+    public function getRecentSaleLots($limit = 10)
+    {
+        return $this->db->fetchAll(
+            "SELECT
+                sl.*,
+                b.name as branch_name,
+                u.full_name as created_by_name,
+                (sl.total_amount - sl.total_cost) as profit
+            FROM sale_lots sl
+            LEFT JOIN branches b ON sl.branch_id = b.id
+            LEFT JOIN users u ON sl.created_by = u.id
+            ORDER BY sl.created_at DESC
+            LIMIT ?",
+            [$limit]
+        );
+    }
+
+    public function getPurchaseReport($dateFrom, $dateTo, $groupBy = 'day')
+    {
+        switch ($groupBy) {
+            case 'day':
+                $groupFormat = 'DATE(po.created_at)';
+                $labelFormat = 'DATE(po.created_at)';
+                break;
+            case 'month':
+                $groupFormat = "DATE_FORMAT(po.created_at, '%Y-%m')";
+                $labelFormat = "DATE_FORMAT(po.created_at, '%Y-%m')";
+                break;
+            case 'year':
+                $groupFormat = 'YEAR(po.created_at)';
+                $labelFormat = 'YEAR(po.created_at)';
+                break;
+            default:
+                throw new Exception('Invalid grouping');
+        }
+
+        $reportData = $this->db->fetchAll(
+            "SELECT
+                {$labelFormat} as label,
+                COUNT(*) as order_count,
+                COALESCE(SUM(po.total_amount), 0) as total_amount,
+                COALESCE(AVG(po.total_amount), 0) as avg_amount
+            FROM purchase_orders po
+            WHERE
+                DATE(po.created_at) BETWEEN ? AND ?
+                AND po.status != 'cancelled'
+            GROUP BY {$groupFormat}
+            ORDER BY {$labelFormat} ASC",
+            [$dateFrom, $dateTo]
+        );
+
+        $totalOrders = 0;
+        $totalAmount = 0;
+
+        foreach ($reportData as $row) {
+            $totalOrders += $row['order_count'];
+            $totalAmount += $row['total_amount'];
+        }
+
+        return [
+            'report_data' => $reportData,
+            'totals' => [
+                'total_orders' => $totalOrders,
+                'total_amount' => $totalAmount
+            ],
+            'filters' => [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'group_by' => $groupBy
+            ]
+        ];
+    }
+
+    public function getSaleLotReport($dateFrom, $dateTo, $groupBy = 'day')
+    {
+        switch ($groupBy) {
+            case 'day':
+                $groupFormat = 'DATE(sl.sale_date)';
+                $labelFormat = 'DATE(sl.sale_date)';
+                break;
+            case 'month':
+                $groupFormat = "DATE_FORMAT(sl.sale_date, '%Y-%m')";
+                $labelFormat = "DATE_FORMAT(sl.sale_date, '%Y-%m')";
+                break;
+            case 'year':
+                $groupFormat = 'YEAR(sl.sale_date)';
+                $labelFormat = 'YEAR(sl.sale_date)';
+                break;
+            default:
+                throw new Exception('Invalid grouping');
+        }
+
+        $reportData = $this->db->fetchAll(
+            "SELECT
+                {$labelFormat} as label,
+                COUNT(*) as lot_count,
+                COALESCE(SUM(sl.total_amount), 0) as total_amount,
+                COALESCE(SUM(sl.total_cost), 0) as total_cost,
+                COALESCE(SUM(sl.total_amount - sl.total_cost), 0) as profit
+            FROM sale_lots sl
+            WHERE
+                DATE(sl.sale_date) BETWEEN ? AND ?
+                AND sl.status = 'confirmed'
+            GROUP BY {$groupFormat}
+            ORDER BY {$labelFormat} ASC",
+            [$dateFrom, $dateTo]
+        );
+
+        $totalLots = 0;
+        $totalAmount = 0;
+        $totalCost = 0;
+        $totalProfit = 0;
+
+        foreach ($reportData as $row) {
+            $totalLots += $row['lot_count'];
+            $totalAmount += $row['total_amount'];
+            $totalCost += $row['total_cost'];
+            $totalProfit += $row['profit'];
+        }
+
+        return [
+            'report_data' => $reportData,
+            'totals' => [
+                'total_lots' => $totalLots,
+                'total_amount' => $totalAmount,
+                'total_cost' => $totalCost,
+                'total_profit' => $totalProfit
+            ],
+            'filters' => [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'group_by' => $groupBy
+            ]
+        ];
+    }
+
+    public function getSaleLotChartData($period = 'week')
+    {
+        $labels = [];
+        $amountData = [];
+        $profitData = [];
+
+        switch ($period) {
+            case 'week':
+                $result = $this->db->fetchAll(
+                    "SELECT
+                        DATE(sale_date) as sl_date,
+                        COALESCE(SUM(total_amount), 0) as total,
+                        COALESCE(SUM(total_amount - total_cost), 0) as profit
+                    FROM sale_lots
+                    WHERE
+                        sale_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+                        AND status = 'confirmed'
+                    GROUP BY DATE(sale_date)
+                    ORDER BY sl_date ASC"
+                );
+
+                for ($i = 6; $i >= 0; $i--) {
+                    $date = date('Y-m-d', strtotime("-$i days"));
+                    $labels[] = $date;
+                    $amountData[] = 0;
+                    $profitData[] = 0;
+                }
+
+                foreach ($result as $row) {
+                    $dateIndex = array_search($row['sl_date'], $labels);
+                    if ($dateIndex !== false) {
+                        $amountData[$dateIndex] = floatval($row['total']);
+                        $profitData[$dateIndex] = floatval($row['profit']);
+                    }
+                }
+                break;
+
+            case 'month':
+                $result = $this->db->fetchAll(
+                    "SELECT
+                        DATE(sale_date) as sl_date,
+                        COALESCE(SUM(total_amount), 0) as total,
+                        COALESCE(SUM(total_amount - total_cost), 0) as profit
+                    FROM sale_lots
+                    WHERE
+                        MONTH(sale_date) = MONTH(CURDATE())
+                        AND YEAR(sale_date) = YEAR(CURDATE())
+                        AND status = 'confirmed'
+                    GROUP BY DATE(sale_date)
+                    ORDER BY sl_date ASC"
+                );
+
+                $daysInMonth = date('t');
+                for ($i = 1; $i <= $daysInMonth; $i++) {
+                    $date = date('Y-m-').sprintf('%02d', $i);
+                    $labels[] = $date;
+                    $amountData[] = 0;
+                    $profitData[] = 0;
+                }
+
+                foreach ($result as $row) {
+                    $dateIndex = array_search($row['sl_date'], $labels);
+                    if ($dateIndex !== false) {
+                        $amountData[$dateIndex] = floatval($row['total']);
+                        $profitData[$dateIndex] = floatval($row['profit']);
+                    }
+                }
+                break;
+
+            case 'year':
+                $result = $this->db->fetchAll(
+                    "SELECT
+                        DATE_FORMAT(sale_date, '%Y-%m-01') as sl_month,
+                        COALESCE(SUM(total_amount), 0) as total,
+                        COALESCE(SUM(total_amount - total_cost), 0) as profit
+                    FROM sale_lots
+                    WHERE
+                        YEAR(sale_date) = YEAR(CURDATE())
+                        AND status = 'confirmed'
+                    GROUP BY sl_month
+                    ORDER BY sl_month ASC"
+                );
+
+                for ($i = 1; $i <= 12; $i++) {
+                    $month = date('Y-').sprintf('%02d', $i).'-01';
+                    $labels[] = $month;
+                    $amountData[] = 0;
+                    $profitData[] = 0;
+                }
+
+                foreach ($result as $row) {
+                    $monthIndex = array_search($row['sl_month'], $labels);
+                    if ($monthIndex !== false) {
+                        $amountData[$monthIndex] = floatval($row['total']);
+                        $profitData[$monthIndex] = floatval($row['profit']);
+                    }
+                }
+                break;
+        }
+
+        return [
+            'labels' => $labels,
+            'amounts' => $amountData,
+            'profits' => $profitData
         ];
     }
 

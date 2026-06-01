@@ -1,8 +1,9 @@
 # 🤖 Agent Memory — Secondhand POS Project
 **สำหรับ Claude session ถัดไปอ่านเพื่อทำงานต่อ**
 
-**Last updated:** 28 พฤษภาคม 2569 (session: code review + hardening)
-**Project status:** ✅ ปิดดีลแล้ว — Dev อยู่ระหว่าง MVP (PO + SaleLot + Sellers + PriceTiers ใช้งานได้)
+**Last updated:** 1 มิถุนายน 2569 (session: inventory shows catalog)
+**Project status:** ✅ Phases 1-3 complete + P0 hardening done — all 57 tests pass
+**Project status:** ✅ Phases 1-3 complete + P0 hardening done — all 58 tests pass — documentation finalized
 
 ---
 
@@ -127,6 +128,8 @@ code/
 14. ✅ UTF-8 encoding fix
 15. ✅ ปิดดีลกับลูกค้าที่ 40,000 บาท
 16. ✅ Code review & hardening session (28 พ.ค. 2569) — แก้ 5 blockers + 4 medium + 1 bonus
+17. ✅ Tier buttons dynamic — แสดงปุ่มตั้งแต่แรก, โชว์ราคาจริงจาก catalog, default "บิล1/2/3"
+18. ✅ Stock card — เพิ่มการ์ดสต็อกหมวดในหน้า inventory แสดง stock_kg แบบ real-time พร้อมกราฟ
 
 ---
 
@@ -309,5 +312,172 @@ migrations/017→018_rename_tier_labels_to_bill.sql             (H4)
 - Low/Nit จากรีวิว: `UsersController.php:365` indent เพี้ยน, admin/*.html whitespace churn (~79 บรรทัดเหมือนกัน 7 ไฟล์), เมนู "สาขา" ถูกลบจาก sidebar แต่ controller ยังอยู่ (ไม่มีทาง access UI)
 - ควรลบ `code/base-pos/backups/.htaccess` (legacy path, BACKUP_DIR ย้ายไป `code/data/backups` แล้ว)
 - `JWT_SECRET` ยัง hardcode ใน apache-config.conf (`pos_jwt_secret_key_2024`) → production ต้องเปลี่ยน
+
+---
+
+## 2026-06-01: Inventory SKU & Cost Field Fixes
+
+**Context:** ร้านรับซื้อของเก่า — ราคาทุนมาจาก Purchase Orders ไม่ใช่ตอนเพิ่มสินค้า
+
+**Changes:**
+1. ✅ ลบช่อง "ราคาทุน" จากหน้า Inventory (HTML + JS + API validation)
+2. ✅ แก้ `category_id` ให้ส่ง `null` แทน `""` เมื่อไม่เลือกหมวดหมู่
+3. ✅ แก้ช่อง SKU ให้กรอกเองได้ (แค่ตัวเลข 1, 2, 3... ไม่มี prefix)
+
+**Key Learning:**
+- ร้านรับซื้อของเก่า ≠ ร้านค้าทั่วไป → ราคาทุน = ราคารับซื้อจาก PO
+- MySQL `INT` column ไม่รับ empty string `""` ต้องเป็น `null`
+- ฟังให้ชัดก่อนทำ — "รหัสสินค้าเรียง 1-2-3" ≠ auto-generate (คือกรอกเอง)
+
+**Files:** `inventory.html`, `inventory.js`, `InventoryController.php`
+
+**Detail:** `.learnings/2026-06-01-inventory-sku-cost-fixes.md`
+
+---
+
+## 2026-06-01: Tier Button UX Fix + Category Stock Card
+
+**Context:** Dr.solodev reported two UI issues — (1) price tier buttons not selectable, (2) inventory not reflecting stock after purchase.
+
+**Changes:**
+1. **Tier buttons fixed** (`purchase-orders.js`):
+   - Always visible from page load (ไม่ต้องรอเลือกสินค้าก่อน)
+   - Show actual tier labels + prices from catalog item (e.g. `บิล1 10.00 ฿`)
+   - Default labels changed from "ระดับ 1/2/3" → "บิล1/บิล2/บิล3"
+   - Select tier first → every item auto-gets that tier price
+   - Tier stays selected after adding item to cart
+   - Resets properly on clear/input change
+
+2. **Category stock card added** (`inventory.html` + `inventory.js`):
+   - New card "สต็อกตามหมวด (กก.)" above products table
+   - Shows `stock_kg` for each active category in a grid layout
+   - Visual bar graph relative to max stock
+   - Color: green (normal), amber (<20%), red (empty)
+   - Refreshes on page load + manual refresh button
+   - `categories` API already returned `stock_kg` — just needed frontend
+
+3. **HTML/JS**: `escapeHtml()` added to inventory.js (was missing)
+
+**Files:** `purchase-orders.js`, `inventory.html`, `inventory.js`, `AGENTS.md`, `AGENT-MEMORY.md`
+
+---
+
+## 2026-06-01: Final Documentation Update
+
+**Context:** Dr.solodev requested update of all 4 documentation files (AGENTS.md, AGENT-MEMORY.md, root README.md, COMPLETION-REPORT.md) + code/README.md to reflect full project state.
+
+**What was done:**
+- **AGENTS.md** — Added missing completed items (code review 5 blockers, Inventory SKU/cost fix, Seller error propagation), migration 017-019 entries, ReportService.php to file map
+- **AGENT-MEMORY.md** — Added this session entry
+- **root README.md** — Rewrote from research-phase-only to full project overview (business model, architecture, status, quick start)
+- **COMPLETION-REPORT.md** — Rewrote from research-phase completion to full project completion covering all 3 phases + P0 hardening + 47 tests passing
+- **code/README.md** — Updated migration count (013→021), added Docker setup, test suite, ReportService, responsive CSS
+
+**Key Learning:**
+- Root `README.md` was still stuck at research phase (2026-05-16) while all code had moved far ahead
+- `COMPLETION-REPORT.md` also only covered research phase — needed full rewrite
+- `code/README.md` said 13 migrations but we have 21
+- All docs now consistent — AGENTS.md = agent context, AGENT-MEMORY.md = session history, READMEs = user-facing docs
+
+## 2026-06-01: Hardening Round 2 — Throwable catch + Edge-case tests
+
+**Context:** ต่อเนื่องจากการทำ Phase 3 + P0 hardening — เหลือ tech debt เล็กน้อยที่ต้องปิด
+
+### Changes
+
+1. **index.php: `catch (Exception $e)` → `catch (\Throwable $e)`**
+   - PHP 8 `catch (Exception $e)` ไม่ catch `TypeError`, `Error` (เช่น method call บน null)
+   - เปลี่ยนเป็น `\Throwable` เพื่อ catch PHP errors ทั้งหมด
+   - ส่ง `$e->getMessage()` กลับใน response (ไม่ปิดบัง error — dev environment)
+
+2. **Missing env vars in `.env`:**
+   - docker-compose.yml ใช้ `${MYSQL_USER}` และ `${MYSQL_PASSWORD}` แต่ .env ไม่มี
+   - ทำให้ docker-compose warning ทุกครั้ง + PHP ได้ DB_USER="" → fallback เป็น root
+   - เพิ่ม `MYSQL_USER=posuser` และ `MYSQL_PASSWORD=pospass` ทั้ง .env และ .env.example
+
+3. **Edge-case tests (47 → 58 tests, +11 assertions):**
+   - `test_sellers.sh`: duplicate phone rejection, blacklist/unblacklist seller workflow
+   - `test_purchase_orders.sh`: PO with invalid branch ID rejected
+   - `test_sale_lots_fifo.sh`: overstock confirm rejection (999999kg >> available stock), update draft lot (PUT), delete draft lot (DELETE)
+   - New helper functions: `api_put()`, `api_delete()`, `assert_not_contains()` in test runner
+   - Fix: original overstock test used 9999kg but seed data has 49580kg+ → confirm succeeded unexpectedly → changed to 999999kg
+
+### Key Learnings
+- Seed data `categories.stock_kg` มีค่าเริ่มต้นสูงมาก (บางหมวด 190,000+ กก.) → เทสที่พึ่ง "overstock" ต้องใช้ตัวเลขที่เกิน 200,000
+- `catch (Exception $e)` vs `catch (\Throwable $e)` — PHP 8 ต้องใช้ Throwable ถ้าอยาก catch ทุกอย่าง
+- `api_put`/`api_delete` helpers ใช้ `-X PUT` / `-X DELETE` ใน curl — Router.php match verb เพื่อ dispatch
+- docker-compose.yml mapping env vars ต้องตรงกับชื่อใน .env — mismatch ทำให้ warning + fallback values
+
+### Files Modified
+- `base-pos/api/index.php` — `catch (Exception $e)` → `catch (\Throwable $e)`
+- `.env` — added `MYSQL_USER` + `MYSQL_PASSWORD`
+- `.env.example` — same
+- `tests/api/test_sellers.sh` — added duplicate phone + blacklist/unblacklist tests
+- `tests/api/test_purchase_orders.sh` — added invalid branch test
+- `tests/api/test_sale_lots_fifo.sh` — added overstock confirm + update/delete draft lot tests
+- `tests/api/helpers/auth.sh` — added `api_put()` + `api_delete()` helpers
+- `tests/api/helpers/test_runner.sh` — added `assert_not_contains()` helper
+- `AGENTS.md` — updated test count 47→58
+- `AGENT-MEMORY.md` — this entry
+
+---
+
+## 2026-06-01: Phase 3 (Reports/Dashboard/Responsive/WeightedAvg) + P0 Hardening
+
+**Context:** รอบนี้เป็น Phase 3 (Reports, Dashboard, Responsive CSS, Weighted Avg Cost) + P0 hardening items (security, cleanup, locking, tests)
+
+### Phase 3 Deliverables
+- **4 new report endpoints:** `reports/purchase-report`, `sale-lot-report`, `sale-lot-chart`, `recent-sale-lots`
+- **Dashboard:** 3 new stat cards + sale lot chart + recent sale lots table
+- **Responsive CSS:** breakpoints at 768px (stack headers) and 576px (smaller tables, stat grid 2 cols)
+- **Weighted average cost:** per-branch `cost_method` ENUM('fifo','weighted'), migration 021
+- `SaleLot::calculateCost()` now dispatches based on branch setting
+- `ReportService.php` — report engine with PO/SL/chart methods
+
+### P0 Hardening Items
+- **Security:** JWT_SECRET moved to .env, all Docker credentials to .env (docker-compose.yml), `.env.example` created
+- **Console cleanup:** 9 `console.log()` calls removed from 3 JS files (inventory.js, branches.js, common.js)
+- **TOCTOU fix:** `SELECT ... FOR UPDATE` added to SaleLot confirm/cancel flow:
+  - `updateStatus()` — locks lot row at transaction start (moved SELECT inside transaction)
+  - `deductStock()` — FOR UPDATE on PO items + lot row
+  - `restoreStock()` — FOR UPDATE on PO items + lot row
+  - `recomputeCost()` — FOR UPDATE on items + lot row
+- **Bug fix:** `PurchaseOrder::cancel()` called undefined `updateStatus()` — replaced with direct SQL UPDATE
+- **Bug fix:** `SaleLot::deductStock()`/`restoreStock()` passed SQL strings to `Database::execute()` which expects PDOStatements — changed to `$this->db->query()` with `rowCount()`
+- **Bug fix:** `SaleLot::generateReferenceNo()` didn't include branch code prefix (unlike PO), causing reference_no collisions across branches — added `SO-{BRANCH_CODE}-YYYYMMDD-NNN` format
+
+### Test Suite Expansion
+- **33 → 47 tests** (14 new assertions)
+- New `test_sale_lots_fifo.sh`: Full confirm/cancel FIFO flow (13 assertions)
+  - Creates PO → creates sale lot → confirms → verifies status → cancels → verifies → reject re-confirm
+- Updated `test_purchase_orders.sh`: Added PO cancel test
+- New `api_post_id` helper in `helpers/auth.sh` for POST with `?id=` query params
+- All 47 tests pass
+
+### Files Modified
+- `customizations/api/Models/SaleLot.php` — FOR UPDATE locking, deductStock/restoreStock bug fix, reference_no format fix
+- `customizations/api/Models/PurchaseOrder.php` — cancel() undefined method fix
+- `customizations/api/Controllers/SaleLotsController.php` — (debug revert)
+- `customizations/api/Controllers/PurchaseOrdersController.php` — (no changes needed)
+- `base-pos/assets/js/inventory.js` — removed 2 console.log()
+- `base-pos/assets/js/branches.js` — removed 5 console.log()
+- `base-pos/assets/js/common.js` — removed 2 console.log()
+- `docker-compose.yml` — all credentials use `${VAR}` references
+- `.env.example` — updated with all Docker credentials
+- `base-pos/api/index.php` — (debug revert)
+- `tests/api/test_sale_lots_fifo.sh` — NEW file (FIFO flow test)
+- `tests/api/test_purchase_orders.sh` — added PO cancel test
+- `tests/api/helpers/auth.sh` — added `api_post_id()` helper
+- `AGENTS.md` — updated (migrations 021, new endpoints, bug fixes)
+- `AGENT-MEMORY.md` — updated (this entry)
+- `code/README.md` — updated (migrations, setup, tests)
+
+### Key Technical Learnings
+1. `Database::execute()` expects a PDOStatement, not SQL string! Use `query()` for raw SQL
+2. `pdo->lastInsertId()` returns a string → JSON encodes as `"id":"123"` not `"id":123`
+3. PHP 8 `catch (Exception $e)` does NOT catch `TypeError` or `Error` — use `catch (\Throwable $e)` for both
+4. `config.php` has an `APP_ACCESS` guard — must be defined before require
+5. Sale lot confirm/cancel was never tested in the original test suite (33 tests but all skipped confirm/cancel)
+6. `FOR UPDATE` requires being inside a transaction — can't lock rows outside `beginTransaction()`
 
 ---

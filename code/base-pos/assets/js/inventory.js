@@ -1,22 +1,16 @@
 document.addEventListener('DOMContentLoaded', function() {
-  // Initialize inventory management
   initInventory();
 
-  // Event listeners
-  document.getElementById('productSearch').addEventListener('input', filterProducts);
-  document.getElementById('categoryFilter').addEventListener('change', filterProducts);
-  document.getElementById('stockFilter').addEventListener('change', filterProducts);
-  document.getElementById('addProductBtn').addEventListener('click', showAddProductModal);
+  document.getElementById('productSearch').addEventListener('input', filterCatalogItems);
+  document.getElementById('categoryFilter').addEventListener('change', filterCatalogItems);
+  document.getElementById('stockFilter').addEventListener('change', filterCatalogItems);
+  document.getElementById('addProductBtn').addEventListener('click', showAddCatalogModal);
   document.getElementById('manageCategories').addEventListener('click', showCategoryModal);
-  document.getElementById('saveProduct').addEventListener('click', saveProduct);
-  document.getElementById('cancelProduct').addEventListener('click', hideProductModal);
+  document.getElementById('saveProduct').addEventListener('click', saveCatalogItem);
+  document.getElementById('cancelProduct').addEventListener('click', hideCatalogModal);
   document.getElementById('saveCategory').addEventListener('click', saveCategory);
   document.getElementById('cancelCategory').addEventListener('click', resetCategoryForm);
-  document.getElementById('saveAdjustment').addEventListener('click', saveStockAdjustment);
-  document.getElementById('cancelAdjustment').addEventListener('click', hideStockModal);
-  document.getElementById('exportInventory').addEventListener('click', exportInventory);
 
-  // Close modals when clicking on X
   document.querySelectorAll('.close-modal').forEach(button => {
     button.addEventListener('click', function() {
       this.closest('.modal').classList.remove('show');
@@ -24,394 +18,270 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-// Global variables
-let products = [];
+let catalogItems = [];
 let categories = [];
 
-// Initialize inventory management
 async function initInventory() {
   try {
-    // Fetch categories
-    const categoryResponse = await apiRequest('inventory/categories');
-    if (categoryResponse.status === 'success') {
-      categories = categoryResponse.data;
+    const catRes = await apiRequest('inventory/categories');
+    if (catRes.status === 'success') {
+      categories = catRes.data;
       renderCategoryDropdowns();
+      renderCategoryStock();
     }
 
-    // Fetch products
-    const productResponse = await apiRequest('inventory/products');
-    if (productResponse.status === 'success') {
-      products = productResponse.data;
-      renderProducts(products);
+    const catalogRes = await apiRequest('purchase-catalog?include_inactive=true');
+    if (catalogRes.status === 'success') {
+      catalogItems = catalogRes.data;
+      renderCatalogItems(catalogItems);
     }
-
   } catch (error) {
     console.error('Failed to initialize inventory:', error);
     showNotification('Error loading inventory data', 'error');
   }
 }
 
-// Render category dropdowns
 function renderCategoryDropdowns() {
   const categoryFilter = document.getElementById('categoryFilter');
   const categorySelect = document.getElementById('categoryId');
 
-  // Clear existing options (except the first one)
-  while (categoryFilter.options.length > 1) {
-    categoryFilter.remove(1);
-  }
+  while (categoryFilter.options.length > 1) categoryFilter.remove(1);
+  while (categorySelect.options.length > 1) categorySelect.remove(1);
 
-  while (categorySelect.options.length > 1) {
-    categorySelect.remove(1);
-  }
-
-  // Add categories to dropdowns
   categories.forEach(category => {
     if (category.status === 'active') {
-      const filterOption = document.createElement('option');
-      filterOption.value = category.id;
-      filterOption.textContent = category.name;
-      categoryFilter.appendChild(filterOption);
+      const opt1 = document.createElement('option');
+      opt1.value = category.id;
+      opt1.textContent = category.name;
+      categoryFilter.appendChild(opt1);
 
-      const selectOption = document.createElement('option');
-      selectOption.value = category.id;
-      selectOption.textContent = category.name;
-      categorySelect.appendChild(selectOption);
+      const opt2 = document.createElement('option');
+      opt2.value = category.id;
+      opt2.textContent = category.name;
+      categorySelect.appendChild(opt2);
     }
   });
 }
 
-// Render products table
-function renderProducts(productsToRender) {
+function renderCategoryStock() {
+  const container = document.getElementById('categoryStockGrid');
+  if (!container) return;
+  const active = categories.filter(c => c.status === 'active');
+  if (active.length === 0) {
+    container.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:12px">ไม่มีหมวดหมู่</div>';
+    return;
+  }
+  const maxStock = Math.max(...active.map(c => parseFloat(c.stock_kg || 0)), 1);
+  container.innerHTML = active.map(c => {
+    const kg = parseFloat(c.stock_kg || 0);
+    const pct = Math.min(100, (kg / maxStock) * 100);
+    let barColor = '#22c55e';
+    if (kg <= 0) barColor = '#ef4444';
+    else if (pct < 20) barColor = '#f59e0b';
+    return `
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:6px">${escapeHtml(c.name)}</div>
+        <div style="font-size:22px;font-weight:700;color:${barColor}">${kg.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+        <div style="font-size:11px;color:#94a3b8">กก.</div>
+        <div style="margin-top:8px;height:4px;background:#f1f5f9;border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width 0.3s"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderCatalogItems(items) {
   const tableBody = document.querySelector('#inventoryTable tbody');
   tableBody.innerHTML = '';
 
-  if (productsToRender.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="8" class="text-center">No products found</td>';
-    tableBody.appendChild(row);
+  if (items.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="10" class="text-center">ไม่มีรายการสินค้าในแคตตาล็อก</td></tr>';
     return;
   }
 
-  productsToRender.forEach(product => {
+  items.forEach(item => {
+    const tiers = item.tier_prices || [];
+    const tier1 = tiers[0] || {};
+    const tier2 = tiers[1] || {};
+    const tier3 = tiers[2] || {};
+
     const row = document.createElement('tr');
-
-    // Determine stock status
-    let stockClass = '';
-    if (product.quantity <= 0) {
-      stockClass = 'text-danger';
-    } else if (product.quantity <= product.low_stock_threshold) {
-      stockClass = 'text-warning';
-    }
-
     row.innerHTML = `
-      <td>${product.sku}</td>
-      <td>${product.name}</td>
-      <td>${product.category_name || 'Uncategorized'}</td>
-      <td>${formatCurrency(product.price)}</td>
-      <td>${formatCurrency(product.cost)}</td>
-      <td class="${stockClass}">${product.quantity}</td>
+      <td>${escapeHtml(item.code)}</td>
+      <td>${escapeHtml(item.name)}</td>
+      <td>${escapeHtml(item.category_name || 'ไม่มีหมวด')}</td>
+      <td>${tier1.price != null ? formatCurrency(tier1.price) : '-'}</td>
+      <td>${tier2.price != null ? formatCurrency(tier2.price) : '-'}</td>
+      <td>${tier3.price != null ? formatCurrency(tier3.price) : '-'}</td>
+      <td>${escapeHtml(item.default_unit || 'กก.')}</td>
       <td>
-        <span class="badge ${product.status === 'active' ? 'badge-success' : 'badge-danger'}">
-            ${product.status}
+        <span class="badge ${item.is_active ? 'badge-success' : 'badge-danger'}">
+          ${item.is_active ? 'active' : 'inactive'}
         </span>
       </td>
       <td class="actions">
-        <button class="btn btn-sm btn-info edit-product" data-id="${product.id}">
-            <i class="icon-edit"></i>
-        </button>
-        <button class="btn btn-sm btn-success adjust-stock" data-id="${product.id}" data-name="${product.name}" data-stock="${product.quantity}">
-            <i class="icon-product"></i>
-        </button>
-        <button class="btn btn-sm btn-danger delete-product" data-id="${product.id}">
-            <i class="icon-delete"></i>
-        </button>
+        <button class="btn btn-sm btn-info edit-catalog" data-id="${item.id}"><i class="icon-edit"></i></button>
+        <button class="btn btn-sm btn-danger delete-catalog" data-id="${item.id}"><i class="icon-delete"></i></button>
       </td>
     `;
-
     tableBody.appendChild(row);
   });
 
-  // Add event listeners for action buttons
-  document.querySelectorAll('.edit-product').forEach(button => {
-    button.addEventListener('click', function() {
-      const productId = this.getAttribute('data-id');
-      if (productId) {
-        editProduct(productId);
-      } else {
-        showNotification('Product ID is missing', 'error');
-      }
+  document.querySelectorAll('.edit-catalog').forEach(btn => {
+    btn.addEventListener('click', function() {
+      editCatalogItem(this.getAttribute('data-id'));
     });
   });
 
-  document.querySelectorAll('.adjust-stock').forEach(button => {
-    button.addEventListener('click', function() {
-      const productId = this.getAttribute('data-id');
-      const productName = this.getAttribute('data-name');
-      const currentStock = this.getAttribute('data-stock');
-      showStockModal(productId, productName, currentStock);
-    });
-  });
-
-  document.querySelectorAll('.delete-product').forEach(button => {
-    button.addEventListener('click', function() {
-      const productId = this.getAttribute('data-id');
-      deleteProduct(productId);
+  document.querySelectorAll('.delete-catalog').forEach(btn => {
+    btn.addEventListener('click', function() {
+      deleteCatalogItem(this.getAttribute('data-id'));
     });
   });
 }
 
-// Filter products
-function filterProducts() {
+function filterCatalogItems() {
   const searchTerm = document.getElementById('productSearch').value.toLowerCase();
   const categoryId = document.getElementById('categoryFilter').value;
   const stockFilter = document.getElementById('stockFilter').value;
 
-  let filtered = [...products];
+  let filtered = [...catalogItems];
 
-  // Apply search filter
   if (searchTerm) {
-    filtered = filtered.filter(product => {
-      return product.name.toLowerCase().includes(searchTerm) ||
-        product.sku.toLowerCase().includes(searchTerm) ||
-        (product.barcode && product.barcode.toLowerCase().includes(searchTerm));
-    });
+    filtered = filtered.filter(item =>
+      item.name.toLowerCase().includes(searchTerm) ||
+      item.code.toLowerCase().includes(searchTerm)
+    );
   }
 
-  // Apply category filter
   if (categoryId) {
-    filtered = filtered.filter(product => product.category_id === categoryId);
+    filtered = filtered.filter(item => String(item.category_id) === categoryId);
   }
 
-  // Apply stock filter
   if (stockFilter !== 'all') {
-    if (stockFilter === 'low') {
-      filtered = filtered.filter(product =>
-        product.quantity <= product.low_stock_threshold && product.quantity > 0
-      );
-    } else if (stockFilter === 'out') {
-      filtered = filtered.filter(product => product.quantity <= 0);
+    if (stockFilter === 'active') {
+      filtered = filtered.filter(item => item.is_active);
+    } else if (stockFilter === 'inactive') {
+      filtered = filtered.filter(item => !item.is_active);
     }
   }
 
-  renderProducts(filtered);
+  renderCatalogItems(filtered);
 }
 
-// Show add product modal
-function showAddProductModal() {
-  // Reset form
+function showAddCatalogModal() {
   document.getElementById('productForm').reset();
   document.getElementById('productId').value = '';
-  document.getElementById('productModalTitle').textContent = 'Add Product';
-  document.getElementById('status').value = 'active';
-
-  // Show modal
+  document.getElementById('productModalTitle').textContent = 'เพิ่มรายการในแคตตาล็อก';
+  document.getElementById('sku').value = '';
+  document.getElementById('priceTier1').value = '';
+  document.getElementById('priceTier2').value = '';
+  document.getElementById('priceTier3').value = '';
   document.getElementById('productModal').classList.add('show');
 }
 
-// Show edit product modal
-async function editProduct(productId) {
+async function editCatalogItem(itemId) {
   try {
-    if (!productId) {
-      showNotification('Product ID is required', 'error');
+    const res = await apiRequest(`purchase-catalog/item?id=${itemId}`);
+    if (res.status !== 'success' || !res.data) {
+      showNotification('ไม่พบรายการ', 'error');
       return;
     }
+    const item = res.data;
+    const tiers = item.tier_prices || [];
 
-    console.log("Editing product with ID:", productId); // Debug line
-
-    const response = await apiRequest(`inventory/product?id=${productId}`);
-
-    if (response.status === 'success') {
-      const product = response.data;
-
-      console.log("Product data received:", product); // Debug line
-
-      // Fill form fields
-      document.getElementById('productId').value = product.id;
-      document.getElementById('sku').value = product.sku;
-      document.getElementById('barcode').value = product.barcode || '';
-      document.getElementById('name').value = product.name;
-      document.getElementById('description').value = product.description || '';
-      document.getElementById('categoryId').value = product.category_id || '';
-      document.getElementById('price').value = product.price;
-      document.getElementById('cost').value = product.cost;
-      document.getElementById('quantity').value = product.quantity;
-      document.getElementById('lowStockThreshold').value = product.low_stock_threshold;
-      document.getElementById('status').value = product.status;
-
-      // Update modal title
-      document.getElementById('productModalTitle').textContent = 'Edit Product';
-
-      // Show modal
-      document.getElementById('productModal').classList.add('show');
-    } else {
-      showNotification(response.message || 'Failed to load product data', 'error');
-    }
+    document.getElementById('productId').value = item.id;
+    document.getElementById('sku').value = item.code || '';
+    document.getElementById('name').value = item.name || '';
+    document.getElementById('categoryId').value = item.category_id || '';
+    document.getElementById('priceTier1').value = tiers[0] && tiers[0].price != null ? tiers[0].price : '';
+    document.getElementById('priceTier2').value = tiers[1] && tiers[1].price != null ? tiers[1].price : '';
+    document.getElementById('priceTier3').value = tiers[2] && tiers[2].price != null ? tiers[2].price : '';
+    document.getElementById('status').value = item.is_active ? 'active' : 'inactive';
+    document.getElementById('productModalTitle').textContent = 'แก้ไขรายการแคตตาล็อก';
+    document.getElementById('productModal').classList.add('show');
   } catch (error) {
-    console.error('Error fetching product:', error);
-    showNotification('Error loading product data', 'error');
+    console.error('Error fetching catalog item:', error);
+    showNotification('Error loading item data', 'error');
   }
 }
 
-// Hide product modal
-function hideProductModal() {
+function hideCatalogModal() {
   document.getElementById('productModal').classList.remove('show');
 }
 
-// Save product (create or update)
-async function saveProduct() {
+async function saveCatalogItem() {
   try {
-    const productId = document.getElementById('productId').value;
+    const itemId = document.getElementById('productId').value;
+    const tiers = [
+      { label: 'บิล 1', price: parseFloat(document.getElementById('priceTier1').value) || 0 },
+      { label: 'บิล 2', price: parseFloat(document.getElementById('priceTier2').value) || 0 },
+      { label: 'บิล 3', price: parseFloat(document.getElementById('priceTier3').value) || 0 },
+    ];
 
-    // Gather form data
-    const productData = {
-      sku: document.getElementById('sku').value,
-      barcode: document.getElementById('barcode').value,
-      name: document.getElementById('name').value,
-      description: document.getElementById('description').value,
-      category_id: document.getElementById('categoryId').value,
-      price: parseFloat(document.getElementById('price').value),
-      cost: parseFloat(document.getElementById('cost').value),
-      quantity: parseInt(document.getElementById('quantity').value),
-      low_stock_threshold: parseInt(document.getElementById('lowStockThreshold').value),
-      status: document.getElementById('status').value
-    };
-
-    let response;
-
-    if (productId) {
-      // Update existing product
-      response = await apiRequest(`inventory/product?id=${productId}`, 'PUT', productData);
-    } else {
-      // Create new product
-      response = await apiRequest('inventory/products', 'POST', productData);
-    }
-
-    if (response.status === 'success') {
-      showNotification(productId ? 'อัปเดตสินค้าสำเร็จ' : 'เพิ่มสินค้าสำเร็จ', 'success');
-      hideProductModal();
-
-      // Refresh product list
-      const productResponse = await apiRequest('inventory/products');
-      if (productResponse.status === 'success') {
-        products = productResponse.data;
-        renderProducts(products);
-      }
-    } else {
-      showNotification(response.message, 'error');
-    }
-  } catch (error) {
-    console.error('Error saving product:', error);
-    showNotification('Error saving product data', 'error');
-  }
-}
-
-// Delete product
-async function deleteProduct(productId) {
-  if (confirm('แน่ใจหรือไม่ที่จะลบสินค้านี้?')) {
-    try {
-      const response = await apiRequest(`inventory/product?id=${productId}`, 'DELETE');
-
-      if (response.status === 'success') {
-        showNotification('ลบสินค้าสำเร็จ', 'success');
-
-        // Refresh product list
-        const productResponse = await apiRequest('inventory/products');
-        if (productResponse.status === 'success') {
-          products = productResponse.data;
-          renderProducts(products);
-        }
-      } else {
-        showNotification(response.message, 'error');
-      }
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      showNotification('Error deleting product', 'error');
-    }
-  }
-}
-
-// Show stock adjustment modal
-function showStockModal(productId, productName, currentStock) {
-  document.getElementById('stockProductId').value = productId;
-  document.getElementById('stockProductName').textContent = productName;
-  document.getElementById('currentStock').textContent = currentStock;
-  document.getElementById('adjustmentType').value = 'add';
-  document.getElementById('adjustmentQuantity').value = '';
-  document.getElementById('adjustmentNotes').value = '';
-
-  document.getElementById('stockModal').classList.add('show');
-}
-
-// Hide stock adjustment modal
-function hideStockModal() {
-  document.getElementById('stockModal').classList.remove('show');
-}
-
-// Save stock adjustment
-async function saveStockAdjustment() {
-  try {
-    const productId = document.getElementById('stockProductId').value;
-    const adjustmentType = document.getElementById('adjustmentType').value;
-    const quantityInput = parseInt(document.getElementById('adjustmentQuantity').value);
-    const notes = document.getElementById('adjustmentNotes').value;
-
-    if (isNaN(quantityInput) || quantityInput < 0) {
-      showNotification('Please enter a valid quantity', 'error');
+    if (tiers[0].price >= tiers[1].price || tiers[1].price >= tiers[2].price) {
+      showNotification('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 < บิล 2 < บิล 3', 'error');
       return;
     }
 
-    let quantity, type;
-    const currentStock = parseInt(document.getElementById('currentStock').textContent);
-
-    switch (adjustmentType) {
-      case 'add':
-        quantity = currentStock + quantityInput;
-        type = 'adjustment';
-        break;
-      case 'subtract':
-        if (currentStock < quantityInput) {
-          showNotification('Cannot subtract more than current stock', 'error');
-          return;
-        }
-        quantity = currentStock - quantityInput;
-        type = 'adjustment';
-        break;
-      case 'set':
-        quantity = quantityInput;
-        type = 'adjustment';
-        break;
-    }
-
-    const adjustmentData = {
-      product_id: productId,
-      type: type,
-      quantity: quantity,
-      notes: `${adjustmentType} stock: ${quantityInput} - ${notes}`
+    const payload = {
+      code: document.getElementById('sku').value,
+      name: document.getElementById('name').value,
+      category_id: document.getElementById('categoryId').value || null,
+      tier_prices: tiers,
+      is_active: document.getElementById('status').value === 'active' ? 1 : 0,
+      default_unit: 'กก.',
     };
 
-    const response = await apiRequest('inventory/transactions', 'POST', adjustmentData);
+    if (!payload.code || !payload.name) {
+      showNotification('กรุณาระบุรหัสและชื่อสินค้า', 'error');
+      return;
+    }
 
-    if (response.status === 'success') {
-      showNotification('Stock adjustment saved successfully', 'success');
-      hideStockModal();
+    let res;
+    if (itemId) {
+      res = await apiRequest(`purchase-catalog/item?id=${itemId}`, 'PUT', payload);
+    } else {
+      res = await apiRequest('purchase-catalog', 'POST', payload);
+    }
 
-      // Refresh product list
-      const productResponse = await apiRequest('inventory/products');
-      if (productResponse.status === 'success') {
-        products = productResponse.data;
-        renderProducts(products);
+    if (res.status === 'success') {
+      showNotification(itemId ? 'อัปเดตรายการสำเร็จ' : 'เพิ่มรายการสำเร็จ', 'success');
+      hideCatalogModal();
+      const catalogRes = await apiRequest('purchase-catalog?include_inactive=true');
+      if (catalogRes.status === 'success') {
+        catalogItems = catalogRes.data;
+        renderCatalogItems(catalogItems);
       }
     } else {
-      showNotification(response.message, 'error');
+      showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
     }
   } catch (error) {
-    console.error('Error adjusting stock:', error);
-    showNotification('Error saving stock adjustment', 'error');
+    console.error('Error saving catalog item:', error);
+    showNotification('Error saving catalog item', 'error');
   }
 }
 
-// Show category management modal
+async function deleteCatalogItem(itemId) {
+  if (!confirm('แน่ใจหรือไม่ที่จะลบรายการนี้ออกจากแคตตาล็อก?')) return;
+  try {
+    const res = await apiRequest(`purchase-catalog/item?id=${itemId}`, 'DELETE');
+    if (res.status === 'success') {
+      showNotification('ลบรายการสำเร็จ', 'success');
+      const catalogRes = await apiRequest('purchase-catalog?include_inactive=true');
+      if (catalogRes.status === 'success') {
+        catalogItems = catalogRes.data;
+        renderCatalogItems(catalogItems);
+      }
+    } else {
+      showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+    }
+  } catch (error) {
+    console.error('Error deleting catalog item:', error);
+    showNotification('Error deleting catalog item', 'error');
+  }
+}
+
 function showCategoryModal() {
   document.getElementById('categoryForm').reset();
   document.getElementById('categoryId').value = '';
@@ -420,50 +290,31 @@ function showCategoryModal() {
   document.getElementById('categoryModal').classList.add('show');
 }
 
-// Render category list in modal
 function renderCategoryList() {
   const categoryList = document.getElementById('categoryList');
   categoryList.innerHTML = '';
-
   categories.forEach(category => {
-    const categoryItem = document.createElement('div');
-    categoryItem.className = 'category-item';
-
-    categoryItem.innerHTML = `
-            <div class="category-name">${category.name}</div>
-            <div class="category-actions">
-                <button class="btn-icon edit-category" data-id="${category.id}">
-                    <i class="icon-edit"></i>
-                </button>
-                <button class="btn-icon delete-category" data-id="${category.id}">
-                    <i class="icon-delete"></i>
-                </button>
-            </div>
-        `;
-
-    categoryList.appendChild(categoryItem);
+    const item = document.createElement('div');
+    item.className = 'category-item';
+    item.innerHTML = `
+      <div class="category-name">${escapeHtml(category.name)}</div>
+      <div class="category-actions">
+        <button class="btn-icon edit-category" data-id="${category.id}"><i class="icon-edit"></i></button>
+        <button class="btn-icon delete-category" data-id="${category.id}"><i class="icon-delete"></i></button>
+      </div>`;
+    categoryList.appendChild(item);
   });
 
-  // Add event listeners for category actions
-  document.querySelectorAll('.edit-category').forEach(button => {
-    button.addEventListener('click', function() {
-      const categoryId = this.dataset.id;
-      editCategory(categoryId);
-    });
+  document.querySelectorAll('.edit-category').forEach(btn => {
+    btn.addEventListener('click', function() { editCategory(this.dataset.id); });
   });
-
-  document.querySelectorAll('.delete-category').forEach(button => {
-    button.addEventListener('click', function() {
-      const categoryId = this.dataset.id;
-      deleteCategory(categoryId);
-    });
+  document.querySelectorAll('.delete-category').forEach(btn => {
+    btn.addEventListener('click', function() { deleteCategory(this.dataset.id); });
   });
 }
 
-// Edit category
 function editCategory(categoryId) {
   const category = categories.find(c => c.id === categoryId);
-
   if (category) {
     document.getElementById('categoryId').value = category.id;
     document.getElementById('categoryName').value = category.name;
@@ -471,52 +322,39 @@ function editCategory(categoryId) {
   }
 }
 
-// Reset category form
 function resetCategoryForm() {
   document.getElementById('categoryForm').reset();
   document.getElementById('categoryId').value = '';
 }
 
-// Save category (create or update)
 async function saveCategory() {
   try {
     const categoryId = document.getElementById('categoryId').value;
     const categoryName = document.getElementById('categoryName').value;
     const categoryDescription = document.getElementById('categoryDescription').value;
-
     if (!categoryName) {
       showNotification('Category name is required', 'error');
       return;
     }
-
-    const categoryData = {
-      name: categoryName,
-      description: categoryDescription
-    };
-
-    let response;
-
+    const payload = { name: categoryName, description: categoryDescription };
+    let res;
     if (categoryId) {
-      // Update existing category
-      response = await apiRequest(`inventory/category?id=${categoryId}`, 'PUT', categoryData);
+      res = await apiRequest(`inventory/category?id=${categoryId}`, 'PUT', payload);
     } else {
-      // Create new category
-      response = await apiRequest('inventory/categories', 'POST', categoryData);
+      res = await apiRequest('inventory/categories', 'POST', payload);
     }
-
-    if (response.status === 'success') {
+    if (res.status === 'success') {
       showNotification(categoryId ? 'อัปเดตหมวดหมู่สำเร็จ' : 'เพิ่มหมวดหมู่สำเร็จ', 'success');
       resetCategoryForm();
-
-      // Refresh category list
-      const categoryResponse = await apiRequest('inventory/categories');
-      if (categoryResponse.status === 'success') {
-        categories = categoryResponse.data;
+      const catRes = await apiRequest('inventory/categories');
+      if (catRes.status === 'success') {
+        categories = catRes.data;
         renderCategoryList();
         renderCategoryDropdowns();
+        renderCategoryStock();
       }
     } else {
-      showNotification(response.message, 'error');
+      showNotification(res.message, 'error');
     }
   } catch (error) {
     console.error('Error saving category:', error);
@@ -524,97 +362,33 @@ async function saveCategory() {
   }
 }
 
-// Delete category
 async function deleteCategory(categoryId) {
-  if (confirm('แน่ใจหรือไม่ที่จะลบหมวดหมู่นี้?')) {
-    try {
-      const response = await apiRequest(`inventory/category?id=${categoryId}`, 'DELETE');
-
-      if (response.status === 'success') {
-        showNotification('ลบหมวดหมู่สำเร็จ', 'success');
-
-        // Refresh category list
-        const categoryResponse = await apiRequest('inventory/categories');
-        if (categoryResponse.status === 'success') {
-          categories = categoryResponse.data;
-          renderCategoryList();
-          renderCategoryDropdowns();
-        }
-      } else {
-        showNotification(response.message, 'error');
+  if (!confirm('แน่ใจหรือไม่ที่จะลบหมวดหมู่นี้?')) return;
+  try {
+    const res = await apiRequest(`inventory/category?id=${categoryId}`, 'DELETE');
+    if (res.status === 'success') {
+      showNotification('ลบหมวดหมู่สำเร็จ', 'success');
+      const catRes = await apiRequest('inventory/categories');
+      if (catRes.status === 'success') {
+        categories = catRes.data;
+        renderCategoryList();
+        renderCategoryDropdowns();
+        renderCategoryStock();
       }
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      showNotification('Error deleting category', 'error');
+    } else {
+      showNotification(res.message, 'error');
     }
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    showNotification('Error deleting category', 'error');
   }
 }
 
-// Export inventory to CSV
-function exportInventory() {
-  // Get filtered products
-  const searchTerm = document.getElementById('productSearch').value.toLowerCase();
-  const categoryId = document.getElementById('categoryFilter').value;
-  const stockFilter = document.getElementById('stockFilter').value;
-
-  let filtered = [...products];
-
-  // Apply filters
-  if (searchTerm) {
-    filtered = filtered.filter(product => {
-      return product.name.toLowerCase().includes(searchTerm) ||
-        product.sku.toLowerCase().includes(searchTerm) ||
-        (product.barcode && product.barcode.toLowerCase().includes(searchTerm));
-    });
-  }
-
-  if (categoryId) {
-    filtered = filtered.filter(product => product.category_id === categoryId);
-  }
-
-  if (stockFilter !== 'all') {
-    if (stockFilter === 'low') {
-      filtered = filtered.filter(product =>
-        product.quantity <= product.low_stock_threshold && product.quantity > 0
-      );
-    } else if (stockFilter === 'out') {
-      filtered = filtered.filter(product => product.quantity <= 0);
-    }
-  }
-
-  // Create CSV content
-  let csvContent = 'SKU,Name,Category,Price,Cost,Stock,Status\n';
-
-  filtered.forEach(product => {
-    const row = [
-      product.sku,
-      `"${product.name.replace(/"/g, '""')}"`,
-      `"${(product.category_name || 'Uncategorized').replace(/"/g, '""')}"`,
-      product.price,
-      product.cost,
-      product.quantity,
-      product.status
-    ];
-    csvContent += row.join(',') + '\n';
-  });
-
-  // Create download link
-  const blob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.setAttribute('href', url);
-  link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
-  link.style.visibility = 'hidden';
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-// Show notification
-function showNotification(message, type = 'info') {
-  // You can implement a notification system here
-  // For simplicity, we'll use alert for now
+function showNotification(message, type) {
   alert(message);
 }

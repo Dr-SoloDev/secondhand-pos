@@ -223,19 +223,6 @@ a:hover {
   padding: 0 24px;
   margin: -24px -24px 20px -24px;
 }
-.toggle-sidebar {
-  background: none;
-  border: none;
-  color: var(--color-text-light);
-  font-size: 20px;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: var(--radius-sm);
-  transition: background var(--transition);
-}
-.toggle-sidebar:hover {
-  background-color: var(--color-bg);
-}
 .user-dropdown {
   position: relative;
 }
@@ -1608,6 +1595,22 @@ select.form-control {
     margin: -16px -16px 16px -16px;
     padding: 0 16px;
   }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .card-tools {
+    width: 100%;
+  }
+  .card-tools select {
+    width: 100%;
+  }
   .date-range {
     flex-direction: column;
   }
@@ -1620,6 +1623,12 @@ select.form-control {
   }
   .summary-item {
     min-width: 100%;
+  }
+  .modal-large {
+    width: 95%;
+  }
+  .modal-body .form-row .form-col {
+    flex: 1 0 100%;
   }
 }
 
@@ -1664,5 +1673,38 @@ select.form-control {
   .notification {
     min-width: 0;
     max-width: calc(100vw - 40px);
+  }
+  .data-table {
+    font-size: 12px;
+  }
+  .data-table th,
+  .data-table td {
+    padding: 8px 10px;
+  }
+  .stat-card {
+    padding: 16px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .btn {
+    font-size: 13px;
+    padding: 8px 14px;
+  }
+  .po-grid {
+    grid-template-columns: 1fr;
+  }
+  .item-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .cart-summary {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sidebar-menu {
+    padding-bottom: 80px;
   }
 }

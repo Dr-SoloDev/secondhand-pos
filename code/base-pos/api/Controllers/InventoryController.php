@@ -30,9 +30,19 @@ class InventoryController extends Controller
         $data = $this->sanitizeInput($data);
 
         // M1: ตรวจค่าตัวเลขให้ไม่ติดลบ (negative price/cost/quantity ไม่ make sense)
-        foreach (['price', 'cost', 'quantity', 'low_stock_threshold'] as $f) {
+        foreach (['price_tier1', 'price_tier2', 'price_tier3', 'quantity', 'low_stock_threshold'] as $f) {
             if (isset($data[$f]) && (!is_numeric($data[$f]) || (float)$data[$f] < 0)) {
                 Response::error("Field '$f' must be a non-negative number", 400);
+            }
+        }
+
+        // Validate: บิล1 < บิล2 < บิล3
+        if (isset($data['price_tier1']) && isset($data['price_tier2']) && isset($data['price_tier3'])) {
+            $t1 = (float)$data['price_tier1'];
+            $t2 = (float)$data['price_tier2'];
+            $t3 = (float)$data['price_tier3'];
+            if ($t1 >= $t2 || $t2 >= $t3) {
+                Response::error('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 < บิล 2 < บิล 3', 400);
             }
         }
 
@@ -42,6 +52,7 @@ class InventoryController extends Controller
         }
 
         $productModel = new Product();
+
         try {
             $productId = $productModel->create([
                 'name' => $name,
@@ -49,7 +60,10 @@ class InventoryController extends Controller
                 'barcode' => trim((string)($data['barcode'] ?? '')),
                 'description' => $data['description'] ?? '',
                 'category_id' => $data['category_id'] ?? null,
-                'price' => $data['price'] ?? 0,
+                'price' => $data['price_tier2'] ?? 0,  // backward compatibility
+                'price_tier1' => $data['price_tier1'] ?? 0,
+                'price_tier2' => $data['price_tier2'] ?? 0,
+                'price_tier3' => $data['price_tier3'] ?? 0,
                 'cost' => $data['cost'] ?? 0,
                 'quantity' => $data['quantity'] ?? 0,
                 'unit' => $data['unit'] ?? 'ชิ้น',
@@ -245,6 +259,16 @@ class InventoryController extends Controller
 
         // Sanitize input
         $data = $this->sanitizeInput($data);
+
+        // Validate: บิล1 < บิล2 < บิล3
+        if (isset($data['price_tier1']) && isset($data['price_tier2']) && isset($data['price_tier3'])) {
+            $t1 = (float)$data['price_tier1'];
+            $t2 = (float)$data['price_tier2'];
+            $t3 = (float)$data['price_tier3'];
+            if ($t1 >= $t2 || $t2 >= $t3) {
+                Response::error('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 < บิล 2 < บิล 3', 400);
+            }
+        }
 
         // Update product
         $productModel = new Product();

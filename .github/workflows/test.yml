@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: code
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: pos_system
+          MYSQL_USER: posuser
+          MYSQL_PASSWORD: pospass
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -uroot -prootpass"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 3307:3306
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate PHP syntax
+        run: |
+          find base-pos/api -name '*.php' -exec php -l {} \;
+          find customizations/api -name '*.php' -exec php -l {} \;
+
+      - name: Generate .env
+        run: |
+          cp .env.example .env
+          echo "JWT_SECRET=ci-test-secret" >> .env
+
+      - name: Run migrations
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3307
+          DB_NAME: pos_system
+          DB_USER: posuser
+          DB_PASS: pospass
+        run: |
+          mysql -h 127.0.0.1 -P 3307 -u posuser -ppospass pos_system < base-pos/database/pos_system.sql
+          for f in customizations/database/migrations/*.sql; do
+            echo "Running migration: $f"
+            mysql -h 127.0.0.1 -P 3307 -u posuser -ppospass pos_system < "$f"
+          done
+
+      - name: Start PHP server
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3307
+          DB_NAME: pos_system
+          DB_USER: posuser
+          DB_PASS: pospass
+          JWT_SECRET: ci-test-secret
+        run: |
+          php -S 0.0.0.0:8080 -t base-pos &
+          sleep 2
+
+      - name: Run API tests
+        run: |
+          bash tests/api/run.sh

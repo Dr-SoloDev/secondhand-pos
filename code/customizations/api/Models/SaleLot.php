@@ -132,21 +132,21 @@ class SaleLot extends Model
                 }
 
                 $subtotal  = $qty * $unitPrice;
-                // C3 FIX: draft อนุญาตให้บันทึกได้แม้สต็อกไม่พอ — fifo จะถูกคำนวณใหม่ตอน confirm
+                // draft อนุญาตให้บันทึกได้แม้สต็อกไม่พอ — cost จะถูกคำนวณใหม่ตอน confirm
                 try {
-                    $fifoCost = $this->calculateFifoCost($branchId, $catId, $qty);
+                    $itemCost = $this->calculateCost($branchId, $catId, $qty);
                 } catch (Exception $e) {
-                    $fifoCost = 0;
+                    $itemCost = 0;
                 }
 
                 $totalAmount += $subtotal;
-                $totalCost   += $fifoCost;
+                $totalCost   += $itemCost;
 
                 $preparedItems[] = [
                     'category_id'  => $catId,
                     'quantity_kg'  => $qty,
                     'unit_price'   => $unitPrice,
-                    'fifo_cost'    => $fifoCost,
+                    'fifo_cost'    => $itemCost,
                 ];
             }
 
@@ -217,21 +217,21 @@ class SaleLot extends Model
                 }
 
                 $subtotal = $qty * $unitPrice;
-                // C3 FIX: draft อนุญาตให้บันทึกได้แม้สต็อกไม่พอ — fifo จะถูกคำนวณใหม่ตอน confirm
+                // draft อนุญาตให้บันทึกได้แม้สต็อกไม่พอ — cost จะถูกคำนวณใหม่ตอน confirm
                 try {
-                    $fifoCost = $this->calculateFifoCost($branchId, $catId, $qty);
+                    $itemCost = $this->calculateCost($branchId, $catId, $qty);
                 } catch (Exception $e) {
-                    $fifoCost = 0;
+                    $itemCost = 0;
                 }
 
                 $totalAmount += $subtotal;
-                $totalCost   += $fifoCost;
+                $totalCost   += $itemCost;
 
                 $preparedItems[] = [
                     'category_id' => $catId,
                     'quantity_kg' => $qty,
                     'unit_price'  => $unitPrice,
-                    'fifo_cost'   => $fifoCost,
+                    'fifo_cost'   => $itemCost,
                 ];
             }
 
@@ -273,29 +273,29 @@ class SaleLot extends Model
     // เปลี่ยนสถานะ: draft->confirmed ตัดสต็อก, confirmed->cancelled คืนสต็อก
     public function updateStatus($id, $status)
     {
-        $lot = $this->db->fetch(
-            "SELECT id, status FROM {$this->table} WHERE id = ?",
-            [$id]
-        );
-        if (!$lot) {
-            throw new Exception('ไม่พบ Sale Lot');
-        }
-
         $allowed = [
             'draft'     => ['confirmed'],
             'confirmed' => ['cancelled'],
         ];
 
-        if (!isset($allowed[$lot['status']]) || !in_array($status, $allowed[$lot['status']])) {
-            throw new Exception("ไม่สามารถเปลี่ยนสถานะจาก {$lot['status']} เป็น {$status} ได้");
-        }
-
         $this->db->beginTransaction();
         try {
-            // C3 FIX: draft→confirmed ต้องคำนวณ fifo_cost ใหม่จากสต็อกปัจจุบัน
-            // (update() อาจบันทึก fifo=0 ถ้าสต็อกไม่พอตอนเป็น draft)
+            // Lock the lot row to prevent TOCTOU race
+            $lot = $this->db->fetch(
+                "SELECT id, status, branch_id FROM {$this->table} WHERE id = ? FOR UPDATE",
+                [$id]
+            );
+            if (!$lot) {
+                throw new Exception('ไม่พบ Sale Lot');
+            }
+
+            if (!isset($allowed[$lot['status']]) || !in_array($status, $allowed[$lot['status']])) {
+                throw new Exception("ไม่สามารถเปลี่ยนสถานะจาก {$lot['status']} เป็น {$status} ได้");
+            }
+            // draft→confirmed ต้องคำนวณ cost ใหม่จากสต็อกปัจจุบัน
+            // (update() อาจบันทึก cost=0 ถ้าสต็อกไม่พอตอนเป็น draft)
             if ($status === 'confirmed' && $lot['status'] === 'draft') {
-                $this->recomputeFifoCost($id);
+                $this->recomputeCost($id);
             }
 
             $this->db->query(
@@ -317,37 +317,90 @@ class SaleLot extends Model
         }
     }
 
-    // คำนวณ fifo_cost ใหม่สำหรับทุกรายการของ sale_lot และอัปเดต total_cost
+    // คำนวณ cost ใหม่สำหรับทุกรายการของ sale_lot และอัปเดต total_cost
+    // ใช้ cost_method ตามการตั้งค่าของสาขา (fifo หรือ weighted)
     // จะ throw ถ้าสต็อกไม่พอ (ใช้ตอน confirm)
-    private function recomputeFifoCost($sale_lot_id)
+    private function recomputeCost($sale_lot_id)
     {
         $lot = $this->db->fetch(
-            "SELECT branch_id FROM {$this->table} WHERE id = ?",
+            "SELECT branch_id FROM {$this->table} WHERE id = ? FOR UPDATE",
             [$sale_lot_id]
         );
         $items = $this->db->fetchAll(
-            "SELECT id, category_id, quantity_kg FROM sale_lot_items WHERE sale_lot_id = ?",
+            "SELECT id, category_id, quantity_kg FROM sale_lot_items WHERE sale_lot_id = ? FOR UPDATE",
             [$sale_lot_id]
         );
 
         $totalCost = 0.0;
         foreach ($items as $item) {
-            $fifo = $this->calculateFifoCost(
+            $itemCost = $this->calculateCost(
                 (int)$lot['branch_id'],
                 (int)$item['category_id'],
                 (float)$item['quantity_kg']
             );
             $this->db->query(
                 "UPDATE sale_lot_items SET fifo_cost = ? WHERE id = ?",
-                [$fifo, $item['id']]
+                [$itemCost, $item['id']]
             );
-            $totalCost += $fifo;
+            $totalCost += $itemCost;
         }
 
         $this->db->query(
             "UPDATE {$this->table} SET total_cost = ? WHERE id = ?",
             [$totalCost, $sale_lot_id]
         );
+    }
+
+    // ดึง cost_method ของสาขา
+    private function getCostMethod($branch_id)
+    {
+        return $this->db->fetchColumn(
+            "SELECT cost_method FROM branches WHERE id = ?",
+            [$branch_id]
+        ) ?: 'fifo';
+    }
+
+    // คำนวณต้นทุนตาม cost_method ของสาขา (fifo หรือ weighted)
+    public function calculateCost($branch_id, $category_id, $quantity_kg)
+    {
+        $method = $this->getCostMethod($branch_id);
+        if ($method === 'weighted') {
+            return $this->calculateWeightedAvgCost($branch_id, $category_id, $quantity_kg);
+        }
+        return $this->calculateFifoCost($branch_id, $category_id, $quantity_kg);
+    }
+
+    // คำนวณต้นทุนแบบถัวเฉลี่ย (Weighted Average)
+    public function calculateWeightedAvgCost($branch_id, $category_id, $quantity_kg)
+    {
+        $row = $this->db->fetch(
+            "SELECT
+                COALESCE(SUM(poi.quantity - poi.consumed_qty), 0) AS total_qty,
+                COALESCE(SUM((poi.quantity - poi.consumed_qty) * poi.unit_price), 0) AS total_value
+             FROM purchase_order_items poi
+             INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
+             WHERE po.branch_id = ?
+               AND poi.category_id = ?
+               AND po.status = 'completed'
+               AND (poi.quantity - poi.consumed_qty) > 0",
+            [$branch_id, $category_id]
+        );
+
+        $totalQty   = (float)$row['total_qty'];
+        $totalValue = (float)$row['total_value'];
+
+        if ($totalQty <= 0) {
+            throw new Exception("สต็อกหมวดหมู่ ID {$category_id} ไม่เพียงพอ");
+        }
+
+        $avgPrice = $totalValue / $totalQty;
+
+        // เช็คว่ามีสต็อกพอตามปริมาณที่ต้องการ
+        if ($totalQty < $quantity_kg) {
+            throw new Exception("สต็อกหมวดหมู่ ID {$category_id} ไม่เพียงพอ (ขาด " . ($quantity_kg - $totalQty) . " กก.)");
+        }
+
+        return $avgPrice * $quantity_kg;
     }
 
     // คำนวณต้นทุน FIFO สำหรับหมวดหมู่และปริมาณที่ต้องการ
@@ -389,22 +442,30 @@ class SaleLot extends Model
     }
 
     // ตัดสต็อกเมื่อยืนยัน Sale Lot โดยบันทึก consumed_qty ใน purchase_order_items
+    // และลด stock_kg ในหมวดหมู่
     public function deductStock($sale_lot_id)
     {
         $items = $this->db->fetchAll(
             "SELECT category_id, quantity_kg
              FROM sale_lot_items
-             WHERE sale_lot_id = ?",
+             WHERE sale_lot_id = ? FOR UPDATE",
             [$sale_lot_id]
         );
 
         $lot = $this->db->fetch(
-            "SELECT branch_id FROM {$this->table} WHERE id = ?",
+            "SELECT branch_id FROM {$this->table} WHERE id = ? FOR UPDATE",
             [$sale_lot_id]
         );
 
         foreach ($items as $item) {
             $remaining = (float)$item['quantity_kg'];
+            $categoryId = (int)$item['category_id'];
+
+            // STOCK FIX: Deduct from category stock
+            $this->db->query(
+                "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",
+                [$remaining, $categoryId]
+            );
 
             // ดึง PO items ที่ยังมีสต็อกเหลือสำหรับหมวดหมู่นี้
             $rows = $this->db->fetchAll(
@@ -417,8 +478,9 @@ class SaleLot extends Model
                    AND poi.category_id = ?
                    AND po.status = 'completed'
                    AND (poi.quantity - poi.consumed_qty) > 0
-                 ORDER BY po.created_at ASC",
-                [$lot['branch_id'], $item['category_id']]
+                  ORDER BY po.created_at ASC
+                 FOR UPDATE",
+                [$lot['branch_id'], $categoryId]
             );
 
             foreach ($rows as $row) {
@@ -427,12 +489,17 @@ class SaleLot extends Model
                 $available = (float)$row['quantity'] - (float)$row['consumed_qty'];
                 $take      = min($available, $remaining);
 
-                $this->db->query(
+                // Atomic update — ป้องกัน race condition
+                $stmt = $this->db->query(
                     "UPDATE purchase_order_items
                      SET consumed_qty = consumed_qty + ?
-                     WHERE id = ?",
-                    [$take, $row['id']]
+                     WHERE id = ? AND consumed_qty + ? <= quantity",
+                    [$take, $row['id'], $take]
                 );
+
+                if (!$stmt->rowCount()) {
+                    throw new Exception("สต็อกถูกตัดโดยรายการอื่นแล้ว กรุณาลองใหม่");
+                }
 
                 $remaining -= $take;
             }
@@ -445,17 +512,24 @@ class SaleLot extends Model
         $items = $this->db->fetchAll(
             "SELECT category_id, quantity_kg
              FROM sale_lot_items
-             WHERE sale_lot_id = ?",
+             WHERE sale_lot_id = ? FOR UPDATE",
             [$sale_lot_id]
         );
 
         $lot = $this->db->fetch(
-            "SELECT branch_id FROM {$this->table} WHERE id = ?",
+            "SELECT branch_id FROM {$this->table} WHERE id = ? FOR UPDATE",
             [$sale_lot_id]
         );
 
         foreach ($items as $item) {
             $toRestore = (float)$item['quantity_kg'];
+            $categoryId = (int)$item['category_id'];
+
+            // STOCK FIX: Restore category stock
+            $this->db->query(
+                "UPDATE categories SET stock_kg = stock_kg + ? WHERE id = ?",
+                [$toRestore, $categoryId]
+            );
 
             // คืนสต็อกย้อนกลับจากล็อตล่าสุดก่อน (LIFO สำหรับการคืน)
             $rows = $this->db->fetchAll(
@@ -467,8 +541,9 @@ class SaleLot extends Model
                    AND poi.category_id = ?
                    AND po.status = 'completed'
                    AND poi.consumed_qty > 0
-                 ORDER BY po.created_at DESC",
-                [$lot['branch_id'], $item['category_id']]
+                  ORDER BY po.created_at DESC
+                 FOR UPDATE",
+                [$lot['branch_id'], $categoryId]
             );
 
             foreach ($rows as $row) {
@@ -476,23 +551,29 @@ class SaleLot extends Model
 
                 $canRestore = min((float)$row['consumed_qty'], $toRestore);
 
-                $this->db->query(
+                $stmt = $this->db->query(
                      "UPDATE purchase_order_items
                       SET consumed_qty = consumed_qty - ?
-                      WHERE id = ?",
-                    [$canRestore, $row['id']]
+                      WHERE id = ? AND consumed_qty >= ?",
+                    [$canRestore, $row['id'], $canRestore]
                 );
+
+                if (!$stmt->rowCount()) {
+                    throw new Exception("ข้อมูล consumed_qty ไม่ตรงกัน กรุณาลองใหม่");
+                }
 
                 $toRestore -= $canRestore;
             }
         }
     }
 
-    // สร้างเลขอ้างอิง SO-YYYYMMDD-NNN เพิ่มขึ้นอัตโนมัติรายวันต่อสาขา
+    // สร้างเลขอ้างอิง SO-{BRANCH_CODE}-YYYYMMDD-NNN เพิ่มขึ้นอัตโนมัติรายวันต่อสาขา
     // BUG-06 FIX: ใช้ MAX+1 แทน COUNT+1 เพื่อป้องกัน race condition
+    // BUG-07 FIX: เพิ่ม branch code เข้าไปใน prefix เพื่อป้องกัน reference_no ซ้ำข้ามสาขา
     public function generateReferenceNo($branch_id)
     {
-        $prefix = 'SO' . date('Ymd');
+        $branchCode = $this->db->fetchColumn("SELECT code FROM branches WHERE id = ?", [$branch_id]) ?: 'XX';
+        $prefix = 'SO-' . $branchCode . '-' . date('Ymd');
         $last   = $this->db->fetchColumn(
             "SELECT MAX(CAST(SUBSTRING_INDEX(reference_no, '-', -1) AS UNSIGNED))
              FROM {$this->table}

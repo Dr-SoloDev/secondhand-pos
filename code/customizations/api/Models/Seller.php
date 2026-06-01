@@ -88,12 +88,12 @@ class Seller extends Model
         }
 
         return $this->insert([
-            'id_card' => $data['id_card'] ?? null,
+            'id_card' => !empty($data['id_card']) ? $data['id_card'] : null,
             'full_name' => $data['full_name'],
-            'phone' => $data['phone'] ?? null,
-            'address' => $data['address'] ?? null,
-            'vehicle_plate' => $data['vehicle_plate'] ?? null,
-            'notes' => $data['notes'] ?? null,
+            'phone' => !empty($data['phone']) ? $data['phone'] : null,
+            'address' => !empty($data['address']) ? $data['address'] : null,
+            'vehicle_plate' => !empty($data['vehicle_plate']) ? $data['vehicle_plate'] : null,
+            'notes' => !empty($data['notes']) ? $data['notes'] : null,
             'is_blacklisted' => $data['is_blacklisted'] ?? 0,
         ]);
     }

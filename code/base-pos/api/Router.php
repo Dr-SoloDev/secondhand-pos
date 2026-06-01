@@ -98,11 +98,15 @@ class Router
         $this->routes[] = ['route' => 'reports/recent-sales', 'controller' => 'ReportsController', 'method' => 'getRecentSales', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/purchase-chart', 'controller' => 'ReportsController', 'method' => 'getPurchaseChart', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/recent-purchases', 'controller' => 'ReportsController', 'method' => 'getRecentPurchases', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/recent-sale-lots', 'controller' => 'ReportsController', 'method' => 'getRecentSaleLots', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/sales-report', 'controller' => 'ReportsController', 'method' => 'getSalesReport', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/product-sales', 'controller' => 'ReportsController', 'method' => 'getProductSales', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/inventory-report', 'controller' => 'ReportsController', 'method' => 'getInventoryReport', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/cashier-performance', 'controller' => 'ReportsController', 'method' => 'getCashierPerformance', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'reports/tax-report', 'controller' => 'ReportsController', 'method' => 'getTaxReport', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/purchase-report', 'controller' => 'ReportsController', 'method' => 'getPurchaseReport', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/sale-lot-report', 'controller' => 'ReportsController', 'method' => 'getSaleLotReport', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'reports/sale-lot-chart', 'controller' => 'ReportsController', 'method' => 'getSaleLotChart', 'verb' => 'GET'];
 
         // Users routes
         $this->routes[] = ['route' => 'users/all', 'controller' => 'UsersController', 'method' => 'getAllUsers', 'verb' => 'GET'];
@@ -162,6 +166,7 @@ class Router
 
         // Price Tiers routes
         $this->routes[] = ['route' => 'price-tiers', 'controller' => 'PriceTiersController', 'method' => 'getPriceTiers', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'price-tiers', 'controller' => 'PriceTiersController', 'method' => 'createCatalogItem', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'price-tiers/category', 'controller' => 'PriceTiersController', 'method' => 'updatePriceTiers', 'verb' => 'PUT'];
 
         // Purchase Item Catalog routes
@@ -170,6 +175,7 @@ class Router
         $this->routes[] = ['route' => 'purchase-catalog/search', 'controller' => 'PurchaseItemCatalogController', 'method' => 'searchCatalog', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-catalog/item', 'controller' => 'PurchaseItemCatalogController', 'method' => 'getItem', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-catalog/item', 'controller' => 'PurchaseItemCatalogController', 'method' => 'updateItem', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'purchase-catalog/item', 'controller' => 'PurchaseItemCatalogController', 'method' => 'deleteItem', 'verb' => 'DELETE'];
 
         // Sale Lots routes
         $this->routes[] = ['route' => 'sale-lots', 'controller' => 'SaleLotsController', 'method' => 'index', 'verb' => 'GET'];

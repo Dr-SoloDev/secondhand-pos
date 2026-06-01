@@ -1,7 +1,7 @@
 # Secondhand POS — AI Agent Context
 
 > ระบบจัดการร้านรับซื้อของเก่า (Junk Shop POS)
-> Owner: Dr.solodev | Last Updated: 2026-05-28
+> Owner: Dr.solodev | Last Updated: 2026-06-01 (UI: tier buttons + stock card)
 
 ---
 
@@ -42,7 +42,7 @@ code/
 └── customizations/        # Custom code (mounted INTO base-pos via autoloader)
     ├── api/Models/        # Custom: Branch, Seller, ItemCondition, PurchaseOrder, PurchaseItemCatalog, SaleLot
     ├── api/Controllers/   # Custom: Branches, Sellers, PurchaseOrders, ItemConditions, PriceTiers, PurchaseItemCatalog, SaleLots
-    ├── database/migrations/  # 013 migrations (numbered sequentially)
+    ├── database/migrations/  # 021 migrations (numbered sequentially)
     └── frontend-react/    # DEPRECATED — React v2 app, no longer active delivery target
 ```
 
@@ -77,6 +77,11 @@ code/
 | 013 | — | REPLACE condition_id with weight_deduction in purchase_order_items |
 | 015 | `purchase_item_catalog` | ADD price_tier1/2/3 columns (fixed 3 tiers) |
 | 016 | `purchase_item_catalog` | ADD tier_prices JSON column (dynamic tiers, replaces price_tier1/2/3) |
+| 017 | — | ADD expenses JSON to sale_lots |
+| 018 | — | Rename tier labels to "บิล1/2/3" (was duplicate 017) |
+| 019 | — | (No-op / placeholder) |
+| 020 | — | FIFO indexes + atomic conditional UPDATE for consumed_qty |
+| 021 | `branches` | ADD cost_method ENUM('fifo','weighted') default 'fifo' |
 
 ### Sale Lot Tables
 
@@ -98,8 +103,8 @@ code/
 - `products.category_id` → FK to `categories(id)` with `ON DELETE SET NULL` (cannot convert to free-text)
 - `sale_lots.profit` = `GENERATED ALWAYS AS (total_amount - total_cost) STORED`
 - `sale_lot_items.subtotal` = `GENERATED ALWAYS AS (quantity_kg * unit_price) STORED`
-- `sale_lots.reference_no` format: `SO-YYYYMMDD-NNN` (per branch, per day sequential)
-- `purchase_orders.reference_no` format: `PO-YYYYMMDD-NNN` (per branch, per day sequential)
+- `sale_lots.reference_no` format: `SO-{BRANCH_CODE}-YYYYMMDD-NNN` (per branch, per day sequential — branch_code added by BUG-07 fix)
+- `purchase_orders.reference_no` format: `PO-B{BRANCH_ID}-YYYYMMDD-NNN` (per branch, per day sequential)
 
 ---
 
@@ -118,6 +123,10 @@ POST   /sales/create                        # Retail sales
 GET    /sales/list, /details, /export       # Sales history
 POST   /sales/void                          # Void sale
 GET    /reports/dashboard-stats, /sales-chart, /recent-sales, ...
+GET    /reports/purchase-report             # Purchase report (with filters + CSV)
+GET    /reports/sale-lot-report             # Sale lot report (with filters + CSV)
+GET    /reports/sale-lot-chart              # Sale lot chart data
+GET    /reports/recent-sale-lots            # Recent sale lots for dashboard
 GET    /users/all, /users/user              # User management
 POST   /users, /users/change-password       # CRUD + profile
 GET    /customers, /customers/customer      # Customer management
@@ -195,8 +204,9 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 1. Select branch → search/select seller (or create new)
 2. Search catalog item by code/name → auto-fill category + unit
 3. Enter: weight (kg), weight deduction (kg), unit price
-4. Optional: select price tier (dynamic buttons from catalog tiers)
-5. Click "เพิ่มรายการ" → item added to cart table
+4. **Before adding items**: select price tier first (buttons show actual labels/prices from catalog item)
+5. Click "เพิ่มรายการ" → item added to cart table, tier level stays selected
+6. Next item auto-gets same tier price — no need to re-select
 6. Repeat steps 2-5 for multiple items
 7. Set payment method + notes
 8. Click "บันทึกใบรับซื้อ"
@@ -230,9 +240,10 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 ```
 1. On lot confirm: calculate cost for each lot item by consuming PO items
 2. Consume oldest PO items first (FIFO by created_at)
-3. Update consumed_qty on purchase_order_items
-4. On lot cancel: restore consumed_qty using LIFO
+3. Update consumed_qty on purchase_order_items (atomic conditional UPDATE for race safety)
+4. On lot cancel: restore consumed_qty using LIFO (atomic conditional UPDATE)
 5. profit = total_amount - total_cost (GENERATED column)
+6. TOCTOU protection: SELECT ... FOR UPDATE locks the lot row at transaction start
 ```
 
 ---
@@ -240,28 +251,42 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 ## Development State
 
 ### ✅ Completed
-- All 16 database migrations created and documented
+- All 21 database migrations created and documented
 - All custom Models + Controllers built
+- Code review hardening (2026-05-28): 5 blockers + 4 medium + 1 bonus bug fixed — PO/SL scope checks, JWT branch_id, FIFO regression, ID card validation, CORS env, backup perms, input validation, tier sanitize
+- Inventory SKU/cost field fixes: removed cost_price field (ทุนมาจาก PO), SKU manual entry (ตัวเลข 1, 2, 3...), null category_id handling
+- Inventory stock card: real-time category stock_kg display with visual bar graph
+- Inventory table: changed from `products` (retail) to `purchase_item_catalog` — shows catalog items with tier prices, CRUD via modal, search/filter by category/status
+- Sellers duplicate entry: error propagation from model to controller for duplicate id_card/phone
 - Router has ALL routes registered
-- Purchase Orders page (PHP): catalog autocomplete, seller search, item row + cart table, dynamic tier buttons
+- Purchase Orders page (PHP): catalog autocomplete, seller search, item row + cart table, dynamic tier buttons (select tier first → price auto-fill on all items)
 - Sale Lots page (PHP): full CRUD with modal, line items, confirm/delete, profit display
 - Sidebar: "ขาย Lot" link added to all admin pages
 - Price Tiers: dynamic tier pricing (add/remove levels per catalog item, stored as JSON)
 - Purchase Item Catalog: master catalog management
-- Build: passes, no errors
+- Reports: 4 new endpoints (purchase-report, sale-lot-report, sale-lot-chart, recent-sale-lots)
+- Dashboard: 3 new stat cards + sale lot chart + recent sale lots table
+- Responsive CSS: breakpoints at 768px and 576px
+- Weighted average cost: per-branch cost_method (fifo/weighted), migration 021
+- FIFO race fix: atomic conditional UPDATE for consumed_qty, migration 020
+- TOCTOU fix: FOR UPDATE locking in SaleLot confirm/cancel flow
+- Security: JWT_SECRET moved to .env, all Docker credentials to .env (docker-compose.yml)
+- Console cleanup: 9 console.log() calls removed from 3 JS files
+- Test suite: expanded from 33→58 tests (47→58 this session) — PO cancel, FIFO confirm/cancel/cost, duplicate phone seller, PO invalid branch, blacklist/unblacklist seller, overstock confirm rejection, update/delete draft lot
+- Bug fixes: PO cancel undefined method (PurchaseOrder::updateStatus), SL reference_no collision (branch code in prefix), deductStock/restoreStock execute→query, index.php catch(Exception) → catch(\Throwable)
+- Build: all 58 tests pass
 
 ### ⏳ Pending / Future
-- Reports for purchase + sale lots (currently only retail sales reports exist)
-- Dashboard integration (showing PO/SL stats)
-- Mobile-responsive refinement
-- Weighted average cost calculation option (currently FIFO only)
 - Auto-generate purchase from catalog low-stock alerts
 - Tax/nightly batch reports
+- PHPUnit test framework integration (currently bash/curl)
+- HTTPS setup
+- Rate limiting on auth endpoint
 
 ### 🔴 Known Issues
 - `item-conditions` is deprecated in favor of `weight_deduction` but old UI still references it
 - No validation for duplicate seller ID card
-- FIFO cost calculation recalculates on every confirm (no cost locking)
+- FIFO cost calculation recalculates on every confirm (no cost locking — mitigated by FOR UPDATE)
 
 ---
 
@@ -333,6 +358,7 @@ $this->routes[] = ['route' => 'resource/action', 'controller' => 'FooController'
 | `base-pos/assets/css/styles.css` | All CSS custom properties + component styles |
 | `base-pos/api/autoload.php` | PSR-4 autoloader for both base-pos and customizations |
 | `base-pos/api/Router.php` | Route registration + dispatch + auth |
+| `customizations/api/Services/ReportService.php` | Report engine — purchase-report, sale-lot-report, sale-lot-chart |
 
 ---
 

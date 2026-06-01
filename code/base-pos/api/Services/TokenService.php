@@ -97,6 +97,6 @@ class TokenService
             return false;
         }
 
-        return self::generate($decoded['user_id'], $decoded['username'], $decoded['role']);
+        return self::generate($decoded['user_id'], $decoded['username'], $decoded['role'], $decoded['branch_id'] ?? null);
     }
 }

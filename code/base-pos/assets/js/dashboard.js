@@ -4,6 +4,10 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('purchasePeriod').addEventListener('change', function() {
     fetchPurchaseChartData(this.value);
   });
+
+  document.getElementById('salelotPeriod').addEventListener('change', function() {
+    fetchSalelotChartData(this.value);
+  });
 });
 
 async function fetchDashboardData() {
@@ -13,10 +17,16 @@ async function fetchDashboardData() {
   }
 
   fetchPurchaseChartData('week');
+  fetchSalelotChartData('week');
 
   const purchaseResponse = await apiRequest('reports/recent-purchases');
   if (purchaseResponse.status === 'success') {
     renderRecentPurchases(purchaseResponse.data);
+  }
+
+  const salelotResponse = await apiRequest('reports/recent-sale-lots');
+  if (salelotResponse.status === 'success') {
+    renderRecentSaleLots(salelotResponse.data);
   }
 
   const stockResponse = await apiRequest('inventory/low-stock');
@@ -30,6 +40,10 @@ function updateDashboardStats(stats) {
   document.getElementById('todayPO').textContent = stats.today_po_count;
   document.getElementById('totalSellers').textContent = stats.total_sellers;
   document.getElementById('pendingPO').textContent = stats.pending_po;
+  document.getElementById('todaySaleLotAmount').textContent = formatCurrency(stats.today_salelot_amount);
+  document.getElementById('monthSaleLotProfit').textContent = formatCurrency(stats.month_salelot_profit);
+  document.getElementById('pendingSaleLots').textContent = stats.pending_salelots;
+  document.getElementById('lowStockCount').textContent = stats.low_stock_count;
 }
 
 async function fetchPurchaseChartData(period) {
@@ -149,6 +163,115 @@ function renderRecentPurchases(purchases) {
             <td><span class="badge ${badgeClass}">${statusText}</span></td>
         `;
 
+    tableBody.appendChild(row);
+  });
+}
+
+async function fetchSalelotChartData(period) {
+  const chartResponse = await apiRequest(`reports/sale-lot-chart?period=${period}`);
+  if (chartResponse.status === 'success') {
+    renderSalelotDashboardChart(chartResponse.data, period);
+  }
+}
+
+function renderSalelotDashboardChart(data, period) {
+  const chartContainer = document.getElementById('salelotDashboardChart');
+  const canvas = chartContainer.querySelector('canvas');
+  if (canvas) {
+    const chartInstance = Chart.getChart(canvas);
+    if (chartInstance) chartInstance.destroy();
+  }
+  const newCanvas = document.createElement('canvas');
+  chartContainer.innerHTML = '';
+  chartContainer.appendChild(newCanvas);
+
+  let labels = data.labels;
+  if (period === 'week') {
+    labels = data.labels.map(d => new Date(d).toLocaleDateString('th-TH', {weekday: 'short'}));
+  } else if (period === 'month') {
+    labels = data.labels.map(d => new Date(d).getDate());
+  } else if (period === 'year') {
+    labels = data.labels.map(d => new Date(d).toLocaleDateString('th-TH', {month: 'short'}));
+  }
+
+  new Chart(newCanvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'ยอดขาย',
+          data: data.amounts,
+          backgroundColor: 'rgba(52, 152, 219, 0.7)',
+          borderColor: '#3498db',
+          borderWidth: 2
+        },
+        {
+          label: 'กำไร',
+          data: data.profits,
+          backgroundColor: 'rgba(46, 204, 113, 0.7)',
+          borderColor: '#2ecc71',
+          borderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: v => formatCurrency(v) }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + formatCurrency(ctx.raw)
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderRecentSaleLots(lots) {
+  const tableBody = document.querySelector('#recentSaleLotsTable tbody');
+  tableBody.innerHTML = '';
+
+  if (lots.length === 0) {
+    const row = document.createElement('tr');
+    row.innerHTML = '<td colspan="7" class="text-center">ยังไม่มีรายการขาย Lot</td>';
+    tableBody.appendChild(row);
+    return;
+  }
+
+  lots.forEach(lot => {
+    const row = document.createElement('tr');
+    const date = new Date(lot.sale_date).toLocaleDateString('th-TH');
+
+    let badgeClass = 'badge-secondary';
+    let statusText = lot.status;
+    if (lot.status === 'confirmed') {
+      badgeClass = 'badge-success';
+      statusText = 'ยืนยันแล้ว';
+    } else if (lot.status === 'draft') {
+      badgeClass = 'badge-warning';
+      statusText = 'ร่าง';
+    } else if (lot.status === 'cancelled') {
+      badgeClass = 'badge-danger';
+      statusText = 'ยกเลิก';
+    }
+
+    row.innerHTML = `
+      <td>${lot.reference_no}</td>
+      <td>${date}</td>
+      <td>${lot.buyer_name || '-'}</td>
+      <td>${lot.branch_name || '-'}</td>
+      <td>${formatCurrency(lot.total_amount)}</td>
+      <td>${formatCurrency(lot.profit)}</td>
+      <td><span class="badge ${badgeClass}">${statusText}</span></td>
+    `;
     tableBody.appendChild(row);
   });
 }

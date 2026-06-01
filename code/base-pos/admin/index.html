@@ -21,21 +21,20 @@
       <ul class="sidebar-menu">
         <li><a href="index.html" class="active"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
         <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
-        <li><a href="sellers.html"><i class="icon-users"></i><span>ผู้ขาย</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
         <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
         <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
         <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
-        <li><a href="price-tiers.html"><i class="icon-tagss"></i><span>ตั้งค่าราคา</span></a></li>
       </ul>
     </aside>
 
     <main class="content-area">
       <div class="topbar">
-        <button class="toggle-sidebar"><i class="icon-bars"></i></button>
         <div class="user-dropdown">
           <button class="user-dropdown-toggle">
             <div class="user-avatar"><i class="icon-user"></i></div>
@@ -94,6 +93,45 @@
         </div>
       </div>
 
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="icon-stats"></i>
+          </div>
+          <div class="stat-details">
+            <div class="stat-title">ขาย Lot วันนี้</div>
+            <div class="stat-value" id="todaySaleLotAmount">฿0.00</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="icon-money"></i>
+          </div>
+          <div class="stat-details">
+            <div class="stat-title">กำไรเดือนนี้</div>
+            <div class="stat-value" id="monthSaleLotProfit">฿0.00</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="icon-product"></i>
+          </div>
+          <div class="stat-details">
+            <div class="stat-title">Lot รอตรวจสอบ</div>
+            <div class="stat-value" id="pendingSaleLots">0</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="icon-cart"></i>
+          </div>
+          <div class="stat-details">
+            <div class="stat-title">สินค้าใกล้หมด</div>
+            <div class="stat-value" id="lowStockCount">0</div>
+          </div>
+        </div>
+      </div>
+
       <div class="row">
         <div class="col">
           <div class="card">
@@ -138,6 +176,59 @@
                   </thead>
                   <tbody>
                     <!-- Purchase data will be populated here -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">ภาพรวมขาย Lot</h2>
+              <div class="card-tools">
+                <select id="salelotPeriod">
+                  <option value="week">7 วันที่ผ่านมา</option>
+                  <option value="month">เดือนนี้</option>
+                  <option value="year">ปีนี้</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="chart-container" id="salelotDashboardChart">
+                <!-- Chart will be rendered here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">รายการขาย Lot ล่าสุด</h2>
+              <a href="sale-lots.html" class="btn btn-sm btn-primary">ดูทั้งหมด</a>
+            </div>
+            <div class="card-body">
+              <div class="table-container">
+                <table class="data-table" id="recentSaleLotsTable">
+                  <thead>
+                    <tr>
+                      <th>เลขที่</th>
+                      <th>วันที่</th>
+                      <th>ผู้ซื้อ</th>
+                      <th>สาขา</th>
+                      <th>ยอดขาย</th>
+                      <th>กำไร</th>
+                      <th>สถานะ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Sale lot data will be populated here -->
                   </tbody>
                 </table>
               </div>

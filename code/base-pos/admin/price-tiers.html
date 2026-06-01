@@ -19,12 +19,13 @@
       <ul class="sidebar-menu">
         <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
         <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
-        <li><a href="sellers.html"><i class="icon-users"></i><span>ผู้ขาย</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
         <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
         <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
         <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
         <li><a href="price-tiers.html" class="active"><i class="icon-tagss"></i><span>ตั้งค่าราคา</span></a></li>
@@ -33,7 +34,6 @@
 
     <main class="content-area">
       <div class="topbar">
-        <button class="toggle-sidebar"><i class="icon-bars"></i></button>
         <div class="user-dropdown">
           <button class="user-dropdown-toggle">
             <div class="user-avatar"><i class="icon-user"></i></div>
@@ -66,8 +66,9 @@
       </div>
 
       <div class="card">
-        <div class="card-header">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
           <h2 class="card-title">ตั้งค่าราคา ระดับ</h2>
+          <button class="btn btn-primary" onclick="openAddModal()">+ เพิ่มรายการ</button>
         </div>
         <div class="card-body">
           <div id="accessDenied" style="display: none; text-align: center; padding: 2rem; color: #dc2626;">
@@ -98,6 +99,40 @@
   </div>
 
   <div id="notification-container"></div>
+
+  <!-- Add Item Modal -->
+  <div id="addModal" class="modal">
+    <div class="modal-content" style="max-width:480px">
+      <div class="modal-header">
+        <h3>เพิ่มรายการสินค้าใหม่</h3>
+        <button class="modal-close" onclick="closeAddModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>รหัสสินค้า *</label>
+          <input type="text" id="newCode" class="form-control" placeholder="เช่น P99">
+        </div>
+        <div class="form-group">
+          <label>ชื่อสินค้า *</label>
+          <input type="text" id="newName" class="form-control" placeholder="เช่น ทองแดง">
+        </div>
+        <div class="form-group">
+          <label>หมวดหมู่</label>
+          <select id="newCategory" class="form-control">
+            <option value="">-- ไม่ระบุ --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>หน่วย</label>
+          <input type="text" id="newUnit" class="form-control" value="กก.">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeAddModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="submitAddItem()">บันทึก</button>
+      </div>
+    </div>
+  </div>
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>

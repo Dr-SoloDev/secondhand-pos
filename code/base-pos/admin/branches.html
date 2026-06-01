@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>จัดการสาขา - ระบบขายหน้าร้าน</title>
+  <link rel="stylesheet" href="../assets/css/fonts.css">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <i class="icon-cart"></i>
+          <span>รับซื้อของเก่า</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
+        <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li><a href="branches.html" class="active"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+      </ul>
+    </aside>
+
+    <main class="content-area">
+      <div class="topbar">
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="currentUser"></span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-header">
+        <h1>จัดการสาขา</h1>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">รายการสาขาทั้งหมด</h2>
+        </div>
+        <div class="card-body">
+          <div class="table-container">
+            <table class="data-table" id="branchesTable">
+              <thead>
+                <tr>
+                  <th>รหัสสาขา</th>
+                  <th>ชื่อสาขา</th>
+                  <th>ที่อยู่</th>
+                  <th>เบอร์โทร</th>
+                  <th>ผู้จัดการ</th>
+                  <th>สถานะ</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="branchesTableBody">
+                <tr>
+                  <td colspan="7" class="text-center">กำลังโหลด...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Edit Branch -->
+  <div class="modal" id="branchModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">แก้ไขข้อมูลสาขา</h2>
+        <button class="close-modal" onclick="closeBranchModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="branchForm">
+          <input type="hidden" id="branchId">
+          <div class="form-group">
+            <label for="branchCode">รหัสสาขา</label>
+            <input type="text" id="branchCode" disabled style="background:#f5f5f5;cursor:not-allowed">
+            <small class="form-text">รหัสสาขาไม่สามารถแก้ไขได้</small>
+          </div>
+          <div class="form-group">
+            <label for="branchName">ชื่อสาขา <span class="required">*</span></label>
+            <input type="text" id="branchName" placeholder="เช่น สาขา 2 บ้านตะบัล" required>
+            <small class="form-text">ตั้งชื่อตามสะดวก เช่น "สาขา 1 ตลาดเมือง"</small>
+          </div>
+          <div class="form-group">
+            <label for="branchAddress">ที่อยู่</label>
+            <textarea id="branchAddress" rows="3" placeholder="ที่อยู่สาขา"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label for="branchPhone">เบอร์โทรศัพท์</label>
+              <input type="tel" id="branchPhone" placeholder="08X-XXX-XXXX">
+            </div>
+            <div class="form-col">
+              <label for="branchManager">ชื่อผู้จัดการ</label>
+              <input type="text" id="branchManager" placeholder="ชื่อผู้จัดการสาขา">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeBranchModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveBranch()">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notification-container"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/branches.js"></script>
+</body>
+</html>
