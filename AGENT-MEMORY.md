@@ -1,9 +1,8 @@
 # 🤖 Agent Memory — Secondhand POS Project
 **สำหรับ Claude session ถัดไปอ่านเพื่อทำงานต่อ**
 
-**Last updated:** 1 มิถุนายน 2569 (session: inventory shows catalog)
-**Project status:** ✅ Phases 1-3 complete + P0 hardening done — all 57 tests pass
-**Project status:** ✅ Phases 1-3 complete + P0 hardening done — all 58 tests pass — documentation finalized
+**Last updated:** 5 มิถุนายน 2569 (session: global categories + UX improvements)
+**Project status:** ✅ Phase 1-3 complete + hardening + global categories migration done
 
 ---
 
@@ -359,6 +358,75 @@ migrations/017→018_rename_tier_labels_to_bill.sql             (H4)
 3. **HTML/JS**: `escapeHtml()` added to inventory.js (was missing)
 
 **Files:** `purchase-orders.js`, `inventory.html`, `inventory.js`, `AGENTS.md`, `AGENT-MEMORY.md`
+
+---
+
+## 2026-06-05: Global Categories + UX Improvements
+
+**Context:** ลูกค้าเริ่มบันทึก catalog จริง 79 รายการ — พบว่า categories ซ้ำ 4 สาขา + validation ราคาเข้มงวดเกินไป + ต้องการจำสาขาที่เลือก
+
+### Changes
+
+**1. Database: Global Categories Migration**
+- **ปัญหา:** categories มี 59 รายการ (4 สาขา × ~15 หมวด) — ชื่อซ้ำกัน
+- **แก้:** Merge → 15 หมวดหมู่ global (ลบ branch_id column)
+- **Migration 024:** 
+  - สร้าง temp mapping: `old_id → canonical_id` (MIN(id) per name)
+  - UPDATE FK references ใน `sale_lot_items` (196 rows)
+  - DELETE duplicates (เก็บ canonical_id)
+  - DROP branch_id + ADD UNIQUE constraint on name
+- **Learning:** ต้อง DROP FK constraint ก่อน DROP column
+
+**2. default_unit per Category**
+- เพิ่ม column `default_unit VARCHAR(20) DEFAULT 'กก.'`
+- "ขวดใส่ลัง" → `default_unit = 'ลัง'`
+- Frontend: auto-fill หน่วยตอนเลือกหมวดหมู่ (ใช้ `data-unit` attribute)
+- **Migration 025**
+
+**3. localStorage + Branch Banner**
+- บันทึกสาขาที่เลือกลง `localStorage.setItem('selected_branch_id', value)`
+- โหลดกลับมาตอน init
+- แสดง banner: **"🏪 กำลังรับซื้อที่สาขา: XXX"** (สีเหลือง, เด่น)
+- **ป้องกัน:** พนักงานลืมเช็คสาขา → บันทึกผิด
+
+**4. Relax Price Validation**
+- **ปัญหา:** บังคับ บิล1 **<** บิล2 **<** บิล3 (strictly increasing) แต่บางสินค้าต้องใส่เท่ากัน
+- **แก้:** บิล1 **≤** บิล2 **≤** บิล3 (equal allowed, ห้ามกลับด้าน)
+- แก้ทั้ง backend (InventoryController.php) และ frontend (inventory.js)
+
+**5. UI Improvements**
+- ย้ายปุ่ม "เพิ่มรายการ" + "หมวดหมู่" → card-header ของ "รายการแคตตาล็อก"
+- Categories dropdown: แสดง 15 หมวดหมื่อ (ไม่ filter branch)
+- ลบ event listener ที่ reload categories ตอนเปลี่ยนสาขา
+
+**6. Data Reset**
+- TRUNCATE `purchase_item_catalog` (99 → 0 รายการ)
+- เตรียมให้ลูกค้าบันทึกข้อมูลจริง 79 รายการ
+
+### Files Modified
+```
+code/base-pos/admin/inventory.html                 (UI buttons)
+code/base-pos/admin/purchase-orders.html           (branch banner)
+code/base-pos/api/Controllers/InventoryController.php  (validation)
+code/base-pos/assets/js/inventory.js               (validation)
+code/base-pos/assets/js/purchase-orders.js         (localStorage + categories)
+code/customizations/migrations/024_merge_duplicate_categories.sql
+code/customizations/migrations/025_add_default_unit_to_categories.sql
+.learnings/LEARNINGS.md                            (5 new entries)
+```
+
+### Key Learnings
+- DROP FK constraint ก่อน DROP column (MySQL requirement)
+- localStorage + banner = persist + remind (UX pattern)
+- Validation: < vs ≤ สำคัญมาก — ถาม user ก่อนเดา
+- Global shared data ต้อง merge duplicates + remap FKs อย่างระมัดระวัง
+
+### Status
+- ✅ 15 global categories
+- ✅ localStorage จำสาขา
+- ✅ default_unit auto-fill
+- ✅ Validation ผ่อนปรน
+- ⏳ รอลูกค้าบันทึก catalog (12/79 รายการ)
 
 ---
 
