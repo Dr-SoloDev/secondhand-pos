@@ -176,6 +176,7 @@ class Router
         $this->routes[] = ['route' => 'purchase-catalog/item', 'controller' => 'PurchaseItemCatalogController', 'method' => 'getItem', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-catalog/item', 'controller' => 'PurchaseItemCatalogController', 'method' => 'updateItem', 'verb' => 'PUT'];
         $this->routes[] = ['route' => 'purchase-catalog/item', 'controller' => 'PurchaseItemCatalogController', 'method' => 'deleteItem', 'verb' => 'DELETE'];
+        $this->routes[] = ['route' => 'purchase-catalog/update-category', 'controller' => 'PurchaseItemCatalogController', 'method' => 'updateCategory', 'verb' => 'POST'];
 
         // Sale Lots routes
         $this->routes[] = ['route' => 'sale-lots', 'controller' => 'SaleLotsController', 'method' => 'index', 'verb' => 'GET'];

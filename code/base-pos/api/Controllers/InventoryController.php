@@ -36,13 +36,13 @@ class InventoryController extends Controller
             }
         }
 
-        // Validate: บิล1 < บิล2 < บิล3
+        // Validate: บิล1 ≤ บิล2 ≤ บิล3 (เท่ากันได้ แต่ห้ามกลับด้าน)
         if (isset($data['price_tier1']) && isset($data['price_tier2']) && isset($data['price_tier3'])) {
             $t1 = (float)$data['price_tier1'];
             $t2 = (float)$data['price_tier2'];
             $t3 = (float)$data['price_tier3'];
-            if ($t1 >= $t2 || $t2 >= $t3) {
-                Response::error('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 < บิล 2 < บิล 3', 400);
+            if ($t1 > $t2 || $t2 > $t3) {
+                Response::error('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 ≤ บิล 2 ≤ บิล 3', 400);
             }
         }
 
@@ -260,13 +260,13 @@ class InventoryController extends Controller
         // Sanitize input
         $data = $this->sanitizeInput($data);
 
-        // Validate: บิล1 < บิล2 < บิล3
+        // Validate: บิล1 ≤ บิล2 ≤ บิล3 (เท่ากันได้ แต่ห้ามกลับด้าน)
         if (isset($data['price_tier1']) && isset($data['price_tier2']) && isset($data['price_tier3'])) {
             $t1 = (float)$data['price_tier1'];
             $t2 = (float)$data['price_tier2'];
             $t3 = (float)$data['price_tier3'];
-            if ($t1 >= $t2 || $t2 >= $t3) {
-                Response::error('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 < บิล 2 < บิล 3', 400);
+            if ($t1 > $t2 || $t2 > $t3) {
+                Response::error('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 ≤ บิล 2 ≤ บิล 3', 400);
             }
         }
 

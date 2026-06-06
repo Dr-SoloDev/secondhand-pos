@@ -102,4 +102,29 @@ class PurchaseItemCatalogController extends Controller
             Response::error('ไม่สามารถลบรายการได้', 400);
         }
     }
+
+    /**
+     * POST /api/purchase-catalog/update-category
+     * บันทึก category_id ลง catalog เพื่อให้ครั้งต่อไป auto-select ได้
+     */
+    public function updateCategory()
+    {
+        $this->requireAuth(['admin', 'manager']);
+        $data = json_decode(file_get_contents('php://input'), true);
+        $catalogId = $data['catalog_id'] ?? null;
+        $categoryId = $data['category_id'] ?? null;
+
+        if (!$catalogId || !$categoryId) {
+            Response::error('กรุณาระบุ catalog_id และ category_id', 400);
+        }
+
+        $model = new PurchaseItemCatalog();
+        try {
+            $model->updateCategory($catalogId, $categoryId);
+            Response::success('บันทึกหมวดหมู่สำเร็จ');
+        } catch (Exception $e) {
+            error_log('Update category failed: ' . $e->getMessage());
+            Response::error('ไม่สามารถบันทึกหมวดหมู่ได้', 400);
+        }
+    }
 }

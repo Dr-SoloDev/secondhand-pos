@@ -19,6 +19,11 @@ async function fetchDashboardData() {
   fetchPurchaseChartData('week');
   fetchSalelotChartData('week');
 
+  const branchResponse = await apiRequest('branches/summary');
+  if (branchResponse.status === 'success') {
+    renderBranchSummary(branchResponse.data);
+  }
+
   const purchaseResponse = await apiRequest('reports/recent-purchases');
   if (purchaseResponse.status === 'success') {
     renderRecentPurchases(purchaseResponse.data);
@@ -312,4 +317,45 @@ function renderLowStockItems(items) {
 
     tableBody.appendChild(row);
   });
+}
+function renderBranchSummary(branches) {
+  const grid = document.getElementById('branchSummaryGrid');
+  if (!branches || branches.length === 0) {
+    grid.innerHTML = '<p style="color:var(--color-gray-500)">ยังไม่มีข้อมูลสาขา</p>';
+    return;
+  }
+  grid.innerHTML = branches.map(b => {
+    const pendingTotal = parseInt(b.pending_po_count || 0) + parseInt(b.pending_salelot_count || 0);
+    const pendingHtml = pendingTotal > 0
+      ? `<span class="branch-pending-badge">รอดำเนินการ ${pendingTotal}</span>` : '';
+    return `
+    <div class="branch-card">
+      <div class="branch-card-header">
+        <span class="branch-card-name">${escapeHtml(b.name)}</span>
+        <span class="branch-card-code">${escapeHtml(b.code)}</span>
+      </div>
+      <div class="branch-card-stats">
+        <div class="branch-stat">
+          <div class="branch-stat-value">${formatCurrency(b.today_purchase_amount)}</div>
+          <div class="branch-stat-label">รับซื้อวันนี้</div>
+        </div>
+        <div class="branch-stat">
+          <div class="branch-stat-value">${parseInt(b.today_purchase_count)}</div>
+          <div class="branch-stat-label">ใบรับซื้อวันนี้</div>
+        </div>
+        <div class="branch-stat">
+          <div class="branch-stat-value">${formatCurrency(b.month_purchase_amount)}</div>
+          <div class="branch-stat-label">รับซื้อเดือนนี้</div>
+        </div>
+        <div class="branch-stat">
+          <div class="branch-stat-value">${parseFloat(b.total_stock_kg || 0).toLocaleString('th-TH', {maximumFractionDigits:1})} กก.</div>
+          <div class="branch-stat-label">สต็อกรวม</div>
+        </div>
+      </div>
+      <div class="branch-card-meta">
+        ${b.manager_name ? `<span>👤 ${escapeHtml(b.manager_name)}</span>` : ''}
+        ${pendingHtml}
+      </div>
+    </div>`;
+  }).join('');
 }

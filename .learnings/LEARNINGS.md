@@ -382,6 +382,208 @@ Base POS admin pages มี sidebar HTML แบบที่แตกต่าง
 
 ---
 
+## 2026-06-01 — Tier Buttons Always Visible, Select Tier First
+
+**Category:** contribution
+**Pattern-Key:** tier-buttons-visible-first
+
+**Learning:**
+User workflow จริงสำหรับร้านรับซื้อของเก่า: แคชเชียร์อยากเลือกระดับราคา (บิล) **ก่อน** เพิ่มรายการสินค้า — เพื่อให้ทุกรายการได้ราคาตาม Level นั้นอัตโนมัติ ไม่ต้องเลือกทีละตัว
+
+**ฟัง user ก่อน fix:**
+- User report แรกว่า "ปุ่มกดไม่ได้" → fix โดยให้ปุ่มโชว์ราคาจริงจาก catalog
+- แต่ user บอกต่อว่า workflow จริงของเค้าคือ เลือก Level ก่อน แล้วค่อยเพิ่มของ → ต้องโชว์ปุ่มตั้งแต่แรก ไม่ต้องรอเลือกสินค้า
+
+**Pattern ที่ถูก:**
+1. ปุ่มระดับราคา (บิล1/2/3) ต้อง visible เสมอตั้งแต่โหลดหน้า — ไม่ hide หลัง catalog selection
+2. Default labels = "บิล1", "บิล2", "บิล3" (หรือจาก label ที่เซ็ตใน catalog)
+3. เมื่อเลือก catalog item ที่มี tier_prices → ปุ่มอัปเดท label + ราคาจริง
+4. Level ที่เลือกไว้ยัง active อยู่ ข้าม item ได้
+5. `buildGlobalTierButtons()` รับ tierPrices param → fallback to generic ถ้าไม่มี
+
+**How to apply:**
+- UI component ที่เป็น "global setting" สำหรับทั้งฟอร์ม — ต้อง visible ตั้งแต่เริ่ม กรณีนี้ user อยาก select tier ก่อน add items
+- ฟัง user workflow จริงไปทีละรอบ — อย่าเดาว่า "fix นี้ครอบคลุมแล้ว"
+- แก้ 4 จุดเชื่อมโยงใน purchase-orders.js: buildGlobalTierButtons, selectCatalogItem, addItemToCart, clearAll, itemName input handler
+
+---
+
+## 2026-06-05 — DROP FK constraint ก่อน DROP column
+
+**Category:** database_migrations
+**Pattern-Key:** drop-fk-before-drop-column
+
+**Learning:**
+ตอน migrate categories เพื่อลบ branch_id column → Error: "Cannot drop column 'branch_id': needed in a foreign key constraint"
+
+**Root cause:**
+MySQL ไม่อนุญาตให้ DROP column ที่มี FK constraint อยู่ — ต้อง DROP constraint ก่อน
+
+**Fix:**
+```sql
+-- ❌ Wrong
+ALTER TABLE categories DROP COLUMN branch_id;
+
+-- ✅ Right
+ALTER TABLE categories DROP FOREIGN KEY fk_categories_branch;
+ALTER TABLE categories DROP COLUMN branch_id;
+```
+
+**How to apply:**
+- เช็ค FK constraints ก่อน DROP column: `SHOW CREATE TABLE categories;`
+- ลำดับ: DROP FK → DROP column → ADD new constraints (ถ้ามี)
+- ใช้ `SHOW CREATE TABLE` เพื่อเห็น constraint names ที่ถูกต้อง
+
+---
+
+## 2026-06-05 — Global categories = merge duplicates + remap FKs
+
+**Category:** data_migration
+**Pattern-Key:** merge-duplicates-remap-foreign-keys
+
+**Learning:**
+โปรเจกต์นี้มี categories แยกตาม branch_id (59 รายการ = 4 สาขา × ~15 หมวด) แต่จริงๆ ชื่อหมวดหมู่เหมือนกันทุกสาขา → ควรเป็น global shared categories
+
+**Migration strategy:**
+1. สร้าง temp mapping table: `old_id → canonical_id` (MIN(id) per name)
+2. UPDATE FK references ใน child tables (sale_lot_items, purchase_order_items)
+3. DELETE duplicates (เก็บแค่ MIN(id) per name)
+4. DROP branch_id column + ADD UNIQUE constraint on name
+
+**Key insight:**
+ต้อง remap FK references **ก่อน** ลบ duplicates — ไม่งั้น orphaned records
+
+**How to apply:**
+- เช็คว่ามี child tables ไหน reference categories: `SHOW CREATE TABLE sale_lot_items;`
+- ใช้ temp table สำหรับ mapping แทนการ hardcode IDs
+- Test ว่า remap สำเร็จ: `SELECT COUNT(DISTINCT category_id) FROM sale_lot_items;`
+
+---
+
+## 2026-06-05 — localStorage + banner = persist + remind
+
+**Category:** ux_improvement
+**Pattern-Key:** localstorage-branch-selection-banner
+
+**Learning:**
+พนักงานมักลืมเช็คว่ากำลังรับซื้อที่สาขาไหน → บันทึกผิดสาขา
+
+**Solution:**
+1. **localStorage** — บันทึกสาขาที่เลือก: `localStorage.setItem('selected_branch_id', value)`
+2. **Banner** — แสดงชัดเจน: "🏪 กำลังรับซื้อที่สาขา: XXX" (สีเหลือง, เด่น)
+3. **Auto-restore** — โหลดสาขากลับมาตอน init
+
+**Implementation:**
+```javascript
+// Save on change
+branchSelect.addEventListener('change', (e) => {
+  localStorage.setItem('selected_branch_id', e.target.value);
+  updateBranchBanner();
+});
+
+// Restore on load
+const savedBranchId = localStorage.getItem('selected_branch_id');
+if (savedBranchId) branchSelect.value = savedBranchId;
+```
+
+**How to apply:**
+- การเลือกที่สำคัญ (สาขา, warehouse, payment method) → persist ด้วย localStorage
+- แสดง banner/indicator ชัดเจน — อย่าให้ user ต้องมองหา dropdown
+- ข้าม browser/device → ต้องเลือกใหม่ (ปลอดภัยกว่า)
+
+---
+
+## 2026-06-05 — Validation: < vs ≤ ใน business rules
+
+**Category:** business_logic
+**Pattern-Key:** strict-vs-relaxed-validation
+
+**Learning:**
+ระบบบังคับ price tiers: บิล1 **<** บิล2 **<** บิล3 (strictly increasing) แต่ user ต้องการใส่ราคา**เท่ากันได้** (เช่น บิล1=6, บิล2=6, บิล3=7) เพราะราคากลางผันแปรบ่อย
+
+**Fix:**
+แก้จาก `>=` เป็น `>`:
+```php
+// ❌ Old: strictly increasing
+if ($t1 >= $t2 || $t2 >= $t3) {
+  Response::error('บิล 1 < บิล 2 < บิล 3', 400);
+}
+
+// ✅ New: non-decreasing (equal allowed)
+if ($t1 > $t2 || $t2 > $t3) {
+  Response::error('บิล 1 ≤ บิล 2 ≤ บิล 3', 400);
+}
+```
+
+**ต้องแก้ 2 จุด:**
+1. Backend: `InventoryController.php` (createProduct, updateProduct)
+2. Frontend: `inventory.js` (form validation)
+
+**How to apply:**
+- ถาม user ว่า business rule เข้มงวดแค่ไหน — "ต้องเรียงเสมอ" อาจหมายถึง "ห้ามกลับด้าน" ไม่ใช่ "ห้ามเท่ากัน"
+- อย่าเดาเอง — ถ้า user บอกว่า "บางทีต้องใส่เท่ากัน" → relax validation
+- แก้ทั้ง backend และ frontend ให้ตรงกัน
+
+---
+
+## 2026-06-05 — default_unit per category (multi-unit inventory)
+
+**Category:** feature
+**Pattern-Key:** category-default-unit-autofill
+
+**Learning:**
+บางหมวดหมู่ใช้หน่วยต่างกัน: "เหล็ก" → กก., "ขวดใส่ลัง" → ลัง, "โทรศัพท์เก่า" → ชิ้น
+
+**Implementation:**
+1. เพิ่ม column `default_unit VARCHAR(20) DEFAULT 'กก.'` ใน categories
+2. API ส่ง `default_unit` มาพร้อม categories (ใช้ `SELECT *` อยู่แล้ว)
+3. Frontend: เพิ่ม `data-unit` ใน `<option>`, auto-fill ตอนเลือกหมวดหมู่
+
+```javascript
+// Store unit in option
+<option value="${cat.id}" data-unit="${cat.default_unit}">${cat.name}</option>
+
+// Auto-fill on select
+const selectedOption = categorySelect.selectedOptions[0];
+const defaultUnit = selectedOption?.dataset.unit || 'ชิ้น';
+unitInput.value = defaultUnit;
+```
+
+**How to apply:**
+- ถ้าระบบมีหลายหน่วย → เก็บ default_unit per category
+- User ยังแก้ได้ถ้าต้องการ (dropdown หน่วยยังเปิดอยู่)
+- เทียบกับ allowed_units (JSON array) — default_unit ง่ายกว่าถ้า 1 หมวด = 1 หน่วยหลัก
+
+---
+
+## 2026-06-01 — categories.stock_kg มีอยู่แล้ว แต่ UI ไม่แสดง
+
+**Category:** correction
+**Pattern-Key:** api-returns-data-frontend-not-rendering
+
+**Learning:**
+PO system อัปเดท `categories.stock_kg` ทุกครั้งที่มีการซื้อเข้า (ใน `PurchaseOrder::createWithItems()`) และ SaleLot confirm ก็หัก stock_kg ด้วย — แต่หน้า inventory (`inventory.html`) โชว์แค่ `products` table ไม่มี card สำหรับ category stock
+
+**Root cause:**
+- `InventoryController::getCategories()` ใช้ `Category::findAll()` → `SELECT * FROM categories` → `stock_kg` อยู่ใน response อยู่แล้ว ✅
+- แต่ `inventory.js` เรียกแค่ `renderCategoryDropdowns()` ไม่ได้ render stock_kg
+- user เห็นแต่ product quantity (INT) ซึ่งไม่เคย update จาก PO
+
+**Fix:**
+- เพิ่ม `renderCategoryStock()` ใน inventory.js — อ่าน `c.stock_kg` (DECIMAL) จาก categories API
+- สร้าง card "สต็อกตามหมวด (กก.)" ใน inventory.html — grid layout + กราฟบาร์
+- `categories` API ไม่ต้องแก้ — data มีอยู่แล้ว
+
+**Key insight:**
+ถ้า API return field อยู่แล้ว แต่ frontend ไม่ show — user คิดว่าระบบไม่ทำงาน ต้อง trace data flow ครบวงจร: DB → Model → Controller → API response → JS fetch → DOM render
+
+**How to apply:**
+- อย่าด่วนสรุปว่า "แบ็คเอนด์ไม่ update" — check API response ก่อน (curl + jq)
+- หน้า inventory ในระบบนี้แยกเป็น 2 ระบบ: products (retail) vs categories (scrap kg) — ทำให้ user งงว่าทำไมซื้อของแล้วสต็อกไม่ขึ้น
+- ถ้ามี 2 stock system ควร show ทั้งคู่ในหน้าเดียวกัน
+
+---
+
 ## 2026-05-27 — 401 ≠ 404 — Confirming API Route Works
 
 **Category:** knowledge_gap

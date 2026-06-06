@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('productSearch').addEventListener('input', filterCatalogItems);
   document.getElementById('categoryFilter').addEventListener('change', filterCatalogItems);
   document.getElementById('stockFilter').addEventListener('change', filterCatalogItems);
+  document.getElementById('branchFilterStock').addEventListener('change', renderCategoryStock);
   document.getElementById('addProductBtn').addEventListener('click', showAddCatalogModal);
   document.getElementById('manageCategories').addEventListener('click', showCategoryModal);
   document.getElementById('saveProduct').addEventListener('click', saveCatalogItem);
@@ -20,25 +21,59 @@ document.addEventListener('DOMContentLoaded', function() {
 
 let catalogItems = [];
 let categories = [];
+let branches = [];
 
 async function initInventory() {
   try {
+    console.log('initInventory: loading branches...');
+    const branchRes = await apiRequest('branches');
+    if (branchRes.status === 'success') {
+      branches = branchRes.data;
+      console.log('Branches loaded:', branches.length);
+      renderBranchDropdown();
+    }
+
+    console.log('initInventory: loading categories...');
     const catRes = await apiRequest('inventory/categories');
     if (catRes.status === 'success') {
       categories = catRes.data;
+      console.log('Categories loaded:', categories.length);
       renderCategoryDropdowns();
       renderCategoryStock();
     }
 
+    console.log('initInventory: loading catalog...');
     const catalogRes = await apiRequest('purchase-catalog?include_inactive=true');
     if (catalogRes.status === 'success') {
       catalogItems = catalogRes.data;
+      console.log('Catalog items loaded:', catalogItems.length);
       renderCatalogItems(catalogItems);
     }
   } catch (error) {
     console.error('Failed to initialize inventory:', error);
     showNotification('Error loading inventory data', 'error');
   }
+}
+
+function renderBranchDropdown() {
+  const select = document.getElementById('branchFilterStock');
+  if (!select) {
+    console.error('branchFilterStock select not found');
+    return;
+  }
+  // ลบตัวเลือกเก่าออก (เว้น "รวมทุกสาขา")
+  while (select.options.length > 1) {
+    select.remove(1);
+  }
+  // เพิ่มสาขา active
+  const activeBranches = branches.filter(b => b.status === 'active');
+  console.log('Active branches:', activeBranches.length);
+  activeBranches.forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b.id;
+    opt.textContent = `${b.code} - ${b.name}`;
+    select.appendChild(opt);
+  });
 }
 
 function renderCategoryDropdowns() {
@@ -66,13 +101,33 @@ function renderCategoryDropdowns() {
 function renderCategoryStock() {
   const container = document.getElementById('categoryStockGrid');
   if (!container) return;
-  const active = categories.filter(c => c.status === 'active');
-  if (active.length === 0) {
+
+  const branchFilter = document.getElementById('branchFilterStock').value;
+  let filtered = categories.filter(c => c.status === 'active');
+
+  if (branchFilter === 'all') {
+    // รวมทุกสาขา — group by category name แล้ว sum stock_kg
+    const grouped = {};
+    filtered.forEach(c => {
+      if (!grouped[c.name]) grouped[c.name] = 0;
+      grouped[c.name] += parseFloat(c.stock_kg || 0);
+    });
+    filtered = Object.keys(grouped).map(name => ({
+      name: name,
+      stock_kg: grouped[name]
+    }));
+  } else {
+    // filter เฉพาะสาขา
+    filtered = filtered.filter(c => c.branch_id == branchFilter);
+  }
+
+  if (filtered.length === 0) {
     container.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:12px">ไม่มีหมวดหมู่</div>';
     return;
   }
-  const maxStock = Math.max(...active.map(c => parseFloat(c.stock_kg || 0)), 1);
-  container.innerHTML = active.map(c => {
+
+  const maxStock = Math.max(...filtered.map(c => parseFloat(c.stock_kg || 0)), 1);
+  container.innerHTML = filtered.map(c => {
     const kg = parseFloat(c.stock_kg || 0);
     const pct = Math.min(100, (kg / maxStock) * 100);
     let barColor = '#22c55e';
@@ -219,8 +274,9 @@ async function saveCatalogItem() {
       { label: 'บิล 3', price: parseFloat(document.getElementById('priceTier3').value) || 0 },
     ];
 
-    if (tiers[0].price >= tiers[1].price || tiers[1].price >= tiers[2].price) {
-      showNotification('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 < บิล 2 < บิล 3', 'error');
+    // เท่ากันได้ แต่ห้ามกลับด้าน
+    if (tiers[0].price > tiers[1].price || tiers[1].price > tiers[2].price) {
+      showNotification('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 ≤ บิล 2 ≤ บิล 3', 'error');
       return;
     }
 

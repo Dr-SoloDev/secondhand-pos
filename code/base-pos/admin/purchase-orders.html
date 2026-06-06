@@ -64,6 +64,9 @@
                 <select id="branchSelect" class="form-control"></select>
               </div>
 
+              <!-- Branch Banner -->
+              <div id="branchBanner" style="display:none; background-color:#fff3cd; border:1px solid #ffc107; padding:12px; margin-bottom:16px; border-radius:4px; font-weight:bold; color:#856404;"></div>
+
               <div class="form-group">
                 <label>ค้นหาผู้ขาย (ชื่อ / เลขบัตร / เบอร์โทร)</label>
                 <div class="seller-search-box">
@@ -112,10 +115,10 @@
               </div>
 
               <div class="form-group">
-                <label>หมวดหมู่</label>
-                <div id="itemCategoryDisplay" style="padding:8px 0;font-size:13px;color:#999">
-                  — รอเลือกสินค้าจากแคตตาล็อก —
-                </div>
+                <label for="itemCategorySelect">หมวดหมู่</label>
+                <select id="itemCategorySelect" class="form-control">
+                  <option value="">— เลือกหมวดหมู่ —</option>
+                </select>
               </div>
 
               <div class="form-row">
@@ -283,6 +286,6 @@
   <div id="notification-container"></div>
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
-  <script src="../assets/js/purchase-orders.js"></script>
+  <script src="../assets/js/purchase-orders.js?v=20260607"></script>
 </body>
 </html>

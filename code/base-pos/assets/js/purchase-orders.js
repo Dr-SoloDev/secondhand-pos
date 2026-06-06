@@ -1,4 +1,5 @@
 let branches = [];
+let categories = [];
 let cart = [];
 let selectedSeller = null;
 let recentPOs = [];
@@ -7,10 +8,12 @@ let currentCatalogItem = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadBranches();
+  await loadCategories();
   await loadRecentPOs();
   buildGlobalTierButtons();
 
   document.getElementById('searchSellerInput').addEventListener('input', debounce(searchSellers, 300));
+  // ลบ loadCategories เพราะ categories เป็น global แล้ว (ไม่ต้อง reload ตอนเปลี่ยนสาขา)
   document.getElementById('createNewSellerBtn').addEventListener('click', () => openNewSellerModal());
   document.getElementById('saveNewSellerBtn').addEventListener('click', saveNewSeller);
   document.getElementById('addItemBtn').addEventListener('click', addItemToCart);
@@ -24,11 +27,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('itemUnitPrice').addEventListener('input', updateItemTotal);
   document.getElementById('itemQuantity').addEventListener('input', updateItemTotal);
   document.getElementById('itemWeightDeduct').addEventListener('input', updateItemTotal);
+  document.getElementById('itemCategorySelect').addEventListener('change', saveCategoryToCatalog);
   document.getElementById('itemName').addEventListener('input', debounce(searchCatalog, 250));
   document.getElementById('itemName').addEventListener('input', () => {
     document.getElementById('itemCatalogId').value = '';
     document.getElementById('itemCategoryId').value = '';
-    document.getElementById('itemCategoryDisplay').textContent = '\u2014 \u0e23\u0e2d\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e08\u0e32\u0e01\u0e41\u0e04\u0e15\u0e15\u0e32\u0e25\u0e47\u0e2d\u0e01 \u2014';
+    document.getElementById('itemCategorySelect').value = '';
   document.getElementById('itemUnit').value = 'ชิ้น';
   document.getElementById('itemTotalPreview').textContent = '\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e08\u0e32\u0e01\u0e41\u0e04\u0e15\u0e15\u0e32\u0e25\u0e47\u0e2d\u0e01';
   document.getElementById('itemTotalPreview').style.color = '#999';
@@ -61,6 +65,81 @@ async function loadBranches() {
     sel.innerHTML = branches.map(b =>
       `<option value="${b.id}">${escapeHtml(b.name)}</option>`
     ).join('');
+
+    // อ่านสาขาที่เลือกไว้จาก localStorage
+    const savedBranchId = localStorage.getItem('selected_branch_id');
+    if (savedBranchId && branches.find(b => b.id == savedBranchId)) {
+      sel.value = savedBranchId;
+    }
+
+    // บันทึกสาขาที่เลือกลง localStorage เมื่อเปลี่ยน
+    sel.addEventListener('change', (e) => {
+      localStorage.setItem('selected_branch_id', e.target.value);
+      updateBranchBanner();
+    });
+
+    // แสดง banner สาขาปัจจุบัน
+    updateBranchBanner();
+  }
+}
+
+function updateBranchBanner() {
+  const branchId = document.getElementById('branchSelect').value;
+  const branch = branches.find(b => b.id == branchId);
+  const banner = document.getElementById('branchBanner');
+
+  if (branch && banner) {
+    banner.textContent = `🏪 กำลังรับซื้อที่สาขา: ${branch.name}`;
+    banner.style.display = 'block';
+  }
+}
+
+async function loadCategories() {
+  const res = await apiRequest('inventory/categories');
+  if (res.status === 'success') {
+    categories = res.data;
+    const sel = document.getElementById('itemCategorySelect');
+
+    // Global categories — ไม่ filter branch
+    const activeCategories = categories.filter(c => c.status === 'active');
+
+    sel.innerHTML = '<option value="">— เลือกหมวดหมู่ —</option>' +
+      activeCategories.sort((a, b) => a.name.localeCompare(b.name, 'th')).map(cat => {
+        const unit = cat.default_unit || 'ชิ้น';
+        return `<option value="${cat.id}" data-name="${escapeHtml(cat.name)}" data-unit="${escapeHtml(unit)}">${escapeHtml(cat.name)}</option>`;
+      }).join('');
+  }
+}
+
+async function saveCategoryToCatalog() {
+  const catalogId = document.getElementById('itemCatalogId').value;
+  const categoryId = document.getElementById('itemCategorySelect').value;
+
+  // ถ้ายังไม่ได้เลือก catalog item หรือ category → skip
+  if (!catalogId || !categoryId) return;
+
+  // Auto-fill unit ตาม default_unit ของหมวดหมู่ที่เลือก
+  const selectedOption = document.getElementById('itemCategorySelect').selectedOptions[0];
+  const defaultUnit = selectedOption?.dataset.unit || 'ชิ้น';
+  document.getElementById('itemUnit').value = defaultUnit;
+
+  console.log('Saving category', categoryId, 'to catalog item', catalogId);
+
+  try {
+    const res = await apiRequest(`purchase-catalog/update-category`, 'POST', {
+      catalog_id: catalogId,
+      category_id: categoryId
+    });
+
+    if (res.status === 'success') {
+      // Update hidden field
+      document.getElementById('itemCategoryId').value = categoryId;
+      console.log('✓ Category saved to catalog');
+    } else {
+      console.error('Failed to save category:', res.message);
+    }
+  } catch (error) {
+    console.error('Error saving category:', error);
   }
 }
 
@@ -142,13 +221,26 @@ function selectCatalogItem(d) {
   document.getElementById('itemCatalogResults').style.display = 'none';
 
   // Set category display
-  document.getElementById('itemCategoryId').value = d.cat || '';
   const catName = d.catname || '';
-  const catEl = document.getElementById('itemCategoryDisplay');
+  const catEl = document.getElementById('itemCategorySelect');
+
   if (catName) {
-    catEl.innerHTML = `<span style="color:#2575fc;font-weight:500">${escapeHtml(catName)}</span>`;
+    // หา option ที่มี data-name ตรงกับ catName
+    const option = Array.from(catEl.options).find(opt => opt.dataset.name === catName);
+    if (option) {
+      catEl.value = option.value;
+      document.getElementById('itemCategoryId').value = option.value;
+      console.log('✓ Auto-selected category:', catName, '→ id:', option.value);
+    } else {
+      console.warn('Category name not found in dropdown:', catName);
+      catEl.value = '';
+      document.getElementById('itemCategoryId').value = '';
+    }
   } else {
-    catEl.textContent = '\u2014 \u0e44\u0e21\u0e48\u0e23\u0e30\u0e1a\u0e38\u0e2b\u0e21\u0e27\u0e14\u0e2b\u0e21\u0e39\u0e48 \u2014';
+    // ไม่มี category_name ใน catalog → ปล่อยว่างให้ user เลือกเอง
+    console.log('No category in catalog, user must select manually');
+    catEl.value = '';
+    document.getElementById('itemCategoryId').value = '';
   }
 
   // Set unit
@@ -296,7 +388,7 @@ function addItemToCart() {
   document.getElementById('itemCatalogId').value = '';
   document.getElementById('itemCatalogResults').innerHTML = '';
   document.getElementById('itemCategoryId').value = '';
-  document.getElementById('itemCategoryDisplay').textContent = '\u2014 \u0e23\u0e2d\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e08\u0e32\u0e01\u0e41\u0e04\u0e15\u0e15\u0e32\u0e25\u0e47\u0e2d\u0e01 \u2014';
+  document.getElementById('itemCategorySelect').value = '';
   document.getElementById('itemUnitPrice').value = '0';
   document.getElementById('itemQuantity').value = '1';
   document.getElementById('itemWeightDeduct').value = '0';
@@ -398,7 +490,7 @@ function clearAll() {
   document.getElementById('itemCatalogId').value = '';
   document.getElementById('itemCatalogResults').innerHTML = '';
   document.getElementById('itemCategoryId').value = '';
-  document.getElementById('itemCategoryDisplay').textContent = '\u2014 \u0e23\u0e2d\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e08\u0e32\u0e01\u0e41\u0e04\u0e15\u0e15\u0e32\u0e25\u0e47\u0e2d\u0e01 \u2014';
+  document.getElementById('itemCategorySelect').value = '';
   document.getElementById('itemUnitPrice').value = '0';
   document.getElementById('itemQuantity').value = '1';
   document.getElementById('itemWeightDeduct').value = '0';

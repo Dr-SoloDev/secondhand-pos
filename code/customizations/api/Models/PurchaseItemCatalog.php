@@ -141,4 +141,18 @@ class PurchaseItemCatalog extends Model
         }
         return $clean;
     }
+
+    /**
+     * อัปเดต category_id ของ catalog item
+     */
+    public function updateCategory($catalogId, $categoryId)
+    {
+        $sql = "UPDATE purchase_item_catalog SET category_id = ? WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bind_param('ii', $categoryId, $catalogId);
+        if (!$stmt->execute()) {
+            throw new Exception('Update category failed: ' . $stmt->error);
+        }
+        $stmt->close();
+    }
 }

@@ -51,20 +51,15 @@
 
       <div class="page-header">
         <h1>จัดการสินค้าคงคลัง</h1>
-        <div>
-          <button class="btn btn-primary" id="addProductBtn">
-            <i class="icon-additem"></i> เพิ่มรายการ
-          </button>
-          <button class="btn btn-secondary" id="manageCategories">
-            <i class="icon-tagss"></i> หมวดหมู่
-          </button>
-        </div>
       </div>
 
       <div class="card" style="margin-bottom:16px">
         <div class="card-header">
           <h2 class="card-title">สต็อกตามหมวด (กก.)</h2>
           <div class="card-tools">
+            <select id="branchFilterStock" class="form-control" style="width:200px;margin-right:8px">
+              <option value="all">รวมทุกสาขา</option>
+            </select>
             <button class="btn btn-sm btn-secondary" id="refreshCategoryStock" onclick="renderCategoryStock()">รีเฟรช</button>
           </div>
         </div>
@@ -77,6 +72,12 @@
         <div class="card-header">
           <h2 class="card-title">รายการแคตตาล็อก</h2>
           <div class="card-tools">
+            <button class="btn btn-primary" id="addProductBtn" style="margin-right:8px">
+              <i class="icon-additem"></i> เพิ่มรายการ
+            </button>
+            <button class="btn btn-secondary" id="manageCategories" style="margin-right:8px">
+              <i class="icon-tagss"></i> หมวดหมู่
+            </button>
             <input type="text" id="productSearch" class="form-control" placeholder="ค้นหารหัสหรือชื่อสินค้า...">
           </div>
         </div>
@@ -246,7 +247,7 @@
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
-  <script src="../assets/js/inventory.js"></script>
+  <script src="../assets/js/inventory.js?v=20260607"></script>
 </body>
 
 </html>
