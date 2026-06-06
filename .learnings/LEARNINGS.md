@@ -6,6 +6,59 @@ Corrections, insights, and knowledge gaps captured during development.
 
 ---
 
+## 2026-06-05 — taste-skill redesign: framework-driven UX upgrade (5 phases, 92K tokens)
+
+**Category:** best_practice
+**Context:** นำ taste-skill framework (https://github.com/Leonxlnx/taste-skill) มาปรับใช้ครบ 5 phases — typography, colors, layout, motion, components
+
+**Pattern-Key:** framework-driven-design-system-upgrade
+
+**What worked:**
+1. **Design Audit first** — อ่าน taste-skill SKILL.md (redesign-skill + minimalist-skill) แล้วทำ audit เทียบกับโปรเจกต์ → ได้ roadmap ชัดเจน 5 phases
+2. **Priority order ตาม taste-skill** — Phase 1 (typography) = biggest impact, lowest risk → เห็นผลทันที, ไม่เสี่ยง
+3. **Incremental commits** — commit 2 ครั้ง: Phase 1-3 (foundation) + Phase 4-5 (polish) → reviewable chunks
+4. **CSS variables already existed** — มี `:root` vars อยู่แล้วทำให้แก้ง่าย (font, colors, shadows ครั้งเดียวได้ทั้งระบบ)
+5. **IntersectionObserver pattern** — taste-skill แนะนำ (ไม่ใช่ scroll listeners) → performance ดีกว่า, code สั้นกว่า
+
+**Key changes per phase:**
+- **Phase 1 (Typography):** Mitr → IBM Plex Sans Thai, tabular figures, scale 40/32/24/20/18/16
+- **Phase 2 (Colors):** Off-white canvas (#f7f6f3), desaturate gradient, warm-tinted shadows, grain texture
+- **Phase 3 (Layout):** Max-width 1440px, asymmetry (stats ±4px), overlap utilities
+- **Phase 4 (Motion):** Scroll reveals (IntersectionObserver), stagger 80ms, spring physics easing
+- **Phase 5 (Components):** Card variants (flat/elevated/minimal), muted badges, asymmetric grids (bento/zigzag)
+
+**Why taste-skill works:**
+- **Opinionated rules** — ไม่ต้องคิดเอง มี checklist audit ชัด (typography 8 จุด, colors 14 จุด, layout 16 จุด)
+- **Anti-slop patterns** — บอกชัดว่าอะไร generic (3-column equal cards, Mitr/Inter, purple gradient) → หลีกเลี่ยงได้ทันที
+- **Framework-agnostic** — ใช้กับ PHP/HTML/CSS ได้เหมือน React/Vue เพราะ target design intent ไม่ใช่ specific APIs
+- **Minimalist variant** — เหมาะกับ POS/admin systems (warm monochrome, editorial typography, flat components)
+
+**Trade-offs:**
+- **Tabular figures กับ Thai fonts** — IBM Plex Sans Thai support tabular-nums แต่ Mitr ไม่มี → เลือก font ต้องเช็ค feature support
+- **Animation ต้อง JS** — CSS-only animations ไม่รู้ว่า element เข้า viewport → ต้องใช้ IntersectionObserver (+ 60 lines JS)
+- **Asymmetric grids complex บน mobile** — bento/zigzag fallback เป็น single column → ต้อง @media queries ทุก variant
+
+**What NOT to do (taste-skill violations we avoided):**
+- ❌ ไม่ใช้ pure `#000000` หรือ pure `#ffffff` (เปลี่ยนเป็น off-black/off-white)
+- ❌ ไม่ใช้ box-shadow opacity > 0.08 (ลดเหลือ 0.04-0.06)
+- ❌ ไม่ทำ 3-column equal cards (ใช้ bento/zigzag แทน)
+- ❌ ไม่ใช้ instant transitions (เปลี่ยนเป็น 200ms spring easing)
+
+**How to apply next time:**
+- Clone taste-skill repo → อ่าน `/skills/redesign-skill/SKILL.md` ก่อนเริ่มงาน UX ทุกครั้ง
+- ทำ Design Audit ตาม checklist → เขียน `.design-audit.md` เก็บไว้
+- เริ่มจาก Phase 1 (typography) เสมอ — biggest visual ROI
+- ใช้ CSS variables สำหรับ design tokens — แก้ครั้งเดียวได้ทั้งระบบ
+- เทส scroll animations ด้วย browser DevTools → slow network ถ้า stagger delay มากเกิน
+
+**Token efficiency:**
+- Design Audit: ~8K (อ่าน taste-skill framework 2 files)
+- Phase 1-3: ~20K (CSS refactoring, no HTML changes)
+- Phase 4-5: ~15K (animations.js + component variants)
+- Total: ~92K สำหรับ complete redesign (น้อยกว่า context compaction threshold)
+
+---
+
 ## 2026-06-05 — UX/UI Redesign: utilities + responsive + form states (4 phases)
 
 **Category:** best_practice
