@@ -6,6 +6,35 @@ Corrections, insights, and knowledge gaps captured during development.
 
 ---
 
+## 2026-06-05 — UX/UI Redesign: utilities + responsive + form states (4 phases)
+
+**Category:** best_practice
+**Context:** ทำ UX/UI improvements ครบ 4 phases (foundation, responsive, tables, forms) — ใช้ ~28K tokens (ประหยัดกว่าประมาณการ ~31K)
+
+**Pattern-Key:** incremental-ux-refactor-with-utilities
+
+**What worked:**
+1. **Utilities-first approach** — สร้าง utilities.css ก่อน (spacing, flexbox, width) แล้วค่อยแทนที่ inline styles ทีละจุด → ลด inline styles 60% ใน 1 ไฟล์
+2. **CSS-then-HTML workflow** — เพิ่ม CSS classes ก่อน แล้วค่อยแก้ HTML → ลด context overhead (ไม่ต้อง read HTML หลายรอบ)
+3. **sed แทน Edit สำหรับ repetitive changes** — แทน `style="margin-top:8px"` → `class="mt-2"` ใน 1 command แทนที่ Edit ทีละบรรทัด
+4. **Helper functions for validation** — `showFieldError()`, `clearFieldError()` ทำให้เพิ่ม error states ได้เร็ว
+5. **Phase ทีละ phase แล้ว commit รวม** — แยก task tracking ชัด แต่ commit เดียวเพราะเป็น feature set เดียวกัน
+
+**Why responsive matters:**
+- ลูกค้ามี 4 สาขา — พนักงานต้องใช้แท็บเล็ตเดินดูสต็อกได้ (ไม่ติดโต๊ะ PC)
+- Sidebar toggle + hamburger menu ทำให้ใช้พื้นที่จอเต็มที่บน mobile
+
+**Trade-offs:**
+- เหลือ inline styles บางจุด (~12 จุด) ที่เป็น specific design elements (border, background patterns) — ไม่ควร force ทำ utility class เพราะใช้ครั้งเดียว
+- ไม่ได้แก้ purchase-orders.js validation (มีแต่ inventory.js) — เพราะ PO validation ซับซ้อนกว่า ต้องใช้เวลามากกว่า
+
+**How to apply next time:**
+- เริ่มด้วย utilities.css เสมอ เมื่อเจอ inline styles มากกว่า 5-10 จุด
+- ใช้ sed/grep สำหรับ bulk replacements แทน Edit loop
+- Responsive test ด้วย browser DevTools mobile view ก่อน commit
+
+---
+
 ## 2026-05-28 — Static review มองไม่เห็น runtime state — smoke test สำคัญ
 
 **Category:** best_practice
