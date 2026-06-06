@@ -1733,3 +1733,309 @@ select.form-control {
 .branch-stat-label { font-size: 11px; color: var(--color-gray-500); margin-top: 2px; }
 .branch-card-meta { margin-top: 10px; font-size: 12px; color: var(--color-gray-500); display: flex; gap: 12px; }
 .branch-pending-badge { background: var(--color-warning-light); color: var(--color-warning); padding: 1px 6px; border-radius: 8px; font-size: 11px; font-weight: 500; }
+.branch-pending-badge { background: var(--color-warning-light); color: var(--color-warning); padding: 1px 6px; border-radius: 8px; font-size: 11px; font-weight: 500; }
+
+/* === Form Grid System === */
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-col-auto {
+  flex: 0 0 auto;
+}
+
+.form-control-sm { max-width: 120px; }
+.form-control-md { max-width: 200px; }
+.form-control-lg { max-width: 300px; }
+
+/* === Button Groups === */
+.btn-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.btn-group.stack {
+  flex-direction: column;
+}
+
+.modal-footer .btn-group {
+  justify-content: flex-end;
+}
+
+/* === Form Field States === */
+.form-group label.required::after {
+  content: " *";
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.form-control-error {
+  border-color: var(--color-danger);
+  background-color: #FEF2F2;
+}
+
+.form-control-error:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.form-error-message {
+  color: var(--color-danger);
+  font-size: 13px;
+  margin-top: 4px;
+  display: block;
+}
+
+.form-control:disabled,
+.form-control[disabled] {
+  background-color: var(--color-gray-100);
+  color: var(--color-gray-500);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* === Button Loading State === */
+.btn.loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.btn.loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.btn-primary.loading::after {
+  border-color: white;
+  border-right-color: transparent;
+}
+
+@keyframes spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* === Table Improvements === */
+.data-table td,
+.data-table th {
+  padding: 16px 20px;
+  border-right: 1px solid #f1f5f9;
+}
+
+.data-table td:last-child,
+.data-table th:last-child {
+  border-right: none;
+}
+
+.table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Branch Banner */
+.branch-banner {
+  display: none;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  padding: 12px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  color: #856404;
+}
+
+/* Text Colors */
+.text-muted {
+  color: #888;
+}
+
+/* === Responsive Design === */
+
+/* Tablet (1024px and below) */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 200px;
+  }
+  
+  .po-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile (768px and below) */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 250px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+  }
+  
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+  }
+  
+  .sidebar-overlay.active {
+    display: block;
+  }
+  
+  .content-area {
+    margin-left: 0;
+  }
+  
+  .topbar {
+    padding: 12px 16px;
+  }
+  
+  .hamburger-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: var(--color-white);
+    border: 1px solid var(--color-gray-200);
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 12px;
+  }
+  
+  .hamburger-btn:hover {
+    background: var(--color-gray-50);
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .page-header h1 {
+    font-size: 20px;
+  }
+  
+  .stat-value {
+    font-size: 18px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .btn {
+    font-size: 13px;
+    padding: 8px 14px;
+  }
+  
+  .po-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .item-form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .cart-summary {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .sidebar-menu {
+    padding-bottom: 80px;
+  }
+  
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .data-table {
+    min-width: 800px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+  }
+  
+  .card-tools {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .card-tools > * {
+    width: 100%;
+  }
+  
+  .modal-content {
+    max-width: 95%;
+    margin: 20px auto;
+  }
+  
+  .btn-group {
+    flex-direction: column;
+  }
+  
+  .btn-group button {
+    width: 100%;
+  }
+}
+
+/* Small mobile (480px and below) */
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .page-header h1 {
+    font-size: 18px;
+  }
+  
+  .card {
+    padding: 12px;
+  }
+  
+  .data-table td,
+  .data-table th {
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+}

@@ -6,6 +6,7 @@
   <title>ขาย Lot - ระบบรับซื้อของเก่า</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/utilities.css">
   <style>
     .page-header {
       display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
@@ -113,15 +114,15 @@
       <div class="modal-body">
         <div class="form-row" style="margin-bottom:12px">
           <div class="form-col" style="flex:2">
-            <label for="buyerName">ชื่อผู้ซื้อ *</label>
+            <label for="buyerName" class="required">ชื่อผู้ซื้อ</label>
             <input type="text" id="buyerName" class="form-control" placeholder="ชื่อผู้ซื้อ / บริษัท">
           </div>
           <div class="form-col">
-            <label for="saleDate">วันที่ขาย *</label>
+            <label for="saleDate" class="required">วันที่ขาย</label>
             <input type="date" id="saleDate" class="form-control">
           </div>
           <div class="form-col">
-            <label for="branchSelect">สาขา *</label>
+            <label for="branchSelect" class="required">สาขา</label>
             <select id="branchSelect" class="form-control">
               <option value="">— เลือกสาขา —</option>
             </select>

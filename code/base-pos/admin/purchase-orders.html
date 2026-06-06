@@ -6,6 +6,7 @@
   <title>รับซื้อของ - ระบบรับซื้อของเก่า</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/utilities.css">
 </head>
 <body>
   <div class="app-container">
@@ -60,12 +61,12 @@
             </div>
             <div class="card-body">
               <div class="form-group">
-                <label for="branchSelect">สาขาที่รับซื้อ*</label>
+                <label for="branchSelect" class="required">สาขาที่รับซื้อ</label>
                 <select id="branchSelect" class="form-control"></select>
               </div>
 
               <!-- Branch Banner -->
-              <div id="branchBanner" style="display:none; background-color:#fff3cd; border:1px solid #ffc107; padding:12px; margin-bottom:16px; border-radius:4px; font-weight:bold; color:#856404;"></div>
+              <div id="branchBanner" class="branch-banner"></div>
 
               <div class="form-group">
                 <label>ค้นหาผู้ขาย (ชื่อ / เลขบัตร / เบอร์โทร)</label>
@@ -73,7 +74,7 @@
                   <input type="text" id="searchSellerInput" class="form-control" placeholder="พิมพ์เพื่อค้นหา...">
                   <div id="sellerSearchResults" class="seller-results"></div>
                 </div>
-                <button class="btn btn-sm btn-secondary" id="createNewSellerBtn" style="margin-top:8px">
+                <button class="btn btn-sm btn-secondary mt-2" id="createNewSellerBtn">
                   <i class="icon-additem"></i> + ผู้ขายใหม่
                 </button>
               </div>
@@ -81,30 +82,30 @@
               <div class="form-group">
                 <label>ผู้ขายที่เลือก</label>
                 <div id="selectedSellerBox">
-                  <div style="color:#888">ยังไม่ได้เลือกผู้ขาย</div>
+                  <div class="text-muted">ยังไม่ได้เลือกผู้ขาย</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="card" style="margin-top:16px">
+          <div class="card" class="mt-4">
             <div class="card-header">
               <h2 class="card-title">2. เพิ่มรายการสินค้า</h2>
             </div>
             <div class="card-body">
-              <div class="form-group" style="margin-bottom:16px;padding:16px;background:#f8fafc;border-radius:12px;border:2px dashed #cbd5e1">
-                <label style="font-size:14px;color:#475569;display:block;margin-bottom:10px;font-weight:600">
+              <div class="form-group" class="mb-4 p-4" style="background:#f8fafc;border-radius:12px;border:2px dashed #cbd5e1">
+                <label class="mb-2" style="font-size:14px;color:#475569;display:block;font-weight:600">
                   <i class="icon-price" style="margin-right:4px"></i> ราคาระดับบิล
                 </label>
-                <div id="globalTierButtons" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-                <div id="globalTierInfo" style="font-size:12px;color:#64748b;margin-top:8px">
+                <div id="globalTierButtons" class="flex gap-2" style="flex-wrap:wrap"></div>
+                <div id="globalTierInfo" class="mt-2" style="font-size:12px;color:#64748b">
                   💡 เลือกระดับบิล <strong>ครั้งเดียว</strong> — จะใช้กับทุกรายการในใบนี้อัตโนมัติ
                 </div>
               </div>
 
               <div class="form-group">
-                <label for="itemName">รหัส/ชื่อสินค้า* <span style="font-weight:400;color:#999">(auto-fill เมื่อตรง)</span></label>
-                <div class="seller-search-box" style="position:relative">
+                <label for="itemName" class="required">รหัส/ชื่อสินค้า <span style="font-weight:400;color:#999">(auto-fill เมื่อตรง)</span></label>
+                <div class="seller-search-box" class="relative">
                   <input type="text" id="itemName" class="form-control" autocomplete="off"
                          placeholder="พิมพ์รหัสหรือชื่อ เช่น WM01, เครื่องซักผ้า">
                   <input type="hidden" id="itemCatalogId" value="">
@@ -136,8 +137,8 @@
                 </div>
               </div>
 
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:2px solid #eee">
-                <div id="itemTotalPreview" style="font-size:14px;color:#999">เลือกสินค้าจากแคตตาล็อก</div>
+              <div class="flex justify-between items-center mt-4 pt-4" style="border-top:2px solid #eee">
+                <div id="itemTotalPreview" class="text-muted" style="font-size:14px">เลือกสินค้าจากแคตตาล็อก</div>
                 <button class="btn btn-primary" id="addItemBtn">
                   <i class="icon-additem"></i> เพิ่มรายการ
                 </button>
@@ -176,7 +177,7 @@
                 <div><strong>ยอดรวมจ่าย: <span id="cartTotalAmount">฿0.00</span></strong></div>
               </div>
 
-              <div class="form-row" style="margin-top:12px">
+              <div class="form-row" class="mt-3">
                 <div class="form-col">
                   <label for="paymentMethod">วิธีจ่าย</label>
                   <select id="paymentMethod" class="form-control">
@@ -191,8 +192,8 @@
                 <textarea id="poNotes" class="form-control" rows="2"></textarea>
               </div>
 
-              <div style="display:flex;gap:8px;margin-top:12px">
-                <button class="btn btn-secondary" id="clearPOBtn" style="flex:1">
+              <div class="btn-group mt-3">
+                <button class="btn btn-secondary flex-1" id="clearPOBtn">
                   ล้างรายการ
                 </button>
                 <button class="btn btn-primary" id="savePOBtn" style="flex:2">
@@ -202,7 +203,7 @@
             </div>
           </div>
 
-          <div class="card" style="margin-top:16px">
+          <div class="card" class="mt-4">
             <div class="card-header">
               <h2 class="card-title">ใบรับซื้อล่าสุด</h2>
             </div>
@@ -214,8 +215,8 @@
                       <th>เลขที่</th>
                       <th>สาขา</th>
                       <th>ผู้ขาย</th>
-                      <th>ชิ้น</th>
-                      <th>ยอด</th>
+                      <th class="text-right">ชิ้น</th>
+                      <th class="text-right">ยอด</th>
                       <th>วันที่</th>
                     </tr>
                   </thead>
@@ -241,7 +242,7 @@
           ชื่อ-นามสกุลจำเป็น — ส่วนช่องอื่นกรอกตามดุลพินิจของแอดมิน
         </div>
         <div class="form-group">
-          <label for="newFullName">ชื่อ-นามสกุล*</label>
+          <label for="newFullName" class="required">ชื่อ-นามสกุล</label>
           <input type="text" id="newFullName" class="form-control" required>
         </div>
         <div class="form-group">

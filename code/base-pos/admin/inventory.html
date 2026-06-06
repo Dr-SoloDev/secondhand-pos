@@ -7,6 +7,7 @@
   <title>จัดการสินค้าคงคลัง - ระบบขายหน้าร้าน</title>
   <link rel="stylesheet" href="../assets/css/fonts.css">
   <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/utilities.css">
 </head>
 
 <body>
@@ -100,12 +101,12 @@
                   <th>รหัส</th>
                   <th>ชื่อสินค้า</th>
                   <th>หมวดหมู่</th>
-                  <th>บิล 1</th>
-                  <th>บิล 2</th>
-                  <th>บิล 3</th>
+                  <th class="text-right">บิล 1</th>
+                  <th class="text-right">บิล 2</th>
+                  <th class="text-right">บิล 3</th>
                   <th>หน่วย</th>
-                  <th>สถานะ</th>
-                  <th>จัดการ</th>
+                  <th class="text-center">สถานะ</th>
+                  <th class="text-center">จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,11 +130,11 @@
           <input type="hidden" id="productId">
           <div class="form-row">
             <div class="form-col">
-              <label for="sku">รหัสสินค้า*</label>
+              <label for="sku" class="required">รหัสสินค้า</label>
               <input type="text" id="sku" class="form-control" required placeholder="เช่น 01, 02, A001">
             </div>
             <div class="form-col">
-              <label for="name">ชื่อสินค้า*</label>
+              <label for="name" class="required">ชื่อสินค้า</label>
               <input type="text" id="name" class="form-control" required placeholder="เช่น เหล็กรวม">
             </div>
           </div>
@@ -154,15 +155,15 @@
           </div>
           <div class="form-row">
             <div class="form-col">
-              <label for="priceTier1">ราคาบิล 1 (ต่ำสุด)*</label>
+              <label for="priceTier1" class="required">ราคาบิล 1 (ต่ำสุด)</label>
               <input type="number" id="priceTier1" class="form-control" min="0" step="0.01" required>
             </div>
             <div class="form-col">
-              <label for="priceTier2">ราคาบิล 2 (กลาง)*</label>
+              <label for="priceTier2" class="required">ราคาบิล 2 (กลาง)</label>
               <input type="number" id="priceTier2" class="form-control" min="0" step="0.01" required>
             </div>
             <div class="form-col">
-              <label for="priceTier3">ราคาบิล 3 (สูงสุด)*</label>
+              <label for="priceTier3" class="required">ราคาบิล 3 (สูงสุด)</label>
               <input type="number" id="priceTier3" class="form-control" min="0" step="0.01" required>
             </div>
           </div>

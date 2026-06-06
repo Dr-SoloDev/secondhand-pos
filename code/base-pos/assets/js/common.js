@@ -269,3 +269,56 @@ async function saveProfileChanges() {
     showNotification('เกิดข้อผิดพลาด: ' + error.message, 'error');
   }
 }
+  // === Sidebar Toggle for Mobile ===
+  function initSidebarToggle() {
+    // Create hamburger button
+    const hamburger = document.createElement('button');
+    hamburger.className = 'hamburger-btn';
+    hamburger.innerHTML = '<i class="icon-menu"></i>';
+    hamburger.style.display = 'none'; // Hidden by default, shown via CSS @media
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'sidebar-overlay';
+    
+    // Insert hamburger at start of topbar
+    const topbar = document.querySelector('.topbar');
+    if (topbar) {
+      topbar.insertBefore(hamburger, topbar.firstChild);
+    }
+    
+    // Insert overlay before sidebar
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+      sidebar.parentNode.insertBefore(overlay, sidebar);
+    }
+    
+    // Toggle function
+    function toggleSidebar() {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('active');
+    }
+    
+    // Event listeners
+    hamburger.addEventListener('click', toggleSidebar);
+    overlay.addEventListener('click', toggleSidebar);
+    
+    // Show hamburger on mobile
+    if (window.innerWidth <= 768) {
+      hamburger.style.display = 'flex';
+    }
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (window.innerWidth <= 768) {
+        hamburger.style.display = 'flex';
+      } else {
+        hamburger.style.display = 'none';
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+      }
+    });
+  }
+  
+  // Initialize sidebar toggle
+  initSidebarToggle();

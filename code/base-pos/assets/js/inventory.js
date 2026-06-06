@@ -275,7 +275,13 @@ async function saveCatalogItem() {
     ];
 
     // เท่ากันได้ แต่ห้ามกลับด้าน
+    // Clear previous errors
+    clearAllErrors();
+
     if (tiers[0].price > tiers[1].price || tiers[1].price > tiers[2].price) {
+      showFieldError('priceTier1', 'ราคาต้องเรียงจากน้อยไปมาก');
+      showFieldError('priceTier2', 'ราคาต้องเรียงจากน้อยไปมาก');
+      showFieldError('priceTier3', 'ราคาต้องเรียงจากน้อยไปมาก');
       showNotification('ราคาต้องเรียงจากน้อยไปมาก: บิล 1 ≤ บิล 2 ≤ บิล 3', 'error');
       return;
     }
@@ -290,6 +296,8 @@ async function saveCatalogItem() {
     };
 
     if (!payload.code || !payload.name) {
+      if (!payload.code) showFieldError('sku', 'กรุณาระบุรหัสสินค้า');
+      if (!payload.name) showFieldError('name', 'กรุณาระบุชื่อสินค้า');
       showNotification('กรุณาระบุรหัสและชื่อสินค้า', 'error');
       return;
     }
@@ -448,3 +456,52 @@ function escapeHtml(s) {
 function showNotification(message, type) {
   alert(message);
 }
+
+// === Helper Functions for Error States ===
+function showFieldError(fieldId, message) {
+  const field = document.getElementById(fieldId);
+  if (!field) return;
+  
+  // Add error class
+  field.classList.add('form-control-error');
+  
+  // Create or update error message
+  let errorDiv = field.nextElementSibling;
+  if (!errorDiv || !errorDiv.classList.contains('form-error-message')) {
+    errorDiv = document.createElement('div');
+    errorDiv.className = 'form-error-message';
+    field.parentNode.insertBefore(errorDiv, field.nextSibling);
+  }
+  errorDiv.textContent = message;
+}
+
+function clearFieldError(fieldId) {
+  const field = document.getElementById(fieldId);
+  if (!field) return;
+  
+  field.classList.remove('form-control-error');
+  
+  const errorDiv = field.nextElementSibling;
+  if (errorDiv && errorDiv.classList.contains('form-error-message')) {
+    errorDiv.remove();
+  }
+}
+
+function clearAllErrors() {
+  document.querySelectorAll('.form-control-error').forEach(el => {
+    el.classList.remove('form-control-error');
+  });
+  document.querySelectorAll('.form-error-message').forEach(el => {
+    el.remove();
+  });
+}
+
+// Clear errors on input
+document.addEventListener('DOMContentLoaded', () => {
+  ['sku', 'name', 'priceTier1', 'priceTier2', 'priceTier3'].forEach(id => {
+    const field = document.getElementById(id);
+    if (field) {
+      field.addEventListener('input', () => clearFieldError(id));
+    }
+  });
+});
