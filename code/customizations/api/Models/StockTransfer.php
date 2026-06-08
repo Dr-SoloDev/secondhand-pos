@@ -60,31 +60,109 @@ class StockTransfer extends Model
         $st = $this->db->fetch("SELECT * FROM stock_transfers WHERE id = ? AND status = 'pending'", [$id]);
         if (!$st) throw new Exception('ไม่พบใบโอนหรือดำเนินการแล้ว');
 
-        // ตรวจสอบว่าสต็อกต้นทางเพียงพอก่อน confirm
-        $stockKg = $this->db->fetchColumn(
-            "SELECT stock_kg FROM categories WHERE id = ?",
-            [$st['category_id']]
+        $fromBranch  = (int)$st['from_branch_id'];
+        $toBranch    = (int)$st['to_branch_id'];
+        $categoryId  = (int)$st['category_id'];
+        $weightNeeded = (float)$st['weight_kg'];
+
+        // ── 1. เช็คสต็อกจริงจาก PO items ต้นทาง (ไม่ใช่ global stock_kg) ──
+        $availableRows = $this->db->fetchAll(
+            "SELECT poi.id, (poi.quantity - poi.consumed_qty) AS avail, poi.unit_price
+             FROM purchase_order_items poi
+             JOIN purchase_orders po ON poi.purchase_order_id = po.id
+             WHERE po.branch_id = ? AND poi.category_id = ?
+               AND po.status = 'completed'
+               AND (poi.quantity - poi.consumed_qty) > 0
+             ORDER BY po.created_at ASC
+             FOR UPDATE",
+            [$fromBranch, $categoryId]
         );
-        if ($stockKg === false || floatval($stockKg) < floatval($st['weight_kg'])) {
+
+        $totalAvail = array_sum(array_column($availableRows, 'avail'));
+        if ($totalAvail < $weightNeeded) {
             throw new Exception(
-                "สต็อกไม่เพียงพอ (มี " . number_format(floatval($stockKg), 2) .
-                " กก. ต้องการ " . number_format(floatval($st['weight_kg']), 2) . " กก.)"
+                "สต็อกต้นทางไม่เพียงพอ (มี " . number_format($totalAvail, 2) .
+                " กก. ต้องการ " . number_format($weightNeeded, 2) . " กก.)"
             );
         }
 
         $this->db->beginTransaction();
         try {
-            $this->db->execute(
-                $this->db->prepare("UPDATE stock_transfers SET status='confirmed', confirmed_by=?, confirmed_at=NOW() WHERE id=?"),
-                [$userId, $id]
+            // ── 2. หัก consumed_qty จาก PO items ต้นทาง (FIFO) ──
+            //        พร้อมคำนวณ weighted avg cost ของที่โอน
+            $remaining   = $weightNeeded;
+            $totalCost   = 0.0;
+            foreach ($availableRows as $row) {
+                if ($remaining <= 0) break;
+                $take = min((float)$row['avail'], $remaining);
+
+                $stmt = $this->db->prepare(
+                    "UPDATE purchase_order_items
+                     SET consumed_qty = consumed_qty + ?
+                     WHERE id = ? AND (quantity - consumed_qty) >= ?"
+                );
+                $this->db->execute($stmt, [$take, $row['id'], $take]);
+
+                $totalCost += $take * (float)$row['unit_price'];
+                $remaining -= $take;
+            }
+
+            $avgUnitPrice = $weightNeeded > 0 ? round($totalCost / $weightNeeded, 4) : 0;
+
+            // ── 3. สร้าง "transfer PO" ในสาขาปลายทาง ──
+            //        ให้ FIFO ของปลายทางเดินต่อได้ตามปกติ
+            $today    = date('Ymd');
+            $lastSeq  = $this->db->fetchColumn(
+                "SELECT MAX(CAST(SUBSTRING_INDEX(reference_no, '-', -1) AS UNSIGNED))
+                 FROM purchase_orders
+                 WHERE reference_no LIKE ? AND branch_id = ?",
+                ["PO-B{$toBranch}-{$today}-%", $toBranch]
+            ) ?: 0;
+            $refNo = "PO-B{$toBranch}-{$today}-" . str_pad($lastSeq + 1, 3, '0', STR_PAD_LEFT);
+
+            $poId = $this->db->fetchColumn(
+                "SELECT id FROM purchase_orders WHERE reference_no = ?", [$refNo]
             );
-            // หัก/เพิ่ม stock_kg (global per category) ตาม weight_kg ที่โอน
-            $this->db->execute(
-                $this->db->prepare(
-                    "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?"
-                ),
-                [$st['weight_kg'], $st['category_id']]
+            if (!$poId) {
+                $stmt = $this->db->prepare(
+                    "INSERT INTO purchase_orders
+                       (reference_no, branch_id, seller_id, user_id,
+                        total_items, total_amount, payment_method, payment_status, status, notes)
+                     VALUES (?, ?, NULL, ?, 1, ?, 'transfer', 'paid', 'completed', ?)"
+                );
+                $this->db->execute($stmt, [
+                    $refNo, $toBranch, $userId,
+                    round($totalCost, 2),
+                    "โอนสต็อกจากสาขา {$fromBranch} (ST: {$st['reference_no']})",
+                ]);
+                $poId = (int)$this->db->lastInsertId();
+            }
+
+            $stmt = $this->db->prepare(
+                "INSERT INTO purchase_order_items
+                   (purchase_order_id, item_name, category_id,
+                    quantity, unit_price, total_price, consumed_qty, unit)
+                 VALUES (?, ?, ?, ?, ?, ?, 0, 'กก.')"
             );
+            $this->db->execute($stmt, [
+                $poId,
+                "โอนสต็อก (ST: {$st['reference_no']})",
+                $categoryId,
+                $weightNeeded,
+                $avgUnitPrice,
+                round($totalCost, 2),
+            ]);
+
+            // ── 4. อัปเดตสถานะ transfer ──
+            $stmt = $this->db->prepare(
+                "UPDATE stock_transfers
+                 SET status='confirmed', confirmed_by=?, confirmed_at=NOW()
+                 WHERE id=?"
+            );
+            $this->db->execute($stmt, [$userId, $id]);
+
+            // ── 5. stock_kg global ไม่เปลี่ยน (ของยังอยู่ในระบบ แค่ย้ายสาขา) ──
+
             $this->db->commit();
         } catch (Exception $e) {
             $this->db->rollBack();
