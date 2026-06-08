@@ -72,8 +72,7 @@ class SaleLot extends Model
         $totalExpenses = array_sum(array_column($expenses, 'amount'));
 
         $lot['items'] = $this->db->fetchAll(
-            "SELECT sli.*,
-                    c.name AS category_name
+            "SELECT sli.*, c.name AS category_name
              FROM sale_lot_items sli
              LEFT JOIN categories c ON sli.category_id = c.id
              WHERE sli.sale_lot_id = ?
@@ -125,16 +124,17 @@ class SaleLot extends Model
             foreach ($data['items'] as $item) {
                 $qty       = (float)($item['quantity_kg'] ?? 0);
                 $unitPrice = (float)($item['unit_price'] ?? 0);
-                $catId     = intval($item['category_id']);
+                $catId     = intval($item['category_id'] ?? 0);
+                $itemName  = trim((string)($item['item_name'] ?? ''));
+                $catalogId = intval($item['catalog_id'] ?? 0) ?: null;
 
-                if ($qty <= 0 || $catId <= 0) {
-                    throw new Exception('รายการสินค้าต้องมี category_id และ quantity_kg ที่ถูกต้อง');
+                if ($qty <= 0 || empty($itemName)) {
+                    throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
                 }
 
                 $subtotal  = $qty * $unitPrice;
-                // draft อนุญาตให้บันทึกได้แม้สต็อกไม่พอ — cost จะถูกคำนวณใหม่ตอน confirm
                 try {
-                    $itemCost = $this->calculateCost($branchId, $catId, $qty);
+                    $itemCost = $catId > 0 ? $this->calculateCost($branchId, $catId, $qty) : 0;
                 } catch (Exception $e) {
                     $itemCost = 0;
                 }
@@ -143,7 +143,9 @@ class SaleLot extends Model
                 $totalCost   += $itemCost;
 
                 $preparedItems[] = [
-                    'category_id'  => $catId,
+                    'catalog_id'   => $catalogId,
+                    'item_name'    => $itemName,
+                    'category_id'  => $catId ?: null,
                     'quantity_kg'  => $qty,
                     'unit_price'   => $unitPrice,
                     'fifo_cost'    => $itemCost,
@@ -168,6 +170,8 @@ class SaleLot extends Model
             foreach ($preparedItems as $item) {
                 $this->db->insert('sale_lot_items', [
                     'sale_lot_id'  => $lotId,
+                    'catalog_id'   => $item['catalog_id'],
+                    'item_name'    => $item['item_name'],
                     'category_id'  => $item['category_id'],
                     'quantity_kg'  => $item['quantity_kg'],
                     'unit_price'   => $item['unit_price'],
@@ -210,16 +214,17 @@ class SaleLot extends Model
             foreach ($data['items'] as $item) {
                 $qty       = (float)($item['quantity_kg'] ?? 0);
                 $unitPrice = (float)($item['unit_price'] ?? 0);
-                $catId     = intval($item['category_id']);
+                $catId     = intval($item['category_id'] ?? 0);
+                $itemName  = trim((string)($item['item_name'] ?? ''));
+                $catalogId = intval($item['catalog_id'] ?? 0) ?: null;
 
-                if ($qty <= 0 || $catId <= 0) {
-                    throw new Exception('รายการสินค้าต้องมี category_id และ quantity_kg ที่ถูกต้อง');
+                if ($qty <= 0 || empty($itemName)) {
+                    throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
                 }
 
                 $subtotal = $qty * $unitPrice;
-                // draft อนุญาตให้บันทึกได้แม้สต็อกไม่พอ — cost จะถูกคำนวณใหม่ตอน confirm
                 try {
-                    $itemCost = $this->calculateCost($branchId, $catId, $qty);
+                    $itemCost = $catId > 0 ? $this->calculateCost($branchId, $catId, $qty) : 0;
                 } catch (Exception $e) {
                     $itemCost = 0;
                 }
@@ -228,7 +233,9 @@ class SaleLot extends Model
                 $totalCost   += $itemCost;
 
                 $preparedItems[] = [
-                    'category_id' => $catId,
+                    'catalog_id'  => $catalogId,
+                    'item_name'   => $itemName,
+                    'category_id' => $catId ?: null,
                     'quantity_kg' => $qty,
                     'unit_price'  => $unitPrice,
                     'fifo_cost'   => $itemCost,
@@ -255,6 +262,8 @@ class SaleLot extends Model
             foreach ($preparedItems as $item) {
                 $this->db->insert('sale_lot_items', [
                     'sale_lot_id' => $id,
+                    'catalog_id'  => $item['catalog_id'],
+                    'item_name'   => $item['item_name'],
                     'category_id' => $item['category_id'],
                     'quantity_kg' => $item['quantity_kg'],
                     'unit_price'  => $item['unit_price'],
@@ -608,5 +617,25 @@ class SaleLot extends Model
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    // บันทึกรายรับจริงจากบิลศูนย์รับซื้อ (เฉพาะ lot ที่ confirmed แล้ว)
+    public function recordRevenue($id, $data)
+    {
+        $this->db->query(
+            "UPDATE {$this->table}
+             SET actual_revenue      = ?,
+                 actual_revenue_note = ?,
+                 actual_revenue_date = ?,
+                 updated_at          = NOW()
+             WHERE id = ? AND status = 'confirmed'",
+            [
+                $data['actual_revenue'],
+                $data['actual_revenue_note'],
+                $data['actual_revenue_date'],
+                $id,
+            ]
+        );
+        return true;
     }
 }

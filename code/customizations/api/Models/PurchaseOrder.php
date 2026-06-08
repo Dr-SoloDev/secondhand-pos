@@ -77,7 +77,7 @@ class PurchaseOrder extends Model
         if (!$po) return null;
         $po['items'] = $this->db->fetchAll(
             "SELECT poi.*, ic.name AS condition_name, ic.code AS condition_code,
-                     c.name AS category_name
+                     c.name AS category_name, c.requires_precious_receipt
               FROM purchase_order_items poi
               LEFT JOIN item_conditions ic ON poi.condition_id = ic.id /* DEPRECATED — legacy PO view only */
               LEFT JOIN categories c ON poi.category_id = c.id

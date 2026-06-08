@@ -53,7 +53,7 @@ class Branch extends Model
                 (SELECT COUNT(*) FROM sale_lots sl WHERE sl.branch_id = b.id AND sl.status = 'draft') AS pending_salelot_count,
                 (SELECT COALESCE(SUM(sl.total_amount), 0) FROM sale_lots sl WHERE sl.branch_id = b.id AND DATE(sl.sale_date) = CURDATE() AND sl.status = 'confirmed') AS today_salelot_amount,
                 (SELECT COALESCE(SUM(sl.total_amount), 0) FROM sale_lots sl WHERE sl.branch_id = b.id AND MONTH(sl.sale_date) = MONTH(CURDATE()) AND YEAR(sl.sale_date) = YEAR(CURDATE()) AND sl.status = 'confirmed') AS month_salelot_amount,
-                (SELECT COALESCE(SUM(c.stock_kg), 0) FROM categories c WHERE c.branch_id = b.id AND c.status = 'active') AS total_stock_kg
+                (SELECT COALESCE(SUM(c.stock_kg), 0) FROM categories c WHERE c.status = 'active') AS total_stock_kg
             FROM {$this->table} b
             WHERE b.status = 'active'
             ORDER BY b.code ASC";

@@ -71,6 +71,8 @@ class Router
         // Inventory routes
         $this->routes[] = ['route' => 'inventory/categories', 'controller' => 'InventoryController', 'method' => 'getCategories', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'inventory/categories', 'controller' => 'InventoryController', 'method' => 'createCategory', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'inventory/set-threshold', 'controller' => 'InventoryController', 'method' => 'setThreshold', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'inventory/stock-alerts', 'controller' => 'InventoryController', 'method' => 'getStockAlerts', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'getCategory', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'updateCategory', 'verb' => 'PUT'];
         $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'deleteCategory', 'verb' => 'DELETE'];
@@ -154,6 +156,7 @@ class Router
         $this->routes[] = ['route' => 'sellers/seller', 'controller' => 'SellersController', 'method' => 'updateSeller', 'verb' => 'PUT'];
         $this->routes[] = ['route' => 'sellers/blacklist', 'controller' => 'SellersController', 'method' => 'blacklistSeller', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'sellers/unblacklist', 'controller' => 'SellersController', 'method' => 'unblacklistSeller', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sellers/history', 'controller' => 'SellersController', 'method' => 'getSellerHistory', 'verb' => 'GET'];
 
         // Purchase Orders routes
         $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrders', 'verb' => 'GET'];
@@ -186,6 +189,22 @@ class Router
         $this->routes[] = ['route' => 'sale-lots/sale-lot', 'controller' => 'SaleLotsController', 'method' => 'destroy', 'verb' => 'DELETE'];
         $this->routes[] = ['route' => 'sale-lots/confirm', 'controller' => 'SaleLotsController', 'method' => 'confirm', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'sale-lots/cancel', 'controller' => 'SaleLotsController', 'method' => 'cancel', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sale-lots/record-revenue', 'controller' => 'SaleLotsController', 'method' => 'recordRevenue', 'verb' => 'POST'];
+
+        // Financial Summary (admin only)
+        $this->routes[] = ['route' => 'financial/summary',              'controller' => 'FinancialController', 'method' => 'summary',             'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/lot-revenues',         'controller' => 'FinancialController', 'method' => 'lotRevenues',          'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/purchase-by-category', 'controller' => 'FinancialController', 'method' => 'purchaseByCategory',   'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/expenses',             'controller' => 'FinancialController', 'method' => 'listExpenses',         'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/expenses',             'controller' => 'FinancialController', 'method' => 'createExpense',        'verb' => 'POST'];
+        $this->routes[] = ['route' => 'financial/expenses',             'controller' => 'FinancialController', 'method' => 'deleteExpense',        'verb' => 'DELETE'];
+        $this->routes[] = ['route' => 'financial/export',               'controller' => 'FinancialController', 'method' => 'exportCsv',            'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-catalog/price-board',   'controller' => 'PurchaseItemCatalogController', 'method' => 'getPriceBoard', 'verb' => 'GET'];
+        // Stock Transfers
+        $this->routes[] = ['route' => 'stock-transfers',         'controller' => 'StockTransfersController', 'method' => 'index',   'verb' => 'GET'];
+        $this->routes[] = ['route' => 'stock-transfers',         'controller' => 'StockTransfersController', 'method' => 'store',   'verb' => 'POST'];
+        $this->routes[] = ['route' => 'stock-transfers/confirm', 'controller' => 'StockTransfersController', 'method' => 'confirm', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'stock-transfers/cancel',  'controller' => 'StockTransfersController', 'method' => 'cancel',  'verb' => 'POST'];
     }
 
     public function dispatch()

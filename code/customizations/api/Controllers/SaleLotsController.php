@@ -70,11 +70,13 @@ class SaleLotsController extends Controller
 
         $cleanItems = [];
         foreach ($data['items'] as $item) {
-            if (empty($item['category_id']) || empty($item['quantity_kg'])) {
-                Response::error('แต่ละรายการต้องมี category_id และ quantity_kg', 400);
+            if (empty($item['item_name']) || empty($item['quantity_kg'])) {
+                Response::error('แต่ละรายการต้องมีชื่อสินค้าและน้ำหนัก', 400);
             }
             $cleanItems[] = [
-                'category_id' => intval($item['category_id']),
+                'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
+                'item_name'   => trim((string)$item['item_name']),
+                'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 'quantity_kg' => floatval($item['quantity_kg']),
                 'unit_price'  => floatval($item['unit_price'] ?? 0),
             ];
@@ -119,11 +121,13 @@ class SaleLotsController extends Controller
 
         $cleanItems = [];
         foreach ($data['items'] as $item) {
-            if (empty($item['category_id']) || empty($item['quantity_kg'])) {
-                Response::error('แต่ละรายการต้องมี category_id และ quantity_kg', 400);
+            if (empty($item['item_name']) || empty($item['quantity_kg'])) {
+                Response::error('แต่ละรายการต้องมีชื่อสินค้าและน้ำหนัก', 400);
             }
             $cleanItems[] = [
-                'category_id' => intval($item['category_id']),
+                'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
+                'item_name'   => trim((string)$item['item_name']),
+                'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 'quantity_kg' => floatval($item['quantity_kg']),
                 'unit_price'  => floatval($item['unit_price'] ?? 0),
             ];
@@ -185,6 +189,53 @@ class SaleLotsController extends Controller
         } catch (Exception $e) {
             error_log('SaleLot cancel failed: ' . $e->getMessage());
             Response::error('ยกเลิก Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
+        }
+    }
+
+    // บันทึกรายรับจริงจากบิลศูนย์รับซื้อ (เฉพาะ lot ที่ confirmed แล้ว)
+    public function recordRevenue($id)
+    {
+        $this->requireAuth(['admin', 'manager']);
+        if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
+
+        $data = $this->getRequestData();
+        if (!isset($data['actual_revenue']) || !is_numeric($data['actual_revenue'])) {
+            Response::error('ต้องระบุยอดรายรับจริง (actual_revenue)', 400);
+        }
+
+        $actualRevenue = floatval($data['actual_revenue']);
+        if ($actualRevenue < 0) Response::error('ยอดรายรับต้องไม่ติดลบ', 400);
+
+        $model = new SaleLot();
+        $lot   = $model->getById($id);
+        if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+        if ($lot['status'] !== 'confirmed') Response::error('บันทึกรายรับได้เฉพาะ Lot ที่ยืนยันแล้ว', 400);
+
+        // SECURITY: non-admin บันทึกได้เฉพาะสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์เข้าถึง Sale Lot นี้', 403);
+            }
+        }
+
+        $cleanData = [
+            'actual_revenue'      => $actualRevenue,
+            'actual_revenue_note' => isset($data['actual_revenue_note']) ? trim((string)$data['actual_revenue_note']) : null,
+            'actual_revenue_date' => isset($data['actual_revenue_date']) ? $this->sanitizeInput($data['actual_revenue_date']) : date('Y-m-d'),
+        ];
+
+        try {
+            $model->recordRevenue($id, $cleanData);
+            Logger::logActivity(
+                $this->user['user_id'],
+                'record_revenue',
+                "Recorded revenue ฿{$actualRevenue} for Sale Lot ID: {$id}"
+            );
+            Response::success('บันทึกรายรับสำเร็จ', null);
+        } catch (Exception $e) {
+            error_log('SaleLot recordRevenue failed: ' . $e->getMessage());
+            Response::error('บันทึกรายรับไม่สำเร็จ กรุณาลองใหม่', 500);
         }
     }
 

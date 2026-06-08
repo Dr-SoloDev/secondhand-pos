@@ -138,6 +138,25 @@ class SellersController extends Controller
         }
     }
 
+    public function getSellerHistory()
+    {
+        $this->requireAuth();
+        $id = intval($_GET['id'] ?? 0);
+        if (!$id) { Response::error('ไม่พบ id', 400); return; }
+
+        $db = Database::getInstance();
+        $items = $db->fetchAll(
+            "SELECT po.reference_no, po.created_at, po.total_amount, po.total_items,
+                    b.name AS branch_name
+             FROM purchase_orders po
+             LEFT JOIN branches b ON b.id = po.branch_id
+             WHERE po.seller_id = ? AND po.status = 'completed'
+             ORDER BY po.created_at DESC LIMIT 50",
+            [$id]
+        );
+        Response::success('สำเร็จ', ['items' => $items ?: []]);
+    }
+
     /**
      * POST /api/sellers/blacklist - Blacklist ผู้ขาย
      */

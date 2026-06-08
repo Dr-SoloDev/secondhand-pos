@@ -4,6 +4,9 @@ let currentSeller = null;
 document.addEventListener('DOMContentLoaded', function() {
     loadSellers();
     setupIdCardFormatter();
+    document.getElementById('isBlacklisted').addEventListener('change', function() {
+        document.getElementById('blacklistReasonGroup').style.display = this.checked ? '' : 'none';
+    });
 });
 
 async function loadSellers() {
@@ -100,34 +103,51 @@ function editSeller(id) {
     document.getElementById('idCard').value = formatIdCard(currentSeller.id_card);
     document.getElementById('address').value = currentSeller.address || '';
     document.getElementById('notes').value = currentSeller.notes || '';
-    document.getElementById('isBlacklisted').checked = currentSeller.is_blacklisted == 1;
+    const bl = currentSeller.is_blacklisted == 1;
+    document.getElementById('isBlacklisted').checked = bl;
+    document.getElementById('blacklistReason').value = currentSeller.blacklist_reason || '';
+    document.getElementById('blacklistReasonGroup').style.display = bl ? '' : 'none';
 
     document.getElementById('sellerModal').classList.add('show');
 }
 
-function viewSeller(id) {
+async function viewSeller(id) {
     const seller = sellers.find(s => s.id === id);
+    if (!seller) return;
 
-    if (!seller) {
-        showNotification('ไม่พบข้อมูลผู้ขาย', 'error');
-        return;
+    // เปิด modal ก่อน แล้วโหลด history
+    document.getElementById('viewSellerName').textContent = seller.full_name;
+    document.getElementById('viewSellerIdCard').textContent = formatIdCard(seller.id_card);
+    document.getElementById('viewSellerPhone').textContent = seller.phone || '-';
+    document.getElementById('viewSellerAddress').textContent = seller.address || '-';
+    document.getElementById('viewSellerStats').textContent =
+        `มาขาย ${seller.total_transactions} ครั้ง · ยอดรวม ${formatNumber(seller.total_amount)} บาท · ล่าสุด ${seller.last_transaction_at ? formatDate(seller.last_transaction_at) : '-'}`;
+
+    const blacklistBadge = document.getElementById('viewSellerBlacklist');
+    if (seller.is_blacklisted) {
+        blacklistBadge.style.display = '';
+        blacklistBadge.textContent = `⛔ Blacklist: ${seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล'}`;
+    } else {
+        blacklistBadge.style.display = 'none';
     }
 
-    const info = `
-        ชื่อ: ${seller.full_name}
-        เบอร์โทร: ${seller.phone || '-'}
-        บัตรประชาชน: ${formatIdCard(seller.id_card)}
-        ที่อยู่: ${seller.address || '-'}
+    document.getElementById('viewSellerHistoryBody').innerHTML =
+        '<tr><td colspan="4" style="text-align:center;color:#888">กำลังโหลด...</td></tr>';
+    document.getElementById('viewSellerModal').classList.add('show');
 
-        จำนวนครั้งที่ขาย: ${seller.total_transactions} ครั้ง
-        ยอดรวม: ${formatNumber(seller.total_amount)} บาท
-        ขายล่าสุด: ${seller.last_transaction_at ? formatDate(seller.last_transaction_at) : '-'}
-
-        สถานะ: ${seller.is_blacklisted ? 'Blacklist' : 'ปกติ'}
-        ${seller.notes ? '\nหมายเหตุ: ' + seller.notes : ''}
-    `;
-
-    alert(info);
+    const res = await apiRequest(`sellers/history?id=${id}`);
+    const tbody = document.getElementById('viewSellerHistoryBody');
+    const items = res.status === 'success' ? (res.data.items || []) : [];
+    if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888">ยังไม่มีประวัติ</td></tr>';
+        return;
+    }
+    tbody.innerHTML = items.map(po => `<tr>
+        <td style="font-size:12px;font-family:monospace">${escapeHtml(po.reference_no)}</td>
+        <td>${formatDate(po.created_at)}</td>
+        <td>${escapeHtml(po.branch_name || '-')}</td>
+        <td class="text-right"><strong>${formatNumber(po.total_amount)}</strong></td>
+    </tr>`).join('');
 }
 
 async function saveSeller() {
@@ -160,7 +180,8 @@ async function saveSeller() {
         id_card: idCard || null,
         address: address || null,
         notes: notes || null,
-        is_blacklisted: isBlacklisted
+        is_blacklisted: isBlacklisted,
+        blacklist_reason: isBlacklisted ? (document.getElementById('blacklistReason').value.trim() || null) : null,
     };
 
     const isEdit = sellerId !== '';

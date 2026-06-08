@@ -55,15 +55,14 @@ class Seller extends Model
      */
     public function search($keyword)
     {
-        $query = "SELECT * FROM {$this->table} 
-                  WHERE phone LIKE ? 
-                     OR full_name LIKE ?
-                     OR id_card LIKE ?
-                  ORDER BY created_at DESC
-                  LIMIT 20";
-        
-        $searchTerm = "%{$keyword}%";
-        return $this->db->fetchAll($query, [$searchTerm, $searchTerm, $searchTerm]);
+        $query = "SELECT id, id_card, full_name, phone, address, vehicle_plate,
+                         is_blacklisted, blacklist_reason, blacklisted_at,
+                         total_transactions, total_amount, last_transaction_at
+                  FROM {$this->table}
+                  WHERE phone LIKE ? OR full_name LIKE ? OR id_card LIKE ?
+                  ORDER BY created_at DESC LIMIT 20";
+        $t = "%{$keyword}%";
+        return $this->db->fetchAll($query, [$t, $t, $t]);
     }
 
     /**
@@ -132,6 +131,7 @@ class Seller extends Model
         if (isset($data['vehicle_plate'])) $updateData['vehicle_plate'] = $data['vehicle_plate'];
         if (isset($data['notes'])) $updateData['notes'] = $data['notes'];
         if (isset($data['is_blacklisted'])) $updateData['is_blacklisted'] = $data['is_blacklisted'];
+        if (isset($data['blacklist_reason'])) $updateData['blacklist_reason'] = $data['blacklist_reason'];
 
         if (!empty($updateData)) {
             parent::update($id, $updateData);
@@ -159,11 +159,11 @@ class Seller extends Model
      */
     public function blacklist($id, $reason = null)
     {
-        $updateData = ['is_blacklisted' => 1];
-        if ($reason) {
-            $updateData['notes'] = $reason;
-        }
-        return parent::update($id, $updateData);
+        return parent::update($id, [
+            'is_blacklisted'   => 1,
+            'blacklist_reason' => $reason ?: null,
+            'blacklisted_at'   => date('Y-m-d H:i:s'),
+        ]);
     }
 
     /**

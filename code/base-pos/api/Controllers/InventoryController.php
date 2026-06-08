@@ -432,4 +432,28 @@ class InventoryController extends Controller
             Response::error('Failed to create transaction', 500);
         }
     }
+
+    public function setThreshold()
+    {
+        $this->requireAuth(['admin']);
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $id  = intval($body['category_id'] ?? 0);
+        $val = isset($body['threshold']) && $body['threshold'] !== '' ? floatval($body['threshold']) : null;
+        if (!$id) { Response::error('ไม่พบ category_id', 400); return; }
+        $stmt = $this->db->prepare("UPDATE categories SET alert_threshold=? WHERE id=?");
+        $this->db->execute($stmt, [$val, $id]);
+        Response::success('บันทึกแล้ว');
+    }
+
+    public function getStockAlerts()
+    {
+        $this->requireAuth();
+        $rows = $this->db->fetchAll(
+            "SELECT id, name, stock_kg, alert_threshold, default_unit
+             FROM categories
+             WHERE status='active' AND alert_threshold IS NOT NULL AND stock_kg <= alert_threshold
+             ORDER BY stock_kg ASC"
+        );
+        Response::success('สำเร็จ', ['items' => $rows ?: []]);
+    }
 }

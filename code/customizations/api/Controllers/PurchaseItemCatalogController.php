@@ -127,4 +127,23 @@ class PurchaseItemCatalogController extends Controller
             Response::error('ไม่สามารถบันทึกหมวดหมู่ได้', 400);
         }
     }
+
+    // GET /api/purchase-catalog/price-board — ดึงราคาทุกรายการแยกตามหมวด สำหรับพิมพ์บอร์ด
+    public function getPriceBoard()
+    {
+        $db = Database::getInstance();
+        $rows = $db->fetchAll(
+            "SELECT pic.id, pic.code, pic.name, pic.tier_prices, pic.default_unit,
+                    c.name AS category_name
+             FROM purchase_item_catalog pic
+             LEFT JOIN categories c ON c.id = pic.category_id
+             WHERE pic.tier_prices IS NOT NULL
+               AND JSON_LENGTH(pic.tier_prices) > 0
+             ORDER BY c.name, pic.name"
+        );
+        foreach ($rows as &$row) {
+            $row['tier_prices'] = json_decode($row['tier_prices'] ?? '[]', true);
+        }
+        Response::success('สำเร็จ', ['items' => $rows]);
+    }
 }
