@@ -34,7 +34,16 @@ class StockTransfer extends Model
 
     public function create($data, $userId)
     {
-        $ref = 'ST-' . date('Ymd') . '-' . str_pad(mt_rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        // Sequential reference_no (ST-YYYYMMDD-NNN) — ป้องกัน collision จาก mt_rand
+        $today = date('Ymd');
+        $lastRef = $this->db->fetchColumn(
+            "SELECT reference_no FROM stock_transfers
+             WHERE reference_no LIKE ? ORDER BY id DESC LIMIT 1",
+            ["ST-{$today}-%"]
+        );
+        $seq = $lastRef ? (intval(substr($lastRef, -3)) + 1) : 1;
+        $ref = 'ST-' . $today . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
+
         $stmt = $this->db->prepare(
             "INSERT INTO stock_transfers (reference_no,from_branch_id,to_branch_id,category_id,weight_kg,note,created_by)
              VALUES (?,?,?,?,?,?,?)"
@@ -51,13 +60,30 @@ class StockTransfer extends Model
         $st = $this->db->fetch("SELECT * FROM stock_transfers WHERE id = ? AND status = 'pending'", [$id]);
         if (!$st) throw new Exception('ไม่พบใบโอนหรือดำเนินการแล้ว');
 
+        // ตรวจสอบว่าสต็อกต้นทางเพียงพอก่อน confirm
+        $stockKg = $this->db->fetchColumn(
+            "SELECT stock_kg FROM categories WHERE id = ?",
+            [$st['category_id']]
+        );
+        if ($stockKg === false || floatval($stockKg) < floatval($st['weight_kg'])) {
+            throw new Exception(
+                "สต็อกไม่เพียงพอ (มี " . number_format(floatval($stockKg), 2) .
+                " กก. ต้องการ " . number_format(floatval($st['weight_kg']), 2) . " กก.)"
+            );
+        }
+
         $this->db->beginTransaction();
         try {
-            // หัก stock จากสาขาต้นทาง — categories เป็น global แต่ stock_kg คือ global ด้วย
-            // ระบบนี้ stock_kg เป็น global per category → โอนแค่บันทึก audit trail
             $this->db->execute(
                 $this->db->prepare("UPDATE stock_transfers SET status='confirmed', confirmed_by=?, confirmed_at=NOW() WHERE id=?"),
                 [$userId, $id]
+            );
+            // หัก/เพิ่ม stock_kg (global per category) ตาม weight_kg ที่โอน
+            $this->db->execute(
+                $this->db->prepare(
+                    "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?"
+                ),
+                [$st['weight_kg'], $st['category_id']]
             );
             $this->db->commit();
         } catch (Exception $e) {
