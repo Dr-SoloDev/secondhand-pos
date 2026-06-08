@@ -1,8 +1,8 @@
 # 🤖 Agent Memory — Secondhand POS Project
 **สำหรับ Claude session ถัดไปอ่านเพื่อทำงานต่อ**
 
-**Last updated:** 5 มิถุนายน 2569 (session: global categories + UX improvements)
-**Project status:** ✅ Phase 1-3 complete + hardening + global categories migration done
+**Last updated:** 8 มิถุนายน 2569 (session: GOALS G2-G10 complete + UI/UX fixes)
+**Project status:** ✅ GOALS 10 ข้อเสร็จครบ — พร้อมนัดเจ้าของพรุ่งนี้ (9 มิ.ย.)
 
 ---
 
@@ -10,43 +10,93 @@
 
 ### Deal Closed
 - **วันที่ปิดดีล:** 18 พฤษภาคม 2569
-- **ราคา:** **40,000 บาท** (สูงกว่าราคาตั้ง 35,000 → ลูกค้าจ่ายเพิ่มเอง 5,000)
+- **ราคา:** **40,000 บาท**
 - **ลูกค้า:** ร้านรับซื้อของเก่า 4 สาขา จ.สุรินทร์
-- **Pattern ที่ทำให้ปิดดีลได้:** ฟังปัญหาก่อน + เปิด demo ฟรี 7 วัน + เน้นไปหน้างานจริง 4 สาขา + เทรนพนักงานถึงที่
+- **ลูกค้าโดนทิ้งงานมาแล้ว 2 ครั้ง** → trust สำคัญที่สุด
 
-### Context สำคัญที่ต้องจำ
-- **ลูกค้าโดนทิ้งงานมาแล้ว 2 ครั้ง** (เสียไป 27,000 บาท) → trust สำคัญที่สุด
-- **mindset ของ Dr.Solodev:** "ขายผลงาน ไม่ได้ขายวิญญาณ" — ห้ามอาสาลดราคาเอง
-- **ลูกค้าอยู่สุรินทร์เหมือน Dr.Solodev** — จุดขายหลักคือไปหน้างานได้
+### นัดคุยกับเจ้าของ: 9 มิถุนายน 2569
+**ต้องคุย 2 เรื่อง:**
+1. **Storage รูปภาพ** — ยื่น 3 ทางเลือก: NAS (Synology ~10,000฿) / Backblaze B2 (~12฿/เดือน) / Hybrid
+2. **Remote access** — แนะนำ Cloudflare Tunnel เพื่อดู Dashboard จากมือถือนอกร้าน
+
+### เอกสารที่เตรียมไว้แล้ว
+- `GOALS.md` — 10 goals ตกผลึกครบ
+- `OWNER-PRESENTATION.md` — สรุปคุณค่าสำหรับเจ้าของ
+
+---
+
+## ✅ GOALS ที่เสร็จแล้ว (session 8 มิ.ย.)
+
+| Goal | รายละเอียด |
+|---|---|
+| G1 | ถ่ายรูปสินค้า — ⏳ pending storage decision |
+| G2 | ใบรับซื้อพิมพ์ได้ 2 แบบ (บิลปกติ + บิลโลหะมีค่า auto-detect) |
+| G3 | Blacklist alert popup สีแดง + blacklist_reason field |
+| G4 | ค้นหาผู้ขาย real-time + blacklist badge ใน dropdown |
+| G5 | Dashboard 4 สาขา: รวม / เลือกสาขา / side-by-side + highlight ⭐ |
+| G6 | บอร์ดราคาพิมพ์ได้ (price-board.html) |
+| G7 | ประวัติผู้ขายต่อคน (modal แทน alert) |
+| G8 | Export CSV 4 แบบ: รับซื้อ / ขาย Lot / ค่าใช้จ่าย / สรุปรวม |
+| G9 | โอนสต็อกระหว่างสาขา + audit trail |
+| G10 | Stock alert — admin ตั้ง threshold ต่อหมวด |
 
 ---
 
-## 📋 Scope งาน (ตามที่ตกลง)
+## 🐛 Bugs ที่แก้ใน session นี้
 
-### ระบบหลัก
-- POS ขายหน้าร้าน + พิมพ์ใบเสร็จ
-- ระบบรับซื้อของเก่า (Purchase Orders) — มีรูปถ่าย, สภาพของ, ต่อรองราคา
-- ระบบสต็อกสินค้า แยก 4 สาขา + ดูรวมจากที่เดียว
-- ระบบผู้ขาย (Sellers) — เก็บบัตรประชาชนตามกฎหมาย
-- รายงานเฉพาะธุรกิจของเก่า — กำไรต่อชิ้น, สินค้าค้างนาน, เปรียบเทียบสาขา
-- ระบบ Hybrid Online + Offline
-
-### บริการพิเศษที่รวมในราคา
-- ✅ เดินทางสำรวจหน้างานทั้ง 4 สาขา
-- ✅ เทรนพนักงานถึงที่ทุกสาขา
-- ✅ Demo ทดลองใช้ฟรี 7 วัน
-- ✅ Warranty 60 วัน
-- ✅ Support ผ่าน LINE/โทร
-
-### Timeline
-- **8-12 สัปดาห์** แบ่งส่งมอบ 4 รอบ
-- **ชำระ 4 งวด:** 30/25/25/20%
-
-### บริการหลังขาย
-- ค่าดูแลรายเดือน 500 บาท (รวม backup, support, แก้บั๊ก)
-- ค่าฟีเจอร์ใหม่รายครั้ง 500 - 5,000 บาท
+- `branches/summary` error เพราะ query ใช้ `c.branch_id` ที่ถูกลบตั้งแต่ migration 024
+- `requireAuth()` ไม่มีใน common.js — เพิ่มแล้ว
+- `escapeHtml()` ไม่มีใน common.js — เพิ่มแล้ว (dashboard crash)
+- token key ไม่ตรงกัน: ระบบใช้ `posToken`/`posUser` แต่ไฟล์ใหม่ใช้ `token`/`user` — แก้แล้ว
+- sale-lots.js: line item ยังเป็น category dropdown แทน catalog search — แก้แล้ว
+- SaleLotsController: validate ด้วย `category_id` ทำให้ส่ง `item_name` ไม่ผ่าน — แก้แล้ว
 
 ---
+
+## 📁 Migrations ล่าสุด
+
+```
+027_add_business_expenses.sql
+028_add_blacklist_fields_to_sellers.sql   — blacklist_reason + blacklisted_at
+029_add_precious_receipt_flag.sql         — requires_precious_receipt ใน categories
+030_add_stock_transfers.sql               — ตาราง stock_transfers
+031_add_stock_alert_threshold.sql         — alert_threshold ใน categories
+032_add_catalog_to_sale_lot_items.sql     — catalog_id + item_name ใน sale_lot_items
+```
+
+---
+
+## 📄 หน้าใหม่ที่เพิ่มใน session นี้
+
+- `admin/price-board.html` — บอร์ดราคาพิมพ์ได้
+- `admin/stock-transfers.html` — โอนสต็อกระหว่างสาขา
+
+---
+
+## ⏳ สิ่งที่ต้องทำต่อ
+
+### หลังคุยกับเจ้าของ 9 มิ.ย.
+- [ ] G1: implement upload รูปภาพ (หลังเจ้าของเลือก storage)
+- [ ] ติดตั้ง Cloudflare Tunnel สำหรับ remote access
+- [ ] commit ทุกอย่างที่ยังค้างอยู่
+
+### Tech Debt ที่ยังไม่ได้ทำ
+- [ ] JWT_SECRET ย้ายออกจาก apache-config.conf ก่อน production
+- [ ] sidebar ใน stock-transfers.html และ price-board.html ควรเพิ่มลิงก์เมนูใหม่ครบ
+- [ ] ทดสอบ end-to-end บน mobile browser จริง
+
+---
+
+## 🚀 คำสั่งที่ใช้บ่อย
+
+```bash
+cd /home/drsolodev/projects/secondhand-pos/code
+docker compose up -d
+docker compose logs -f web
+```
+
+URLs: Admin http://localhost:8080/admin/ | Login: admin/admin
+
 
 ## 🛠️ Technical Stack
 

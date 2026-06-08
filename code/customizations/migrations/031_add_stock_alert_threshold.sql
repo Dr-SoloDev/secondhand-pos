@@ -1,0 +1,1 @@
+ALTER TABLE categories ADD COLUMN alert_threshold DECIMAL(12,3) DEFAULT NULL;
