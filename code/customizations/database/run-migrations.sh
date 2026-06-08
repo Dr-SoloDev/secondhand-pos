@@ -27,9 +27,9 @@ fi
 
 # Build mysql command
 if [ -z "$DB_PASS" ]; then
-    MYSQL_CMD="mysql -u $DB_USER"
+    MYSQL_CMD="mysql -u $DB_USER --default-character-set=utf8mb4"
 else
-    MYSQL_CMD="mysql -u $DB_USER -p$DB_PASS"
+    MYSQL_CMD="mysql -u $DB_USER -p$DB_PASS --default-character-set=utf8mb4"
 fi
 
 # Step 1: รัน base schema

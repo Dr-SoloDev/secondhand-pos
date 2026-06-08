@@ -15,7 +15,8 @@ class StockTransfersController extends Controller
 
     public function store()
     {
-        $user = $this->requireAuth();
+        $this->requireAuth();
+        $user = $this->user;
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $fromId   = intval($body['from_branch_id'] ?? 0);
         $toId     = intval($body['to_branch_id']   ?? 0);
@@ -49,7 +50,8 @@ class StockTransfersController extends Controller
 
     public function confirm()
     {
-        $user = $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager']);
+        $user = $this->user;
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $id   = intval($body['id'] ?? 0);
         if (!$id) { Response::error('ไม่พบ id', 400); return; }
