@@ -5,6 +5,99 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>รับซื้อของ - ระบบรับซื้อของเก่า</title>
   <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    /* ===== PO Page Layout ===== */
+    .po-page { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+
+    /* Row 1: สาขา + บิล */
+    .po-top-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .po-branch-group { display: flex; flex-direction: column; gap: 4px; min-width: 200px; }
+    .po-branch-group label { font-size: 12px; font-weight: 600; color: #6b7280; }
+    .po-branch-group select { height: 38px; }
+    .po-tier-group { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+    .po-tier-group label { font-size: 12px; font-weight: 600; color: #6b7280; }
+    #globalTierButtons { display: flex; gap: 8px; flex-wrap: wrap; }
+    #branchBanner {
+      font-size: 13px; font-weight: 600; color: #92400e;
+      background: #fef3c7; border: 1px solid #fcd34d;
+      border-radius: 6px; padding: 6px 12px;
+      white-space: nowrap;
+      align-self: flex-end;
+    }
+    #branchBanner:empty { display: none; }
+
+    /* Row 2: Add item inline */
+    .po-add-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+    .po-add-row .field-group { display: flex; flex-direction: column; gap: 4px; }
+    .po-add-row .field-group label { font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap; }
+    .po-add-row .field-group input,
+    .po-add-row .field-group select { height: 38px; }
+    .po-field-name { flex: 2; min-width: 180px; position: relative; }
+    .po-field-sm { width: 100px; }
+    .po-field-xs { width: 80px; }
+    .po-field-price { width: 110px; }
+    .po-field-preview {
+      font-size: 13px; font-weight: 700; color: #059669;
+      white-space: nowrap; align-self: flex-end;
+      padding-bottom: 8px; min-width: 80px; text-align: right;
+    }
+    .btn-add-item {
+      height: 38px; white-space: nowrap; align-self: flex-end;
+      padding: 0 18px; font-weight: 700;
+    }
+
+    /* Cart table — full width */
+    .po-cart-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+    .po-cart-card .cart-summary {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 16px; background: #f9fafb; border-top: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+    .cart-total-amount { font-size: 20px; font-weight: 800; color: #059669; }
+
+    /* Row bottom: ผู้ขาย + form + actions */
+    .po-bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    .po-bottom-card {
+      background: #fff; border: 1px solid #e5e7eb;
+      border-radius: 10px; padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .po-bottom-card h3 { font-size: 13px; font-weight: 700; color: #374151; margin: 0 0 4px; }
+    .po-actions { display: flex; gap: 8px; align-items: flex-end; height: 100%; }
+    .po-actions .btn { flex: 1; height: 44px; font-size: 15px; font-weight: 700; }
+    .po-actions .btn-save { flex: 2; }
+
+    /* Recent POs */
+    .po-recent { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+    .po-recent-header { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; font-weight: 700; font-size: 14px; }
+
+    @media (max-width: 768px) {
+      .po-top-row { flex-wrap: wrap; }
+      .po-add-row { flex-wrap: wrap; }
+      .po-add-row .field-group { min-width: calc(50% - 8px); }
+      .po-bottom-row { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
   <div class="app-container">
@@ -29,7 +122,7 @@
         <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
         <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
         <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
-        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i> <span>ตั้งค่า</span></a></li>
       </ul>
     </aside>
 
@@ -53,172 +146,160 @@
         <h1>รับซื้อของเก่า</h1>
       </div>
 
-      <div class="po-grid">
-        <!-- LEFT: ฟอร์มรับซื้อ -->
-        <div>
-          <div class="card" style="margin-top: -8px;">
-            <div class="card-body">
-              <div class="form-group">
-                <label for="branchSelect" class="required">สาขาที่รับซื้อ</label>
-                <select id="branchSelect" class="form-control"></select>
-              </div>
+      <div class="po-page">
 
-              <!-- Branch Banner -->
-              <div id="branchBanner" class="branch-banner"></div>
+        <!-- ===== Row 1: สาขา + บิล ===== -->
+        <div class="po-top-row">
+          <div class="po-branch-group">
+            <label for="branchSelect">สาขาที่รับซื้อ</label>
+            <select id="branchSelect" class="form-control"></select>
+          </div>
+          <div class="po-tier-group">
+            <label>ระดับราคา (บิล)</label>
+            <div id="globalTierButtons"></div>
+          </div>
+          <div id="branchBanner"></div>
+        </div>
 
-              <div class="form-group">
-                <label>ค้นหาผู้ขาย (ชื่อ / เลขบัตร / เบอร์โทร)</label>
-                <div class="seller-search-box">
-                  <input type="text" id="searchSellerInput" class="form-control" placeholder="พิมพ์เพื่อค้นหา...">
-                  <div id="sellerSearchResults" class="seller-results"></div>
-                </div>
-                <button class="btn btn-sm btn-secondary mt-2" id="createNewSellerBtn">
-                  <i class="icon-additem"></i> + ผู้ขายใหม่
-                </button>
-              </div>
-
-              <div class="form-group">
-                <label>ผู้ขายที่เลือก</label>
-                <div id="selectedSellerBox">
-                  <div class="text-muted">ยังไม่ได้เลือกผู้ขาย</div>
-                </div>
-              </div>
+        <!-- ===== Row 2: เพิ่มสินค้า inline ===== -->
+        <div class="po-add-row">
+          <!-- ชื่อ/รหัสสินค้า -->
+          <div class="field-group po-field-name">
+            <label>รหัส / ชื่อสินค้า</label>
+            <div style="position:relative">
+              <input type="text" id="itemName" class="form-control" autocomplete="off"
+                     placeholder="พิมพ์รหัสหรือชื่อ เช่น WM01, เครื่องซักผ้า">
+              <input type="hidden" id="itemCatalogId" value="">
+              <input type="hidden" id="itemCategoryId" value="">
+              <input type="hidden" id="itemUnit" value="ชิ้น">
+              <div id="itemCatalogResults" class="seller-results"></div>
+            </div>
+            <!-- hidden category select — JS ใช้งานอัตโนมัติ ไม่แสดงใน UI -->
+            <select id="itemCategorySelect" style="display:none"></select>
             </div>
           </div>
+          <!-- น้ำหนัก -->
+          <div class="field-group po-field-sm">
+            <label>น้ำหนัก (กก.)</label>
+            <input type="number" id="itemQuantity" class="form-control" min="0" step="0.01" value="1">
+          </div>
+          <!-- หักน้ำหนัก -->
+          <div class="field-group po-field-xs">
+            <label>หัก (กก.)</label>
+            <input type="number" id="itemWeightDeduct" class="form-control" min="0" step="0.01" value="0">
+          </div>
+          <!-- ราคา/หน่วย -->
+          <div class="field-group po-field-price">
+            <label>ราคา/หน่วย (฿)</label>
+            <input type="number" id="itemUnitPrice" class="form-control" min="0" step="0.01" value="0">
+          </div>
+          <!-- preview -->
+          <div id="itemTotalPreview" class="po-field-preview">฿0.00</div>
+          <!-- ปุ่มเพิ่ม -->
+          <button class="btn btn-primary btn-add-item" id="addItemBtn">
+            <i class="icon-additem"></i> + เพิ่ม
+          </button>
+        </div>
 
-          <div class="card mt-4">
-            <div class="card-body">
-              <div class="form-group" class="mb-4 p-4" style="background:#f8fafc;border-radius:12px;border:2px dashed #cbd5e1">
-                <label class="mb-2" style="font-size:14px;color:#475569;display:block;font-weight:600">
-                  <i class="icon-price" style="margin-right:4px"></i> ราคาระดับบิล
-                </label>
-                <div id="globalTierButtons" class="flex gap-2" style="flex-wrap:wrap"></div>
-                <div id="globalTierInfo" class="mt-2" style="font-size:12px;color:#64748b">
-                  💡 เลือกระดับบิล <strong>ครั้งเดียว</strong> — จะใช้กับทุกรายการในใบนี้อัตโนมัติ
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="itemName" class="required">รหัส/ชื่อสินค้า <span style="font-weight:400;color:#999">(auto-fill เมื่อตรง)</span></label>
-                <div class="seller-search-box" class="relative">
-                  <input type="text" id="itemName" class="form-control" autocomplete="off"
-                         placeholder="พิมพ์รหัสหรือชื่อ เช่น WM01, เครื่องซักผ้า">
-                  <input type="hidden" id="itemCatalogId" value="">
-                  <input type="hidden" id="itemCategoryId" value="">
-                  <input type="hidden" id="itemUnit" value="ชิ้น">
-                  <div id="itemCatalogResults" class="seller-results"></div>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="itemCategorySelect">หมวดหมู่</label>
-                <select id="itemCategorySelect" class="form-control">
-                  <option value="">— เลือกหมวดหมู่ —</option>
-                </select>
-              </div>
-
-              <div class="form-row">
-                <div class="form-col">
-                  <label for="itemUnitPrice">ราคา/หน่วย (฿)</label>
-                  <input type="number" id="itemUnitPrice" class="form-control" min="0" step="0.01" value="0">
-                </div>
-                <div class="form-col">
-                  <label for="itemQuantity">น้ำหนัก (กก.)</label>
-                  <input type="number" id="itemQuantity" class="form-control" min="0" step="0.01" value="1">
-                </div>
-                <div class="form-col">
-                  <label for="itemWeightDeduct">หักน้ำหนัก (กก.)</label>
-                  <input type="number" id="itemWeightDeduct" class="form-control" min="0" step="0.01" value="0">
-                </div>
-              </div>
-
-              <div class="flex justify-between items-center mt-4 pt-4" style="border-top:2px solid #eee">
-                <div id="itemTotalPreview" class="text-muted" style="font-size:14px">เลือกสินค้าจากแคตตาล็อก</div>
-                <button class="btn btn-primary" id="addItemBtn">
-                  <i class="icon-additem"></i> เพิ่มรายการ
-                </button>
-              </div>
-            </div>
+        <!-- ===== ตาราง Cart ===== -->
+        <div class="po-cart-card">
+          <div class="table-container">
+            <table class="data-table" id="cartTable">
+              <thead>
+                <tr>
+                  <th style="width:32px">#</th>
+                  <th>สินค้า</th>
+                  <th class="text-right">น้ำหนัก</th>
+                  <th class="text-right">หัก</th>
+                  <th class="text-right">สุทธิ</th>
+                  <th class="text-right">ราคา/หน่วย</th>
+                  <th class="text-right">รวม</th>
+                  <th style="width:40px;text-align:center"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="cart-summary">
+            <div id="cartTotalItems" style="color:#6b7280">0 ชิ้น (0 รายการ)</div>
+            <div>ยอดรวมจ่าย: <span id="cartTotalAmount" class="cart-total-amount">฿0.00</span></div>
           </div>
         </div>
 
-        <!-- RIGHT: ตะกร้า + บันทึก -->
-        <div>
-          <div class="card" style="margin-top: -8px;">
-            <div class="card-body">
-              <div class="table-container">
-                <table class="data-table" id="cartTable">
-                  <thead>
-                    <tr>
-                      <th style="width:32px">#</th>
-                      <th>สินค้า</th>
-                      <th class="text-right">น้ำหนัก</th>
-                      <th class="text-right">หัก</th>
-                      <th class="text-right">สุทธิ</th>
-                      <th class="text-right">ราคา/หน่วย</th>
-                      <th class="text-right">รวม</th>
-                      <th style="width:40px;text-align:center"></th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
-              </div>
+        <!-- ===== Row ล่าง: ผู้ขาย + วิธีจ่าย/หมายเหตุ + ปุ่ม ===== -->
+        <div class="po-bottom-row">
 
-              <div class="cart-summary">
-                <div id="cartTotalItems">0 ชิ้น (0 รายการ)</div>
-                <div><strong>ยอดรวมจ่าย: <span id="cartTotalAmount">฿0.00</span></strong></div>
+          <!-- ผู้ขาย -->
+          <div class="po-bottom-card">
+            <h3><i class="icon-user"></i> ผู้ขาย</h3>
+            <div>
+              <label style="font-size:12px;color:#6b7280;font-weight:600">ค้นหา (ชื่อ / เลขบัตร / เบอร์)</label>
+              <div class="seller-search-box" style="margin-top:4px">
+                <input type="text" id="searchSellerInput" class="form-control" placeholder="พิมพ์เพื่อค้นหา...">
+                <div id="sellerSearchResults" class="seller-results"></div>
               </div>
+            </div>
+            <div id="selectedSellerBox">
+              <div class="text-muted" style="font-size:13px">ยังไม่ได้เลือกผู้ขาย</div>
+            </div>
+            <button class="btn btn-sm btn-secondary" id="createNewSellerBtn" style="align-self:flex-start">
+              <i class="icon-additem"></i> + ผู้ขายใหม่
+            </button>
+          </div>
 
-              <div class="form-row" class="mt-3">
-                <div class="form-col">
-                  <label for="paymentMethod">วิธีจ่าย</label>
-                  <select id="paymentMethod" class="form-control">
-                    <option value="cash">เงินสด</option>
-                    <option value="bank_transfer">โอนธนาคาร</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="poNotes">หมายเหตุใบรับซื้อ</label>
-                <textarea id="poNotes" class="form-control" rows="2"></textarea>
-              </div>
-
-              <div class="btn-group mt-3">
-                <button class="btn btn-secondary flex-1" id="clearPOBtn">
-                  ล้างรายการ
-                </button>
-                <button class="btn btn-primary" id="savePOBtn" style="flex:2">
-                  <i class="icon-additem"></i> บันทึกใบรับซื้อ
-                </button>
-              </div>
+          <!-- วิธีจ่าย + หมายเหตุ -->
+          <div class="po-bottom-card">
+            <h3><i class="icon-price"></i> รายละเอียดบิล</h3>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:#6b7280;font-weight:600">วิธีจ่าย</label>
+              <select id="paymentMethod" class="form-control mt-1">
+                <option value="cash">เงินสด</option>
+                <option value="bank_transfer">โอนธนาคาร</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:12px;color:#6b7280;font-weight:600">หมายเหตุ</label>
+              <textarea id="poNotes" class="form-control mt-1" rows="3" placeholder="(ไม่บังคับ)"></textarea>
             </div>
           </div>
 
-          <div class="card" class="mt-4">
-            <div class="card-header">
-              <h2 class="card-title">ใบรับซื้อล่าสุด</h2>
+          <!-- ปุ่มบันทึก -->
+          <div class="po-bottom-card" style="justify-content:flex-end">
+            <div style="text-align:right;margin-bottom:8px">
+              <div style="font-size:13px;color:#6b7280">ยอดรวม</div>
+              <div style="font-size:28px;font-weight:800;color:#059669" id="cartTotalAmountBig">฿0.00</div>
             </div>
-            <div class="card-body">
-              <div class="table-container">
-                <table class="data-table" id="recentPOTable">
-                  <thead>
-                    <tr>
-                      <th>เลขที่</th>
-                      <th>สาขา</th>
-                      <th>ผู้ขาย</th>
-                      <th class="text-right">ชิ้น</th>
-                      <th class="text-right">ยอด</th>
-                      <th>วันที่</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
-              </div>
+            <div class="po-actions">
+              <button class="btn btn-secondary" id="clearPOBtn">ล้าง</button>
+              <button class="btn btn-primary btn-save" id="savePOBtn">
+                <i class="icon-additem"></i> บันทึกใบรับซื้อ
+              </button>
             </div>
+          </div>
+
+        </div>
+
+        <!-- ===== ใบรับซื้อล่าสุด ===== -->
+        <div class="po-recent">
+          <div class="po-recent-header">ใบรับซื้อล่าสุด</div>
+          <div class="table-container">
+            <table class="data-table" id="recentPOTable">
+              <thead>
+                <tr>
+                  <th>เลขที่</th>
+                  <th>สาขา</th>
+                  <th>ผู้ขาย</th>
+                  <th class="text-right">ชิ้น</th>
+                  <th class="text-right">ยอด</th>
+                  <th>วันที่</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
-      </div>
+
+      </div><!-- .po-page -->
     </main>
   </div>
 
@@ -279,7 +360,17 @@
   <div id="notification-container"></div>
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
-  <script src="../assets/js/purchase-orders.js?v=20260607"></script>
+  <script src="../assets/js/purchase-orders.js?v=20260608"></script>
+  <script>
+    // sync ยอดรวม big display
+    const cartTotalAmountBig = document.getElementById('cartTotalAmountBig');
+    const cartTotalAmount    = document.getElementById('cartTotalAmount');
+    if (cartTotalAmountBig && cartTotalAmount) {
+      new MutationObserver(() => {
+        cartTotalAmountBig.textContent = cartTotalAmount.textContent;
+      }).observe(cartTotalAmount, { childList: true, characterData: true, subtree: true });
+    }
+  </script>
   <script src="../assets/js/animations.js"></script>
 </body>
 </html>
