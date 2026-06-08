@@ -6,6 +6,7 @@ class SellersController extends Controller
      */
     public function getSellers()
     {
+        $this->requireAuth();
         $sellerModel = new Seller();
         $includeBlacklisted = isset($_GET['include_blacklisted']) && $_GET['include_blacklisted'] === 'true';
         
@@ -18,6 +19,7 @@ class SellersController extends Controller
      */
     public function getSeller()
     {
+        $this->requireAuth();
         $id = $_GET['id'] ?? null;
         
         if (!$id) {
@@ -39,6 +41,7 @@ class SellersController extends Controller
      */
     public function searchSellers()
     {
+        $this->requireAuth();
         $keyword = $_GET['q'] ?? '';
         
         if (empty($keyword)) {

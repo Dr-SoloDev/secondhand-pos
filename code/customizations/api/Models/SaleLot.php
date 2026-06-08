@@ -342,11 +342,15 @@ class SaleLot extends Model
 
         $totalCost = 0.0;
         foreach ($items as $item) {
-            $itemCost = $this->calculateCost(
-                (int)$lot['branch_id'],
-                (int)$item['category_id'],
-                (float)$item['quantity_kg']
-            );
+            if (empty($item['category_id'])) {
+                $itemCost = 0.0;
+            } else {
+                $itemCost = $this->calculateCost(
+                    (int)$lot['branch_id'],
+                    (int)$item['category_id'],
+                    (float)$item['quantity_kg']
+                );
+            }
             $this->db->query(
                 "UPDATE sale_lot_items SET fifo_cost = ? WHERE id = ?",
                 [$itemCost, $item['id']]

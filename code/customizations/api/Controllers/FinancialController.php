@@ -88,7 +88,7 @@ class FinancialController extends Controller
              FROM sale_lots sl
              WHERE sl.status = 'confirmed'
                AND {$params['date_filter_sl']}
-               {$params['branch_filter']}
+               {$params['branch_filter_sl']}
              ORDER BY sl.actual_revenue_date DESC, sl.sale_date DESC",
             $params['bindings_sl']
         );

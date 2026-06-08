@@ -105,6 +105,17 @@ class SaleLotsController extends Controller
         $this->requireAuth(['admin', 'manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
+        // SECURITY: non-admin แก้ได้เฉพาะ Sale Lot ของสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $model = new SaleLot();
+            $lot   = $model->getById($id);
+            if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์แก้ไข Sale Lot นี้', 403);
+            }
+        }
+
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['buyer_name', 'sale_date', 'items']);
 
@@ -246,6 +257,17 @@ class SaleLotsController extends Controller
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
+
+        // SECURITY: non-admin ลบได้เฉพาะ Sale Lot ของสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $lot = $model->getById($id);
+            if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์ลบ Sale Lot นี้', 403);
+            }
+        }
+
         try {
             $model->delete($id);
             Logger::logActivity(

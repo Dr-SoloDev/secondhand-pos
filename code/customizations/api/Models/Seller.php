@@ -130,8 +130,7 @@ class Seller extends Model
         if (isset($data['address'])) $updateData['address'] = $data['address'];
         if (isset($data['vehicle_plate'])) $updateData['vehicle_plate'] = $data['vehicle_plate'];
         if (isset($data['notes'])) $updateData['notes'] = $data['notes'];
-        if (isset($data['is_blacklisted'])) $updateData['is_blacklisted'] = $data['is_blacklisted'];
-        if (isset($data['blacklist_reason'])) $updateData['blacklist_reason'] = $data['blacklist_reason'];
+        // is_blacklisted/blacklist_reason ต้องใช้ผ่าน endpoint blacklist/unblacklist เท่านั้น
 
         if (!empty($updateData)) {
             parent::update($id, $updateData);

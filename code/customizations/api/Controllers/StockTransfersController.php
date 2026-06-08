@@ -27,6 +27,15 @@ class StockTransfersController extends Controller
         if ($fromId === $toId)
             { Response::error('ต้นทางและปลายทางต้องต่างกัน', 400); return; }
 
+        // SECURITY: non-admin สร้างได้เฉพาะโอนจากสาขาตัวเอง
+        if (($user['role'] ?? '') !== 'admin') {
+            $userBranch = $user['branch_id'] ?? $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$fromId !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์โอนสต็อกจากสาขาอื่น', 403);
+                return;
+            }
+        }
+
         $result = (new StockTransfer())->create([
             'from_branch_id' => $fromId,
             'to_branch_id'   => $toId,
