@@ -216,50 +216,47 @@ function selectCatalogItem(d) {
   document.getElementById('itemCatalogResults').style.display = 'none';
 
   // Set category display
-  const catName = d.catname || '';
+  const catName = d.catname || d.catName || '';
   const catEl = document.getElementById('itemCategorySelect');
-
   if (catName) {
-    // หา option ที่มี data-name ตรงกับ catName
     const option = Array.from(catEl.options).find(opt => opt.dataset.name === catName);
     if (option) {
       catEl.value = option.value;
       document.getElementById('itemCategoryId').value = option.value;
-      console.log('✓ Auto-selected category:', catName, '→ id:', option.value);
     } else {
-      console.warn('Category name not found in dropdown:', catName);
       catEl.value = '';
-      document.getElementById('itemCategoryId').value = '';
+      document.getElementById('itemCategoryId').value = d.cat || '';
     }
   } else {
-    // ไม่มี category_name ใน catalog → ปล่อยว่างให้ user เลือกเอง
-    console.log('No category in catalog, user must select manually');
     catEl.value = '';
-    document.getElementById('itemCategoryId').value = '';
+    document.getElementById('itemCategoryId').value = d.cat || '';
   }
 
   // Set unit
-  const unit = d.unit || 'ชิ้น';
-  document.getElementById('itemUnit').value = unit;
+  document.getElementById('itemUnit').value = d.unit || 'ชิ้น';
 
-  // Set unit price
-  const basePrice = parseFloat(d.price || 0);
-  if (basePrice > 0) {
-    document.getElementById('itemUnitPrice').value = basePrice.toFixed(2);
-  } else {
-    document.getElementById('itemUnitPrice').value = '0';
+  // Parse tier prices once — รองรับทั้ง string (จาก data-attribute) และ array (จาก exact match)
+  let tierPricesArr = [];
+  if (d.tierprices) {
+    try {
+      const raw = typeof d.tierprices === 'string' ? d.tierprices : JSON.stringify(d.tierprices);
+      // unescape HTML entities ที่อาจติดมาจาก data-attribute
+      const txt = document.createElement('textarea');
+      txt.innerHTML = raw;
+      tierPricesArr = JSON.parse(txt.value);
+    } catch(e) { console.warn('tierprices parse error', e); }
   }
 
-  // Store current catalog item for tier price auto-apply
-  currentCatalogItem = { ...d };
+  // Store current catalog item FIRST (tierprices เป็น array เพื่อใช้ใน applyTierPrice)
+  currentCatalogItem = { ...d, _tierPricesArr: tierPricesArr };
 
-  // Refresh tier buttons with actual prices from this catalog item
-  buildGlobalTierButtons(d.tierprices);
+  // Rebuild tier buttons พร้อมราคาของ item นี้
+  // ถ้ามี tier active อยู่แล้ว buildGlobalTierButtons จะ apply ราคาให้อัตโนมัติ
+  buildGlobalTierButtons(JSON.stringify(tierPricesArr));
 
-  // Set unit price - apply global tier if set
-  const tierPrices = d.tierprices ? JSON.parse(d.tierprices) : [];
-  if (globalTier.level && tierPrices[globalTier.level - 1]) {
-    const tp = tierPrices[globalTier.level - 1];
+  // Set unit price: ใช้ tier ที่ active อยู่ หรือ base price
+  if (globalTier.level && tierPricesArr[globalTier.level - 1]) {
+    const tp = tierPricesArr[globalTier.level - 1];
     document.getElementById('itemUnitPrice').value = parseFloat(tp.price || 0).toFixed(2);
   } else {
     const basePrice = parseFloat(d.price || 0);
@@ -330,14 +327,22 @@ function selectGlobalTier(btn, level) {
   const tierLabel = btn.innerText.split('\n')[0] || `ระดับ ${level}`;
   document.getElementById('globalTierInfo').innerHTML = `<span style="color:${c};font-weight:600">${tierLabel}</span> — ราคาจะถูกใช้กับทุกรายการในใบนี้อัตโนมัติ`;
   // If catalog item already selected, update price immediately
-  if (currentCatalogItem && currentCatalogItem.tierprices) {
-    applyTierPrice(currentCatalogItem.tierprices);
+  if (currentCatalogItem) {
+    // ใช้ _tierPricesArr ที่ parse ไว้แล้ว หรือ fallback ไป tierprices string
+    const tiers = currentCatalogItem._tierPricesArr || currentCatalogItem.tierprices;
+    if (tiers) applyTierPrice(tiers);
   }
 }
 
 function applyTierPrice(tierPrices) {
   if (!globalTier.level || !tierPrices) return;
-  const tiers = JSON.parse(tierPrices || '[]');
+  // รองรับทั้ง array และ string
+  let tiers = [];
+  if (Array.isArray(tierPrices)) {
+    tiers = tierPrices;
+  } else {
+    try { tiers = JSON.parse(tierPrices || '[]'); } catch(e) { return; }
+  }
   const selected = tiers[globalTier.level - 1];
   if (selected && selected.price > 0) {
     document.getElementById('itemUnitPrice').value = parseFloat(selected.price).toFixed(2);
