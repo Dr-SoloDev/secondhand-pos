@@ -84,14 +84,9 @@ async function loadBranches() {
 }
 
 function updateBranchBanner() {
-  const branchId = document.getElementById('branchSelect').value;
-  const branch = branches.find(b => b.id == branchId);
+  // banner ถูกเอาออกจาก UI แล้ว — ไม่ต้องทำอะไร
   const banner = document.getElementById('branchBanner');
-
-  if (branch && banner) {
-    banner.textContent = `🏪 กำลังรับซื้อที่สาขา: ${branch.name}`;
-    banner.style.display = 'block';
-  }
+  if (banner) banner.style.display = 'none';
 }
 
 async function loadCategories() {
