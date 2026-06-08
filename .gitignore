@@ -29,3 +29,6 @@ code/base-pos/backups/
 
 # Node (if any future frontend)
 node_modules/
+
+# OpenCode
+.opencode/
