@@ -74,7 +74,7 @@ Dr.Solodev กำลังจะปิดงานของวัน — ก่�
 
 ถาม Dr.Solodev เป็น checklist สั้นๆ ครั้งเดียว:
 1. วันนี้ทำอะไรเสร็จ? (จะอัปเดต AGENT-MEMORY.md)
-2. เจอปัญหา/ติดขัดอะไรไหม? (จะลง .learnings/ERRORS.md)
+2. เจอปัญหา/ติดขัดอะไรไหม? (จะลง .learnings/LEARNINGS.md category: correction)
 3. มี learning อะไรใหม่ที่อยากจำ? (จะลง .learnings/LEARNINGS.md)
 4. มี feature ใหม่ที่ลูกค้า/พี่อยากได้? (จะลง .learnings/FEATURE_REQUESTS.md)
 
@@ -85,8 +85,8 @@ Dr.Solodev กำลังจะปิดงานของวัน — ก่�
 
 Project paths:
 - ~/projects/secondhand-pos/AGENT-MEMORY.md
-- ~/projects/secondhand-pos/.learnings/
-- Mirror: ~/.openclaw/workspace/projects/secondhand-pos/
+- ~/projects/secondhand-pos/.learnings/LEARNINGS.md (errors ลงที่นี่ category: correction)
+- ~/projects/secondhand-pos/.learnings/FEATURE_REQUESTS.md
 </system-reminder>
 EOF
 fi

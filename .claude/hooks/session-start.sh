@@ -21,13 +21,10 @@ Dr.Solodev กำลังทำงานในโปรเจกต์ POS ร�
 1. **AGENT-MEMORY.md** — สถานะโปรเจกต์ + what's done + todo
    $PROJECT_ROOT/AGENT-MEMORY.md
 
-2. **.learnings/LEARNINGS.md** — บทเรียนสะสมจาก sessions ก่อน
+2. **.learnings/LEARNINGS.md** — บทเรียน + errors สะสมจาก sessions ก่อน (category: correction = errors)
    $PROJECT_ROOT/.learnings/LEARNINGS.md
 
-3. **.learnings/ERRORS.md** — errors เก่า อย่าทำซ้ำ
-   $PROJECT_ROOT/.learnings/ERRORS.md
-
-4. **.learnings/FEATURE_REQUESTS.md** — สิ่งที่ลูกค้า/Dr.Solodev อยากได้
+3. **.learnings/FEATURE_REQUESTS.md** — สิ่งที่ลูกค้า/Dr.Solodev อยากได้
    $PROJECT_ROOT/.learnings/FEATURE_REQUESTS.md
 
 Quick context:

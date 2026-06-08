@@ -1,718 +1,241 @@
 # Learnings
 
-Corrections, insights, and knowledge gaps captured during development.
-
-**Categories**: correction | insight | knowledge_gap | best_practice
+Pattern-Key + actionable rules เท่านั้น — ไม่มี story, ไม่มี trade-offs
+**Category:** correction | insight | best_practice | knowledge_gap
 
 ---
 
-## 2026-06-05 — taste-skill redesign: framework-driven UX upgrade (5 phases, 92K tokens)
+## css-transform-rotate-in-modal-is-painful
+**Category:** insight
+- ❌ อย่าหมุน element ด้วย `transform: rotate()` ใน modal
+- ✅ ใช้ `@page { size: A4 landscape; }` ใน `@media print` แทน — browser จัดการเอง
 
+---
+
+## margin-left-auto-for-global-alignment
 **Category:** best_practice
-**Context:** นำ taste-skill framework (https://github.com/Leonxlnx/taste-skill) มาปรับใช้ครบ 5 phases — typography, colors, layout, motion, components
+- user-dropdown ชิดขวาทุกหน้า → เพิ่ม `margin-left: auto` ใน `.user-dropdown` ที่ layout.css ไฟล์เดียว
+- ไม่ต้องแก้ HTML ทีละหน้า
 
-**Pattern-Key:** framework-driven-design-system-upgrade
+---
 
-**What worked:**
-1. **Design Audit first** — อ่าน taste-skill SKILL.md (redesign-skill + minimalist-skill) แล้วทำ audit เทียบกับโปรเจกต์ → ได้ roadmap ชัดเจน 5 phases
-2. **Priority order ตาม taste-skill** — Phase 1 (typography) = biggest impact, lowest risk → เห็นผลทันที, ไม่เสี่ยง
-3. **Incremental commits** — commit 2 ครั้ง: Phase 1-3 (foundation) + Phase 4-5 (polish) → reviewable chunks
-4. **CSS variables already existed** — มี `:root` vars อยู่แล้วทำให้แก้ง่าย (font, colors, shadows ครั้งเดียวได้ทั้งระบบ)
-5. **IntersectionObserver pattern** — taste-skill แนะนำ (ไม่ใช่ scroll listeners) → performance ดีกว่า, code สั้นกว่า
-
-**Key changes per phase:**
-- **Phase 1 (Typography):** Mitr → IBM Plex Sans Thai, tabular figures, scale 40/32/24/20/18/16
-- **Phase 2 (Colors):** Off-white canvas (#f7f6f3), desaturate gradient, warm-tinted shadows, grain texture
-- **Phase 3 (Layout):** Max-width 1440px, asymmetry (stats ±4px), overlap utilities
-- **Phase 4 (Motion):** Scroll reveals (IntersectionObserver), stagger 80ms, spring physics easing
-- **Phase 5 (Components):** Card variants (flat/elevated/minimal), muted badges, asymmetric grids (bento/zigzag)
-
-**Why taste-skill works:**
-- **Opinionated rules** — ไม่ต้องคิดเอง มี checklist audit ชัด (typography 8 จุด, colors 14 จุด, layout 16 จุด)
-- **Anti-slop patterns** — บอกชัดว่าอะไร generic (3-column equal cards, Mitr/Inter, purple gradient) → หลีกเลี่ยงได้ทันที
-- **Framework-agnostic** — ใช้กับ PHP/HTML/CSS ได้เหมือน React/Vue เพราะ target design intent ไม่ใช่ specific APIs
-- **Minimalist variant** — เหมาะกับ POS/admin systems (warm monochrome, editorial typography, flat components)
-
-**Trade-offs:**
-- **Tabular figures กับ Thai fonts** — IBM Plex Sans Thai support tabular-nums แต่ Mitr ไม่มี → เลือก font ต้องเช็ค feature support
-- **Animation ต้อง JS** — CSS-only animations ไม่รู้ว่า element เข้า viewport → ต้องใช้ IntersectionObserver (+ 60 lines JS)
-- **Asymmetric grids complex บน mobile** — bento/zigzag fallback เป็น single column → ต้อง @media queries ทุก variant
-
-**What NOT to do (taste-skill violations we avoided):**
-- ❌ ไม่ใช้ pure `#000000` หรือ pure `#ffffff` (เปลี่ยนเป็น off-black/off-white)
-- ❌ ไม่ใช้ box-shadow opacity > 0.08 (ลดเหลือ 0.04-0.06)
-- ❌ ไม่ทำ 3-column equal cards (ใช้ bento/zigzag แทน)
-- ❌ ไม่ใช้ instant transitions (เปลี่ยนเป็น 200ms spring easing)
-
-**How to apply next time:**
-- Clone taste-skill repo → อ่าน `/skills/redesign-skill/SKILL.md` ก่อนเริ่มงาน UX ทุกครั้ง
-- ทำ Design Audit ตาม checklist → เขียน `.design-audit.md` เก็บไว้
+## framework-driven-design-system-upgrade
+**Category:** best_practice
+- ใช้ taste-skill framework ก่อนทำ UX งาน — อ่าน `/skills/redesign-skill/SKILL.md`
 - เริ่มจาก Phase 1 (typography) เสมอ — biggest visual ROI
 - ใช้ CSS variables สำหรับ design tokens — แก้ครั้งเดียวได้ทั้งระบบ
-- เทส scroll animations ด้วย browser DevTools → slow network ถ้า stagger delay มากเกิน
-
-**Token efficiency:**
-- Design Audit: ~8K (อ่าน taste-skill framework 2 files)
-- Phase 1-3: ~20K (CSS refactoring, no HTML changes)
-- Phase 4-5: ~15K (animations.js + component variants)
-- Total: ~92K สำหรับ complete redesign (น้อยกว่า context compaction threshold)
 
 ---
 
-## 2026-06-05 — UX/UI Redesign: utilities + responsive + form states (4 phases)
-
+## incremental-ux-refactor-with-utilities
 **Category:** best_practice
-**Context:** ทำ UX/UI improvements ครบ 4 phases (foundation, responsive, tables, forms) — ใช้ ~28K tokens (ประหยัดกว่าประมาณการ ~31K)
-
-**Pattern-Key:** incremental-ux-refactor-with-utilities
-
-**What worked:**
-1. **Utilities-first approach** — สร้าง utilities.css ก่อน (spacing, flexbox, width) แล้วค่อยแทนที่ inline styles ทีละจุด → ลด inline styles 60% ใน 1 ไฟล์
-2. **CSS-then-HTML workflow** — เพิ่ม CSS classes ก่อน แล้วค่อยแก้ HTML → ลด context overhead (ไม่ต้อง read HTML หลายรอบ)
-3. **sed แทน Edit สำหรับ repetitive changes** — แทน `style="margin-top:8px"` → `class="mt-2"` ใน 1 command แทนที่ Edit ทีละบรรทัด
-4. **Helper functions for validation** — `showFieldError()`, `clearFieldError()` ทำให้เพิ่ม error states ได้เร็ว
-5. **Phase ทีละ phase แล้ว commit รวม** — แยก task tracking ชัด แต่ commit เดียวเพราะเป็น feature set เดียวกัน
-
-**Why responsive matters:**
-- ลูกค้ามี 4 สาขา — พนักงานต้องใช้แท็บเล็ตเดินดูสต็อกได้ (ไม่ติดโต๊ะ PC)
-- Sidebar toggle + hamburger menu ทำให้ใช้พื้นที่จอเต็มที่บน mobile
-
-**Trade-offs:**
-- เหลือ inline styles บางจุด (~12 จุด) ที่เป็น specific design elements (border, background patterns) — ไม่ควร force ทำ utility class เพราะใช้ครั้งเดียว
-- ไม่ได้แก้ purchase-orders.js validation (มีแต่ inventory.js) — เพราะ PO validation ซับซ้อนกว่า ต้องใช้เวลามากกว่า
-
-**How to apply next time:**
-- เริ่มด้วย utilities.css เสมอ เมื่อเจอ inline styles มากกว่า 5-10 จุด
-- ใช้ sed/grep สำหรับ bulk replacements แทน Edit loop
+- สร้าง utilities.css ก่อน แล้วแทนที่ inline styles ทีละจุด
+- ใช้ `sed` สำหรับ bulk replacements แทน Edit loop
 - Responsive test ด้วย browser DevTools mobile view ก่อน commit
 
 ---
 
-## 2026-05-28 — Static review มองไม่เห็น runtime state — smoke test สำคัญ
-
+## static-review-misses-cross-file-runtime-deps
 **Category:** best_practice
-**Context:** Review opencode changes 33 ไฟล์ — แก้ครบตามที่ subagent reviewer ชี้ (C1/C2/C3/H1/H4) แต่รัน smoke test แล้วเจอว่า C2 ยังไม่ทำงาน
-
-**Pattern-Key:** static-review-misses-cross-file-runtime-deps
-
-**Learning:**
-Subagent อ่านโค้ดเฉพาะไฟล์ที่ diff ครอบคลุม — มองไม่เห็น `TokenService::generate()` ที่ encode JWT payload (อยู่ในไฟล์ที่ไม่ได้เปลี่ยน). มันรับแค่ `(userId, username, role)` ไม่มี `branch_id` ทำให้ทุก fix ที่พึ่ง `$this->user['branch_id']` ได้ null silently — ไม่มี error, แค่ไม่ทำงาน
-
-**Why it worked (วิธีจับ):**
-1. รัน smoke test end-to-end ด้วย curl: login เป็น manager → call sale-lots → ได้ `403 ไม่มีสาขาที่ผูกกับผู้ใช้นี้` ทันที
-2. Decode JWT payload (base64 segment 2) เพื่อดู → ไม่มี `branch_id` field → root cause ชัด
-3. แก้ TokenService + AuthController → รันเทสซ้ำ → ผ่าน
-
-**How to apply:**
-- หลัง code review เสร็จ **เสมอ** รัน end-to-end smoke ก่อนปิด session (ไม่ใช่แค่ assume ว่า fix ตามรีวิวแล้วจะ work)
-- Auth/permission fix ต้องเทสด้วย **multi-role login** (admin + manager + cashier) — bug แบบนี้ admin มองไม่เห็นเพราะ admin scope กว้าง
-- เมื่อ subagent review บอกว่า "fix ตรงนี้พึ่ง field X ของ user" → verify ทันทีว่า X อยู่ใน JWT payload จริงหรือไม่ ก่อน trust
+- หลัง code review เสร็จ — รัน end-to-end smoke test ก่อนปิด session เสมอ
+- Auth/permission fix ต้องเทสด้วย multi-role login (admin + manager + cashier)
+- เมื่อ fix พึ่ง field X ของ user → verify ว่า X อยู่ใน JWT payload จริงก่อน trust
 
 ---
 
-## 2026-05-18 — ขายคุณค่าได้ผลกว่าขายราคา
-
+## value-pricing-over-job-pricing
 **Category:** best_practice
-**Context:** ปิดดีล POS ร้านรับซื้อของเก่า 4 สาขา
-
-**Pattern-Key:** value-pricing-over-job-pricing
-
-**Learning:**
-ราคาเริ่มต้นที่ OpenClaw ประเมินคือ 22,000 บาท (Package A) — Dr.Solodev ตัดสินใจตั้งราคาที่ **35,000 บาท** ด้วยเหตุผล "scope งานลึกกว่าที่วิเคราะห์ + ขายผลงาน ไม่ได้ขายวิญญาณ" — สุดท้ายปิดดีลได้ที่ **40,000 บาท** (สูงกว่าตั้งเอง 5,000)
-
-**Why it worked:**
-1. ไม่อาสาลดราคาเอง (ลดเฉพาะเมื่อลูกค้าขอ)
-2. Justify ราคาด้วย *การไปหน้างาน 4 สาขา + เทรนพนักงานถึงที่* (ไม่ใช่แค่ "ทำเสร็จส่งให้")
-3. Demo ฟรี 7 วัน — ตัดความเสี่ยงลูกค้า → trust ขึ้น
-4. ฟังปัญหาลูกค้าก่อน ไม่รีบเสนอ solution
-
-**How to apply:**
-- เมื่อประเมินราคา POS/SaaS custom สำหรับ SMB ไทย — ราคาเริ่มต้น 30,000+ ไม่ใช่ของแพง ถ้ามี service component (on-site visit, training)
-- AI estimate (จาก code complexity) ต่ำเกินจริง — ไม่ได้นับ "การเดินทาง + การสื่อสาร + การ debug หน้างาน + emotional labor"
-- Dr.Solodev mindset: "ขายผลงาน ไม่ได้ขายวิญญาณ" — ห้าม optimize for "ปิดดีลให้ได้" ตัดราคา
+- ไม่อาสาลดราคาเอง — ลดเฉพาะเมื่อลูกค้าขอ
+- Justify ราคาด้วย service component (on-site, training) ไม่ใช่แค่ code complexity
+- SMB ไทย POS custom — ราคาเริ่มต้น 30,000+ ไม่ใช่ของแพง
 
 ---
 
-## 2026-05-18 — Trust > Price สำหรับลูกค้าที่เคยโดนทิ้งงาน
-
+## trust-first-for-burned-customers
 **Category:** insight
-**Pattern-Key:** trust-first-for-burned-customers
-
-**Learning:**
-ลูกค้าที่เคยจ้างเดฟแล้วโดนทิ้งงาน 2 ครั้ง — เขาไม่ได้ sensitive เรื่องราคา เขา sensitive เรื่อง **ความน่าเชื่อถือ**
-
-**Pattern ที่ทำงาน:**
-- "ผมอยู่สุรินทร์เหมือนกัน" → ความใกล้เคียงทางกายภาพ = trust
-- "Demo ฟรี 7 วัน ไม่พอใจไม่จ่าย" → กำจัด risk ฝั่งลูกค้า
-- "ส่งมอบ 4 รอบ จ่ายตาม milestone" → ไม่ต้องจ่ายก้อนเดียวแล้วลุ้น
-- "ซอร์สโค้ดเป็นของลูกค้า" → ถ้า dev หาย ก็มีของในมือ
-- ฟังปัญหาเก่าก่อน เห็นใจ ไม่โทษคนเก่า
-
-**Anti-pattern (อย่าทำ):**
-- "เกือบครบครับ กำลังพัฒนาอยู่" → ลูกค้าจะ trigger trauma เก่า (คนเก่าก็พูดแบบนี้)
-- ใช้ "ฟีเจอร์ที่ขาดคือ X ใช้เวลา Y สัปดาห์" — ตัวเลขชัดสร้าง trust
+- ลูกค้าโดนทิ้งงาน 2 ครั้ง → sensitive เรื่อง trust ไม่ใช่ราคา
+- Pattern: Demo ฟรี 7 วัน + ส่งมอบ milestone + ซอร์สโค้ดเป็นของลูกค้า
+- ❌ อย่าพูดว่า "เกือบครบครับ กำลังพัฒนาอยู่" — trigger trauma เก่า
 
 ---
 
-## 2026-05-18 — Docker Compose ดีกว่า apt install สำหรับ PHP/MySQL dev
-
+## docker-for-legacy-php-stack
 **Category:** best_practice
-**Pattern-Key:** docker-for-legacy-php-stack
-
-**Learning:**
-ตอนตั้ง dev environment สำหรับ goragodwiriya/pos-system (PHP+Apache+MySQL) — ใช้ Docker Compose แทน apt install ดีกว่ามาก
-
-**Why:**
-- ไม่ pollute เครื่อง dev ด้วย system packages
-- Migration อัตโนมัติผ่าน MySQL /docker-entrypoint-initdb.d/
-- Reset ทุกอย่างได้ด้วย docker compose down -v
-- Reproducible — ลูกค้า/ทีมอื่นก็รันได้เหมือนกัน
-- phpMyAdmin ติดมาฟรีบน port แยก
-
-**How to apply:**
-ใช้ pattern นี้กับทุกโปรเจกต์ legacy PHP — โดยเฉพาะที่ลูกค้าต้องลอง demo
+- PHP+Apache+MySQL → ใช้ Docker Compose เสมอ ไม่ใช่ apt install
+- Reset ทุกอย่าง: `docker compose down -v && docker compose up -d`
 
 ---
 
-## 2026-05-18 — ห้ามแก้ base repo ของ open source โดยตรง
-
+## customization-overlay-pattern
 **Category:** best_practice
-**Pattern-Key:** customization-overlay-pattern
-
-**Learning:**
-เมื่อใช้ open source เป็นฐาน (เช่น goragodwiriya/pos-system) — สร้าง folder customizations/ แยก แทนการแก้ใน base-pos/ โดยตรง
-
-**Structure:**
-- code/base-pos/              # อย่าแตะ ยกเว้นจำเป็นจริงๆ
-- code/customizations/api/Models/        # Model ใหม่
-- code/customizations/api/Controllers/
-- code/customizations/database/migrations/
-- code/customizations/admin/             # Page ใหม่
-
-**ข้อยกเว้นที่แก้ base-pos ได้:**
-- config.php (ทำให้อ่าน env vars)
-- Router.php (เพิ่ม routes ใหม่ — patch แบบ minimal + comment เหตุผล)
-
-**Why:**
-- Update upstream ได้ง่าย (git pull ใน base-pos ไม่ conflict)
-- เห็นชัดว่าอันไหนของเราเขียนเอง vs ของเดิม
-- Migration เป็นไฟล์แยก — เห็น history ของ schema changes
+- legacy PHP static-file stack → direct edit + document changes แพรกติคกว่า overlay
+- แก้ base-pos ได้เฉพาะ: config.php, Router.php (patch minimal + comment เหตุผล)
 
 ---
 
-## 2026-05-18 — TaskUpdate API caveat
-
-**Category:** knowledge_gap
-**Pattern-Key:** taskupdate-taskid-string-required
-
-**Learning:**
-TaskUpdate tool require taskId เป็น string ไม่ใช่ number — แม้ว่า task IDs ที่เห็นจะเป็นตัวเลข 1, 2, 3 แต่ schema strict ตรง type validation บางครั้งก็ reject ทั้งคู่ workaround คือใช้ TaskCreate ใหม่แทน
-
----
-
-## 2026-05-23 — Secondhand POS Dashboard Pivot
-
+## docker-volume-no-rebuild-files
 **Category:** best_practice
-**Pattern-Key:** dashboard-pivot-from-sales-to-purchase
-
-**Learning:**
-แปลง POS ขายของ → POS รับซื้อของเก่า ทำได้โดยไม่ต้อง rewrite core sales logic แค่ pivot dashboard + เพิ่ม purchase backend
-
-**Architecture (สิ่งที่ทำ):**
-1. **ReportService.php** — เพิ่ม `getDashboardStats()` ดึง purchase stats (today_purchases, today_po_count, total_sellers, pending_po) แทน sales stats, เพิ่ม `getPurchaseChartData()`, `getRecentPurchases()`
-2. **ReportsController.php** — เพิ่ม `getPurchaseChart()`, `getRecentPurchases()` endpoint handlers
-3. **Router.php** — register routes `reports/purchase-chart`, `reports/recent-purchases`
-4. **index.html** — เปลี่ยน stat cards (ยอดรับซื้อ/ใบรับซื้อ/ผู้ขาย/รอตรวจสอบ), chart selector (#purchasePeriod), purchase table (#recentPOTable)
-5. **dashboard.js** — fetch + render purchase data, `th-TH` locale labels, Thai status badges
-
-**Key insight:**
-เราไม่ต้องลบ sales code ทิ้ง — แค่เพิ่ม purchase queries ข้างๆ แล้ว dashboard เลือก render purchase side  sales side ยังทำงานปกติที่หน้ารายงาน/ประวัติการขาย
-
-**Why it worked with this codebase:**
-- Base POS (goragodwiriya/pos-system) มี `sales` + `sale_items` tables — แต่เราสร้าง `purchase_orders`, `sellers` เป็นตารางใหม่ parallel structure
-- Router-based MVC ทำให้เพิ่ม routes ได้โดยไม่กระทบ controller เดิม
-- dashboard เป็น static HTML + JS แยก — เปลี่ยนแค่ fetch/render logic ไม่ต้องแตะ core
-
-**Tables created:**
-- `purchase_orders` (reference_no, seller_id, user_id, branch_id, total_amount, status, created_at)
-- `purchase_order_items` (purchase_order_id, product_id, quantity, unit_price, total)
-- `sellers` (full_name, id_card_no, phone, address, is_blacklisted)
-- `item_conditions` (name, multiplier, sort_order)
+- PHP/JS/CSS/HTML → save แล้วใช้ได้ทันที ไม่ต้อง rebuild
+- Apache config change → `docker compose restart web`
 
 ---
 
-## 2026-05-23 — Multi-layer UTF-8 Fix สำหรับภาษาไทยใน PHP+MySQL
-
+## utf8-must-set-at-every-layer
 **Category:** correction
-**Pattern-Key:** utf8-must-set-at-every-layer
-
-**Learning:**
-ภาษาไทยแสดงเป็น `??????????` ใน browser เพราะ charset ไม่ถูกต้อง — ต้องตั้ง UTF-8 ทุก layer ไม่งั้นค้างคาที่ layer ใด layer หนึ่ง
-
-**Layers ที่ต้องตั้ง:**
-1. **Apache** — `AddDefaultCharset UTF-8` ใน apache-config.conf + restart container
-2. **PHP API** — `header('Content-Type: application/json; charset=utf-8')` ใน Response.php
-3. **PDO Connection** — `PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4"` ใน Database.php
-4. **MySQL Table** — `DEFAULT CHARACTER SET utf8mb4` ใน CREATE TABLE / ALTER TABLE
-5. **MySQL Init Script** — `--default-character-set=utf8mb4` ใน mysql-init.sh + `character-set-server = utf8mb4` ใน my.cnf
-6. **HTML** — `<meta charset="UTF-8">` (มีอยู่แล้ว)
-7. **JS** — `fetch()` + `JSON.parse()` จัดการ UTF-8 ให้อัตโนมัติ ถ้าทุก layer ข้างบนถูก
-
-**Symptom ที่เจอ:**
-- DB insert ผ่าน PHP → ไทยปกติ
-- DB insert ผ่าน mysql CLI by default → latin1 → data กลายเป็น mojibake
-- PDO ต่อตรงไม่ตั้ง charset → ข้อมูลไทยขึ้น `???`
-- `fetchColumn()` ใน Database.php ใช้ PDO::FETCH_COLUMN แต่ไม่เป็น issue จริง — ปัญหาหลักอยู่ที่ connection charset
-
-**Fix sequence:**
-1. ตั้ง Apache `AddDefaultCharset UTF-8` + restart container
-2. ใส่ charset ใน PDO connection
-3. Re-insert categories + settings data ที่เสีย (เพราะตอน first import ใช้ latin1 connection)
-4. ตั้ง mysql-init.sh charset ให้ถูกต้องตั้งแต่ container first run
-
-**Remember:**
-เวลาเห็น `????` ใน PHP+MySQL app → ไล่ layer จาก client (browser) → web server → PHP → PDO → MySQL → init script — เช็คทีละ layer
+- เห็น `????` → ไล่ทีละ layer: Apache → PHP header → PDO → MySQL table → init script
+- PDO connection ต้องมี: `PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4"`
 
 ---
 
-## 2026-05-27 — docker exec mysql ต้องใส่ --default-character-set=utf8mb4 เสมอ
-
+## docker-exec-mysql-charset-flag-required
 **Category:** correction
-**Pattern-Key:** docker-exec-mysql-charset-flag-required
-
-**Learning:**
-ทำซ้ำบั๊ก UTF-8 (ที่เคย learn ไปแล้ว 2026-05-23) — รัน `docker exec secondhand-pos-db mysql -uroot -p... -e "UPDATE branches SET name='สาขา 1'..."` แล้วข้อมูลในตารางกลายเป็น `à¸ªà¸²à¸‚à¸² 1` (double-encoded UTF-8)
-
-**Root cause:**
-- คอลัมน์ `name` เป็น `utf8mb4` → ถูก
-- terminal ส่ง bytes `E0B8AA...` (UTF-8 ของ `ส`) ไปจริง
-- แต่ mysql client default connection = latin1 → ตีความ bytes แต่ละตัวเป็น Windows-1252 char → convert เป็น utf8mb4 อีกชั้น → double-encode
-
-**Fix (เชิงคำสั่ง):**
+- ทุกครั้งที่รัน `docker exec ... mysql ... -e` กับข้อมูลภาษาไทย:
 ```bash
-# ❌ ผิด — กลายเป็น mojibake
-docker exec db mysql -uroot -p... pos_system -e "UPDATE ... SET name='ไทย'"
-
-# ✅ ถูก — ใส่ flag เสมอ
-docker exec db mysql -uroot -p... --default-character-set=utf8mb4 pos_system -e "UPDATE ... SET name='ไทย'"
+docker exec secondhand-pos-db mysql -uroot -prootpass --default-character-set=utf8mb4 pos_system -e "UPDATE ..."
 ```
-
-**How to apply:**
-- ทุกครั้งที่ใช้ `docker exec ... mysql ... -e` กับข้อมูลภาษาไทย ต้องมี `--default-character-set=utf8mb4`
-- เช็คผลลัพธ์ด้วย `SELECT name, HEX(name) FROM ...` — ตัวอักษรไทย UTF-8 ที่ถูกต้องเริ่มด้วย `E0Bx` (3 bytes/ตัว) ไม่ใช่ `C3A0C2Bx...` (6 bytes ของ double-encode)
-- ถ้าเจอ mojibake แล้ว: re-UPDATE ด้วย flag ที่ถูก จะเขียนทับได้เลย ไม่ต้อง drop table
-- เกี่ยวข้องกับ [[utf8-must-set-at-every-layer]]
-
-**Why we missed it:**
-Lesson เก่าระบุไว้แล้วว่า "DB insert ผ่าน mysql CLI by default → latin1 → mojibake" แต่ไม่ได้บันทึก *flag ที่ถูกต้อง* ไว้ตรงๆ — agent อ่านแล้วยังพลาดได้ เพราะไม่ใช่ checklist ที่ copy-paste ได้
+- เช็คผล: `SELECT HEX(name) FROM ...` — UTF-8 ไทยที่ถูกต้องเริ่มด้วย `E0Bx`
 
 ---
 
-## 2026-05-27 — อย่าทำเกินคำสั่ง แม้ "เดาว่า user น่าจะอยากได้"
-
+## no-action-beyond-explicit-scope
 **Category:** feedback
-**Pattern-Key:** no-action-beyond-explicit-scope
-
-**Learning:**
-ใน session เดียวกัน agent ทำ "เกินขอบเขต" 2 ครั้ง:
-1. แก้ใบรับซื้อตัด `(branch_code)` ออก ทั้งที่เพิ่งบอกว่า "ถ้าจะให้ตัดออกบอกได้ครับ"
-2. รัน `ALTER TABLE sellers MODIFY full_name NULL` ทั้งที่บอกว่า "ถ้าอยากเปลี่ยนให้รับ NULL ได้จริงๆ บอกได้ครับ"
-
-ทั้งสองครั้ง — agent บอกชัดว่า "จะรอคำสั่ง" แล้วก็ทำเองทันทีในก้อน tool call ถัดไป
-
-**Why this is wrong:**
-- Trust ของ Dr.Solodev สำคัญที่สุด (`AGENT-MEMORY.md` ระบุ "ลูกค้าโดนทิ้งงาน 2 ครั้ง → trust สำคัญที่สุด" — agent เองก็ต้อง trust ได้เหมือนกัน)
-- การพูดว่า "จะรอ" แล้วทำต่อทันที = พูดอย่างทำอย่าง = สูญเสีย credibility
-- เมื่อทำเกิน user ต้อง audit + revert = เสียเวลามากกว่าทำเอง
-
-**How to apply:**
-- ถ้าพูด "บอกได้ครับ" / "ถ้าอยากให้... บอก" / "รออนุญาต" → **หยุดที่นั่น**, ห้ามทำในก้อน tool call ต่อไปจนกว่า user reply
-- ถ้าเดาว่า user น่าจะอยากให้ทำต่อ → **ถาม** ก่อน (ใช้ ask_user_question / รอ message ถัดไป) ไม่ใช่ทำแล้วรอให้ revert
-- "Match the scope of your actions to what was actually requested" — ทำตรงตามที่สั่ง ไม่บวกขอบเขตเอง
-- ถ้าทำเกินไปแล้ว: ยอมรับตรงๆ + revert + ถาม (ห้ามแก้ตัวว่า "ก็คิดว่า user น่าจะ...")
-
-**Why:**
-Dr.Solodev mindset = "ขายผลงาน ไม่ได้ขายวิญญาณ" → agent ก็ไม่ควร "ขายวิญญาณ" ให้ความเร็วในการทำงาน โดยข้าม consent
-
-**Related:** [[trust-first-for-burned-customers]] — trust กฎเดียวกัน ทั้งกับลูกค้าและกับ Dr.Solodev
+- ถ้าพูด "บอกได้ครับ" / "รออนุญาต" → หยุดที่นั่น ห้ามทำในก้อน tool call ต่อไป
+- ทำตรงตามที่สั่ง ไม่บวกขอบเขตเอง
 
 ---
 
-## 2026-05-23 — Docker Volume Mount = No Rebuild for PHP/JS/Files
-
+## dashboard-pivot-from-sales-to-purchase
 **Category:** best_practice
-**Pattern-Key:** docker-volume-no-rebuild-files
+- แปลง POS ขายของ → POS รับซื้อ: เพิ่ม purchase queries ข้างๆ ไม่ต้องลบ sales code
+- Tables: purchase_orders, purchase_order_items, sellers, item_conditions
 
-**Learning:**
-ใน Docker dev setup ที่ volume mount project folder ตรงเข้า container (`./code/:/var/www/html/`) — ไฟล์ PHP, HTML, JS, CSS ใช้ได้ทันทีที่บันทึก ไม่ต้อง rebuild image
+---
 
-**Exceptions (ต้อง restart container):**
-- Apache config change (`apache-config.conf` / `.htaccess`)
-- PHP extensions หรือ php.ini
-- Router.php routes (กรณี Router.php ถูก include ใน PHP ที่ cached — แต่ใน project นี้ไม่ต้อง restart เพราะ Apache PHP module re-read ทุก request)
+## react-to-vanilla-php-port-strategy
+**Category:** best_practice
+- อ่าน React source ก่อน → model HTML+JS ตาม existing PHP page (เช่น purchase-orders)
+- เช็ค common.js ก่อนเขียน utility function ใหม่
+- Modal pattern: `.modal` / `.modal-content` / `.modal.show`
 
-**Command:**
+---
+
+## sidebar-two-styles-in-same-project
+**Category:** insight
+- base-pos มี sidebar HTML 2 แบบ: short (one-liner) และ long (multi-line)
+- เพิ่มลิงก์ sidebar → ต้องแก้ทั้ง 9 pages ด้วย exact string match ของแต่ละ style
+- grep ก่อนเสมอเพื่อดูว่าหน้าไหนใช้ style ไหน
+
+---
+
+## html-data-attribute-json-encoding-bug
+**Category:** correction
+- ❌ อย่าใช้ `escapeHtml()` กับ JSON ที่จะเก็บใน data-attribute → `JSON.parse()` ล้มเหลวเงียบๆ
+- ✅ ใช้ closure ส่ง object ตรงๆ แทน:
+```javascript
+div.addEventListener('click', () => selectCatalogItem(it));
+```
+
+---
+
+## global-state-must-be-set-before-dependent-function-call
+**Category:** correction
+- set state ก่อนเรียก function ที่อ่านค่านั้นเสมอ:
+```javascript
+currentCatalogItem = { ...item, tierPrices }; // set ก่อน
+buildTierButtons(tierPrices);                 // แล้วค่อย call
+```
+
+---
+
+## rewrite-beats-incremental-patching-when-broken
+**Category:** best_practice
+- สัญญาณควร rewrite: แก้แล้วไม่ทำงาน ≥2 รอบ / มี workaround ซ้อน >2 ชั้น / มี debug code ค้าง
+- เมื่อ rewrite → อ่านไฟล์ทั้งหมดก่อน normalize data format ให้ consistent ตั้งแต่ต้น
+
+---
+
+## js-referenced-element-must-exist-in-html
+**Category:** correction
+- JS ที่ set innerHTML/textContent → grep HTML ว่า id นั้นมีจริงก่อนเสมอ
 ```bash
-# For Apache config changes:
-docker compose restart web
-# For everything else (PHP/JS/HTML/CSS):
-# Just save file — no action needed
+grep -o "getElementById('[^']*')" file.js | sort -u
+grep -o 'id="[^"]*"' file.html | sort -u
 ```
 
 ---
 
-## 2026-05-23 — Customization Overlay: เมื่อเลี่ยงการแก้ base-pos ไม่ได้
+## docker-mysql-credentials-secondhand-pos
+**Category:** knowledge_gap
+- Container: `secondhand-pos-db` | DB: `pos_system`
+- User: `posuser/pospass` | Root: `rootpass`
+- API base: `http://localhost:8080/api/index.php/{route}`
 
+---
+
+## tier-buttons-visible-first
 **Category:** insight
-**Pattern-Key:** pragmatic-overlay-vs-direct-edit
-
-**Learning:**
-จากแผนเดิมใน learnings ก่อนหน้า (2026-05-18) — "ห้ามแก้ base-pos โดยตรง, สร้าง customizations/ โฟลเดอร์แยก" — แต่ในโปรเจกต์นี้ เราเลือกแก้ base-pos โดยตรง 5 ไฟล์:
-
-**ไฟล์ที่แก้ใน base-pos:**
-- `api/Services/ReportService.php` — เพิ่ม purchase queries (แก้ไข, ไม่ใช่แค่เพิ่มไฟล์ใหม่)
-- `api/Controllers/ReportsController.php` — เพิ่ม purchase endpoint methods
-- `api/Router.php` — register purchase routes
-- `admin/index.html` — เปลี่ยน UI dashboard
-- `assets/js/dashboard.js` — เปลี่ยน fetch/render logic
-- `assets/js/config.js` — เปลี่ยน basePath
-- `api/config.php` — เปลี่ยน DB host
-
-**เหตุผลที่เลือกแก้ตรง:**
-1. Base POS เป็น **static HTML+JS** — ไม่มี build pipeline, ไม่มี import/export — ทำให้ overlay pattern (override folder) ทำงานยาก
-2. เป็น **fixed-price project** จบในรอบเดียว — ไม่ต้อง update upstream
-3. **ไม่มี autoloader** — PHP class ต้องอยู่ในตำแหน่งที่ include ถึง
-4. Router.php เป็น switch-case — ไม่ support dynamic route registration
-
-**Lesson for future:**
-- Overlay pattern ใช้ได้ดีกับ **modular frameworks** (React, Laravel, Django) หรือเมื่อมี **build pipeline**
-- สำหรับ legacy PHP static-file stacks — **direct edit + document changes** แพรกติคกว่า
-- ต้องแยกให้ออกระหว่าง "แก้ base เพราะ framework ไม่ support overlay" กับ "แก้ base เพราะขี้เกียจทำ overlay"
-- ถ้ายังไงก็ต้องแก้ base — commit + comment ให้ชัดเจนว่าเราแก้อะไร เพื่อให้ cherry-pick ตอน upstream update ได้
+- ปุ่มระดับราคา (บิล1/2/3) ต้อง visible ตั้งแต่โหลดหน้า — user เลือก tier ก่อน add items
+- Default labels = "บิล1/2/3" → อัปเดตเมื่อเลือก catalog item ที่มี tier_prices
 
 ---
 
-## 2026-05-27 — SaleLots: React → PHP Base POS Port
-
-**Category:** best_practice
-**Pattern-Key:** react-to-vanilla-php-port-strategy
-
-**Learning:**
-ใน session นี้เรา port หน้า SaleLots (ขาย Lot) จาก React (`code/customizations/frontend-react/`) มาทำใน PHP base-pos (`code/base-pos/`) — ใช้ pattern เดียวกับที่ทำ Purchase Orders มาก่อน
-
-**สิ่งที่ต้องทำ:**
-1. **Router.php** — เพิ่ม 7 routes (`index`, `store`, `show`, `update`, `destroy`, `confirm`, `cancel`)
-2. **`admin/sale-lots.html`** — สร้างหน้าใหม่จาก template ของ `purchase-orders.html`
-3. **`assets/js/sale-lots.js`** — port logic จาก React `SaleLots.jsx` → Vanilla JS
-4. **Sidebar** — เพิ่มลิงก์ "ขาย Lot" ใน 9 admin HTML pages
-
-**Key differences when porting React → Vanilla PHP:**
-- React: state hooks (useState, useEffect), TanStack Query for data fetching
-- Vanilla JS: global state variables, manual DOM manipulation via innerHTML
-- React: `formatCurrency()` from utils — Vanilla: same function already in `common.js`
-- React: JSX components → Vanilla: template literals in render functions
-- React: Tailwind-like class naming → Vanilla: custom CSS classes (`.badge-*`, `.btn-*`, etc.)
-- React: `apiCall.get('/sale-lots')` → Vanilla: `apiRequest('sale-lots', 'POST', payload)` where apiPath = `/api/index.php`
-
-**What we reused from purchase-orders.js:**
-- Modal toggle pattern (`.modal.show`)
-- Cart/line-items rendering with `innerHTML`
-- `escapeHtml()`, `formatDateTime()` utility functions (defined locally)
-- API call pattern via `apiRequest()` from `common.js`
-
-**How to apply:**
-- When porting React feature to PHP base-pos: first read React source fully, then model the HTML+JS after an existing PHP page (e.g. purchase-orders)
-- Always check `common.js` for existing utility functions before defining new ones
-- For modals: use `.modal` / `.modal-content` / `.modal.show` pattern (not React portals)
-
----
-
-## 2026-05-27 — Two Sidebar HTML Styles in Base POS
-
-**Category:** insight
-**Pattern-Key:** sidebar-two-styles-in-same-project
-
-**Learning:**
-Base POS admin pages มี sidebar HTML แบบที่แตกต่างกัน 2 แบบ:
-
-**Short style (one-liner):**
-```html
-<li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
-```
-ใช้ใน: `purchase-orders.html`, `sellers.html`, `price-tiers.html`, `sale-lots.html`
-
-**Long style (multi-line):**
-```html
-<li>
-  <a href="sales.html">
-    <i class="icon-stats"></i>
-    <span>ประวัติการขาย</span>
-  </a>
-</li>
-```
-ใช้ใน: `index.html`, `inventory.html`, `sales.html`, `reports.html`, `settings.html`, `users.html`
-
-**Why it matters:**
-- time search/replace ต้อง match 2 patterns
-- Pages 4 หน้าแรกเป็น short style → อาจถูกแก้ล่าสุด (เดิม core POS มีแค่ long style)
-- เมื่อเพิ่มลิงก์ sidebar ใหม่ (เช่น ขาย Lot) — ต้องแก้ทั้ง 9 pages โดยใช้ exact string match ให้ถูกกับ style ของแต่ละหน้า
-
-**How to apply:**
-- ใช้ grep ก่อนเพื่อดูว่าแต่ละหน้าใช้ style ไหน
-- batch edit ด้วย exact multi-line oldString ที่ unique ต่อ context (อย่าใช้แค่ `<span>ประวัติการขาย</span>` เพราะ match 2 ครั้งใน 1 หน้า)
-- ใช้ `${icon}` + `href` เป็น anchor point ที่ unique
-
----
-
-## 2026-06-01 — Tier Buttons Always Visible, Select Tier First
-
-**Category:** contribution
-**Pattern-Key:** tier-buttons-visible-first
-
-**Learning:**
-User workflow จริงสำหรับร้านรับซื้อของเก่า: แคชเชียร์อยากเลือกระดับราคา (บิล) **ก่อน** เพิ่มรายการสินค้า — เพื่อให้ทุกรายการได้ราคาตาม Level นั้นอัตโนมัติ ไม่ต้องเลือกทีละตัว
-
-**ฟัง user ก่อน fix:**
-- User report แรกว่า "ปุ่มกดไม่ได้" → fix โดยให้ปุ่มโชว์ราคาจริงจาก catalog
-- แต่ user บอกต่อว่า workflow จริงของเค้าคือ เลือก Level ก่อน แล้วค่อยเพิ่มของ → ต้องโชว์ปุ่มตั้งแต่แรก ไม่ต้องรอเลือกสินค้า
-
-**Pattern ที่ถูก:**
-1. ปุ่มระดับราคา (บิล1/2/3) ต้อง visible เสมอตั้งแต่โหลดหน้า — ไม่ hide หลัง catalog selection
-2. Default labels = "บิล1", "บิล2", "บิล3" (หรือจาก label ที่เซ็ตใน catalog)
-3. เมื่อเลือก catalog item ที่มี tier_prices → ปุ่มอัปเดท label + ราคาจริง
-4. Level ที่เลือกไว้ยัง active อยู่ ข้าม item ได้
-5. `buildGlobalTierButtons()` รับ tierPrices param → fallback to generic ถ้าไม่มี
-
-**How to apply:**
-- UI component ที่เป็น "global setting" สำหรับทั้งฟอร์ม — ต้อง visible ตั้งแต่เริ่ม กรณีนี้ user อยาก select tier ก่อน add items
-- ฟัง user workflow จริงไปทีละรอบ — อย่าเดาว่า "fix นี้ครอบคลุมแล้ว"
-- แก้ 4 จุดเชื่อมโยงใน purchase-orders.js: buildGlobalTierButtons, selectCatalogItem, addItemToCart, clearAll, itemName input handler
-
----
-
-## 2026-06-05 — DROP FK constraint ก่อน DROP column
-
-**Category:** database_migrations
-**Pattern-Key:** drop-fk-before-drop-column
-
-**Learning:**
-ตอน migrate categories เพื่อลบ branch_id column → Error: "Cannot drop column 'branch_id': needed in a foreign key constraint"
-
-**Root cause:**
-MySQL ไม่อนุญาตให้ DROP column ที่มี FK constraint อยู่ — ต้อง DROP constraint ก่อน
-
-**Fix:**
+## drop-fk-before-drop-column
+**Category:** correction
 ```sql
--- ❌ Wrong
-ALTER TABLE categories DROP COLUMN branch_id;
-
--- ✅ Right
+-- ✅ ลำดับที่ถูก
 ALTER TABLE categories DROP FOREIGN KEY fk_categories_branch;
 ALTER TABLE categories DROP COLUMN branch_id;
+-- เช็ค constraint name: SHOW CREATE TABLE categories;
 ```
 
-**How to apply:**
-- เช็ค FK constraints ก่อน DROP column: `SHOW CREATE TABLE categories;`
-- ลำดับ: DROP FK → DROP column → ADD new constraints (ถ้ามี)
-- ใช้ `SHOW CREATE TABLE` เพื่อเห็น constraint names ที่ถูกต้อง
+---
+
+## merge-duplicates-remap-foreign-keys
+**Category:** best_practice
+- remap FK references ก่อนลบ duplicates เสมอ — ไม่งั้น orphaned records
+- ใช้ temp mapping table: `old_id → canonical_id (MIN(id) per name)`
 
 ---
 
-## 2026-06-05 — Global categories = merge duplicates + remap FKs
-
-**Category:** data_migration
-**Pattern-Key:** merge-duplicates-remap-foreign-keys
-
-**Learning:**
-โปรเจกต์นี้มี categories แยกตาม branch_id (59 รายการ = 4 สาขา × ~15 หมวด) แต่จริงๆ ชื่อหมวดหมู่เหมือนกันทุกสาขา → ควรเป็น global shared categories
-
-**Migration strategy:**
-1. สร้าง temp mapping table: `old_id → canonical_id` (MIN(id) per name)
-2. UPDATE FK references ใน child tables (sale_lot_items, purchase_order_items)
-3. DELETE duplicates (เก็บแค่ MIN(id) per name)
-4. DROP branch_id column + ADD UNIQUE constraint on name
-
-**Key insight:**
-ต้อง remap FK references **ก่อน** ลบ duplicates — ไม่งั้น orphaned records
-
-**How to apply:**
-- เช็คว่ามี child tables ไหน reference categories: `SHOW CREATE TABLE sale_lot_items;`
-- ใช้ temp table สำหรับ mapping แทนการ hardcode IDs
-- Test ว่า remap สำเร็จ: `SELECT COUNT(DISTINCT category_id) FROM sale_lot_items;`
+## localstorage-branch-selection-banner
+**Category:** best_practice
+- การเลือกที่สำคัญ (สาขา, warehouse) → persist ด้วย localStorage
+- แสดง banner ชัดเจน — อย่าให้ user ต้องมองหา dropdown
 
 ---
 
-## 2026-06-05 — localStorage + banner = persist + remind
+## strict-vs-relaxed-validation
+**Category:** best_practice
+- ถาม user ก่อนว่า "ห้ามเท่ากัน" หรือ "ห้ามกลับด้าน" — อย่าเดาเอง
+- แก้ทั้ง backend และ frontend ให้ตรงกันเสมอ
 
-**Category:** ux_improvement
-**Pattern-Key:** localstorage-branch-selection-banner
+---
 
-**Learning:**
-พนักงานมักลืมเช็คว่ากำลังรับซื้อที่สาขาไหน → บันทึกผิดสาขา
-
-**Solution:**
-1. **localStorage** — บันทึกสาขาที่เลือก: `localStorage.setItem('selected_branch_id', value)`
-2. **Banner** — แสดงชัดเจน: "🏪 กำลังรับซื้อที่สาขา: XXX" (สีเหลือง, เด่น)
-3. **Auto-restore** — โหลดสาขากลับมาตอน init
-
-**Implementation:**
+## category-default-unit-autofill
+**Category:** best_practice
+- เพิ่ม `default_unit VARCHAR(20)` ใน categories → auto-fill หน่วยตอนเลือกหมวด
 ```javascript
-// Save on change
-branchSelect.addEventListener('change', (e) => {
-  localStorage.setItem('selected_branch_id', e.target.value);
-  updateBranchBanner();
-});
-
-// Restore on load
-const savedBranchId = localStorage.getItem('selected_branch_id');
-if (savedBranchId) branchSelect.value = savedBranchId;
-```
-
-**How to apply:**
-- การเลือกที่สำคัญ (สาขา, warehouse, payment method) → persist ด้วย localStorage
-- แสดง banner/indicator ชัดเจน — อย่าให้ user ต้องมองหา dropdown
-- ข้าม browser/device → ต้องเลือกใหม่ (ปลอดภัยกว่า)
-
----
-
-## 2026-06-05 — Validation: < vs ≤ ใน business rules
-
-**Category:** business_logic
-**Pattern-Key:** strict-vs-relaxed-validation
-
-**Learning:**
-ระบบบังคับ price tiers: บิล1 **<** บิล2 **<** บิล3 (strictly increasing) แต่ user ต้องการใส่ราคา**เท่ากันได้** (เช่น บิล1=6, บิล2=6, บิล3=7) เพราะราคากลางผันแปรบ่อย
-
-**Fix:**
-แก้จาก `>=` เป็น `>`:
-```php
-// ❌ Old: strictly increasing
-if ($t1 >= $t2 || $t2 >= $t3) {
-  Response::error('บิล 1 < บิล 2 < บิล 3', 400);
-}
-
-// ✅ New: non-decreasing (equal allowed)
-if ($t1 > $t2 || $t2 > $t3) {
-  Response::error('บิล 1 ≤ บิล 2 ≤ บิล 3', 400);
-}
-```
-
-**ต้องแก้ 2 จุด:**
-1. Backend: `InventoryController.php` (createProduct, updateProduct)
-2. Frontend: `inventory.js` (form validation)
-
-**How to apply:**
-- ถาม user ว่า business rule เข้มงวดแค่ไหน — "ต้องเรียงเสมอ" อาจหมายถึง "ห้ามกลับด้าน" ไม่ใช่ "ห้ามเท่ากัน"
-- อย่าเดาเอง — ถ้า user บอกว่า "บางทีต้องใส่เท่ากัน" → relax validation
-- แก้ทั้ง backend และ frontend ให้ตรงกัน
-
----
-
-## 2026-06-05 — default_unit per category (multi-unit inventory)
-
-**Category:** feature
-**Pattern-Key:** category-default-unit-autofill
-
-**Learning:**
-บางหมวดหมู่ใช้หน่วยต่างกัน: "เหล็ก" → กก., "ขวดใส่ลัง" → ลัง, "โทรศัพท์เก่า" → ชิ้น
-
-**Implementation:**
-1. เพิ่ม column `default_unit VARCHAR(20) DEFAULT 'กก.'` ใน categories
-2. API ส่ง `default_unit` มาพร้อม categories (ใช้ `SELECT *` อยู่แล้ว)
-3. Frontend: เพิ่ม `data-unit` ใน `<option>`, auto-fill ตอนเลือกหมวดหมู่
-
-```javascript
-// Store unit in option
-<option value="${cat.id}" data-unit="${cat.default_unit}">${cat.name}</option>
-
-// Auto-fill on select
-const selectedOption = categorySelect.selectedOptions[0];
-const defaultUnit = selectedOption?.dataset.unit || 'ชิ้น';
+const defaultUnit = categorySelect.selectedOptions[0]?.dataset.unit || 'ชิ้น';
 unitInput.value = defaultUnit;
 ```
 
-**How to apply:**
-- ถ้าระบบมีหลายหน่วย → เก็บ default_unit per category
-- User ยังแก้ได้ถ้าต้องการ (dropdown หน่วยยังเปิดอยู่)
-- เทียบกับ allowed_units (JSON array) — default_unit ง่ายกว่าถ้า 1 หมวด = 1 หน่วยหลัก
-
 ---
 
-## 2026-06-01 — categories.stock_kg มีอยู่แล้ว แต่ UI ไม่แสดง
-
+## api-returns-data-frontend-not-rendering
 **Category:** correction
-**Pattern-Key:** api-returns-data-frontend-not-rendering
-
-**Learning:**
-PO system อัปเดท `categories.stock_kg` ทุกครั้งที่มีการซื้อเข้า (ใน `PurchaseOrder::createWithItems()`) และ SaleLot confirm ก็หัก stock_kg ด้วย — แต่หน้า inventory (`inventory.html`) โชว์แค่ `products` table ไม่มี card สำหรับ category stock
-
-**Root cause:**
-- `InventoryController::getCategories()` ใช้ `Category::findAll()` → `SELECT * FROM categories` → `stock_kg` อยู่ใน response อยู่แล้ว ✅
-- แต่ `inventory.js` เรียกแค่ `renderCategoryDropdowns()` ไม่ได้ render stock_kg
-- user เห็นแต่ product quantity (INT) ซึ่งไม่เคย update จาก PO
-
-**Fix:**
-- เพิ่ม `renderCategoryStock()` ใน inventory.js — อ่าน `c.stock_kg` (DECIMAL) จาก categories API
-- สร้าง card "สต็อกตามหมวด (กก.)" ใน inventory.html — grid layout + กราฟบาร์
-- `categories` API ไม่ต้องแก้ — data มีอยู่แล้ว
-
-**Key insight:**
-ถ้า API return field อยู่แล้ว แต่ frontend ไม่ show — user คิดว่าระบบไม่ทำงาน ต้อง trace data flow ครบวงจร: DB → Model → Controller → API response → JS fetch → DOM render
-
-**How to apply:**
-- อย่าด่วนสรุปว่า "แบ็คเอนด์ไม่ update" — check API response ก่อน (curl + jq)
-- หน้า inventory ในระบบนี้แยกเป็น 2 ระบบ: products (retail) vs categories (scrap kg) — ทำให้ user งงว่าทำไมซื้อของแล้วสต็อกไม่ขึ้น
-- ถ้ามี 2 stock system ควร show ทั้งคู่ในหน้าเดียวกัน
+- ก่อนสรุปว่า backend ไม่ update → curl API ดู response ก่อนเสมอ
+- trace data flow ครบ: DB → Model → Controller → API → JS fetch → DOM render
 
 ---
 
-## 2026-05-27 — 401 ≠ 404 — Confirming API Route Works
-
+## api-401-confirms-route-found
 **Category:** knowledge_gap
-**Pattern-Key:** api-401-confirms-route-found
-
-**Learning:**
-เวลา verify API endpoint ด้วย webfetch แล้วได้ 401 — นั่นแปลว่่า **route ถูกต้อง** (matched + dispatched) แต่ต้องใช้ auth token
-
-**Symptom sequence:**
-- `webfetch(http://localhost:8080/api/sale-lots)` → 404 → route not found
-- `webfetch(http://localhost:8080/api/index.php/sale-lots)` → 401 → route found, auth required
-
-**Why:**
-- apiPath = `/api/index.php` (from config.js)
-- Apache passes `/api/index.php/sale-lots` to PHP
-- Router.php parses 'sale-lots' from URI and matches route
-- `checkAuth()` fires before dispatch → returns 401 if no Bearer token
-
-**How to apply:**
-- 401 = route works (just needs login)
-- 404 = route doesn't match — check Router.php registration or URL path
-- Don't confuse 401 with route failure
+- 401 = route ถูกต้อง แต่ต้อง auth token
+- 404 = route ไม่ match → เช็ค Router.php หรือ URL path
 
 ---
 
-## 2026-05-27 — apiPath = `/api/index.php` Not Just `/api/`
-
+## apipath-includes-index-php
 **Category:** correction
-**Pattern-Key:** apipath-includes-index-php
-
-**Learning:**
-ตอน verify API URL ใช้ `http://localhost:8080/api/sale-lots` → 404 แต่ `http://localhost:8080/api/index.php/sale-lots` → 401 (route found)
-
-**Root cause:**
-`config.js` ตั้ง:
-```javascript
-window.apiPath = '/api/index.php';
-```
-และ `common.js` เรียก:
-```javascript
-fetch(`${apiPath}/${endpoint}`, options);
-```
-ดังนั้น API call จริง = `fetch('/api/index.php/sale-lots', ...)`
-
-Apache ต้องเห็น `index.php` ใน path ถึงจะส่งต่อให้ PHP Router processor (เพราะ mod_php / Apache ใช้ index.php เป็น entry point)
-
-**How to apply:**
-- เวลา webfetch/api test ใช้ `/api/index.php/` prefix
-- อย่าเดาเป็น `/api/` เฉยๆ — 404 เสมอ
-- ดู config.js ก่อน verify API
+- API URL ที่ถูกต้อง: `http://localhost:8080/api/index.php/{route}`
+- ❌ `/api/{route}` → 404 เสมอ
