@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ขาย Lot - ระบบรับซื้อของเก่า</title>
-  <link rel="stylesheet" href="../assets/css/fonts.css">
-  <link rel="stylesheet" href="../assets/css/styles.css">
-  <link rel="stylesheet" href="../assets/css/utilities.css">
+  <link rel="stylesheet" href="../assets/css/main.css">
   <style>
     .page-header {
       display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
@@ -44,6 +42,9 @@
         <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
         <li><a href="sale-lots.html" class="active"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+        <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+        <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
         <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
         <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
         <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
@@ -87,8 +88,9 @@
                   <th>เลขที่</th>
                   <th>วันที่ขาย</th>
                   <th>ผู้ซื้อ</th>
-                  <th class="text-right">ยอดขาย</th>
+                  <th class="text-right">ยอดประมาณ</th>
                   <th class="text-right">ต้นทุน</th>
+                  <th class="text-right">รายรับจริง</th>
                   <th class="text-right">กำไร</th>
                   <th>สถานะ</th>
                   <th>จัดการ</th>
@@ -204,9 +206,42 @@
   </div>
 
   <div id="notification-container"></div>
+
+  <!-- Revenue Modal -->
+  <div class="modal" id="revenueModal">
+    <div class="modal-content" style="max-width:460px">
+      <div class="modal-header">
+        <h2 id="revenueModalTitle">บันทึกรายรับ</h2>
+        <button class="close-modal" onclick="document.getElementById('revenueModal').classList.remove('show')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--color-text-light);font-size:13px;margin-bottom:16px">
+          กรอกยอดที่ได้จริงจากบิลศูนย์รับซื้อ/โรงงาน
+        </p>
+        <div class="form-group">
+          <label>ยอดรายรับจริง (บาท) <span style="color:var(--color-danger)">*</span></label>
+          <input type="number" id="revenueAmount" class="form-control" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>วันที่ได้รับเงิน</label>
+          <input type="date" id="revenueDate" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>หมายเหตุ (ไม่บังคับ)</label>
+          <input type="text" id="revenueNote" class="form-control" placeholder="เช่น บิลเลขที่ INV-001, ราคาเหล็ก 8.50 บ./กก.">
+        </div>
+        <p id="revenueError" style="color:var(--color-danger);font-size:13px;margin:0"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('revenueModal').classList.remove('show')">ยกเลิก</button>
+        <button class="btn btn-primary" id="saveRevenueBtn" onclick="saveRevenue()">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
-  <script src="../assets/js/sale-lots.js"></script>
+  <script src="../assets/js/sale-lots.js?v=20260608b"></script>
   <script src="../assets/js/animations.js"></script>
 </body>
 </html>

@@ -98,6 +98,14 @@ function renderCategoryDropdowns() {
   });
 }
 
+let thresholdMode = false;
+
+function toggleThresholdMode() {
+  thresholdMode = !thresholdMode;
+  document.getElementById('thresholdForm').style.display = thresholdMode ? '' : 'none';
+  renderCategoryStock();
+}
+
 function renderCategoryStock() {
   const container = document.getElementById('categoryStockGrid');
   if (!container) return;
@@ -129,20 +137,47 @@ function renderCategoryStock() {
   const maxStock = Math.max(...filtered.map(c => parseFloat(c.stock_kg || 0)), 1);
   container.innerHTML = filtered.map(c => {
     const kg = parseFloat(c.stock_kg || 0);
+    const threshold = parseFloat(c.alert_threshold || 0);
+    const isAlert = threshold > 0 && kg <= threshold;
     const pct = Math.min(100, (kg / maxStock) * 100);
     let barColor = '#22c55e';
     if (kg <= 0) barColor = '#ef4444';
+    else if (isAlert) barColor = '#f59e0b';
     else if (pct < 20) barColor = '#f59e0b';
+
+    const thresholdInput = thresholdMode && c.id ? `
+      <div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+        <input type="number" min="0" step="0.001" placeholder="ตั้ง alert (กก.)"
+          value="${c.alert_threshold != null ? c.alert_threshold : ''}"
+          style="width:100%;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px"
+          onchange="saveThreshold(${c.id}, this.value)">
+      </div>` : '';
+
+    const alertBadge = isAlert && !thresholdMode
+      ? `<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:99px;margin-left:4px">⚠ ใกล้หมด</span>` : '';
+
     return `
-      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
-        <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:6px">${escapeHtml(c.name)}</div>
+      <div style="background:#fff;border:1px solid ${isAlert ? '#fcd34d' : '#e2e8f0'};border-radius:10px;padding:14px">
+        <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:6px">${escapeHtml(c.name)}${alertBadge}</div>
         <div style="font-size:22px;font-weight:700;color:${barColor}">${kg.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
         <div style="font-size:11px;color:#94a3b8">กก.</div>
         <div style="margin-top:8px;height:4px;background:#f1f5f9;border-radius:4px;overflow:hidden">
           <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width 0.3s"></div>
         </div>
+        ${thresholdInput}
       </div>`;
   }).join('');
+}
+
+async function saveThreshold(categoryId, value) {
+  const threshold = value === '' ? null : parseFloat(value);
+  const res = await apiRequest('inventory/set-threshold', 'POST', { category_id: categoryId, threshold });
+  if (res.status === 'success') {
+    const cat = categories.find(c => c.id == categoryId);
+    if (cat) cat.alert_threshold = threshold;
+  } else {
+    showNotification('บันทึก threshold ไม่สำเร็จ', 'error');
+  }
 }
 
 function renderCatalogItems(items) {

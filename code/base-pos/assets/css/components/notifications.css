@@ -1,0 +1,82 @@
+/* Notifications */
+#notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: var(--z-notification);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.notification {
+  padding: 14px 16px;
+  padding-left: 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 300px;
+  max-width: 400px;
+  animation: notification-slide 0.3s ease;
+  border-left: 4px solid transparent;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.notification::before {
+  font-family: 'icomoon';
+  font-size: 16px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+.notification-info {
+  background-color: var(--color-white);
+  color: var(--color-info);
+  border-left-color: var(--color-info);
+  box-shadow: var(--shadow-md);
+}
+.notification-info::before {
+  content: "\e643";
+}
+.notification-success {
+  background-color: var(--color-white);
+  color: var(--color-success);
+  border-left-color: var(--color-success);
+}
+.notification-success::before {
+  content: "\e6d4";
+}
+.notification-error {
+  background-color: var(--color-white);
+  color: var(--color-danger);
+  border-left-color: var(--color-danger);
+}
+.notification-error::before {
+  content: "\e999";
+}
+.notification-warning {
+  background-color: var(--color-white);
+  color: var(--color-warning);
+  border-left-color: var(--color-warning);
+}
+.notification-warning::before {
+  content: "\e644";
+}
+.notification-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--color-text-lighter);
+  padding: 2px 4px;
+  margin-left: 12px;
+  flex-shrink: 0;
+  transition: color var(--transition);
+}
+.notification-close:hover {
+  color: var(--color-text);
+}
+@keyframes notification-slide {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

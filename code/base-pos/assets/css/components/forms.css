@@ -1,0 +1,140 @@
+/* Forms */
+.form-group {
+  margin-bottom: 16px;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--color-text);
+}
+.form-control {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--color-text);
+  background-color: var(--color-input-bg);
+  transition: border-color var(--transition), box-shadow var(--transition);
+  line-height: 1.5;
+}
+.form-control::placeholder {
+  color: var(--color-text-lighter);
+}
+.form-control:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+.form-control:disabled {
+  background-color: var(--color-bg);
+  cursor: not-allowed;
+}
+textarea.form-control {
+  min-height: 100px;
+  resize: vertical;
+}
+select.form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -8px;
+  margin-left: -8px;
+}
+.form-col {
+  flex: 1;
+  padding: 0 8px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+.form-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.form-hint {
+  font-size: 12px;
+  color: var(--color-text-light);
+  margin-top: 4px;
+}
+
+/* Labels & Small Text */
+label {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* Password Fields */
+.password-fields {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+/* === Form Grid System === */
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-col-auto {
+  flex: 0 0 auto;
+}
+
+.form-control-sm { max-width: 120px; }
+.form-control-md { max-width: 200px; }
+.form-control-lg { max-width: 300px; }
+
+/* === Form Field States === */
+.form-group label.required::after {
+  content: " *";
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.form-control-error {
+  border-color: var(--color-danger);
+  background-color: #FEF2F2;
+}
+
+.form-control-error:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.form-error-message {
+  color: var(--color-danger);
+  font-size: 13px;
+  margin-top: 4px;
+  display: block;
+}
+
+.form-control:disabled,
+.form-control[disabled] {
+  background-color: var(--color-gray-100);
+  color: var(--color-gray-500);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Input focus enhancement */
+.form-control:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.08);
+  outline: none;
+}

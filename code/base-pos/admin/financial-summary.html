@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>สรุปธุรกิจ - ระบบรับซื้อของเก่า</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .summary-card {
+      background: var(--color-white);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+    .summary-card .label {
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-light);
+      margin-bottom: 8px;
+    }
+    .summary-card .value {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .summary-card .sub {
+      font-size: 12px;
+      color: var(--color-text-lighter);
+      margin-top: 4px;
+    }
+    .value.income  { color: var(--color-success); }
+    .value.expense { color: var(--color-danger); }
+    .value.profit  { color: var(--color-primary); }
+    .value.neutral { color: var(--color-text); }
+    .period-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .period-bar select, .period-bar input {
+      padding: 8px 12px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-family: inherit;
+      background: var(--color-white);
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--color-primary-light);
+    }
+    .lot-revenue-table td, .lot-revenue-table th {
+      font-size: 13px;
+    }
+    .badge-income  { background: var(--color-success-light); color: var(--color-success); }
+    .badge-expense { background: var(--color-danger-light);  color: var(--color-danger);  }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <i class="icon-cart"></i>
+          <span>รับซื้อของเก่า</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
+        <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li class="admin-only"><a href="financial-summary.html" class="active"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+        <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+        <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+      </ul>
+    </aside>
+
+    <div class="content-area">
+      <div class="topbar">
+        <div class="page-header" style="flex:1">
+          <h1 class="page-title">สรุปธุรกิจ</h1>
+        </div>
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="userName">-</span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Period Selector -->
+      <div class="period-bar">
+        <label style="font-weight:500;font-size:14px">ช่วงเวลา:</label>
+        <select id="periodType">
+          <option value="month">รายเดือน</option>
+          <option value="year">รายปี</option>
+        </select>
+        <select id="periodMonth">
+          <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
+          <option value="3">มีนาคม</option><option value="4">เมษายน</option>
+          <option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
+          <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option>
+          <option value="9">กันยายน</option><option value="10">ตุลาคม</option>
+          <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+        </select>
+        <select id="periodYear"></select>
+        <select id="branchFilter">
+          <option value="">ทุกสาขา</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadSummary()">ดูข้อมูล</button>
+        <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="exportCsv('purchases')">⬇ รับซื้อ</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportCsv('salelots')">⬇ ขาย Lot</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportCsv('expenses')">⬇ ค่าใช้จ่าย</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportCsv('summary')">⬇ สรุปรวม</button>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="summary-grid" id="summaryCards">
+        <div class="summary-card">
+          <div class="label">รายจ่ายรับซื้อของ</div>
+          <div class="value expense" id="totalPurchase">฿0.00</div>
+          <div class="sub" id="totalPurchaseKg">0 กก.</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">รายรับขาย Lot (จริง)</div>
+          <div class="value income" id="totalRevenue">฿0.00</div>
+          <div class="sub" id="totalLots">0 Lot</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">ค่าใช้จ่ายต่อ Lot</div>
+          <div class="value expense" id="totalExpenses">฿0.00</div>
+          <div class="sub">ค่ารถ ค่าน้ำมัน ฯลฯ (ต่อ Lot)</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">ค่าใช้จ่ายประจำร้าน</div>
+          <div class="value expense" id="totalBizExpenses">฿0.00</div>
+          <div class="sub">ค่าไฟ ค่าน้ำ ค่าเช่า ค่าเน็ต ฯลฯ</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">กำไร/ขาดทุนสุทธิ</div>
+          <div class="value profit" id="netProfit">฿0.00</div>
+          <div class="sub" id="profitMargin">-</div>
+        </div>
+      </div>
+
+      <!-- Business Expenses -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+          <h2 class="card-title">ค่าใช้จ่ายประจำร้าน</h2>
+          <button class="btn btn-primary btn-sm" onclick="toggleExpenseForm()">+ เพิ่มรายการ</button>
+        </div>
+        <div class="card-body" id="expenseFormWrap" style="display:none;border-bottom:1px solid var(--color-border);padding-bottom:16px;margin-bottom:16px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div>
+              <label style="font-size:12px;display:block;margin-bottom:4px">สาขา</label>
+              <select id="expBranch" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit"></select>
+            </div>
+            <div>
+              <label style="font-size:12px;display:block;margin-bottom:4px">วันที่</label>
+              <input type="date" id="expDate" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label style="font-size:12px;display:block;margin-bottom:4px">ประเภท</label>
+              <select id="expCategory" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit">
+                <option>ค่าไฟ</option>
+                <option>ค่าน้ำ</option>
+                <option>ค่าเช่า</option>
+                <option>ค่าเน็ต</option>
+                <option>ค่าน้ำมัน</option>
+                <option>เงินเดือนพนักงาน</option>
+                <option>อื่นๆ</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;display:block;margin-bottom:4px">จำนวนเงิน (บาท)</label>
+              <input type="number" id="expAmount" min="0" step="0.01" placeholder="0.00" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;width:120px">
+            </div>
+            <div style="flex:1;min-width:150px">
+              <label style="font-size:12px;display:block;margin-bottom:4px">หมายเหตุ</label>
+              <input type="text" id="expNote" placeholder="(ไม่บังคับ)" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;width:100%">
+            </div>
+            <button class="btn btn-success" onclick="saveExpense()">บันทึก</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding-top:0">
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>สาขา</th>
+                  <th>ประเภท</th>
+                  <th class="text-right">จำนวนเงิน</th>
+                  <th>หมายเหตุ</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="bizExpenseBody">
+                <tr><td colspan="6" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lot Revenue Detail -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header">
+          <h2 class="card-title">รายละเอียดรายรับจากขาย Lot</h2>
+        </div>
+        <div class="card-body">
+          <div class="table-container">
+            <table class="data-table lot-revenue-table" id="lotRevenueTable">
+              <thead>
+                <tr>
+                  <th>เลขที่ Lot</th>
+                  <th>วันที่ขาย</th>
+                  <th>สาขา</th>
+                  <th class="text-right">ต้นทุนรับซื้อ</th>
+                  <th class="text-right">รายรับจริง</th>
+                  <th>หมายเหตุ</th>
+                  <th class="text-right">กำไร/ขาดทุน</th>
+                </tr>
+              </thead>
+              <tbody id="lotRevenueBody">
+                <tr><td colspan="7" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchase Summary by Category -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">รายจ่ายรับซื้อแยกตามหมวดหมู่</h2>
+        </div>
+        <div class="card-body">
+          <div class="table-container">
+            <table class="data-table" id="categoryTable">
+              <thead>
+                <tr>
+                  <th>หมวดหมู่</th>
+                  <th class="text-right">น้ำหนัก (กก.)</th>
+                  <th class="text-right">จำนวนรายการ</th>
+                  <th class="text-right">เงินที่จ่ายออก</th>
+                </tr>
+              </thead>
+              <tbody id="categoryBody">
+                <tr><td colspan="4" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.content-area -->
+  </div><!-- /.app-container -->
+
+  <div id="notification-container"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/financial-summary.js"></script>
+</body>
+</html>

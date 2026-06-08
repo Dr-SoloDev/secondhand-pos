@@ -1,0 +1,130 @@
+/* Sale Header */
+.sale-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+.sale-info, .sale-status {
+  flex: 1;
+}
+.sale-info p, .sale-status p {
+  margin: 5px 0;
+  font-size: 14px;
+}
+.sale-summary {
+  margin-top: 20px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 20px;
+}
+.sale-notes {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.sale-notes p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+.no-products {
+  text-align: center;
+  padding: 20px;
+  color: var(--color-text-lighter);
+  grid-column: 1 / -1;
+}
+
+/* Receipt */
+.receipt {
+  font-family: 'Courier New', monospace;
+  max-width: 380px;
+  margin: 0 auto;
+  padding: 10px;
+}
+.receipt h3 {
+  font-family: var(--font-main);
+}
+.receipt-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.receipt-header h3 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+.receipt-header p {
+  margin: 3px 0;
+  font-size: 12px;
+}
+.receipt-info {
+  margin-bottom: 15px;
+}
+.receipt-info p {
+  margin: 3px 0;
+  font-size: 12px;
+}
+.receipt-items {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 15px;
+}
+.receipt-items th,
+.receipt-items td {
+  text-align: left;
+  padding: 3px;
+  font-size: 12px;
+}
+.receipt-items th {
+  border-bottom: 1px dashed #000;
+}
+.receipt-summary {
+  margin-top: 15px;
+  font-size: 12px;
+}
+.receipt-footer {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px dashed #000;
+  font-size: 12px;
+}
+
+/* Branch Summary Grid */
+.branch-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.branch-card {
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  border-left: 4px solid var(--color-primary);
+  transition: all var(--transition);
+}
+.branch-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.branch-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.branch-card-name { font-weight: 600; font-size: 15px; color: var(--color-gray-800); }
+.branch-card-code { font-size: 12px; color: var(--color-gray-500); background: var(--color-gray-100); padding: 2px 8px; border-radius: 10px; }
+.branch-card-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.branch-stat { text-align: center; padding: 8px; background: var(--color-gray-50); border-radius: var(--radius-sm); }
+.branch-stat-value { font-size: 14px; font-weight: 600; color: var(--color-primary-dark); }
+.branch-stat-label { font-size: 11px; color: var(--color-gray-500); margin-top: 2px; }
+.branch-card-meta { margin-top: 10px; font-size: 12px; color: var(--color-gray-500); display: flex; gap: 12px; }
+.branch-pending-badge { background: var(--color-warning-light); color: var(--color-warning); padding: 1px 6px; border-radius: 8px; font-size: 11px; font-weight: 500; }
+.branch-pending-badge { background: var(--color-warning-light); color: var(--color-warning); padding: 1px 6px; border-radius: 8px; font-size: 11px; font-weight: 500; }
+
+/* Branch Banner */
+.branch-banner {
+  display: none;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  padding: 12px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  color: #856404;
+}

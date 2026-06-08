@@ -93,7 +93,7 @@ function renderLots() {
     : lots;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:24px">' +
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:24px">' +
       (q ? 'ไม่พบรายการที่ค้นหา' : 'ยังไม่มีรายการขาย Lot') + '</td></tr>';
     return;
   }
@@ -108,6 +108,12 @@ function renderLots() {
       <td>${escapeHtml(lot.buyer_name || '-')}</td>
       <td class="text-right">${formatCurrency(lot.total_amount)}</td>
       <td class="text-right" style="color:var(--color-text-light)">${formatCurrency(lot.total_cost)}</td>
+      <td class="text-right">
+        ${lot.actual_revenue != null
+          ? `<span style="color:var(--color-success);font-weight:600">฿${parseFloat(lot.actual_revenue).toLocaleString('th-TH',{minimumFractionDigits:2})}</span>`
+          : `<span style="color:var(--color-text-lighter);font-size:12px">ยังไม่บันทึก</span>`
+        }
+      </td>
       <td class="text-right"><span class="${profitClass}">${profitSign}${formatCurrency(profit)}</span></td>
       <td>${statusBadgeHtml(lot.status)}</td>
       <td>
@@ -115,9 +121,10 @@ function renderLots() {
           ${lot.status === 'draft' ? `
             <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})">แก้ไข</button>
             <button class="btn btn-sm btn-success" onclick="confirmLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')">ยืนยัน</button>
-          ` : ''}
-          ${lot.status === 'draft' ? `
             <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" style="padding:3px 8px">ลบ</button>
+          ` : ''}
+          ${lot.status === 'confirmed' ? `
+            <button class="btn btn-sm btn-primary" onclick="openRevenueModal(${lot.id}, '${escapeHtml(lot.reference_no || '')}', ${lot.actual_revenue || 'null'})">บันทึกรายรับ</button>
           ` : ''}
         </div>
       </td>
@@ -126,7 +133,7 @@ function renderLots() {
 }
 
 function addLineItem() {
-  lineItems.push({ key: Date.now() + Math.random(), category_id: '', quantity_kg: '', unit_price: '' });
+  lineItems.push({ key: Date.now() + Math.random(), catalog_id: '', item_name: '', category_id: '', quantity_kg: '', unit_price: '' });
   renderLineItems();
 }
 
@@ -162,12 +169,15 @@ function renderLineItems() {
         <button class="btn btn-sm btn-danger" onclick="removeLineItem(${idx})" style="padding:1px 8px;font-size:12px">ลบ</button>
       </div>
       <div class="item-fields">
-        <div class="form-group" style="margin:0">
-          <label style="font-size:11px;color:var(--color-text-lighter)">หมวดสินค้า</label>
-          <select class="form-control" onchange="updateLineItem(${idx}, 'category_id', this.value)">
-            <option value="">\u2014 \u0e40\u0e25\u0e37\u0e2d\u0e01\u0e2b\u0e21\u0e27\u0e14 \u2014</option>
-            ${categories.map(c => `<option value="${c.id}" ${String(c.id) === String(item.category_id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
-          </select>
+        <div class="form-group" style="margin:0;position:relative">
+          <label style="font-size:11px;color:var(--color-text-lighter)">ชื่อสินค้า (จากแคตตาล็อก)</label>
+          <input type="text" class="form-control" placeholder="พิมพ์ค้นหา..."
+            value="${escapeHtml(item.item_name || '')}"
+            id="sl-item-${idx}"
+            autocomplete="off"
+            oninput="searchSlCatalog(${idx}, this.value)"
+            onfocus="searchSlCatalog(${idx}, this.value)">
+          <div id="sl-results-${idx}" class="seller-results" style="display:none;position:absolute;z-index:100;width:100%;background:#fff;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto"></div>
         </div>
         <div class="form-group" style="margin:0">
           <label style="font-size:11px;color:var(--color-text-lighter)">น้ำหนัก (กก.)</label>
@@ -193,6 +203,50 @@ function calcTotal() {
   const total = lineItems.reduce((s, it) => s + (parseFloat(it.quantity_kg) || 0) * (parseFloat(it.unit_price) || 0), 0);
   document.getElementById('totalAmountDisplay').textContent = formatCurrency(total);
 }
+
+// Catalog search สำหรับ sale-lot line items
+let slCatalogTimers = {};
+async function searchSlCatalog(idx, q) {
+  clearTimeout(slCatalogTimers[idx]);
+  const box = document.getElementById(`sl-results-${idx}`);
+  if (!box) return;
+  if (!q || q.length < 1) { box.style.display = 'none'; return; }
+
+  slCatalogTimers[idx] = setTimeout(async () => {
+    const res = await apiRequest(`purchase-catalog/search?q=${encodeURIComponent(q)}`);
+    if (!box) return;
+    const items = res.status === 'success' ? (res.data || []) : [];
+    if (!items.length) { box.style.display = 'none'; return; }
+
+    box.innerHTML = items.map(it => {
+      const tiers = it.tier_prices || [];
+      const priceInfo = tiers.length ? ` · ${tiers[0].price} ฿/${it.default_unit||'กก.'}` : '';
+      return `<div class="seller-item" style="cursor:pointer;padding:8px 10px;border-bottom:1px solid #f0f0f0"
+        onclick="selectSlCatalog(${idx}, ${it.id}, '${escapeHtml(it.name)}', ${it.category_id||0}, ${it.default_price||0})">
+        <strong>${escapeHtml(it.code)}</strong> — ${escapeHtml(it.name)}
+        <span style="color:#888;font-size:12px">${it.category_name ? `(${escapeHtml(it.category_name)})` : ''}${priceInfo}</span>
+      </div>`;
+    }).join('');
+    box.style.display = 'block';
+  }, 250);
+}
+
+function selectSlCatalog(idx, catalogId, name, categoryId, price) {
+  lineItems[idx] = { ...lineItems[idx], catalog_id: catalogId, item_name: name, category_id: categoryId, unit_price: price > 0 ? price : lineItems[idx].unit_price };
+  renderLineItems();
+  // ปิด dropdown หลัง render
+  setTimeout(() => {
+    const box = document.getElementById(`sl-results-${idx}`);
+    if (box) box.style.display = 'none';
+  }, 50);
+}
+
+// ปิด dropdown เมื่อคลิกที่อื่น
+document.addEventListener('click', e => {
+  if (!e.target.closest('[id^="sl-item-"]') && !e.target.closest('[id^="sl-results-"]')) {
+    document.querySelectorAll('[id^="sl-results-"]').forEach(el => el.style.display = 'none');
+  }
+});
 
 // Expense functions
 function addExpense() {
@@ -280,6 +334,8 @@ async function openModal(id) {
     lineItems = (d.items || []).map(it => ({
       key: Date.now() + Math.random(),
       id: it.id,
+      catalog_id: it.catalog_id || '',
+      item_name: it.item_name || it.category_name || '',
       category_id: String(it.category_id || ''),
       quantity_kg: it.quantity_kg ?? it.quantity ?? '',
       unit_price: it.unit_price ?? '',
@@ -310,9 +366,9 @@ async function saveLot() {
   if (!branchId) { showNotification('กรุณาเลือกสาขา', 'error'); return; }
   if (lineItems.length === 0) { showNotification('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ', 'error'); return; }
 
-  const validItems = lineItems.filter(it => it.category_id && parseFloat(it.quantity_kg) > 0);
+  const validItems = lineItems.filter(it => it.item_name && parseFloat(it.quantity_kg) > 0);
   if (validItems.length === 0) {
-    showNotification('แต่ละรายการต้องมีหมวดสินค้าและน้ำหนักมากกว่า 0', 'error');
+    showNotification('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อกและระบุน้ำหนักมากกว่า 0', 'error');
     return;
   }
 
@@ -329,7 +385,9 @@ async function saveLot() {
     })) : null,
     items: validItems.map(it => ({
       ...(it.id ? { id: it.id } : {}),
-      category_id: parseInt(it.category_id),
+      catalog_id: it.catalog_id ? parseInt(it.catalog_id) : null,
+      item_name: it.item_name,
+      category_id: it.category_id ? parseInt(it.category_id) : null,
       quantity_kg: parseFloat(it.quantity_kg),
       unit_price: parseFloat(it.unit_price) || 0,
     })),
@@ -422,11 +480,11 @@ async function viewLot(id) {
       <div style="margin-top:4px"><strong>สถานะ:</strong> ${statusBadgeHtml(lot.status)}</div>
       <hr>
       <table class="data-table" style="width:100%">
-        <thead><tr><th>หมวดสินค้า</th><th class="text-right">น้ำหนัก (กก.)</th><th class="text-right">ราคา/กก.</th><th class="text-right">รวม</th><th class="text-right">ต้นทุน</th></tr></thead>
+        <thead><tr><th>ชื่อสินค้า</th><th class="text-right">น้ำหนัก (กก.)</th><th class="text-right">ราคา/กก.</th><th class="text-right">รวม</th><th class="text-right">ต้นทุน</th></tr></thead>
         <tbody>
           ${(lot.items || []).map(it => `
             <tr>
-              <td>${escapeHtml(it.category_name || '-')}</td>
+              <td>${escapeHtml(it.item_name || it.category_name || '-')}</td>
               <td class="text-right">${parseFloat(it.quantity_kg).toFixed(3)}</td>
               <td class="text-right">${formatCurrency(it.unit_price)}</td>
               <td class="text-right">${formatCurrency(it.subtotal)}</td>
@@ -481,4 +539,53 @@ async function viewLot(id) {
   `;
   document.getElementById('viewLotContent').innerHTML = html;
   document.getElementById('viewLotModal').classList.add('show');
+}
+
+// ---- บันทึกรายรับจริงจากบิลศูนย์ ----
+let revenueTargetId = null;
+
+function openRevenueModal(id, refNo, currentRevenue) {
+  revenueTargetId = id;
+  document.getElementById('revenueModalTitle').textContent = `บันทึกรายรับ — ${refNo}`;
+  document.getElementById('revenueAmount').value = currentRevenue != null ? currentRevenue : '';
+  document.getElementById('revenueNote').value = '';
+  document.getElementById('revenueDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('revenueError').textContent = '';
+  document.getElementById('revenueModal').classList.add('show');
+}
+
+async function saveRevenue() {
+  const amount = parseFloat(document.getElementById('revenueAmount').value);
+  const note   = document.getElementById('revenueNote').value.trim();
+  const date   = document.getElementById('revenueDate').value;
+  const errEl  = document.getElementById('revenueError');
+
+  if (isNaN(amount) || amount < 0) {
+    errEl.textContent = 'กรุณากรอกยอดรายรับที่ถูกต้อง';
+    return;
+  }
+
+  const btn = document.getElementById('saveRevenueBtn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังบันทึก...';
+
+  try {
+    const res = await apiRequest(`sale-lots/record-revenue?id=${revenueTargetId}`, 'POST', {
+      actual_revenue:      amount,
+      actual_revenue_note: note || null,
+      actual_revenue_date: date,
+    });
+    if (res.status === 'success') {
+      document.getElementById('revenueModal').classList.remove('show');
+      showNotification('บันทึกรายรับสำเร็จ', 'success');
+      loadLots();
+    } else {
+      errEl.textContent = res.message || 'บันทึกไม่สำเร็จ';
+    }
+  } catch (e) {
+    errEl.textContent = 'เกิดข้อผิดพลาด กรุณาลองใหม่';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'บันทึก';
 }

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>โอนสต็อกระหว่างสาขา</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+<div class="app-container">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand"><i class="icon-cart"></i><span>รับซื้อของเก่า</span></a>
+    </div>
+    <ul class="sidebar-menu">
+      <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+      <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+      <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+      <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+      <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
+      <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
+      <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+      <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+      <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+      <li><a href="stock-transfers.html" class="active"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+      <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+      <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+      <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+    </ul>
+  </aside>
+
+  <main class="content-area">
+    <div class="topbar">
+      <div class="page-header" style="flex:1"><h1 class="page-title">โอนสต็อกระหว่างสาขา</h1></div>
+      <div class="user-dropdown">
+        <button class="user-dropdown-toggle">
+          <div class="user-avatar"><i class="icon-user"></i></div>
+          <span class="user-name" id="userName">-</span>
+          <i class="icon-down"></i>
+        </button>
+        <div class="user-dropdown-menu">
+          <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ฟอร์มสร้างใบโอน -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header"><h2 class="card-title">สร้างใบโอนสต็อก</h2></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;align-items:end">
+          <div>
+            <label style="font-size:12px;display:block;margin-bottom:4px">จากสาขา</label>
+            <select id="fromBranch" class="form-control"></select>
+          </div>
+          <div>
+            <label style="font-size:12px;display:block;margin-bottom:4px">ไปสาขา</label>
+            <select id="toBranch" class="form-control"></select>
+          </div>
+          <div>
+            <label style="font-size:12px;display:block;margin-bottom:4px">หมวดหมู่สินค้า</label>
+            <select id="categorySelect" class="form-control"></select>
+          </div>
+          <div>
+            <label style="font-size:12px;display:block;margin-bottom:4px">น้ำหนัก (กก.)</label>
+            <input type="number" id="weightKg" class="form-control" min="0.001" step="0.001" placeholder="0.000">
+          </div>
+          <div style="flex:1;min-width:160px">
+            <label style="font-size:12px;display:block;margin-bottom:4px">หมายเหตุ</label>
+            <input type="text" id="transferNote" class="form-control" placeholder="(ไม่บังคับ)">
+          </div>
+          <div>
+            <button class="btn btn-primary" onclick="createTransfer()">สร้างใบโอน</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- รายการใบโอน -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">ประวัติใบโอนสต็อก</h2>
+        <div class="card-tools">
+          <select id="statusFilter" class="form-control" onchange="loadTransfers()" style="width:120px">
+            <option value="">ทั้งหมด</option>
+            <option value="pending">รอยืนยัน</option>
+            <option value="confirmed">ยืนยันแล้ว</option>
+            <option value="cancelled">ยกเลิก</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>เลขที่ใบโอน</th>
+                <th>วันที่</th>
+                <th>จากสาขา</th>
+                <th>ไปสาขา</th>
+                <th>หมวดหมู่</th>
+                <th class="text-right">น้ำหนัก (กก.)</th>
+                <th>หมายเหตุ</th>
+                <th>สร้างโดย</th>
+                <th>สถานะ</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="transfersBody">
+              <tr><td colspan="10" style="text-align:center;color:#888">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="notification-container"></div>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/common.js"></script>
+<script>
+let isAdmin = false;
+
+async function init() {
+  const user = await requireAuth();
+  if (!user) return;
+  document.getElementById('userName').textContent = user.username || '-';
+  isAdmin = user.role === 'admin' || user.role === 'manager';
+
+  const [branchRes, catRes] = await Promise.all([
+    apiRequest('branches/active'),
+    apiRequest('inventory/categories'),
+  ]);
+
+  if (branchRes.status === 'success') {
+    const branches = branchRes.data || [];
+    const from = document.getElementById('fromBranch');
+    const to   = document.getElementById('toBranch');
+    branches.forEach(b => {
+      from.appendChild(new Option(b.name, b.id));
+      to.appendChild(new Option(b.name, b.id));
+    });
+    if (branches.length > 1) to.selectedIndex = 1;
+  }
+
+  if (catRes.status === 'success') {
+    const sel = document.getElementById('categorySelect');
+    (catRes.data || []).filter(c => c.status === 'active').forEach(c => {
+      sel.appendChild(new Option(c.name, c.id));
+    });
+  }
+
+  loadTransfers();
+}
+
+async function loadTransfers() {
+  const status = document.getElementById('statusFilter').value;
+  const res = await apiRequest(`stock-transfers${status ? '?status='+status : ''}`);
+  const tbody = document.getElementById('transfersBody');
+  const items = res.status === 'success' ? (res.data.items || []) : [];
+
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#888">ยังไม่มีใบโอน</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = items.map(t => {
+    const statusBadge = {
+      pending:   '<span class="badge badge-warning">รอยืนยัน</span>',
+      confirmed: '<span class="badge badge-success">ยืนยันแล้ว</span>',
+      cancelled: '<span class="badge badge-danger">ยกเลิก</span>',
+    }[t.status] || t.status;
+
+    const actions = t.status === 'pending' && isAdmin
+      ? `<button class="btn btn-sm btn-success" onclick="confirmTransfer(${t.id})">✓ รับของแล้ว</button>
+         <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="cancelTransfer(${t.id})">ยกเลิก</button>`
+      : '-';
+
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px">${escapeHtml(t.reference_no)}</td>
+      <td style="font-size:12px">${(t.created_at||'').slice(0,10)}</td>
+      <td>${escapeHtml(t.from_branch_name||'-')}</td>
+      <td>${escapeHtml(t.to_branch_name||'-')}</td>
+      <td>${escapeHtml(t.category_name||'-')}</td>
+      <td class="text-right">${parseFloat(t.weight_kg).toLocaleString('th-TH',{minimumFractionDigits:3})}</td>
+      <td style="font-size:12px;color:#666">${escapeHtml(t.note||'-')}</td>
+      <td style="font-size:12px">${escapeHtml(t.created_by_name||'-')}</td>
+      <td>${statusBadge}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function createTransfer() {
+  const fromId   = parseInt(document.getElementById('fromBranch').value);
+  const toId     = parseInt(document.getElementById('toBranch').value);
+  const catId    = parseInt(document.getElementById('categorySelect').value);
+  const weight   = parseFloat(document.getElementById('weightKg').value);
+  const note     = document.getElementById('transferNote').value.trim();
+
+  if (fromId === toId) { showNotification('ต้นทางและปลายทางต้องต่างกัน', 'error'); return; }
+  if (!(weight > 0))   { showNotification('กรุณาระบุน้ำหนัก', 'error'); return; }
+
+  const res = await apiRequest('stock-transfers', 'POST', {
+    from_branch_id: fromId, to_branch_id: toId,
+    category_id: catId, weight_kg: weight, note
+  });
+
+  if (res.status === 'success') {
+    showNotification(`สร้างใบโอน ${res.data.reference_no} แล้ว`, 'success');
+    document.getElementById('weightKg').value = '';
+    document.getElementById('transferNote').value = '';
+    loadTransfers();
+  } else {
+    showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+  }
+}
+
+async function confirmTransfer(id) {
+  if (!confirm('ยืนยันว่าปลายทางรับของแล้ว?')) return;
+  const res = await apiRequest('stock-transfers/confirm', 'POST', { id });
+  if (res.status === 'success') { showNotification('ยืนยันแล้ว', 'success'); loadTransfers(); }
+  else showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+}
+
+async function cancelTransfer(id) {
+  if (!confirm('ยืนยันการยกเลิกใบโอนนี้?')) return;
+  const res = await apiRequest('stock-transfers/cancel', 'POST', { id });
+  if (res.status === 'success') { showNotification('ยกเลิกแล้ว', 'success'); loadTransfers(); }
+  else showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.addEventListener('DOMContentLoaded', init);
+document.getElementById('logoutBtn')?.addEventListener('click', e => {
+  e.preventDefault();
+  localStorage.removeItem('posToken'); localStorage.removeItem('posUser');
+  window.location.href = '../index.html';
+});
+</script>
+</body>
+</html>

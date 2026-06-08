@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>บอร์ดราคารับซื้อ</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      .app-container { display: block; }
+      .sidebar { display: none; }
+      .content-area { margin: 0; padding: 0; }
+      .topbar { display: none; }
+    }
+    .price-board { max-width: 900px; margin: 0 auto; }
+    .price-board-header { text-align: center; margin-bottom: 20px; }
+    .price-board-header h2 { font-size: 22px; font-weight: 700; margin: 0; }
+    .price-board-header p { color: #666; font-size: 13px; margin: 4px 0 0; }
+    .category-section { margin-bottom: 20px; }
+    .category-title {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      color: #888; letter-spacing: 0.05em;
+      border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-bottom: 8px;
+    }
+    .price-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .price-table th {
+      background: #f8fafc; text-align: center; padding: 6px 12px;
+      font-size: 12px; font-weight: 600; color: #555;
+      border: 1px solid #e5e7eb;
+    }
+    .price-table td { padding: 6px 12px; border: 1px solid #e5e7eb; }
+    .price-table td.text-right { text-align: right; font-variant-numeric: tabular-nums; }
+    .price-table tr:nth-child(even) { background: #fafafa; }
+    .tier-price { font-weight: 600; color: #1d4ed8; }
+  </style>
+</head>
+<body>
+<div class="app-container">
+  <aside class="sidebar no-print">
+    <div class="sidebar-header">
+      <a href="index.html" class="sidebar-brand">
+        <i class="icon-cart"></i><span>รับซื้อของเก่า</span>
+      </a>
+    </div>
+    <ul class="sidebar-menu">
+      <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+      <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+      <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+      <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+      <li><a href="../pos/index.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
+      <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
+      <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+      <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+      <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+      <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+      <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+      <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+    </ul>
+  </aside>
+
+  <main class="content-area">
+    <div class="topbar no-print">
+      <div class="page-header" style="flex:1">
+        <h1 class="page-title">บอร์ดราคารับซื้อ</h1>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="branchSelect" class="no-print" style="padding:7px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-family:inherit;font-size:14px">
+          <option value="">ทุกสาขา</option>
+        </select>
+        <button class="btn btn-primary no-print" onclick="window.print()">🖨 พิมพ์บอร์ดราคา</button>
+        <div class="user-dropdown no-print">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="userName">-</span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="price-board" id="priceBoard">
+      <div class="price-board-header">
+        <h2 id="boardTitle">ราคารับซื้อวันนี้</h2>
+        <p id="boardDate"></p>
+      </div>
+      <div id="boardContent">กำลังโหลด...</div>
+    </div>
+  </main>
+</div>
+
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/common.js"></script>
+<script>
+async function init() {
+  const user = await requireAuth();
+  if (!user) return;
+
+  const branchRes = await apiRequest('branches/active');
+  if (branchRes.status === 'success') {
+    const sel = document.getElementById('branchSelect');
+    (branchRes.data || []).forEach(b => {
+      sel.appendChild(new Option(b.name, b.id));
+    });
+    sel.addEventListener('change', loadBoard);
+  }
+
+  const now = new Date();
+  document.getElementById('boardDate').textContent =
+    now.toLocaleDateString('th-TH', {year:'numeric', month:'long', day:'numeric', weekday:'long'});
+
+  loadBoard();
+}
+
+async function loadBoard() {
+  const branchId = document.getElementById('branchSelect').value;
+  const branchName = document.getElementById('branchSelect').selectedOptions[0]?.text || 'ทุกสาขา';
+  document.getElementById('boardTitle').textContent =
+    branchId ? `ราคารับซื้อวันนี้ — ${branchName}` : 'ราคารับซื้อวันนี้';
+
+  const res = await apiRequest('purchase-catalog/price-board');
+  if (res.status !== 'success') {
+    document.getElementById('boardContent').innerHTML = '<p style="color:#888">ยังไม่มีข้อมูลราคา</p>';
+    return;
+  }
+
+  const items = res.data.items || [];
+  if (!items.length) {
+    document.getElementById('boardContent').innerHTML = '<p style="color:#888">ยังไม่มีรายการในแคตตาล็อก</p>';
+    return;
+  }
+
+  // จัดกลุ่มตาม category
+  const groups = {};
+  items.forEach(item => {
+    const cat = item.category_name || 'ไม่ระบุหมวด';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  });
+
+  // หา tier labels จากรายการแรกที่มี
+  const sample = items.find(i => i.tier_prices?.length > 0)?.tier_prices || [];
+  const tierLabels = sample.map(t => t.label || `บิล${sample.indexOf(t)+1}`);
+
+  let html = '';
+  Object.entries(groups).forEach(([cat, rows]) => {
+    html += `<div class="category-section">
+      <div class="category-title">${escapeHtml(cat)}</div>
+      <table class="price-table">
+        <thead><tr>
+          <th style="text-align:left">สินค้า</th>
+          <th>หน่วย</th>
+          ${tierLabels.map(l => `<th>${escapeHtml(l)}</th>`).join('')}
+        </tr></thead>
+        <tbody>`;
+    rows.forEach(item => {
+      const tiers = item.tier_prices || [];
+      html += `<tr>
+        <td>${escapeHtml(item.name)}</td>
+        <td style="text-align:center;color:#666">${escapeHtml(item.default_unit || 'กก.')}</td>
+        ${tiers.map(t => `<td class="text-right tier-price">${parseFloat(t.price||0).toFixed(2)}</td>`).join('')}
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  document.getElementById('boardContent').innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

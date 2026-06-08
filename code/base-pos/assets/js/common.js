@@ -70,6 +70,26 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+// ตรวจสอบ auth และ return user object — redirect ถ้าไม่ได้ login
+async function requireAuth() {
+  const token = localStorage.getItem('posToken');
+  const userJson = localStorage.getItem('posUser');
+  if (!token || !userJson) {
+    window.location.href = `${basePath}/index.html`;
+    return null;
+  }
+  try {
+    const user = JSON.parse(userJson);
+    // set username ใน topbar ถ้ามี
+    const nameEl = document.getElementById('currentUser') || document.getElementById('userName');
+    if (nameEl) nameEl.textContent = user.username || user.full_name || '-';
+    return user;
+  } catch(e) {
+    window.location.href = `${basePath}/index.html`;
+    return null;
+  }
+}
+
 // API Request helper
 async function apiRequest(endpoint, method = 'GET', data = null) {
   const token = localStorage.getItem('posToken');
@@ -108,6 +128,10 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
     console.error('API Request Error:', error);
     return {status: 'error', message: error.message};
   }
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/&/g,"\// Format currencyamp;").replace(/</g,"\// Format currencylt;").replace(/>/g,"\// Format currencygt;").replace(/"/g,"\// Format currencyquot;");
 }
 
 // Format currency

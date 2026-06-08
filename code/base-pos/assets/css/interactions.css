@@ -1,0 +1,43 @@
+/* === Interaction States (taste-skill) ===
+ * Loaded last (after all components) to preserve original cascade
+ * from styles.css where these rules sat at the bottom of the file.
+ */
+
+/* Button active/pressed feedback */
+.btn:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+
+/* Smooth transitions for all interactive elements */
+button,
+a,
+.card,
+.form-control,
+input,
+select,
+textarea {
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Focus rings for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Card hover with subtle lift */
+.card:hover {
+  transform: translateY(-1px);
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Interactive elements spring physics */
+.btn,
+.sidebar-menu a,
+.user-dropdown-toggle,
+.data-table tbody tr {
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}

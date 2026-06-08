@@ -525,43 +525,87 @@ window.showReceipt = async function(id) {
   const res = await apiRequest(`purchase-orders/order?id=${id}`);
   if (res.status !== 'success') return;
   const po = res.data;
-  const html = `
-    <div class="receipt">
-      <h3 style="text-align:center;margin:0">\u0e43\u0e1a\u0e23\u0e31\u0e1a\u0e0b\u0e37\u0e49\u0e2d\u0e02\u0e2d\u0e07\u0e40\u0e01\u0e48\u0e32</h3>
-      <div style="text-align:center;color:#888;margin-bottom:12px">${escapeHtml(po.reference_no)}</div>
-      <div><strong>\u0e2a\u0e32\u0e02\u0e32:</strong> ${escapeHtml(po.branch_name)} (${escapeHtml(po.branch_code)})</div>
-      <div><strong>\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48:</strong> ${formatDateTime(po.created_at)}</div>
-      <div><strong>\u0e1c\u0e39\u0e49\u0e02\u0e32\u0e22:</strong> ${escapeHtml(po.seller_name)} ${po.seller_id_card ? `(${maskIdCard(po.seller_id_card)})` : ''}</div>
-      <div><strong>\u0e1e\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19:</strong> ${escapeHtml(po.user_name || '-')}</div>
-      <hr>
-      <table class="data-table" style="width:100%">
-        <thead><tr><th>\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32</th><th>\u0e2b\u0e31\u0e01\u0e19\u0e49\u0e33\u0e2b\u0e19\u0e31\u0e01</th><th>\u0e08\u0e33\u0e19\u0e27\u0e19\u0e2a\u0e38\u0e17\u0e18\u0e34</th><th>\u0e23\u0e32\u0e04\u0e32/\u0e2b\u0e19\u0e48\u0e27\u0e22</th><th>\u0e23\u0e27\u0e21</th></tr></thead>
-        <tbody>
-          ${po.items.map(it => {
-            const dq = parseFloat(it.weight_deduction || 0);
-            const q  = parseFloat(it.quantity || 0);
-            const net = Math.max(0, q - dq);
-            const qtyDisp = dq > 0
-              ? `${q} \u2212 ${dq} = <strong>${net}</strong> ${escapeHtml(it.unit)}`
-              : `${q} ${escapeHtml(it.unit)}`;
-            return `
-            <tr>
-              <td>${escapeHtml(it.item_name)}</td>
-              <td>${dq > 0 ? `${dq} \u0e01\u0e01.` : '-'}</td>
-              <td>${qtyDisp}</td>
-              <td>${formatCurrency(it.unit_price)}</td>
-              <td>${formatCurrency(it.total_price)}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-      <hr>
-      <div style="text-align:right;font-size:18px"><strong>\u0e23\u0e27\u0e21\u0e08\u0e48\u0e32\u0e22: ${formatCurrency(po.total_amount)}</strong></div>
-      <div style="text-align:right;color:#888">\u0e27\u0e34\u0e18\u0e35\u0e08\u0e48\u0e32\u0e22: ${po.payment_method === 'cash' ? '\u0e40\u0e07\u0e34\u0e19\u0e2a\u0e14' : '\u0e42\u0e2d\u0e19\u0e18\u0e19\u0e32\u0e04\u0e32\u0e23'}</div>
-      ${po.notes ? `<div style="margin-top:8px"><strong>\u0e2b\u0e21\u0e32\u0e22\u0e40\u0e2b\u0e15\u0e38:</strong> ${escapeHtml(po.notes)}</div>` : ''}
+
+  const isPrecious = po.items.some(it => it.requires_precious_receipt == 1);
+  const dt = formatDateTime(po.created_at);
+
+  const itemRows = po.items.map(it => {
+    const dq = parseFloat(it.weight_deduction || 0);
+    const q  = parseFloat(it.quantity || 0);
+    const net = Math.max(0, q - dq);
+    return `<tr>
+      <td>${escapeHtml(it.item_name)}</td>
+      <td style="text-align:center">${dq > 0 ? dq.toFixed(2) : '-'}</td>
+      <td style="text-align:center">${net.toFixed(2)} ${escapeHtml(it.unit)}</td>
+      <td style="text-align:right">${formatCurrency(it.unit_price)}</td>
+      <td style="text-align:right">${formatCurrency(it.total_price)}</td>
+    </tr>`;
+  }).join('');
+
+  const billBody = `
+    <div style="font-size:15px;font-weight:700;text-align:center">\u0e43\u0e1a\u0e23\u0e31\u0e1a\u0e0b\u0e37\u0e49\u0e2d\u0e02\u0e2d\u0e07\u0e40\u0e01\u0e48\u0e32</div>
+    <div style="text-align:center;font-size:12px;margin-bottom:4px">${escapeHtml(po.branch_name)} (${escapeHtml(po.branch_code)})</div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;border-bottom:1px dashed #999;padding-bottom:6px;margin-bottom:6px">
+      <span>\u0e40\u0e25\u0e02\u0e17\u0e35\u0e48: <strong>${escapeHtml(po.reference_no)}</strong></span>
+      <span>${dt}</span>
     </div>
-  `;
-  document.getElementById('viewPOContent').innerHTML = html;
+    <div style="font-size:12px;margin-bottom:6px">
+      <div>\u0e1c\u0e39\u0e49\u0e02\u0e32\u0e22: <strong>${escapeHtml(po.seller_name)}</strong>${po.seller_id_card ? ` \u0e1a\u0e31\u0e15\u0e23: ${maskIdCard(po.seller_id_card)}` : ''}</div>
+      <div>\u0e41\u0e04\u0e0a\u0e40\u0e0a\u0e35\u0e22\u0e23\u0e4c: ${escapeHtml(po.user_name || '-')}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="border-bottom:1px solid #333">
+        <th style="text-align:left;padding:2px 4px">\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32</th>
+        <th style="text-align:center;padding:2px 4px">\u0e2b\u0e31\u0e01(\u0e01\u0e01.)</th>
+        <th style="text-align:center;padding:2px 4px">\u0e2a\u0e38\u0e17\u0e18\u0e34</th>
+        <th style="text-align:right;padding:2px 4px">\u0e23\u0e32\u0e04\u0e32/\u0e01\u0e01.</th>
+        <th style="text-align:right;padding:2px 4px">\u0e23\u0e27\u0e21</th>
+      </tr></thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+    <div style="border-top:1px dashed #999;margin-top:6px;padding-top:6px;text-align:right;font-size:14px">
+      <strong>\u0e22\u0e2d\u0e14\u0e23\u0e27\u0e21: ${formatCurrency(po.total_amount)}</strong>
+      &nbsp;&nbsp;${po.payment_method === 'cash' ? '\u0e40\u0e07\u0e34\u0e19\u0e2a\u0e14' : '\u0e42\u0e2d\u0e19\u0e18\u0e19\u0e32\u0e04\u0e32\u0e23'}
+    </div>
+    <div style="font-size:11px;text-align:center;margin-top:8px;color:#555;border-top:1px dashed #ccc;padding-top:6px">
+      \u0e23\u0e49\u0e32\u0e19\u0e1b\u0e34\u0e14\u0e27\u0e31\u0e19\u0e1e\u0e24\u0e2b\u0e31\u0e2a &nbsp;|&nbsp; 084-8233782<br>
+      \u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23\u0e14\u0e35 \u0e23\u0e32\u0e04\u0e32\u0e14\u0e35 \u0e15\u0e32\u0e0a\u0e31\u0e48\u0e07\u0e14\u0e34\u0e08\u0e34\u0e15\u0e2d\u0e25\u0e21\u0e32\u0e15\u0e23\u0e10\u0e32\u0e19\u0e01\u0e23\u0e30\u0e17\u0e23\u0e27\u0e07
+    </div>`;
+
+  const preciousExtra = isPrecious ? `
+    <div style="border:1px solid #333;border-radius:4px;padding:10px;margin-top:12px;font-size:12px">
+      <div style="font-weight:700;margin-bottom:6px">\u0e04\u0e33\u0e23\u0e31\u0e1a\u0e23\u0e2d\u0e07\u0e02\u0e2d\u0e07\u0e1c\u0e39\u0e49\u0e02\u0e32\u0e22</div>
+      <div style="margin-bottom:8px">\u0e02\u0e49\u0e32\u0e1e\u0e40\u0e08\u0e49\u0e32\u0e44\u0e14\u0e49\u0e19\u0e33\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e23\u0e30\u0e1a\u0e38\u0e43\u0e19\u0e1a\u0e34\u0e25\u0e19\u0e35\u0e49\u0e21\u0e32\u0e42\u0e14\u0e22\u0e2a\u0e38\u0e08\u0e23\u0e34\u0e15\u0e08\u0e23\u0e34\u0e07</div>
+      <div style="margin-bottom:12px">
+        \u0e25\u0e32\u0e22\u0e21\u0e37\u0e2d\u0e0a\u0e37\u0e48\u0e2d: ________________________________<br>
+        <span style="font-size:11px">\u0e40\u0e27\u0e25\u0e32: ${dt} &nbsp;&nbsp; \u0e40\u0e25\u0e02\u0e1a\u0e34\u0e25: ${escapeHtml(po.reference_no)}</span>
+      </div>
+      <div style="font-size:11px;margin-bottom:8px">
+        \u0e2b\u0e25\u0e31\u0e01\u0e10\u0e32\u0e19\u0e17\u0e35\u0e48\u0e41\u0e19\u0e1a: &nbsp;
+        \u25a1 \u0e2a\u0e33\u0e40\u0e19\u0e32\u0e1a\u0e31\u0e15\u0e23\u0e1b\u0e23\u0e30\u0e0a\u0e32\u0e0a\u0e19 &nbsp;
+        \u25a1 \u0e2a\u0e33\u0e40\u0e19\u0e32\u0e43\u0e1a\u0e02\u0e31\u0e1a\u0e02\u0e35\u0e48 &nbsp;
+        \u25a1 \u0e40\u0e2d\u0e01\u0e2a\u0e32\u0e23\u0e23\u0e32\u0e0a\u0e01\u0e32\u0e23
+      </div>
+      <div style="font-size:11px;margin-bottom:4px">
+        \u0e17\u0e31\u0e49\u0e07\u0e19\u0e35\u0e49\u0e44\u0e14\u0e49\u0e41\u0e2a\u0e14\u0e07\u0e04\u0e27\u0e32\u0e21\u0e1a\u0e23\u0e34\u0e2a\u0e38\u0e17\u0e18\u0e34\u0e4c\u0e42\u0e14\u0e22\u0e22\u0e34\u0e19\u0e22\u0e2d\u0e21\u0e43\u0e2b\u0e49\u0e16\u0e48\u0e32\u0e22\u0e23\u0e39\u0e1b\u0e2a\u0e33\u0e40\u0e19\u0e32\u0e1a\u0e31\u0e15\u0e23\u0e1b\u0e23\u0e30\u0e0a\u0e32\u0e0a\u0e19\u0e44\u0e27\u0e49\u0e40\u0e1b\u0e47\u0e19\u0e2b\u0e25\u0e31\u0e01\u0e10\u0e32\u0e19
+      </div>
+      <div style="font-size:11px;color:#c00;font-weight:600">
+        \u0e17\u0e32\u0e07\u0e23\u0e49\u0e32\u0e19\u0e44\u0e21\u0e48\u0e23\u0e31\u0e1a\u0e0b\u0e37\u0e49\u0e2d\u0e02\u0e2d\u0e07\u0e17\u0e35\u0e48\u0e21\u0e35\u0e01\u0e32\u0e23\u0e25\u0e31\u0e01\u0e17\u0e23\u0e31\u0e1e\u0e22\u0e4c\u0e42\u0e14\u0e22\u0e40\u0e14\u0e47\u0e14\u0e02\u0e32\u0e14<br>
+        \u0e17\u0e32\u0e07\u0e23\u0e49\u0e32\u0e19\u0e44\u0e21\u0e48\u0e23\u0e31\u0e1a\u0e1c\u0e34\u0e14\u0e0a\u0e2d\u0e1a\u0e15\u0e48\u0e2d\u0e2a\u0e34\u0e19\u0e04\u0e49\u0e32\u0e17\u0e35\u0e48\u0e40\u0e01\u0e34\u0e14\u0e08\u0e32\u0e01\u0e01\u0e32\u0e23\u0e01\u0e23\u0e30\u0e17\u0e33\u0e1c\u0e34\u0e14\u0e01\u0e0e\u0e2b\u0e21\u0e32\u0e22\u0e17\u0e32\u0e07\u0e2d\u0e32\u0e0d\u0e32\u0e17\u0e38\u0e01\u0e01\u0e23\u0e13\u0e35
+      </div>
+    </div>
+    <div style="border:1px dashed #999;border-radius:4px;height:80px;margin-top:10px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#888">
+      \u0e41\u0e19\u0e1a\u0e2a\u0e33\u0e40\u0e19\u0e32\u0e1a\u0e31\u0e15\u0e23\u0e1b\u0e23\u0e30\u0e0a\u0e32\u0e0a\u0e19 / \u0e20\u0e32\u0e1e\u0e16\u0e48\u0e32\u0e22\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48
+    </div>` : '';
+
+  const half = `<div style="padding:12px;font-family:'Sarabun',sans-serif">${billBody}${preciousExtra}</div>`;
+  const printHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #ccc">
+    <div style="border-right:2px dashed #999">${half}</div>
+    <div>${half}</div>
+  </div>
+  <div style="text-align:center;margin-top:8px;font-size:12px;color:#888">\u2702 \u0e09\u0e35\u0e01\u0e15\u0e23\u0e07\u0e40\u0e2a\u0e49\u0e19\u0e1b\u0e23\u0e38 \u2014 \u0e23\u0e49\u0e32\u0e19\u0e40\u0e01\u0e47\u0e1a\u0e0b\u0e49\u0e32\u0e22 | \u0e25\u0e39\u0e01\u0e04\u0e49\u0e32\u0e40\u0e01\u0e47\u0e1a\u0e02\u0e27\u0e32</div>`;
+
+  document.getElementById('viewPOContent').innerHTML = printHtml;
   document.getElementById('viewPOModal').classList.add('show');
 };
 
@@ -599,8 +643,49 @@ async function searchSellers() {
 
 function selectSeller(s) {
   if (s.is_blacklisted == 1) {
-    if (!confirm('\u0e1c\u0e39\u0e49\u0e02\u0e32\u0e22\u0e19\u0e35\u0e49 Blacklist \u0e22\u0e37\u0e19\u0e22\u0e31\u0e19\u0e23\u0e31\u0e1a\u0e0b\u0e37\u0e49\u0e2d\u0e2b\u0e23\u0e37\u0e2d\u0e44\u0e21\u0e48?')) return;
+    showBlacklistAlert(s, () => doSelectSeller(s));
+    return;
   }
+  doSelectSeller(s);
+}
+
+function showBlacklistAlert(s, onConfirm) {
+  const existing = document.getElementById('blacklistAlertOverlay');
+  if (existing) existing.remove();
+
+  const dateStr = s.blacklisted_at
+    ? new Date(s.blacklisted_at.replace(' ','T')).toLocaleDateString('th-TH', {year:'numeric',month:'short',day:'numeric'})
+    : '-';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'blacklistAlertOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <div style="font-size:32px">\u26d4</div>
+        <div>
+          <div style="font-size:17px;font-weight:700;color:#c00">\u0e1c\u0e39\u0e49\u0e02\u0e32\u0e22\u0e23\u0e32\u0e22\u0e19\u0e35\u0e49\u0e2d\u0e22\u0e39\u0e48\u0e43\u0e19\u0e1a\u0e31\u0e0d\u0e0a\u0e35\u0e14\u0e33</div>
+          <div style="font-size:14px;color:#555;margin-top:2px">${escapeHtml(s.full_name)}</div>
+        </div>
+      </div>
+      <div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px">
+        <div><strong>\u0e40\u0e2b\u0e15\u0e38\u0e1c\u0e25:</strong> ${escapeHtml(s.blacklist_reason || '\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e23\u0e30\u0e1a\u0e38')}</div>
+        <div style="margin-top:4px;color:#888"><strong>\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48:</strong> ${dateStr}</div>
+      </div>
+      <div style="font-size:13px;color:#555;margin-bottom:20px">\u0e17\u0e48\u0e32\u0e19\u0e15\u0e49\u0e2d\u0e07\u0e01\u0e32\u0e23\u0e14\u0e33\u0e40\u0e19\u0e34\u0e19\u0e01\u0e32\u0e23\u0e23\u0e31\u0e1a\u0e0b\u0e37\u0e49\u0e2d\u0e15\u0e48\u0e2d\u0e2b\u0e23\u0e37\u0e2d\u0e44\u0e21\u0e48?</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button id="blacklistCancelBtn" class="btn btn-secondary">\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01</button>
+        <button id="blacklistConfirmBtn" style="background:#c00;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:600">\u0e14\u0e33\u0e40\u0e19\u0e34\u0e19\u0e01\u0e32\u0e23\u0e15\u0e48\u0e2d</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.getElementById('blacklistCancelBtn').onclick = () => overlay.remove();
+  document.getElementById('blacklistConfirmBtn').onclick = () => { overlay.remove(); onConfirm(); };
+}
+
+function doSelectSeller(s) {
   selectedSeller = s;
   const box = document.getElementById('selectedSellerBox');
   box.innerHTML = '';

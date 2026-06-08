@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>จัดการผู้ขาย - ระบบขายหน้าร้าน</title>
-  <link rel="stylesheet" href="../assets/css/fonts.css">
-  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/main.css">
 </head>
 <body>
   <div class="app-container">
@@ -25,6 +24,9 @@
         <li><a href="sales.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+        <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+        <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
         <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
         <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
         <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
@@ -97,6 +99,34 @@
     </main>
   </div>
 
+  <!-- Modal: View Seller History -->
+  <div class="modal" id="viewSellerModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="viewSellerName">-</h2>
+        <button class="close-modal" onclick="document.getElementById('viewSellerModal').classList.remove('show')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="viewSellerBlacklist" style="display:none;background:#fff5f5;border:1px solid #fca5a5;border-radius:6px;padding:8px 12px;margin-bottom:12px;color:#c00;font-size:13px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:12px">
+          <div><span style="color:#888">บัตรประชาชน:</span> <span id="viewSellerIdCard">-</span></div>
+          <div><span style="color:#888">โทร:</span> <span id="viewSellerPhone">-</span></div>
+          <div style="grid-column:1/-1"><span style="color:#888">ที่อยู่:</span> <span id="viewSellerAddress">-</span></div>
+        </div>
+        <div id="viewSellerStats" style="font-size:13px;color:#555;margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:6px"></div>
+        <div style="font-weight:600;margin-bottom:8px">ประวัติการขาย</div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead><tr><th>เลขที่บิล</th><th>วันที่</th><th>สาขา</th><th class="text-right">ยอด (฿)</th></tr></thead>
+            <tbody id="viewSellerHistoryBody">
+              <tr><td colspan="4" style="text-align:center;color:#888">กำลังโหลด...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Add/Edit Seller -->
   <div class="modal" id="sellerModal">
     <div class="modal-content">
@@ -134,6 +164,10 @@
               <input type="checkbox" id="isBlacklisted">
               <span class="text-danger">Blacklist (ห้ามรับซื้อ)</span>
             </label>
+          </div>
+          <div class="form-group" id="blacklistReasonGroup" style="display:none">
+            <label for="blacklistReason">เหตุผล Blacklist</label>
+            <input type="text" id="blacklistReason" class="form-control" placeholder="เช่น ของโจร, เช็คยืนยันแล้ว">
           </div>
         </form>
       </div>

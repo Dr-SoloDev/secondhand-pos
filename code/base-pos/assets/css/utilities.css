@@ -126,6 +126,13 @@
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 
+/* === Text Colors === */
+
+.text-danger { color: var(--color-danger); }
+.text-warning { color: var(--color-warning); }
+.text-success { color: var(--color-success); }
+.text-info { color: var(--color-info); }
+
 /* === Position Utilities === */
 
 .relative { position: relative; }
