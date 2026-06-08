@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 70" width="280" height="70">
+  <defs>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4f8ef7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4f8ef7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:0.3" />
+    </linearGradient>
+  </defs>
+
+  <!-- Badge background -->
+  <rect x="0" y="0" width="280" height="70" rx="12" ry="12" fill="#1a1a2e"/>
+
+  <!-- ICON: geometric S-node cluster with hexagon wireframe -->
+  <polygon points="35,12 47,19 47,33 35,40 23,33 23,19"
+           fill="none" stroke="#4f8ef7" stroke-width="1.2" opacity="0.5"/>
+  <polygon points="35,17 44,22 44,32 35,37 26,32 26,22"
+           fill="none" stroke="#a78bfa" stroke-width="1" opacity="0.35"/>
+
+  <!-- S-curve path through center -->
+  <path d="M29,20 Q35,20 35,26 Q35,32 41,32"
+        fill="none" stroke="url(#iconGrad)" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M29,28 Q35,28 35,34 Q35,40 41,40"
+        fill="none" stroke="url(#iconGrad)" stroke-width="2.2" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- Circuit nodes -->
+  <circle cx="29" cy="20" r="2.4" fill="#4f8ef7"/>
+  <circle cx="41" cy="32" r="2.4" fill="#a78bfa"/>
+  <circle cx="35" cy="26" r="1.6" fill="#e2e8f0" opacity="0.9"/>
+
+  <!-- Tick marks top/bottom -->
+  <line x1="35" y1="7" x2="35" y2="11" stroke="#4f8ef7" stroke-width="1.2" opacity="0.5"/>
+  <line x1="35" y1="41" x2="35" y2="45" stroke="#a78bfa" stroke-width="1" opacity="0.4"/>
+
+  <!-- Corner dots (icon base) -->
+  <circle cx="28" cy="51" r="1.4" fill="#4f8ef7" opacity="0.45"/>
+  <circle cx="42" cy="51" r="1.4" fill="#a78bfa" opacity="0.45"/>
+
+  <!-- WORDMARK -->
+  <text x="62" y="36"
+        font-family="'Inter','Segoe UI',sans-serif"
+        font-size="22" font-weight="700" letter-spacing="-0.5"
+        fill="#f1f5f9">Solo</text>
+
+  <text x="114" y="36"
+        font-family="'Inter','Segoe UI',sans-serif"
+        font-size="22" font-weight="300" letter-spacing="0"
+        fill="#94a3b8">Corp</text>
+
+  <!-- Accent divider under wordmark -->
+  <line x1="62" y1="42" x2="170" y2="42"
+        stroke="url(#accentLine)" stroke-width="0.8" opacity="0.65"/>
+
+  <!-- Tagline constrained to wordmark width (62 to 170 = 108px) -->
+  <text x="62" y="55"
+        font-family="'Inter','Segoe UI',sans-serif"
+        font-size="7" font-weight="400"
+        fill="#64748b"
+        textLength="108" lengthAdjust="spacing">SOFTWARE SOLUTIONS</text>
+</svg>
