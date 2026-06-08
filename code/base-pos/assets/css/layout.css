@@ -125,6 +125,7 @@
 }
 .user-dropdown {
   position: relative;
+  margin-left: auto;
 }
 .user-dropdown-toggle {
   background: none;

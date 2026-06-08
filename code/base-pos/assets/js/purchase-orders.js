@@ -517,13 +517,28 @@ window.showReceipt = async function(id) {
       แนบสำเนาบัตรประชาชน / ภาพถ่ายที่นี่
     </div>` : '';
 
-  const half = `<div style="padding:12px;font-family:'Sarabun',sans-serif">${billBody}${preciousExtra}</div>`;
+  const half = `
+    <div style="width:138mm;padding:10px 14px;font-family:'Sarabun',sans-serif;font-size:11px;box-sizing:border-box;">
+      ${billBody}${preciousExtra}
+    </div>`;
+
   document.getElementById('viewPOContent').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #ccc">
+    <style>
+      @media print {
+        @page { size: A4 landscape; margin: 8mm; }
+        #viewPOModal .modal-header,
+        #viewPOModal .modal-footer,
+        #billPrintHint { display: none !important; }
+        #billPrintWrap { border: none !important; }
+      }
+    </style>
+    <div id="billPrintWrap" style="display:flex;flex-direction:row;border:1px solid #ccc;width:fit-content;margin:0 auto;">
       <div style="border-right:2px dashed #999">${half}</div>
       <div>${half}</div>
     </div>
-    <div style="text-align:center;margin-top:8px;font-size:12px;color:#888">✂ ฉีกตรงเส้นปรุ — ร้านเก็บซ้าย | ลูกค้าเก็บขวา</div>`;
+    <div id="billPrintHint" style="text-align:center;font-size:12px;color:#888;margin-top:8px">
+      ✂ พับครึ่งแนวยาวฉีกตรงเส้นปรุ — ร้านเก็บซ้าย | ลูกค้าเก็บขวา
+    </div>`;
   document.getElementById('viewPOModal').classList.add('show');
 };
 
