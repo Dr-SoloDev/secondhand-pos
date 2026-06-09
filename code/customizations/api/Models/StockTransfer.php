@@ -55,6 +55,23 @@ class StockTransfer extends Model
         return ['id' => intval($this->db->lastInsertId()), 'reference_no' => $ref];
     }
 
+    private function getTransferSellerId($branchId)
+    {
+        $idCard = 'TRANSFER0000';
+        $sellerId = $this->db->fetchColumn(
+            "SELECT id FROM sellers WHERE id_card = ? LIMIT 1",
+            [$idCard]
+        );
+        if ($sellerId) return (int)$sellerId;
+
+        $stmt = $this->db->prepare(
+            "INSERT INTO sellers (id_card, full_name, notes, branch_id)
+             VALUES (?, 'โอนสต็อกระหว่างสาขา', 'system placeholder สำหรับ stock transfer', ?)"
+        );
+        $this->db->execute($stmt, [$idCard, $branchId]);
+        return (int)$this->db->lastInsertId();
+    }
+
     public function confirm($id, $userId)
     {
         $st = $this->db->fetch("SELECT * FROM stock_transfers WHERE id = ? AND status = 'pending'", [$id]);
@@ -109,6 +126,8 @@ class StockTransfer extends Model
 
             $avgUnitPrice = $weightNeeded > 0 ? round($totalCost / $weightNeeded, 4) : 0;
 
+            $transferSellerId = $this->getTransferSellerId($toBranch);
+
             // ── 3. สร้าง "transfer PO" ในสาขาปลายทาง ──
             //        ให้ FIFO ของปลายทางเดินต่อได้ตามปกติ
             $today    = date('Ymd');
@@ -128,10 +147,10 @@ class StockTransfer extends Model
                     "INSERT INTO purchase_orders
                        (reference_no, branch_id, seller_id, user_id,
                         total_items, total_amount, payment_method, payment_status, status, notes)
-                     VALUES (?, ?, NULL, ?, 1, ?, 'transfer', 'paid', 'completed', ?)"
+                     VALUES (?, ?, ?, ?, 1, ?, 'cash', 'paid', 'completed', ?)"
                 );
                 $this->db->execute($stmt, [
-                    $refNo, $toBranch, $userId,
+                    $refNo, $toBranch, $transferSellerId, $userId,
                     round($totalCost, 2),
                     "โอนสต็อกจากสาขา {$fromBranch} (ST: {$st['reference_no']})",
                 ]);
