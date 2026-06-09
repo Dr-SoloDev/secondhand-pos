@@ -152,3 +152,12 @@ docker exec -it secondhand-pos-db mysql -uroot -prootpass pos_system
 - sales.js ยังเรียก sales API เดิม (ขายปลีก) — ไม่ใช่ sale-lots
 - **เตรียม script แล้ว:** code/docker/hide-legacy-retail-menus.sh (ยังไม่รัน — scope decision)
 - ⚠️ ถาม Dr.solodev: ซ่อนถาวร / redirect ไป sale-lots / ปล่อยไว้?
+
+### ✅ Final Night Fixes After Dr.solodev Approval (2026-06-09 ~03:00)
+- **ลบ demo garbage data แล้ว**: ลบ sale_lots ที่ cost > amount*2 จำนวน 30 lots + คืน stock จาก lot 78; dashboard profit กลับเป็นบวก (`month_salelot_profit` ~15,478)
+- **หน้า /pos/index.html**: เปลี่ยนเป็น redirect ไป `admin/sale-lots.html`; sidebar "ขายหน้าร้าน"/"ประวัติการขาย" ชี้ไป Sale Lots (ขายจริงของธุรกิจ) แล้ว
+- **Stock transfer architecture แก้แล้วและเทสผ่าน**:
+  - confirm transfer หัก FIFO `purchase_order_items.consumed_qty` จากสาขาต้นทาง
+  - สร้าง transfer PO ในสาขาปลายทางโดยใช้ weighted avg cost ของของที่โอน
+  - `categories.stock_kg` global ไม่ถูกลด เพราะของยังอยู่ในระบบ แค่ย้ายสาขา
+  - E2E test: BR2→BR1 50kg แล้วขายจาก BR1 30kg สำเร็จ; stock ต่อสาขาอัปเดตถูก
