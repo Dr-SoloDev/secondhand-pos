@@ -45,12 +45,18 @@ class StockTransfer extends Model
         $ref = 'ST-' . $today . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
 
         $stmt = $this->db->prepare(
-            "INSERT INTO stock_transfers (reference_no,from_branch_id,to_branch_id,category_id,weight_kg,note,created_by)
-             VALUES (?,?,?,?,?,?,?)"
+            "INSERT INTO stock_transfers
+               (reference_no,from_branch_id,to_branch_id,category_id,weight_kg,
+                note,transporter_name,vehicle_plate,created_by)
+             VALUES (?,?,?,?,?,?,?,?,?)"
         );
         $this->db->execute($stmt, [
             $ref, $data['from_branch_id'], $data['to_branch_id'],
-            $data['category_id'], $data['weight_kg'], $data['note'] ?? null, $userId
+            $data['category_id'], $data['weight_kg'],
+            $data['note'] ?? null,
+            $data['transporter_name'] ?? null,
+            $data['vehicle_plate'] ?? null,
+            $userId,
         ]);
         return ['id' => intval($this->db->lastInsertId()), 'reference_no' => $ref];
     }
@@ -72,15 +78,16 @@ class StockTransfer extends Model
         return (int)$this->db->lastInsertId();
     }
 
-    public function confirm($id, $userId)
+    public function confirm($id, $userId, $receivedWeight = null, $receiveNote = null)
     {
         $st = $this->db->fetch("SELECT * FROM stock_transfers WHERE id = ? AND status = 'pending'", [$id]);
         if (!$st) throw new Exception('ไม่พบใบโอนหรือดำเนินการแล้ว');
 
-        $fromBranch  = (int)$st['from_branch_id'];
-        $toBranch    = (int)$st['to_branch_id'];
-        $categoryId  = (int)$st['category_id'];
-        $weightNeeded = (float)$st['weight_kg'];
+        $fromBranch   = (int)$st['from_branch_id'];
+        $toBranch     = (int)$st['to_branch_id'];
+        $categoryId   = (int)$st['category_id'];
+        $orderedWeight = (float)$st['weight_kg'];
+        $weightNeeded  = $receivedWeight !== null ? (float)$receivedWeight : $orderedWeight;
 
         // ── 1. เช็คสต็อกจริงจาก PO items ต้นทาง (ไม่ใช่ global stock_kg) ──
         $availableRows = $this->db->fetchAll(
@@ -172,13 +179,14 @@ class StockTransfer extends Model
                 round($totalCost, 2),
             ]);
 
-            // ── 4. อัปเดตสถานะ transfer ──
+            // ── 4. อัปเดตสถานะ + บันทึกน้ำหนักรับจริง ──
             $stmt = $this->db->prepare(
                 "UPDATE stock_transfers
-                 SET status='confirmed', confirmed_by=?, confirmed_at=NOW()
+                 SET status='confirmed', confirmed_by=?, confirmed_at=NOW(),
+                     received_weight_kg=?, receive_note=?
                  WHERE id=?"
             );
-            $this->db->execute($stmt, [$userId, $id]);
+            $this->db->execute($stmt, [$userId, $weightNeeded, $receiveNote, $id]);
 
             // ── 5. stock_kg global ไม่เปลี่ยน (ของยังอยู่ในระบบ แค่ย้ายสาขา) ──
 

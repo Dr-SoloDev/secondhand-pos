@@ -38,26 +38,46 @@ class StockTransfersController extends Controller
         }
 
         $result = (new StockTransfer())->create([
-            'from_branch_id' => $fromId,
-            'to_branch_id'   => $toId,
-            'category_id'    => $catId,
-            'weight_kg'      => $weight,
-            'note'           => isset($body['note']) ? substr(trim($body['note']), 0, 255) : null,
+            'from_branch_id'   => $fromId,
+            'to_branch_id'     => $toId,
+            'category_id'      => $catId,
+            'weight_kg'        => $weight,
+            'note'             => isset($body['note']) ? substr(trim($body['note']), 0, 255) : null,
+            'transporter_name' => isset($body['transporter_name']) ? substr(trim($body['transporter_name']), 0, 100) : null,
+            'vehicle_plate'    => isset($body['vehicle_plate']) ? substr(trim($body['vehicle_plate']), 0, 20) : null,
         ], $user['id'] ?? $user['user_id']);
 
+        Logger::logActivity($user['user_id'] ?? $user['id'], 'create_stock_transfer', "โอนสต็อก from:{$fromId} to:{$toId} cat:{$catId} {$weight}kg ref:{$result['reference_no']}");
         Response::success('สร้างใบโอนแล้ว', $result);
     }
 
     public function confirm()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth();
         $user = $this->user;
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $id   = intval($body['id'] ?? 0);
+        $id             = intval($body['id'] ?? 0);
+        $receivedWeight = isset($body['received_weight_kg']) ? floatval($body['received_weight_kg']) : null;
+        $receiveNote    = isset($body['receive_note']) ? substr(trim($body['receive_note']), 0, 500) : null;
         if (!$id) { Response::error('ไม่พบ id', 400); return; }
+        if ($receivedWeight !== null && ($receivedWeight <= 0 || !is_finite($receivedWeight))) {
+            Response::error('น้ำหนักรับต้องมากกว่า 0', 400); return;
+        }
+
+        // SECURITY: non-admin ยืนยันได้เฉพาะใบโอนที่ปลายทางเป็นสาขาตัวเอง
+        if (($user['role'] ?? '') !== 'admin') {
+            $st = (new StockTransfer())->findById($id);
+            if (!$st) { Response::error('ไม่พบใบโอน', 404); return; }
+            $userBranch = $user['branch_id'] ?? null;
+            if (!$userBranch || (int)$st['to_branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์ตรวจรับใบโอนนี้', 403); return;
+            }
+        }
+
         try {
-            (new StockTransfer())->confirm($id, $user['id'] ?? $user['user_id']);
-            Response::success('ยืนยันแล้ว');
+            (new StockTransfer())->confirm($id, $user['id'] ?? $user['user_id'], $receivedWeight, $receiveNote);
+            Logger::logActivity($user['user_id'] ?? $user['id'], 'confirm_stock_transfer', "ตรวจรับใบโอนสต็อก ID:{$id} น้ำหนัก:" . ($receivedWeight ?? 'ตามใบ'));
+            Response::success('ตรวจรับแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
         }
@@ -66,10 +86,12 @@ class StockTransfersController extends Controller
     public function cancel()
     {
         $this->requireAuth(['admin', 'manager']);
+        $user = $this->user;
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $id   = intval($body['id'] ?? 0);
         if (!$id) { Response::error('ไม่พบ id', 400); return; }
         (new StockTransfer())->cancel($id);
+        Logger::logActivity($user['user_id'] ?? $user['id'], 'cancel_stock_transfer', "ยกเลิกใบโอนสต็อก ID:{$id}");
         Response::success('ยกเลิกแล้ว');
     }
 }
