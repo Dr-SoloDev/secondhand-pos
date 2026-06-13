@@ -80,6 +80,15 @@ function renderBranchesTable() {
   }).join('');
 }
 
+function openAddModal() {
+  document.getElementById('branchId').value = '';
+  document.getElementById('branchCode').value = '';
+  document.getElementById('branchForm').reset();
+  document.getElementById('branchCode').removeAttribute('disabled');
+  document.getElementById('modalTitle').textContent = 'เพิ่มสาขาใหม่';
+  document.getElementById('branchModal').classList.add('show');
+}
+
 function openEditModal(branchId) {
   const branch = branches.find(b => b.id === branchId);
   if (!branch) {
@@ -89,6 +98,7 @@ function openEditModal(branchId) {
 
   document.getElementById('branchId').value = branch.id;
   document.getElementById('branchCode').value = branch.code;
+  document.getElementById('branchCode').setAttribute('disabled', 'disabled');
   document.getElementById('branchName').value = branch.name;
   document.getElementById('branchAddress').value = branch.address || '';
   document.getElementById('branchPhone').value = branch.phone || '';
@@ -120,7 +130,12 @@ async function saveBranch() {
   };
 
   try {
-    const res = await apiRequest(`branches/branch?id=${branchId}`, 'PUT', data);
+    const res = branchId
+      ? await apiRequest(`branches/branch?id=${branchId}`, 'PUT', data)
+      : await apiRequest('branches', 'POST', {
+          code: document.getElementById('branchCode').value.trim(),
+          ...data,
+        });
     if (res.status === 'success') {
       showNotification('บันทึกข้อมูลสาขาสำเร็จ', 'success');
       closeBranchModal();
