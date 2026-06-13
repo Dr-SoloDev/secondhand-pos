@@ -46,10 +46,9 @@ code/
     │   ├── Controllers/            # Branches, Sellers, PurchaseOrders, SaleLots, PriceTiers...
     │   └── Services/
     │       └── ReportService.php   # Report engine (purchase/sale-lot/chart)
-    ├── database/
-    │   ├── migrations/             # 021 migrations (001-021, numbered sequentially)
-    │   └── run-migrations.sh
-    └── frontend-react/             # DEPRECATED — React v2, no longer maintained
+    └── database/
+        ├── migrations/             # 021 migrations (001-021, numbered sequentially)
+        └── run-migrations.sh
 ```
 
 ---
