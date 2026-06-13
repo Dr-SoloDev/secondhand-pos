@@ -3,6 +3,7 @@ class BranchesController extends Controller
 {
     public function getBranches()
     {
+        $this->requireAuth();
         $model = new Branch();
         $branches = $model->getAll();
         Response::success('Branches retrieved', $branches);
@@ -10,18 +11,21 @@ class BranchesController extends Controller
 
     public function getActiveBranches()
     {
+        $this->requireAuth();
         $model = new Branch();
         Response::success('Active branches retrieved', $model->getActive());
     }
 
     public function getBranchSummary()
     {
+        $this->requireAuth();
         $model = new Branch();
         Response::success('Branch summary retrieved', $model->getSummary());
     }
 
     public function getBranch($id)
     {
+        $this->requireAuth();
         if (!$id) Response::error('Branch ID is required', 400);
         $model = new Branch();
         $branch = $model->findById($id);

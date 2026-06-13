@@ -3,7 +3,8 @@ class SalesController extends Controller
 {
     public function createSale()
     {
-        $this->requireAuth();
+        $this->requireAuth(['admin', 'manager', 'cashier']);
+
         // Get and validate request data
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['items']);
@@ -137,7 +138,8 @@ class SalesController extends Controller
 
     public function exportSales()
     {
-        $this->requireAuth();
+        $this->requireAuth(['admin', 'manager']);
+
         // Get filter params
         $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : null;
         $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : null;

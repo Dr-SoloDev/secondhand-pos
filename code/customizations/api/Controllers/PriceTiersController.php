@@ -28,6 +28,7 @@ class PriceTiersController extends Controller
         try {
             $model = new PurchaseItemCatalog();
             $id = $model->create($data);
+            Logger::logActivity($this->user['user_id'], 'create_catalog_item', "เพิ่มรายการ catalog ID:{$id}");
             Response::success('เพิ่มรายการสำเร็จ', ['id' => $id]);
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);

@@ -70,7 +70,7 @@ class PurchaseOrdersController extends Controller
             Response::success('ยกเลิกใบรับซื้อสำเร็จ');
         } catch (Exception $e) {
             error_log('PurchaseOrder cancel failed: ' . $e->getMessage());
-            Response::error('ยกเลิกใบรับซื้อไม่สำเร็จ: ' . $e->getMessage(), 500);
+            Response::error('ยกเลิกใบรับซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 
@@ -106,12 +106,17 @@ class PurchaseOrdersController extends Controller
             if (empty($item['item_name'])) {
                 Response::error('แต่ละรายการต้องมีชื่อของ', 400);
             }
+            $qty = floatval($item['quantity'] ?? 1);
+            if ($qty <= 0) {
+                Response::error('น้ำหนัก/จำนวนต้องมากกว่า 0', 400);
+                return;
+            }
             $cleanItems[] = [
                 'item_name' => trim((string)$item['item_name']),
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 // DEPRECATED — condition_id ไม่ใช้แล้ว ใช้ weight_deduction แทน
                 'weight_deduction' => floatval($item['weight_deduction'] ?? 0),
-                'quantity' => floatval($item['quantity'] ?? 1),
+                'quantity' => $qty,
                 'unit' => $item['unit'] ?? 'ชิ้น',
                 'unit_price' => floatval($item['unit_price'] ?? 0),
                 'total_price' => floatval($item['total_price'] ?? (floatval($item['quantity'] ?? 1) * floatval($item['unit_price'] ?? 0))),

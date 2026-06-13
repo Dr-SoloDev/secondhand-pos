@@ -4,6 +4,7 @@ class InventoryController extends Controller
     // Category methods
     public function getCategories()
     {
+        $this->requireAuth();
         $categoryModel = new Category();
         $categories = $categoryModel->findAll('name ASC');
 
@@ -12,6 +13,7 @@ class InventoryController extends Controller
 
     public function getProducts()
     {
+        $this->requireAuth();
         $categoryId = isset($_GET['category_id']) ? intval($_GET['category_id']) : null;
 
         $productModel = new Product();
@@ -128,6 +130,7 @@ class InventoryController extends Controller
      */
     public function getCategory($id)
     {
+        $this->requireAuth();
         if (!$id) {
             Response::error('Category ID is required', 400);
         }
@@ -228,6 +231,7 @@ class InventoryController extends Controller
      */
     public function getProduct($id)
     {
+        $this->requireAuth();
         if (!$id) {
             Response::error('Product ID is required', 400);
         }
@@ -327,6 +331,7 @@ class InventoryController extends Controller
 
     public function getLowStock()
     {
+        $this->requireAuth();
         $productModel = new Product();
         $products = $productModel->getLowStock();
 
@@ -335,6 +340,7 @@ class InventoryController extends Controller
 
     public function getTransactions()
     {
+        $this->requireAuth();
         $productId = isset($_GET['product_id']) ? intval($_GET['product_id']) : null;
         $type = isset($_GET['type']) ? $this->sanitizeInput($_GET['type']) : null;
 
@@ -373,6 +379,9 @@ class InventoryController extends Controller
             $newQuantity = $product['quantity'];
             $type = $data['type'];
             $quantity = intval($data['quantity']);
+            if ($quantity <= 0) {
+                throw new Exception('Quantity must be greater than 0');
+            }
 
             switch ($type) {
                 case 'purchase':

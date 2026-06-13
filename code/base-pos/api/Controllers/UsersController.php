@@ -208,8 +208,8 @@ class UsersController extends Controller
         $newPassword = $data['new_password'];
 
         // Validate password length
-        if (strlen($newPassword) < 6) {
-            Response::error('Password must be at least 6 characters long', 400);
+        if (strlen($newPassword) < 12) {
+            Response::error('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 400);
         }
 
         // Update password
@@ -338,8 +338,8 @@ class UsersController extends Controller
         $newPassword = $data['new_password'];
 
         // Validate password length
-        if (strlen($newPassword) < 6) {
-            Response::error('Password must be at least 6 characters long', 400);
+        if (strlen($newPassword) < 12) {
+            Response::error('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 400);
         }
 
         // Check current password

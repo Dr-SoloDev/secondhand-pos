@@ -52,6 +52,7 @@ class PurchaseItemCatalogController extends Controller
         $model = new PurchaseItemCatalog();
         try {
             $id = $model->create($data);
+            Logger::logActivity($this->user['user_id'] ?? null, 'create_catalog_item', "เพิ่ม catalog item ID:{$id}");
             Response::success('เพิ่มรายการสำเร็จ', ['id' => $id]);
         } catch (Exception $e) {
             error_log('Catalog create failed: ' . $e->getMessage());
@@ -77,6 +78,7 @@ class PurchaseItemCatalogController extends Controller
         $model = new PurchaseItemCatalog();
         try {
             $model->update($id, $data);
+            Logger::logActivity($this->user['user_id'] ?? null, 'update_catalog_item', "แก้ไข catalog item ID:{$id}");
             Response::success('แก้ไขสำเร็จ');
         } catch (Exception $e) {
             error_log('Catalog update failed: ' . $e->getMessage());
@@ -96,6 +98,7 @@ class PurchaseItemCatalogController extends Controller
         $model = new PurchaseItemCatalog();
         try {
             $model->delete($id);
+            Logger::logActivity($this->user['user_id'] ?? null, 'delete_catalog_item', "ลบ catalog item ID:{$id}");
             Response::success('ลบรายการสำเร็จ');
         } catch (Exception $e) {
             error_log('Catalog delete failed: ' . $e->getMessage());
@@ -121,6 +124,7 @@ class PurchaseItemCatalogController extends Controller
         $model = new PurchaseItemCatalog();
         try {
             $model->updateCategory($catalogId, $categoryId);
+            Logger::logActivity($this->user['user_id'] ?? null, 'update_catalog_category', "อัปเดต category catalog:{$catalogId} → cat:{$categoryId}");
             Response::success('บันทึกหมวดหมู่สำเร็จ');
         } catch (Exception $e) {
             error_log('Update category failed: ' . $e->getMessage());

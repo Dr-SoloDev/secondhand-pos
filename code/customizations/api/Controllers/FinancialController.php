@@ -145,7 +145,7 @@ class FinancialController extends Controller
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $branchId = intval($body['branch_id'] ?? 0);
         $amount   = floatval($body['amount'] ?? 0);
-        if (!$branchId || $amount <= 0 || empty($body['expense_date']) || empty($body['category'])) {
+        if (!$branchId || $amount <= 0 || !is_finite($amount) || empty($body['expense_date']) || empty($body['category'])) {
             Response::error('ข้อมูลไม่ครบ', 400);
             return;
         }
@@ -156,8 +156,9 @@ class FinancialController extends Controller
             'category'     => substr(trim($body['category']), 0, 50),
             'amount'       => $amount,
             'note'         => isset($body['note']) ? substr(trim($body['note']), 0, 255) : null,
-            'created_by'   => $user['id'] ?? null,
+            'created_by'   => $this->user['user_id'] ?? $this->user['id'] ?? null,
         ]);
+        Logger::logActivity($this->user['user_id'] ?? null, 'create_business_expense', "เพิ่มค่าใช้จ่าย branch:{$branchId} {$body['category']} {$amount}บาท");
         Response::success('บันทึกแล้ว', ['id' => intval($id)]);
     }
 
@@ -168,6 +169,7 @@ class FinancialController extends Controller
         $id = intval($_GET['id'] ?? 0);
         if (!$id) { Response::error('ไม่พบ id', 400); return; }
         (new BusinessExpense())->delete($id);
+        Logger::logActivity($this->user['user_id'] ?? null, 'delete_business_expense', "ลบค่าใช้จ่าย ID:{$id}");
         Response::success('ลบแล้ว');
     }
 
