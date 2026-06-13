@@ -1,5 +1,5 @@
 # 🤖 Agent Memory — Secondhand POS
-**Last updated:** 8 มิถุนายน 2569
+**Last updated:** 14 มิถุนายน 2569
 **Status:** GOALS G1-G10 เสร็จครบ — อยู่ระหว่างรอผลคุยเจ้าของ 9 มิ.ย.
 
 ---
@@ -38,10 +38,27 @@
 - [ ] Commit 3 ไฟล์ค้าง: `purchase-orders.html`, `layout.css`, `purchase-orders.js`
 
 ### Tech Debt
-- [ ] JWT_SECRET ย้ายออกจาก apache-config.conf ก่อน production
+- [x] ~~JWT_SECRET ย้ายออกจาก apache-config.conf ก่อน production~~ → ย้ายเข้า .env แล้ว
+- [x] Rate limiting — เปลี่ยนเป็น DB-based (login_attempts table) แก้ IP-only bypass
+- [x] Token revocation — token_blocklist + jti + POST /auth/logout
+- [x] requireAuth() เพิ่มใน SalesController (4 methods) + UsersController (3 methods)
+- [ ] **รัน migration ก่อน deploy:** `code/database/security-migrations.sql`
 - [ ] sidebar ใน stock-transfers.html + price-board.html เพิ่มลิงก์เมนูครบ
 - [ ] ลบ `code/base-pos/backups/.htaccess` (legacy)
 - [ ] เมนู "สาขา" ถูกลบจาก sidebar — ตัดสินใจเอาคืนหรือลบ controller
+
+## 🗑️ Dead Code — อย่าแตะ อย่า restore (ตัดสินใจแล้ว 14 มิ.ย. 2569)
+
+ร้านของเก่าใช้ **Sale Lot เป็นช่องทางขายหลัก** (ขายหน้าร้านนานๆครั้ง) จึงตัด retail POS ออก:
+
+| ไฟล์/ส่วน | สถานะ | หมายเหตุ |
+|---|---|---|
+| `admin/sales.html` | dead — ไม่ได้ link ใน sidebar | หน้า POS terminal เดิม (base-pos) |
+| `api/Controllers/SalesController.php` | dead — routes ถูกลบออกจาก Router แล้ว | requireAuth() ยังอยู่ แต่ไม่มีใครเรียก |
+| `api/Models/Sale.php` | ⚠️ ยังเก็บไว้ | `CustomersController` ยังใช้ Sale model |
+| Router `sales/*` routes (5 เส้น) | ลบออกแล้ว | createSale, getSales, getSaleDetails, voidSale, exportSales |
+
+**อย่า** เพิ่ม route sales/* กลับเข้าไปใน Router.php โดยไม่ได้ตัดสินใจก่อน
 
 ### Phase ถัดไป
 - [ ] Reports filter by branch

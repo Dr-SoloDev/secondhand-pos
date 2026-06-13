@@ -18,7 +18,7 @@ The Secondhand POS system — customized from [goragodwiriya/pos-system](https:/
 | Services | 1 (ReportService) |
 | Automated Tests | 47 (bash/curl) — all passing |
 | Bug Fixes | 5 (PO cancel, SL reference_no, DB execute→query, FIFO regression, JWT branch_id) |
-| Security Fixes | 3 (JWT to .env, Docker creds to .env, FOR UPDATE locking, CORS env) |
+| Security Fixes | 7 (JWT to .env, Docker creds to .env, FOR UPDATE locking, CORS env + 4 new) |
 | Console Cleanup | 9 calls removed from 3 JS files |
 | Tool Evaluator Score | 7.9/10 (all P0 resolved) |
 
@@ -121,7 +121,10 @@ The Secondhand POS system — customized from [goragodwiriya/pos-system](https:/
 | SQL Injection | ✅ | PDO prepared statements throughout |
 | Race Conditions | ✅ | Atomic UPDATE + FOR UPDATE locking |
 | Backup Permissions | ✅ | 0750 on backup dir |
-| Rate Limiting | ❌ | Not yet implemented |
+| Rate Limiting | ✅ | DB-based per-IP (login_attempts table), atomic ON DUPLICATE KEY |
+| Token Revocation | ✅ | token_blocklist table + jti claim + POST auth/logout |
+| Column Injection | ✅ | Database::insert() validates column names via regex |
+| Unauthenticated Endpoints | ✅ | requireAuth() added to SalesController (4) + UsersController (3) |
 | HTTPS | ❌ | Not yet configured |
 
 ---

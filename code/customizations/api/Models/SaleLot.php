@@ -554,7 +554,7 @@ class SaleLot extends Model
                    AND poi.category_id = ?
                    AND po.status = 'completed'
                    AND poi.consumed_qty > 0
-                  ORDER BY po.created_at DESC
+                  ORDER BY po.created_at ASC
                  FOR UPDATE",
                 [$lot['branch_id'], $categoryId]
             );

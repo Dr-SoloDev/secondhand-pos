@@ -1,41 +1,39 @@
 <?php
 class AuthController extends Controller
 {
-    private function checkRateLimit($username)
+    private function checkRateLimit()
     {
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $key = 'login_attempts_' . md5($ip . '_' . $username);
-        $filePath = sys_get_temp_dir() . '/' . $key;
+        $db = Database::getInstance();
+        $row = $db->fetch("SELECT attempts, window_start FROM login_attempts WHERE ip = ?", [$ip]);
 
-        $attempts = [];
-        if (file_exists($filePath)) {
-            $data = file_get_contents($filePath);
-            $attempts = json_decode($data, true) ?: [];
+        if ($row) {
+            $windowAge = time() - strtotime($row['window_start']);
+            if ($windowAge < 900 && $row['attempts'] >= 5) {
+                $retryAfter = ceil((900 - $windowAge) / 60);
+                Response::error("Too many login attempts. Try again in {$retryAfter} minutes.", 429);
+                exit;
+            }
         }
-
-        // Remove entries older than 15 minutes
-        $window = time() - 900;
-        $attempts = array_filter($attempts, fn($t) => $t > $window);
-
-        if (count($attempts) >= 5) {
-            $retryAfter = 900 - (time() - min($attempts));
-            Response::error('Too many login attempts. Try again in ' . ceil($retryAfter / 60) . ' minutes.', 429);
-            exit;
-        }
-
-        $attempts[] = time();
-        file_put_contents($filePath, json_encode($attempts), LOCK_EX);
     }
 
-    private function clearRateLimit($username)
+    private function recordFailedAttempt()
     {
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $key = 'login_attempts_' . md5($ip . '_' . $username);
-        $filePath = sys_get_temp_dir() . '/' . $key;
+        $db = Database::getInstance();
+        $db->query(
+            "INSERT INTO login_attempts (ip, attempts, window_start) VALUES (?, 1, NOW())
+             ON DUPLICATE KEY UPDATE
+               attempts = IF(window_start < NOW() - INTERVAL 15 MINUTE, 1, attempts + 1),
+               window_start = IF(window_start < NOW() - INTERVAL 15 MINUTE, NOW(), window_start)",
+            [$ip]
+        );
+    }
 
-        if (file_exists($filePath)) {
-            unlink($filePath);
-        }
+    private function clearRateLimit()
+    {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        Database::getInstance()->query("DELETE FROM login_attempts WHERE ip = ?", [$ip]);
     }
 
     public function login()
@@ -50,27 +48,29 @@ class AuthController extends Controller
         $password = $data['password'];
 
         // Check rate limit
-        $this->checkRateLimit($username);
+        $this->checkRateLimit();
 
         // Check user
         $userModel = new User();
         $user = $userModel->findByUsername($username);
 
         if (!$user || !password_verify($password, $user['password'])) {
-            // Log failed attempt
+            $this->recordFailedAttempt();
             error_log("Failed login attempt for username: {$username} from IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
             Response::error('Invalid username or password', 401);
             exit;
         }
 
         if ($user['status'] !== 'active') {
+            $this->recordFailedAttempt();
             error_log("Inactive account login attempt for username: {$username} from IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
             Response::error('Account is inactive', 403);
             exit;
         }
 
         // Clear rate limit on success
-        $this->clearRateLimit($username);
+        $this->clearRateLimit();
+        TokenService::pruneExpired();
 
         // Generate token
         $token = TokenService::generate($user['id'], $user['username'], $user['role'], $user['branch_id'] ?? null);
@@ -118,5 +118,18 @@ class AuthController extends Controller
         Response::success('Token is valid', [
             'user' => $user
         ]);
+    }
+
+    public function logout()
+    {
+        $headers = getallheaders();
+        $token = substr($headers['Authorization'] ?? '', 7);
+        $decoded = TokenService::validate($token);
+
+        if ($decoded && isset($decoded['jti'])) {
+            TokenService::revokeToken($decoded['jti'], $decoded['exp']);
+        }
+
+        Response::success('Logged out successfully');
     }
 }

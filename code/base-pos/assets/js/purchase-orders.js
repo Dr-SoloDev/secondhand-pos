@@ -454,66 +454,72 @@ window.showReceipt = async function(id) {
   const dt = formatDateTime(po.created_at);
   const isPrecious = po.items.some(it => it.requires_precious_receipt == 1);
 
-  const itemRows = po.items.map(it => {
+  const itemRows = po.items.map((it, i) => {
     const dq = parseFloat(it.weight_deduction || 0);
     const q = parseFloat(it.quantity || 0);
     const net = Math.max(0, q - dq);
-    return `<tr>
-      <td>${escapeHtml(it.item_name)}</td>
-      <td style="text-align:center">${dq > 0 ? dq.toFixed(2) : '-'}</td>
-      <td style="text-align:center">${net.toFixed(2)} ${escapeHtml(it.unit)}</td>
-      <td style="text-align:right">${formatCurrency(it.unit_price)}</td>
-      <td style="text-align:right">${formatCurrency(it.total_price)}</td>
+    const bg = i % 2 === 0 ? '#fff' : '#f9f9f9';
+    return `<tr style="background:${bg}">
+      <td style="padding:4px 5px">${escapeHtml(it.item_name)}</td>
+      <td style="text-align:center;padding:4px 5px;color:#666">${dq > 0 ? dq.toFixed(2) : '-'}</td>
+      <td style="text-align:center;padding:4px 5px">${net.toFixed(2)} ${escapeHtml(it.unit)}</td>
+      <td style="text-align:right;padding:4px 5px">${formatCurrency(it.unit_price)}</td>
+      <td style="text-align:right;padding:4px 5px;font-weight:600">${formatCurrency(it.total_price)}</td>
     </tr>`;
   }).join('');
 
   const billBody = `
-    <div style="font-size:15px;font-weight:700;text-align:center">ใบรับซื้อของเก่า</div>
-    <div style="text-align:center;font-size:12px;margin-bottom:4px">${escapeHtml(po.branch_name)} (${escapeHtml(po.branch_code)})</div>
-    <div style="display:flex;justify-content:space-between;font-size:12px;border-bottom:1px dashed #999;padding-bottom:6px;margin-bottom:6px">
-      <span>เลขที่: <strong>${escapeHtml(po.reference_no)}</strong></span><span>${dt}</span>
+    <div style="border:2px solid #222;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:8px">
+      <div style="font-size:16px;font-weight:800;letter-spacing:1px">ใบรับซื้อของเก่า</div>
+      <div style="font-size:12px;color:#444;margin-top:2px">${escapeHtml(po.branch_name)} &nbsp;·&nbsp; สาขา ${escapeHtml(po.branch_code)}</div>
     </div>
-    <div style="font-size:12px;margin-bottom:6px">
-      <div>ผู้ขาย: <strong>${escapeHtml(po.seller_name)}</strong>${po.seller_id_card ? ` บัตร: ${maskIdCard(po.seller_id_card)}` : ''}</div>
-      <div>แคชเชียร์: ${escapeHtml(po.user_name || '-')}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:6px">
+      <span>เลขที่ <strong style="font-size:12px">${escapeHtml(po.reference_no)}</strong></span>
+      <span style="color:#555">${dt}</span>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="border-bottom:1px solid #333">
-        <th style="text-align:left;padding:2px 4px">สินค้า</th>
-        <th style="text-align:center;padding:2px 4px">หัก(กก.)</th>
-        <th style="text-align:center;padding:2px 4px">สุทธิ</th>
-        <th style="text-align:right;padding:2px 4px">ราคา/กก.</th>
-        <th style="text-align:right;padding:2px 4px">รวม</th>
-      </tr></thead>
+    <div style="background:#f7f7f7;border-radius:3px;padding:5px 8px;font-size:12px;margin-bottom:8px;line-height:1.7">
+      <div>ผู้ขาย &nbsp;<strong>${escapeHtml(po.seller_name)}</strong>${po.seller_id_card ? `<span style="color:#666;font-size:11px"> &nbsp;บัตร ${maskIdCard(po.seller_id_card)}</span>` : ''}</div>
+      <div style="color:#555;font-size:11px">แคชเชียร์ &nbsp;${escapeHtml(po.user_name || '-')}</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+      <thead>
+        <tr style="background:#222;color:#fff">
+          <th style="text-align:left;padding:4px 5px;font-weight:600">สินค้า</th>
+          <th style="text-align:center;padding:4px 5px;font-weight:600">หัก</th>
+          <th style="text-align:center;padding:4px 5px;font-weight:600">สุทธิ</th>
+          <th style="text-align:right;padding:4px 5px;font-weight:600">ราคา/กก.</th>
+          <th style="text-align:right;padding:4px 5px;font-weight:600">รวม</th>
+        </tr>
+      </thead>
       <tbody>${itemRows}</tbody>
     </table>
-    <div style="border-top:1px dashed #999;margin-top:6px;padding-top:6px;text-align:right;font-size:14px">
-      <strong>ยอดรวม: ${formatCurrency(po.total_amount)}</strong>
-      &nbsp;&nbsp;${po.payment_method === 'cash' ? 'เงินสด' : 'โอนธนาคาร'}
+    <div style="margin-top:8px;padding:6px 8px;background:#222;color:#fff;border-radius:3px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;opacity:.8">${po.payment_method === 'cash' ? '💵 เงินสด' : '🏦 โอนธนาคาร'}</span>
+      <span style="font-size:15px;font-weight:800">฿ ${formatCurrency(po.total_amount)}</span>
     </div>
-    <div style="font-size:11px;text-align:center;margin-top:8px;color:#555;border-top:1px dashed #ccc;padding-top:6px">
-      ร้านปิดวันพฤหัส &nbsp;|&nbsp; 084-8233782<br>
-      บริการดี ราคาดี ตาชั่งดิจิตอลมาตรฐานกระทรวง
+    <div style="font-size:10.5px;text-align:center;margin-top:8px;color:#666;border-top:1px dashed #ccc;padding-top:6px;line-height:1.8">
+      ปิดวันพฤหัส &nbsp;|&nbsp; 084-8233782<br>
+      <span style="font-size:10px">บริการดี ราคาดี ตาชั่งดิจิตอลมาตรฐานกระทรวง</span>
     </div>`;
 
   const preciousExtra = isPrecious ? `
-    <div style="border:1px solid #333;border-radius:4px;padding:10px;margin-top:12px;font-size:12px">
-      <div style="font-weight:700;margin-bottom:6px">คำรับรองของผู้ขาย</div>
-      <div style="margin-bottom:8px">ข้าพเจ้าได้นำสินค้าที่ระบุในบิลนี้มาโดยสุจริตจริง</div>
-      <div style="margin-bottom:12px">
-        ลายมือชื่อ: ________________________________<br>
-        <span style="font-size:11px">เวลา: ${dt} &nbsp;&nbsp; เลขบิล: ${escapeHtml(po.reference_no)}</span>
+    <div style="border:1.5px solid #222;border-radius:4px;padding:10px 12px;margin-top:10px;font-size:11.5px">
+      <div style="font-weight:800;font-size:12px;margin-bottom:6px;border-bottom:1px solid #ccc;padding-bottom:4px">📋 คำรับรองของผู้ขาย</div>
+      <div style="margin-bottom:8px;color:#333">ข้าพเจ้าได้นำสินค้าที่ระบุในบิลนี้มาโดยสุจริตจริง</div>
+      <div style="margin-bottom:14px;line-height:2">
+        ลายมือชื่อ ___________________________<br>
+        <span style="font-size:10.5px;color:#666">เวลา: ${dt} &nbsp; เลขบิล: ${escapeHtml(po.reference_no)}</span>
       </div>
       <div style="font-size:11px;margin-bottom:8px">
-        หลักฐานที่แนบ: &nbsp;
-        ☐ สำเนาบัตรประชาชน &nbsp;☐ สำเนาใบขับขี่ &nbsp;☐ เอกสารราชการ
+        หลักฐานที่แนบ &nbsp;
+        ☐ บัตรประชาชน &nbsp;☐ ใบขับขี่ &nbsp;☐ เอกสารราชการ
       </div>
-      <div style="font-size:11px;color:#c00;font-weight:600">
-        ทางร้านไม่รับซื้อของที่มีการลักทรัพย์โดยเด็ดขาด<br>
-        ทางร้านไม่รับผิดชอบต่อสินค้าที่เกิดจากการกระทำผิดกฎหมายทุกกรณี
+      <div style="font-size:10.5px;color:#c00;font-weight:700;line-height:1.6;border-top:1px dashed #ccc;padding-top:6px">
+        ไม่รับซื้อของโจรทุกกรณี<br>
+        ไม่รับผิดชอบสินค้าผิดกฎหมาย
       </div>
     </div>
-    <div style="border:1px dashed #999;border-radius:4px;height:80px;margin-top:10px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#888">
+    <div style="border:1.5px dashed #bbb;border-radius:4px;height:70px;margin-top:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#999">
       แนบสำเนาบัตรประชาชน / ภาพถ่ายที่นี่
     </div>` : '';
 

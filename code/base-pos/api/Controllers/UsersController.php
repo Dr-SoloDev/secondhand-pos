@@ -257,6 +257,7 @@ class UsersController extends Controller
 
     public function getProfile()
     {
+        $this->requireAuth();
         $userId = $this->user['user_id'];
 
         $userModel = new User();
@@ -274,6 +275,7 @@ class UsersController extends Controller
 
     public function updateProfile()
     {
+        $this->requireAuth();
         $userId = $this->user['user_id'];
 
         // Get and validate request data
@@ -325,6 +327,7 @@ class UsersController extends Controller
 
     public function changeOwnPassword()
     {
+        $this->requireAuth();
         $userId = $this->user['user_id'];
 
         // Get and validate request data

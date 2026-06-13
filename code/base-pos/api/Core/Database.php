@@ -152,6 +152,11 @@ class Database
      */
     public function insert($table, $data)
     {
+        foreach (array_keys($data) as $col) {
+            if (!preg_match('/^[a-zA-Z0-9_]+$/', $col)) {
+                throw new InvalidArgumentException("Invalid column name: $col");
+            }
+        }
         $columns = implode(', ', array_keys($data));
         $placeholders = implode(', ', array_fill(0, count($data), '?'));
 

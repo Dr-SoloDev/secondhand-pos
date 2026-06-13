@@ -67,6 +67,7 @@ class Router
         // Auth routes
         $this->routes[] = ['route' => 'auth/login', 'controller' => 'AuthController', 'method' => 'login'];
         $this->routes[] = ['route' => 'auth/verify', 'controller' => 'AuthController', 'method' => 'verify'];
+        $this->routes[] = ['route' => 'auth/logout', 'controller' => 'AuthController', 'method' => 'logout', 'verb' => 'POST'];
 
         // Inventory routes
         $this->routes[] = ['route' => 'inventory/categories', 'controller' => 'InventoryController', 'method' => 'getCategories', 'verb' => 'GET'];
@@ -86,13 +87,6 @@ class Router
         $this->routes[] = ['route' => 'inventory/low-stock', 'controller' => 'InventoryController', 'method' => 'getLowStock', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'inventory/transactions', 'controller' => 'InventoryController', 'method' => 'getTransactions', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'inventory/transactions', 'controller' => 'InventoryController', 'method' => 'createTransaction', 'verb' => 'POST'];
-
-        // Sales routes
-        $this->routes[] = ['route' => 'sales/create', 'controller' => 'SalesController', 'method' => 'createSale', 'verb' => 'POST'];
-        $this->routes[] = ['route' => 'sales/list', 'controller' => 'SalesController', 'method' => 'getSales', 'verb' => 'GET'];
-        $this->routes[] = ['route' => 'sales/details', 'controller' => 'SalesController', 'method' => 'getSaleDetails', 'verb' => 'GET'];
-        $this->routes[] = ['route' => 'sales/void', 'controller' => 'SalesController', 'method' => 'voidSale', 'verb' => 'POST'];
-        $this->routes[] = ['route' => 'sales/export', 'controller' => 'SalesController', 'method' => 'exportSales', 'verb' => 'GET'];
 
         // Reports routes
         $this->routes[] = ['route' => 'reports/dashboard-stats', 'controller' => 'ReportsController', 'method' => 'getDashboardStats', 'verb' => 'GET'];

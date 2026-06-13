@@ -24,6 +24,7 @@ class TokenService
         $header = self::base64urlEncode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
 
         $payload = [
+            'jti' => bin2hex(random_bytes(16)),
             'iat' => $issuedAt,
             'nbf' => $issuedAt,
             'exp' => $expiryTime,
@@ -84,7 +85,31 @@ class TokenService
             return false;
         }
 
+        // Check blocklist
+        $db = Database::getInstance();
+        $blocked = $db->fetchColumn(
+            "SELECT 1 FROM token_blocklist WHERE jti = ? AND expires_at > NOW()",
+            [$decoded['jti'] ?? '']
+        );
+        if ($blocked) {
+            return false;
+        }
+
         return $decoded;
+    }
+
+    public static function revokeToken(string $jti, int $exp): void
+    {
+        $db = Database::getInstance();
+        $db->query(
+            "INSERT IGNORE INTO token_blocklist (jti, expires_at) VALUES (?, FROM_UNIXTIME(?))",
+            [$jti, $exp]
+        );
+    }
+
+    public static function pruneExpired(): void
+    {
+        Database::getInstance()->query("DELETE FROM token_blocklist WHERE expires_at < NOW()");
     }
 
     /**

@@ -3,6 +3,7 @@ class SalesController extends Controller
 {
     public function createSale()
     {
+        $this->requireAuth();
         // Get and validate request data
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['items']);
@@ -45,6 +46,7 @@ class SalesController extends Controller
 
     public function getSales()
     {
+        $this->requireAuth();
         // Get pagination params
         $pagination = $this->getPaginationParams();
 
@@ -77,6 +79,7 @@ class SalesController extends Controller
      */
     public function getSaleDetails($id)
     {
+        $this->requireAuth();
         if (!$id) {
             Response::error('Sale ID is required', 400);
         }
@@ -134,6 +137,7 @@ class SalesController extends Controller
 
     public function exportSales()
     {
+        $this->requireAuth();
         // Get filter params
         $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : null;
         $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : null;

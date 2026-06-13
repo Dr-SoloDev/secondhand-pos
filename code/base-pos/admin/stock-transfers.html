@@ -17,8 +17,6 @@
       <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
       <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
       <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
-      <li><a href="sale-lots.html"><i class="icon-cart"></i><span>ขายหน้าร้าน</span></a></li>
-      <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ประวัติการขาย</span></a></li>
       <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
       <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
       <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
@@ -117,6 +115,21 @@
 </div>
 
 <div id="notification-container"></div>
+
+<!-- Print Modal -->
+<div class="modal" id="printTransferModal">
+  <div class="modal-content" style="max-width:360px">
+    <div class="modal-header">
+      <h2>ใบโอนสต็อก</h2>
+      <button class="close-modal" onclick="document.getElementById('printTransferModal').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body" id="printTransferContent"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="window.print()">🖨 พิมพ์</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('printTransferModal').classList.remove('show')">ปิด</button>
+    </div>
+  </div>
+</div>
 <script src="../assets/js/config.js"></script>
 <script src="../assets/js/common.js"></script>
 <script>
@@ -172,10 +185,11 @@ async function loadTransfers() {
       cancelled: '<span class="badge badge-danger">ยกเลิก</span>',
     }[t.status] || t.status;
 
-    const actions = t.status === 'pending' && isAdmin
+    const adminActions = t.status === 'pending' && isAdmin
       ? `<button class="btn btn-sm btn-success" onclick="confirmTransfer(${t.id})">✓ รับของแล้ว</button>
          <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="cancelTransfer(${t.id})">ยกเลิก</button>`
-      : '-';
+      : '';
+    const actions = `${adminActions}<button class="btn btn-sm btn-secondary" style="margin-left:4px" onclick='printTransfer(${JSON.stringify(t)})'>🖨 พิมพ์</button>`;
 
     return `<tr>
       <td style="font-family:monospace;font-size:12px">${escapeHtml(t.reference_no)}</td>
@@ -212,6 +226,7 @@ async function createTransfer() {
     document.getElementById('weightKg').value = '';
     document.getElementById('transferNote').value = '';
     loadTransfers();
+    printTransfer(res.data);
   } else {
     showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
   }
@@ -233,6 +248,67 @@ async function cancelTransfer(id) {
 
 function escapeHtml(s) {
   return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function printTransfer(t) {
+  const statusLabel = {pending:'รอยืนยัน', confirmed:'ยืนยันแล้ว', cancelled:'ยกเลิก'}[t.status] || t.status;
+  const weight = parseFloat(t.weight_kg||0).toLocaleString('th-TH',{minimumFractionDigits:3});
+  const dt = (t.created_at||'').slice(0,16).replace('T',' ');
+
+  document.getElementById('printTransferContent').innerHTML = `
+    <style>
+      @media print {
+        @page { size: A5; margin: 8mm; }
+        #printTransferModal .modal-header,
+        #printTransferModal .modal-footer { display:none !important; }
+        #printTransferModal { position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:9999; }
+        .modal-content { box-shadow:none;border:none;max-width:100% !important; }
+      }
+    </style>
+    <div style="font-family:'Sarabun',sans-serif;font-size:12px;padding:8px 4px">
+      <div style="border:2px solid #222;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:8px">
+        <div style="font-size:16px;font-weight:800;letter-spacing:1px">ใบโอนสต็อก</div>
+        <div style="font-size:11px;color:#444;margin-top:2px">Stock Transfer</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px">
+        <span>เลขที่ <strong>${escapeHtml(t.reference_no||'-')}</strong></span>
+        <span style="color:#555">${dt}</span>
+      </div>
+      <div style="background:#f7f7f7;border-radius:3px;padding:8px 10px;font-size:12px;margin-bottom:8px;line-height:2">
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:#555">จากสาขา</span>
+          <strong>${escapeHtml(t.from_branch_name||'-')}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:#555">ไปสาขา</span>
+          <strong>${escapeHtml(t.to_branch_name||'-')}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:#555">หมวดหมู่</span>
+          <span>${escapeHtml(t.category_name||'-')}</span>
+        </div>
+      </div>
+      <div style="background:#222;color:#fff;border-radius:3px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:11px;opacity:.8">น้ำหนักที่โอน</span>
+        <span style="font-size:18px;font-weight:800">${weight} <span style="font-size:13px">กก.</span></span>
+      </div>
+      ${t.note ? `<div style="font-size:11px;color:#555;margin-bottom:8px">หมายเหตุ: ${escapeHtml(t.note)}</div>` : ''}
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:16px">
+        <span>สร้างโดย: ${escapeHtml(t.created_by_name||'-')}</span>
+        <span style="padding:2px 8px;border-radius:10px;background:${t.status==='confirmed'?'#d4edda':t.status==='cancelled'?'#f8d7da':'#fff3cd'};color:#333;font-size:10.5px">${statusLabel}</span>
+      </div>
+      <div style="border-top:1px dashed #ccc;padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:11px">
+        <div style="text-align:center">
+          <div style="height:36px"></div>
+          <div style="border-top:1px solid #333;padding-top:4px">ลายมือชื่อผู้โอน</div>
+        </div>
+        <div style="text-align:center">
+          <div style="height:36px"></div>
+          <div style="border-top:1px solid #333;padding-top:4px">ลายมือชื่อผู้รับ</div>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('printTransferModal').classList.add('show');
 }
 
 document.addEventListener('DOMContentLoaded', init);
