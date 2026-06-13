@@ -47,7 +47,7 @@ class SaleLotsController extends Controller
         Response::success('ดึงข้อมูล Sale Lot สำเร็จ', $lot);
     }
 
-    // สร้าง Sale Lot ใหม่ (draft) พร้อมรายการสินค้า
+    // สร้าง Sale Lot ใหม่ — confirmed ทันที (บันทึกจากบิลที่ขายไปแล้ว)
     public function store()
     {
         $this->requireAuth(['admin', 'manager']);
@@ -62,7 +62,7 @@ class SaleLotsController extends Controller
             'branch_id'  => intval($data['branch_id']),
             'buyer_name' => trim((string)$data['buyer_name']),
             'sale_date'  => $this->sanitizeInput($data['sale_date']),
-            'status'     => $data['status'] ?? 'draft',
+            'status'     => 'confirmed',
             'notes'      => isset($data['notes']) ? trim((string)$data['notes']) : null,
             'expenses'   => $data['expenses'] ?? null,
             'created_by' => $this->user['user_id'] ?? null,
@@ -70,12 +70,12 @@ class SaleLotsController extends Controller
 
         $cleanItems = [];
         foreach ($data['items'] as $item) {
-            if (empty($item['item_name']) || empty($item['quantity_kg'])) {
-                Response::error('แต่ละรายการต้องมีชื่อสินค้าและน้ำหนัก', 400);
+            if (empty($item['quantity_kg'])) {
+                Response::error('แต่ละรายการต้องมีน้ำหนัก', 400);
             }
             $cleanItems[] = [
                 'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
-                'item_name'   => trim((string)$item['item_name']),
+                'item_name'   => !empty($item['item_name']) ? trim((string)$item['item_name']) : 'สินค้า',
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 'quantity_kg' => floatval($item['quantity_kg']),
                 'unit_price'  => floatval($item['unit_price'] ?? 0),
@@ -87,6 +87,7 @@ class SaleLotsController extends Controller
         $model = new SaleLot();
         try {
             $result = $model->create($cleanData);
+            $model->deductStock($result['id']);
             Logger::logActivity(
                 $this->user['user_id'],
                 'create_sale_lot',
@@ -132,12 +133,12 @@ class SaleLotsController extends Controller
 
         $cleanItems = [];
         foreach ($data['items'] as $item) {
-            if (empty($item['item_name']) || empty($item['quantity_kg'])) {
-                Response::error('แต่ละรายการต้องมีชื่อสินค้าและน้ำหนัก', 400);
+            if (empty($item['quantity_kg'])) {
+                Response::error('แต่ละรายการต้องมีน้ำหนัก', 400);
             }
             $cleanItems[] = [
                 'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
-                'item_name'   => trim((string)$item['item_name']),
+                'item_name'   => !empty($item['item_name']) ? trim((string)$item['item_name']) : 'สินค้า',
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 'quantity_kg' => floatval($item['quantity_kg']),
                 'unit_price'  => floatval($item['unit_price'] ?? 0),
@@ -215,7 +216,7 @@ class SaleLotsController extends Controller
         }
 
         $actualRevenue = floatval($data['actual_revenue']);
-        if ($actualRevenue < 0) Response::error('ยอดรายรับต้องไม่ติดลบ', 400);
+        if ($actualRevenue < 0) { Response::error('ยอดรายรับต้องไม่ติดลบ', 400); return; }
 
         $model = new SaleLot();
         $lot   = $model->getById($id);

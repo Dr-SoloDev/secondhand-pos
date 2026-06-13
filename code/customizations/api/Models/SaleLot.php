@@ -133,11 +133,7 @@ class SaleLot extends Model
                 }
 
                 $subtotal  = $qty * $unitPrice;
-                try {
-                    $itemCost = $catId > 0 ? $this->calculateCost($branchId, $catId, $qty) : 0;
-                } catch (Exception $e) {
-                    $itemCost = 0;
-                }
+                $itemCost = $catId > 0 ? $this->calculateCost($branchId, $catId, $qty) : 0;
 
                 $totalAmount += $subtotal;
                 $totalCost   += $itemCost;
@@ -607,8 +603,8 @@ class SaleLot extends Model
         if (!$lot) {
             throw new Exception('ไม่พบ Sale Lot');
         }
-        if ($lot['status'] !== 'draft') {
-            throw new Exception('ลบได้เฉพาะ Sale Lot ที่มีสถานะ draft เท่านั้น');
+        if (!in_array($lot['status'], ['draft', 'cancelled'])) {
+            throw new Exception('ลบได้เฉพาะ Sale Lot ที่ยังไม่ยืนยัน หรือถูกยกเลิกแล้ว');
         }
 
         $this->db->beginTransaction();

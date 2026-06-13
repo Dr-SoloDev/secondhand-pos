@@ -118,13 +118,12 @@ function renderLots() {
       <td>${statusBadgeHtml(lot.status)}</td>
       <td>
         <div class="action-cell">
-          ${lot.status === 'draft' ? `
-            <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})">แก้ไข</button>
-            <button class="btn btn-sm btn-success" onclick="confirmLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')">ยืนยัน</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" style="padding:3px 8px">ลบ</button>
-          ` : ''}
           ${lot.status === 'confirmed' ? `
             <button class="btn btn-sm btn-primary" onclick="openRevenueModal(${lot.id}, '${escapeHtml(lot.reference_no || '')}', ${lot.actual_revenue || 'null'})">บันทึกรายรับ</button>
+            <button class="btn btn-sm btn-danger" onclick="cancelLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')">ยกเลิก</button>
+          ` : ''}
+          ${lot.status === 'cancelled' ? `
+            <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" style="padding:3px 8px">ลบ</button>
           ` : ''}
         </div>
       </td>
@@ -446,6 +445,22 @@ function deleteLot(id, refNo) {
         loadLots();
       } else {
         showNotification(res.message || 'ลบไม่สำเร็จ', 'error');
+      }
+    }
+  );
+}
+
+function cancelLot(id, refNo) {
+  openConfirmDialog(
+    'ยกเลิก Lot ขาย',
+    `ต้องการยกเลิก Lot "${refNo}" ใช่หรือไม่? สต็อกจะถูกคืนกลับ`,
+    async () => {
+      const res = await apiRequest(`sale-lots/cancel?id=${id}`, 'POST', {});
+      if (res.status === 'success') {
+        showNotification('ยกเลิก Lot สำเร็จ', 'success');
+        loadLots();
+      } else {
+        showNotification(res.message || 'ยกเลิกไม่สำเร็จ', 'error');
       }
     }
   );
