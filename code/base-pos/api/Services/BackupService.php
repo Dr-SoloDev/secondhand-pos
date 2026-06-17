@@ -94,7 +94,12 @@ class BackupService
 
                 for ($i = 0; $i < $zip->numFiles; $i++) {
                     $name = $zip->getNameIndex($i);
-                    if (strpos($name, '..') !== false || strpos($name, '/') === 0) {
+                    // SECURITY: reject path traversal (..), absolute paths (/ prefix),
+                    // subdirectory entries (contains /), and hidden files (starts with .)
+                    if (strpos($name, '..') !== false
+                        || strpos($name, '/') !== false
+                        || $name[0] === '.'
+                    ) {
                         $zip->close();
                         array_map('unlink', glob($extractPath . '/*'));
                         rmdir($extractPath);
@@ -113,7 +118,16 @@ class BackupService
                     unlink($tempFile);
                     return ['success' => false, 'message' => 'No SQL files found in archive'];
                 }
+                // SECURITY: verify extracted SQL file is within expected directory
                 $filePath = $sqlFiles[0];
+                $realPath = realpath($filePath);
+                $realExtract = realpath($extractPath);
+                if (!$realPath || !$realExtract || strpos($realPath, $realExtract) !== 0) {
+                    array_map('unlink', glob($extractPath . '/*'));
+                    rmdir($extractPath);
+                    unlink($tempFile);
+                    return ['success' => false, 'message' => 'Invalid file path in archive'];
+                }
             } else {
                 unlink($tempFile);
                 return ['success' => false, 'message' => 'Failed to open archive'];
