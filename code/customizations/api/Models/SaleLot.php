@@ -58,10 +58,12 @@ class SaleLot extends Model
             "SELECT sl.*,
                     b.name AS branch_name,
                     u.full_name AS created_by_name,
+                    uu.full_name AS updated_by_name,
                     (sl.total_amount - sl.total_cost) AS profit
              FROM {$this->table} sl
              LEFT JOIN branches b ON sl.branch_id = b.id
              LEFT JOIN users u ON sl.created_by = u.id
+             LEFT JOIN users uu ON sl.updated_by = uu.id
              WHERE sl.id = ?",
             [$id]
         );
@@ -267,6 +269,88 @@ class SaleLot extends Model
                 ]);
             }
 
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    // แก้ไข Sale Lot ที่ confirmed แล้ว: คืนสต็อกเดิม → update → หักสต็อกใหม่
+    public function updateConfirmed($id, $data)
+    {
+        $lot = $this->db->fetch(
+            "SELECT id, status, branch_id FROM {$this->table} WHERE id = ?",
+            [$id]
+        );
+        if (!$lot) throw new Exception('ไม่พบ Sale Lot');
+        if ($lot['status'] !== 'confirmed') throw new Exception('ใช้ได้เฉพาะ Sale Lot ที่ confirmed แล้ว');
+
+        $this->db->beginTransaction();
+        try {
+            $this->restoreStock($id);
+            $this->db->query("DELETE FROM sale_lot_items WHERE sale_lot_id = ?", [$id]);
+
+            $branchId    = intval($lot['branch_id']);
+            $totalAmount = 0;
+            $totalCost   = 0;
+            $preparedItems = [];
+
+            foreach ($data['items'] as $item) {
+                $qty       = (float)($item['quantity_kg'] ?? 0);
+                $unitPrice = (float)($item['unit_price'] ?? 0);
+                $catId     = intval($item['category_id'] ?? 0);
+                $itemName  = trim((string)($item['item_name'] ?? ''));
+                $catalogId = intval($item['catalog_id'] ?? 0) ?: null;
+
+                if ($qty <= 0 || empty($itemName)) {
+                    throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
+                }
+
+                $itemCost = $catId > 0 ? $this->calculateCost($branchId, $catId, $qty) : 0;
+                $totalAmount += $qty * $unitPrice;
+                $totalCost   += $itemCost;
+
+                $preparedItems[] = [
+                    'catalog_id'  => $catalogId,
+                    'item_name'   => $itemName,
+                    'category_id' => $catId ?: null,
+                    'quantity_kg' => $qty,
+                    'unit_price'  => $unitPrice,
+                    'fifo_cost'   => $itemCost,
+                ];
+            }
+
+            $this->db->query(
+                "UPDATE {$this->table}
+                 SET buyer_name=?, sale_date=?, total_amount=?, total_cost=?, notes=?, expenses=?, updated_by=?, updated_at=NOW()
+                 WHERE id=?",
+                [
+                    trim((string)$data['buyer_name']),
+                    $data['sale_date'],
+                    $totalAmount,
+                    $totalCost,
+                    isset($data['notes']) ? trim((string)$data['notes']) : null,
+                    isset($data['expenses']) ? json_encode($data['expenses']) : null,
+                    $data['updated_by'] ?? null,
+                    $id,
+                ]
+            );
+
+            foreach ($preparedItems as $item) {
+                $this->db->insert('sale_lot_items', [
+                    'sale_lot_id' => $id,
+                    'catalog_id'  => $item['catalog_id'],
+                    'item_name'   => $item['item_name'],
+                    'category_id' => $item['category_id'],
+                    'quantity_kg' => $item['quantity_kg'],
+                    'unit_price'  => $item['unit_price'],
+                    'fifo_cost'   => $item['fifo_cost'],
+                ]);
+            }
+
+            $this->deductStock($id);
             $this->db->commit();
             return true;
         } catch (Exception $e) {

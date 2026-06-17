@@ -100,17 +100,18 @@ class SaleLotsController extends Controller
         }
     }
 
-    // อัปเดต Sale Lot ได้เฉพาะสถานะ draft เท่านั้น
+    // อัปเดต Sale Lot: draft → update ปกติ, confirmed → restore+update+deduct stock ใหม่
     public function update($id)
     {
         $this->requireAuth(['admin', 'manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
+        $model = new SaleLot();
+        $lot   = $model->getById($id);
+        if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+
         // SECURITY: non-admin แก้ได้เฉพาะ Sale Lot ของสาขาตัวเอง
         if (($this->user['role'] ?? '') !== 'admin') {
-            $model = new SaleLot();
-            $lot   = $model->getById($id);
-            if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
             $userBranch = $this->user['branch_id'] ?? null;
             if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
                 Response::error('ไม่มีสิทธิ์แก้ไข Sale Lot นี้', 403);
@@ -124,18 +125,9 @@ class SaleLotsController extends Controller
             Response::error('ต้องระบุรายการสินค้าอย่างน้อย 1 รายการ', 400);
         }
 
-        $cleanData = [
-            'buyer_name' => trim((string)$data['buyer_name']),
-            'sale_date'  => $this->sanitizeInput($data['sale_date']),
-            'notes'      => isset($data['notes']) ? trim((string)$data['notes']) : null,
-            'expenses'   => $data['expenses'] ?? null,
-        ];
-
         $cleanItems = [];
         foreach ($data['items'] as $item) {
-            if (empty($item['quantity_kg'])) {
-                Response::error('แต่ละรายการต้องมีน้ำหนัก', 400);
-            }
+            if (empty($item['quantity_kg'])) Response::error('แต่ละรายการต้องมีน้ำหนัก', 400);
             $cleanItems[] = [
                 'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
                 'item_name'   => !empty($item['item_name']) ? trim((string)$item['item_name']) : 'สินค้า',
@@ -145,20 +137,31 @@ class SaleLotsController extends Controller
             ];
         }
 
-        $cleanData['items'] = $cleanItems;
+        $cleanData = [
+            'buyer_name'  => trim((string)$data['buyer_name']),
+            'sale_date'   => $this->sanitizeInput($data['sale_date']),
+            'notes'       => isset($data['notes']) ? trim((string)$data['notes']) : null,
+            'expenses'    => $data['expenses'] ?? null,
+            'items'       => $cleanItems,
+            'updated_by'  => $this->user['user_id'] ?? null,
+        ];
 
-        $model = new SaleLot();
         try {
-            $model->update($id, $cleanData);
+            if ($lot['status'] === 'confirmed') {
+                $model->updateConfirmed($id, $cleanData);
+            } else {
+                $model->update($id, $cleanData);
+            }
+            $userName = $this->user['username'] ?? $this->user['user_id'];
             Logger::logActivity(
                 $this->user['user_id'],
                 'update_sale_lot',
-                "Updated Sale Lot ID: {$id}"
+                "Updated Sale Lot ID: {$id} (status: {$lot['status']}) by {$userName}"
             );
             Response::success('อัปเดต Sale Lot สำเร็จ', null);
         } catch (Exception $e) {
             error_log('SaleLot update failed: ' . $e->getMessage());
-            Response::error('อัปเดต Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
+            Response::error($e->getMessage() ?: 'อัปเดต Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
 
