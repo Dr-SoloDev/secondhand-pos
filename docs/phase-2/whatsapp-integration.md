@@ -74,7 +74,7 @@
 ## 📁 File Structure
 
 ```
-secondhand-pos/
+scrap-pos/
 ├── services/
 │   └── whatsapp/                      # WhatsApp Service (Node.js)
 │       ├── package.json

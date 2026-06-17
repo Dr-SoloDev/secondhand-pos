@@ -1,4 +1,4 @@
-# Secondhand POS — Code Project
+# Scrap POS — Code Project
 
 **ระบบจัดการร้านรับซื้อของเก่า 4 สาขา | PHP 8.2 + MySQL 8.0 + Docker**
 
@@ -59,9 +59,9 @@ code/
 
 | Service | Container Name | Port | Image |
 |---------|---------------|------|-------|
-| Web (Apache + PHP 8.2) | `secondhand-pos-web` | 8080:80 | `php:8.2-apache` |
-| Database (MySQL 8.0) | `secondhand-pos-db` | 3307:3306 | `mysql:8.0` |
-| phpMyAdmin | `secondhand-pos-pma` | 8081:80 | `phpmyadmin:latest` |
+| Web (Apache + PHP 8.2) | `scrap-pos-web` | 8080:80 | `php:8.2-apache` |
+| Database (MySQL 8.0) | `scrap-pos-db` | 3307:3306 | `mysql:8.0` |
+| phpMyAdmin | `scrap-pos-pma` | 8081:80 | `phpmyadmin:latest` |
 
 ### Environment Variables (`.env`)
 
@@ -92,7 +92,7 @@ docker compose down -v && docker compose up -d --build
 docker compose logs -f web
 
 # MySQL CLI
-docker exec -it secondhand-pos-db mysql -uroot -prootpass pos_system
+docker exec -it scrap-pos-db mysql -uroot -prootpass pos_system
 ```
 
 ---

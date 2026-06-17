@@ -1,4 +1,4 @@
-# 🤖 Agent Memory — Secondhand POS
+# 🤖 Agent Memory — Scrap POS
 **Last updated:** 14 มิถุนายน 2569
 **Status:** GOALS G1-G10 เสร็จครบ — อยู่ระหว่างรอผลคุยเจ้าของ 9 มิ.ย.
 
@@ -92,7 +92,7 @@
 ## 🚀 Commands
 
 ```bash
-cd /home/drsolodev/projects/secondhand-pos/code
+cd /home/drsolodev/projects/scrap-pos/code
 
 docker compose up -d
 docker compose logs -f web
@@ -100,7 +100,7 @@ docker compose restart web
 docker compose down -v && docker compose up -d --build
 
 # MySQL CLI
-docker exec -it secondhand-pos-db mysql -uroot -prootpass pos_system
+docker exec -it scrap-pos-db mysql -uroot -prootpass pos_system
 # ⚠️ ภาษาไทยต้องใส่ --default-character-set=utf8mb4
 ```
 

@@ -4,7 +4,7 @@ services:
   # ============================================================
   db:
     image: mysql:8.0
-    container_name: secondhand-pos-db
+    container_name: scrap-pos-db
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -33,7 +33,7 @@ services:
     build:
       context: ./docker
       dockerfile: Dockerfile.php
-    container_name: secondhand-pos-web
+    container_name: scrap-pos-web
     restart: unless-stopped
     ports:
       - "8080:80"
@@ -58,7 +58,7 @@ services:
   # ============================================================
   phpmyadmin:
     image: phpmyadmin:latest
-    container_name: secondhand-pos-pma
+    container_name: scrap-pos-pma
     restart: unless-stopped
     ports:
       - "8081:80"
