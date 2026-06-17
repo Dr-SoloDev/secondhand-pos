@@ -25,9 +25,4 @@ Deny from all
 # Set default charset
 #AddDefaultCharset UTF-8
 
-# Enable Cross-Origin Resource Sharing (CORS)
-#Header set Access-Control-Allow-Origin "*"
-#Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-#Header set Access-Control-Allow-Headers "Content-Type, Authorization"
-
 RewriteRule .* - [env=HTTP_AUTHORIZATION:%{HTTP:Authorization},last]
