@@ -365,6 +365,11 @@ async function savePurchaseOrder() {
   if (!selectedSeller) { showNotification('กรุณาเลือกผู้ขาย', 'error'); return; }
   if (cart.length === 0) { showNotification('กรุณาเพิ่มรายการสินค้า', 'error'); return; }
 
+  // WF-03: soft reminder ก่อน save ถ้าเป็น blacklist seller (ไม่ block)
+  if (selectedSeller.is_blacklisted == 1) {
+    showNotification('⚠️ กำลังบันทึก PO ให้ผู้ขายที่อยู่ในบัญชีดำ', 'warning');
+  }
+
   const payload = {
     branch_id: parseInt(document.getElementById('branchSelect').value),
     seller_id: selectedSeller.id,
@@ -503,24 +508,25 @@ window.showReceipt = async function(id) {
     </div>`;
 
   const preciousExtra = isPrecious ? `
-    <div style="border:1.5px solid #222;border-radius:4px;padding:10px 12px;margin-top:10px;font-size:11.5px">
-      <div style="font-weight:800;font-size:12px;margin-bottom:6px;border-bottom:1px solid #ccc;padding-bottom:4px">📋 คำรับรองของผู้ขาย</div>
-      <div style="margin-bottom:8px;color:#333">ข้าพเจ้าได้นำสินค้าที่ระบุในบิลนี้มาโดยสุจริตจริง</div>
-      <div style="margin-bottom:14px;line-height:2">
-        ลายมือชื่อ ___________________________<br>
-        <span style="font-size:10.5px;color:#666">เวลา: ${dt} &nbsp; เลขบิล: ${escapeHtml(po.reference_no)}</span>
+    <div style="border:1px solid #333;border-radius:4px;padding:10px;margin-top:12px;font-size:12px">
+      <div style="font-weight:700;margin-bottom:6px">คำรับรองของผู้ขาย</div>
+      <div style="margin-bottom:10px">ข้าพเจ้าได้นำสินค้าที่ระบุในบิลนี้มาโดยสุจริต และยินยอมให้ทางร้านบันทึกข้อมูล</div>
+      <div style="margin-bottom:4px;font-size:11px">ลายมือชื่อ:</div>
+      <div style="border-bottom:1.5px solid #333;height:32px;margin-bottom:6px"></div>
+      <div style="font-size:10px;color:#555;margin-bottom:10px">
+        วันที่/เวลา: ${dt} &nbsp;&nbsp;&nbsp; เลขบิล: ${escapeHtml(po.reference_no)}
       </div>
       <div style="font-size:11px;margin-bottom:8px">
-        หลักฐานที่แนบ &nbsp;
-        ☐ บัตรประชาชน &nbsp;☐ ใบขับขี่ &nbsp;☐ เอกสารราชการ
+        หลักฐานที่แนบ: &nbsp; ☐ สำเนาบัตรประชาชน &nbsp; ☐ สำเนาใบขับขี่ &nbsp; ☐ เอกสารราชการ
       </div>
-      <div style="font-size:10.5px;color:#c00;font-weight:700;line-height:1.6;border-top:1px dashed #ccc;padding-top:6px">
-        ไม่รับซื้อของโจรทุกกรณี<br>
-        ไม่รับผิดชอบสินค้าผิดกฎหมาย
+      <div style="font-size:10px;color:#c00;font-weight:600;line-height:1.5">
+        ทางร้านไม่รับซื้อของที่มีการลักทรัพย์โดยเด็ดขาด<br>
+        ทางร้านไม่รับผิดชอบต่อสินค้าที่เกิดจากการกระทำผิดกฎหมายทุกกรณี
       </div>
     </div>
-    <div style="border:1.5px dashed #bbb;border-radius:4px;height:70px;margin-top:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#999">
-      แนบสำเนาบัตรประชาชน / ภาพถ่ายที่นี่
+    <div style="border:1.5px dashed #999;border-radius:4px;height:90px;margin-top:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;flex-direction:column;gap:4px">
+      <span>📎</span>
+      <span>แนบสำเนาบัตรประชาชน / ภาพถ่ายที่นี่</span>
     </div>` : '';
 
   const half = `
@@ -532,10 +538,15 @@ window.showReceipt = async function(id) {
     <style>
       @media print {
         @page { size: A4 landscape; margin: 8mm; }
+        /* ซ่อน UI ที่ไม่ต้องพิมพ์ */
         #viewPOModal .modal-header,
         #viewPOModal .modal-footer,
-        #billPrintHint { display: none !important; }
+        #billPrintHint,
+        #poQrSection { display: none !important; }
+        /* ลบ border กรอบ modal */
         #billPrintWrap { border: none !important; }
+        /* ถ้า Type B ยาวเกิน → ขึ้นหน้าใหม่โดยอัตโนมัติ */
+        #billPrintWrap > div { page-break-inside: avoid; }
       }
     </style>
     <div id="billPrintWrap" style="display:flex;flex-direction:row;border:1px solid #ccc;width:fit-content;margin:0 auto;">
@@ -546,7 +557,45 @@ window.showReceipt = async function(id) {
       ✂ พับครึ่งแนวยาวฉีกตรงเส้นปรุ — ร้านเก็บซ้าย | ลูกค้าเก็บขวา
     </div>`;
   document.getElementById('viewPOModal').classList.add('show');
+  // WF-01: สร้าง QR code หลังเปิด modal
+  generatePhotoQR(id);
 };
+
+// ===== WF-01: QR Code สำหรับถ่ายรูป =====
+async function generatePhotoQR(poId) {
+  const section  = document.getElementById('poQrSection');
+  const canvas   = document.getElementById('poQrCanvas');
+  const hint     = document.getElementById('poQrHint');
+  if (!section || !canvas) return;
+
+  section.style.display = 'none';
+  canvas.innerHTML = '';
+
+  try {
+    const res = await apiRequest(`purchase-orders/photo-token?id=${poId}`);
+    if (res.status !== 'success') return;
+
+    const { token, expires } = res.data;
+    const origin = location.origin + location.pathname.replace(/\/admin\/.*$/, '');
+    const url    = `${origin}/photo-upload.html?po=${poId}&token=${encodeURIComponent(token)}&expires=${expires}`;
+
+    // สร้าง QR ด้วย qrcode.js (global QRCode)
+    new QRCode(canvas, {
+      text:           url,
+      width:          160,
+      height:         160,
+      colorDark:      '#000000',
+      colorLight:     '#ffffff',
+      correctLevel:   QRCode.CorrectLevel.M,
+    });
+
+    hint.textContent = `ลิงก์ใช้ได้ถึง ${new Date(expires * 1000).toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'})} น.`;
+    section.style.display = 'block';
+  } catch (e) {
+    // QR ไม่สำคัญ ไม่แสดง error
+    console.warn('QR generation failed:', e);
+  }
+}
 
 // ===== Sellers =====
 async function searchSellers() {
@@ -627,7 +676,11 @@ function doSelectSeller(s) {
   wrap.className = 'selected-seller';
   wrap.innerHTML = `<div><strong>${escapeHtml(s.full_name)}</strong></div>`;
   if (s.id_card) wrap.innerHTML += `<div>เลขบัตร: ${maskIdCard(s.id_card)}</div>`;
-  if (s.phone) wrap.innerHTML += `<div>โทร: ${escapeHtml(s.phone)}</div>`;
+  if (s.phone)   wrap.innerHTML += `<div>โทร: ${escapeHtml(s.phone)}</div>`;
+  // WF-03: แสดง badge ถ้าอยู่ใน blacklist (หลัง confirm popup แล้ว)
+  if (s.is_blacklisted == 1) {
+    wrap.innerHTML += `<div style="color:#c00;font-size:12px;font-weight:600;margin-top:6px;padding:4px 8px;background:#fff5f5;border-radius:4px;display:inline-block">⛔ ผู้ขายรายนี้อยู่ในบัญชีดำ</div>`;
+  }
   const btn = document.createElement('button');
   btn.className = 'btn btn-sm btn-secondary';
   btn.textContent = 'เปลี่ยนผู้ขาย';

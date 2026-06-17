@@ -328,6 +328,12 @@
         <button class="close-modal" id="viewPOModalClose">&times;</button>
       </div>
       <div class="modal-body" id="viewPOContent"></div>
+      <!-- WF-01: QR code section (hidden เวลาพิมพ์) -->
+      <div id="poQrSection" style="display:none;text-align:center;padding:12px 0;border-top:1px dashed #ccc;margin:0 16px 8px">
+        <div style="font-size:13px;color:#555;margin-bottom:8px">📱 สแกนเพื่อถ่ายรูปสินค้าผ่านมือถือ</div>
+        <div id="poQrCanvas" style="display:inline-block"></div>
+        <div id="poQrHint" style="font-size:11px;color:#888;margin-top:6px">ลิงก์ใช้ได้ 24 ชั่วโมง</div>
+      </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="window.print()">พิมพ์</button>
         <button class="btn btn-secondary close-modal">ปิด</button>
@@ -338,7 +344,8 @@
   <div id="notification-container"></div>
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
-  <script src="../assets/js/purchase-orders.js?v=20260609"></script>
+  <script src="../assets/js/vendor/qrcode.min.js"></script>
+  <script src="../assets/js/purchase-orders.js?v=20260614"></script>
   <script>
     // sync ยอดรวม big display
     const cartTotalAmountBig = document.getElementById('cartTotalAmountBig');
