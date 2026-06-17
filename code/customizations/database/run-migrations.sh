@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # run-migrations.sh
-# Purpose: รัน migration ทั้งหมดเรียงตามลำดับ
+# Purpose: รัน migration ทั้งหมดเรียงตามลำดับ พร้อม tracking
 # Usage: ./run-migrations.sh [db_user] [db_password]
 # ============================================================
 
@@ -19,41 +19,61 @@ echo "=========================================="
 echo " Secondhand POS — Database Migration"
 echo "=========================================="
 
-# ตรวจสอบว่ามี mysql client
 if ! command -v mysql &> /dev/null; then
-    echo "❌ ไม่พบ mysql client กรุณาติดตั้ง MySQL/MariaDB ก่อน"
+    echo "❌ ไม่พบ mysql client"
     exit 1
 fi
 
-# Build mysql command
 if [ -z "$DB_PASS" ]; then
     MYSQL_CMD="mysql -u $DB_USER --default-character-set=utf8mb4"
 else
     MYSQL_CMD="mysql -u $DB_USER -p$DB_PASS --default-character-set=utf8mb4"
 fi
 
-# Step 1: รัน base schema
 echo ""
-echo "📦 Step 1: ติดตั้ง base schema (goragodwiriya/pos-system)"
+echo "📦 Step 1: ติดตั้ง base schema"
 $MYSQL_CMD < "$BASE_SQL"
 echo "   ✅ Base schema สำเร็จ"
 
-# Step 2: รัน migration ทั้งหมดเรียงตามลำดับ
 echo ""
-echo "🔧 Step 2: รัน migration สำหรับ secondhand customization"
+echo "📋 Step 2: เตรียม schema_migrations tracking"
+$MYSQL_CMD $DB_NAME <<'SQL'
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version    VARCHAR(10)  NOT NULL PRIMARY KEY,
+  filename   VARCHAR(255) NOT NULL,
+  applied_at DATETIME     DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+SQL
+echo "   ✅ schema_migrations ready"
+
+echo ""
+echo "🔧 Step 3: รัน migration (ข้ามอันที่รันแล้ว)"
+
 for migration in "$MIGRATIONS_DIR"/*.sql; do
+    [ -f "$migration" ] || continue
     filename=$(basename "$migration")
+    version="${filename%%_*}"
+
+    already_run=$($MYSQL_CMD --silent --skip-column-names $DB_NAME \
+        -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$version';" 2>/dev/null || echo "0")
+
+    if [ "$already_run" -gt 0 ]; then
+        echo "   ⏭  Skip: $filename"
+        continue
+    fi
+
     echo "   → Running: $filename"
-    $MYSQL_CMD < "$migration"
+    if $MYSQL_CMD $DB_NAME < "$migration"; then
+        $MYSQL_CMD $DB_NAME \
+            -e "INSERT INTO schema_migrations (version, filename) VALUES ('$version', '$filename');"
+        echo "   ✅ Done: $filename"
+    else
+        echo "   ❌ FAILED: $filename"
+        exit 1
+    fi
 done
 
 echo ""
 echo "=========================================="
 echo " ✅ Migration เสร็จสมบูรณ์"
 echo "=========================================="
-echo ""
-echo " Database: $DB_NAME"
-echo " ตารางใหม่: branches, sellers, item_conditions,"
-echo "          purchase_orders, purchase_order_items,"
-echo "          purchase_order_photos"
-echo ""
