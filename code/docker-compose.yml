@@ -40,6 +40,7 @@ services:
     volumes:
       - ./base-pos:/var/www/html:rw
       - ./customizations:/var/www/customizations:rw
+      - ./uploads:/var/www/html/uploads:rw
       - ./docker/apache-config.conf:/etc/apache2/sites-available/000-default.conf:ro
     environment:
       DB_HOST: db

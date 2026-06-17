@@ -11,14 +11,18 @@ class ReportService
         $this->db = Database::getInstance();
     }
 
-    public function getDashboardStats()
+    public function getDashboardStats($branchId = null)
     {
+        // WF-04: optional branch filter
+        $bWhere = $branchId ? " AND branch_id = " . intval($branchId) : "";
+        $bWhereSL = $branchId ? " AND branch_id = " . intval($branchId) : "";
+
         // Today's purchase total (รับซื้อวันนี้)
         $todayPurchases = $this->db->fetchColumn(
             "SELECT COALESCE(SUM(total_amount), 0) as total
               FROM purchase_orders
               WHERE DATE(created_at) = CURDATE()
-              AND status != 'cancelled'"
+              AND status != 'cancelled'" . $bWhere
         );
 
         // Today's purchase orders count (ใบรับซื้อวันนี้)
@@ -26,10 +30,10 @@ class ReportService
             "SELECT COUNT(*)
               FROM purchase_orders
               WHERE DATE(created_at) = CURDATE()
-              AND status != 'cancelled'"
+              AND status != 'cancelled'" . $bWhere
         );
 
-        // Total sellers (ผู้ขายทั้งหมด)
+        // Total sellers (ผู้ขายทั้งหมด — ไม่กรองตาม branch)
         $totalSellers = $this->db->fetchColumn(
             "SELECT COUNT(*) FROM sellers WHERE is_blacklisted = 0"
         );
@@ -38,7 +42,7 @@ class ReportService
         $pendingPO = $this->db->fetchColumn(
             "SELECT COUNT(*)
               FROM purchase_orders
-              WHERE status = 'draft'"
+              WHERE status = 'draft'" . $bWhere
         );
 
         // Also keep sales stats for reference
@@ -62,7 +66,7 @@ class ReportService
             "SELECT COALESCE(SUM(total_amount), 0)
               FROM sale_lots
               WHERE DATE(sale_date) = CURDATE()
-              AND status = 'confirmed'"
+              AND status = 'confirmed'" . $bWhereSL
         );
 
         $monthSaleLotProfit = $this->db->fetchColumn(
@@ -70,13 +74,13 @@ class ReportService
               FROM sale_lots
               WHERE MONTH(sale_date) = MONTH(CURDATE())
               AND YEAR(sale_date) = YEAR(CURDATE())
-              AND status = 'confirmed'"
+              AND status = 'confirmed'" . $bWhereSL
         );
 
         $pendingSaleLots = $this->db->fetchColumn(
             "SELECT COUNT(*)
               FROM sale_lots
-              WHERE status = 'draft'"
+              WHERE status = 'draft'" . $bWhereSL
         );
 
         return [

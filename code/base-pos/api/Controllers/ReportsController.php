@@ -3,8 +3,12 @@ class ReportsController extends Controller
 {
     public function getDashboardStats()
     {
+        // WF-04: รับ branch_id เพื่อกรองตามสาขา (null = รวมทุกสาขา)
+        $branchId = isset($_GET['branch_id']) && is_numeric($_GET['branch_id'])
+            ? intval($_GET['branch_id']) : null;
+
         $reportService = new ReportService();
-        $stats = $reportService->getDashboardStats();
+        $stats = $reportService->getDashboardStats($branchId);
 
         Response::success('Dashboard statistics retrieved', $stats);
     }

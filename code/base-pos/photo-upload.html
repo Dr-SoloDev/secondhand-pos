@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ถ่ายรูปสินค้า</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="assets/css/components/photo-upload.css">
+</head>
+<body class="photo-upload-page">
+
+  <!-- LOADING STATE -->
+  <div id="stateLoading" class="pu-state">
+    <div class="pu-spinner"></div>
+    <p>กำลังโหลดข้อมูล...</p>
+  </div>
+
+  <!-- ERROR STATE -->
+  <div id="stateError" class="pu-state hidden">
+    <div class="pu-icon-error">✕</div>
+    <h2>เกิดข้อผิดพลาด</h2>
+    <p id="errorMessage">ลิงก์หมดอายุหรือไม่ถูกต้อง</p>
+  </div>
+
+  <!-- MAIN STATE: แสดงข้อมูล PO + ปุ่มถ่ายรูป -->
+  <div id="stateMain" class="pu-state hidden">
+    <div class="pu-header">
+      <div class="pu-branch" id="poBranch"></div>
+      <div class="pu-ref" id="poRef"></div>
+      <div class="pu-seller" id="poSeller"></div>
+    </div>
+
+    <!-- Gallery รูปที่อัพโหลดแล้ว -->
+    <div class="pu-gallery" id="photoGallery"></div>
+    <div class="pu-gallery-count" id="galleryCount"></div>
+
+    <!-- Preview ก่อน upload -->
+    <div id="statePreview" class="pu-preview hidden">
+      <img id="previewImg" src="" alt="preview">
+      <div class="pu-preview-actions">
+        <button class="btn-cancel-photo" onclick="cancelPhoto()">ถ่ายใหม่</button>
+        <button class="btn-upload" onclick="uploadPhoto()">
+          <span id="uploadBtnText">อัพโหลดรูปนี้</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ปุ่มกล้อง -->
+    <div id="stateCameraBtn" class="pu-camera-wrap">
+      <label class="btn-camera" for="cameraInput">
+        <span class="camera-icon">📷</span>
+        <span>ถ่ายรูปสินค้า</span>
+      </label>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+    </div>
+
+    <!-- Upload progress -->
+    <div id="stateUploading" class="pu-uploading hidden">
+      <div class="pu-spinner"></div>
+      <p>กำลังอัพโหลด...</p>
+    </div>
+
+    <!-- Success toast -->
+    <div id="toastSuccess" class="pu-toast hidden">✅ อัพโหลดสำเร็จ!</div>
+  </div>
+
+  <script src="assets/js/photo-upload.js"></script>
+</body>
+</html>

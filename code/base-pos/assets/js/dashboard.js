@@ -1,5 +1,7 @@
 let allBranches = [];
 let currentBranchMode = 'all';
+let currentBranchId   = null;   // WF-04: สาขาที่เลือกอยู่
+let refreshTimer      = null;   // WF-04: auto-refresh timer
 
 document.addEventListener('DOMContentLoaded', function() {
   fetchDashboardData();
@@ -9,11 +11,19 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('salelotPeriod').addEventListener('change', function() {
     fetchSalelotChartData(this.value);
   });
+
+  // WF-04: auto-refresh ทุก 2 นาที
+  refreshTimer = setInterval(() => {
+    fetchDashboardData(currentBranchId);
+  }, 2 * 60 * 1000);
 });
 
-async function fetchDashboardData() {
+async function fetchDashboardData(branchId = null) {
+  // WF-04: ส่ง branch_id ถ้ามี
+  const statParam = branchId ? `?branch_id=${branchId}` : '';
+
   const [statsRes, branchRes, purchaseRes, salelotRes, stockRes] = await Promise.all([
-    apiRequest('reports/dashboard-stats'),
+    apiRequest(`reports/dashboard-stats${statParam}`),
     apiRequest('branches/summary'),
     apiRequest('reports/recent-purchases'),
     apiRequest('reports/recent-sale-lots'),
@@ -24,14 +34,15 @@ async function fetchDashboardData() {
   if (branchRes.status === 'success') {
     allBranches = branchRes.data || [];
     buildBranchSingleButtons(allBranches);
-    renderBranchSummary(allBranches, 'all');
+    renderBranchSummary(allBranches, currentBranchMode === 'side' ? 'side' : 'all');
   }
   if (purchaseRes.status === 'success') renderRecentPurchases(purchaseRes.data);
   if (salelotRes.status === 'success') renderRecentSaleLots(salelotRes.data);
   if (stockRes.status === 'success') renderLowStockItems(stockRes.data);
 
-  fetchPurchaseChartData('week');
-  fetchSalelotChartData('week');
+  const period = document.getElementById('purchasePeriod')?.value || 'week';
+  fetchPurchaseChartData(period);
+  fetchSalelotChartData(document.getElementById('salelotPeriod')?.value || 'week');
 }
 
 function buildBranchSingleButtons(branches) {
@@ -49,12 +60,19 @@ function setBranchMode(mode) {
     btn.classList.toggle('btn-secondary', btn.dataset.mode !== mode);
   });
   if (mode === 'all') {
+    currentBranchId = null;
     renderBranchSummary(allBranches, 'all');
+    fetchDashboardData(null);
   } else if (mode === 'side') {
+    currentBranchId = null;
     renderBranchSummary(allBranches, 'side');
+    fetchDashboardData(null);
   } else if (mode.startsWith('single-')) {
     const id = parseInt(mode.replace('single-', ''));
+    currentBranchId = id;
     renderBranchSummary(allBranches.filter(b => b.id === id), 'all');
+    // WF-04: โหลด stats เฉพาะสาขานี้
+    fetchDashboardData(id);
   }
 }
 

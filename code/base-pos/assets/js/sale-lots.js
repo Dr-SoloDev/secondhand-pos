@@ -118,8 +118,14 @@ function renderLots() {
       <td>${statusBadgeHtml(lot.status)}</td>
       <td>
         <div class="action-cell">
+          ${lot.status === 'draft' ? `
+            <button class="btn btn-sm btn-success" onclick="confirmLot(${lot.id})">ยืนยัน</button>
+            <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})">แก้ไข</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')">ลบ</button>
+          ` : ''}
           ${lot.status === 'confirmed' ? `
             <button class="btn btn-sm btn-primary" onclick="openRevenueModal(${lot.id}, '${escapeHtml(lot.reference_no || '')}', ${lot.actual_revenue || 'null'})">บันทึกรายรับ</button>
+            <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})">แก้ไข</button>
             <button class="btn btn-sm btn-danger" onclick="cancelLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')">ยกเลิก</button>
           ` : ''}
           ${lot.status === 'cancelled' ? `
@@ -418,20 +424,14 @@ async function saveLot() {
   }
 }
 
-function confirmLot(id, refNo) {
-  openConfirmDialog(
-    'ยืนยัน Lot ขาย',
-    `ต้องการยืนยัน Lot "${refNo}" ใช่หรือไม่? ไม่สามารถแก้ไขได้หลังยืนยัน`,
-    async () => {
-      const res = await apiRequest(`sale-lots/confirm?id=${id}`, 'POST');
-      if (res.status === 'success') {
-        showNotification('ยืนยัน Lot สำเร็จ', 'success');
-        loadLots();
-      } else {
-        showNotification(res.message || 'ยืนยันไม่สำเร็จ', 'error');
-      }
-    }
-  );
+async function confirmLot(id) {
+  const res = await apiRequest(`sale-lots/confirm?id=${id}`, 'POST');
+  if (res.status === 'success') {
+    showNotification('ยืนยัน Lot สำเร็จ', 'success');
+    loadLots();
+  } else {
+    showNotification(res.message || 'ยืนยันไม่สำเร็จ', 'error');
+  }
 }
 
 function deleteLot(id, refNo) {
@@ -492,6 +492,7 @@ async function viewLot(id) {
       <div><strong>วันที่ขาย:</strong> ${lot.sale_date ? lot.sale_date.slice(0, 10) : '-'}</div>
       <div><strong>ผู้ซื้อ:</strong> ${escapeHtml(lot.buyer_name || '-')}</div>
       <div><strong>พนักงาน:</strong> ${escapeHtml(lot.created_by_name || '-')}</div>
+      ${lot.updated_by_name ? `<div><strong>แก้ไขโดย:</strong> ${escapeHtml(lot.updated_by_name)}</div>` : ''}
       <div style="margin-top:4px"><strong>สถานะ:</strong> ${statusBadgeHtml(lot.status)}</div>
       <hr>
       <table class="data-table" style="width:100%">

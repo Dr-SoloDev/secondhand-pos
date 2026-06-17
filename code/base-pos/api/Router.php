@@ -24,8 +24,9 @@ class Router
     {
         // Public routes - no authentication required
         $publicRoutes = [
-            'auth/login' => true,
-            'auth/verify' => true
+            'auth/login'             => true,
+            'auth/verify'            => true,
+            'purchase-orders/photos' => true,  // WF-01: HMAC token auth (no Bearer needed)
         ];
 
         // Get request URI and method
@@ -157,6 +158,10 @@ class Router
         $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'createPurchaseOrder', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'purchase-orders/order', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrder', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders/cancel', 'controller' => 'PurchaseOrdersController', 'method' => 'cancelPurchaseOrder', 'verb' => 'POST'];
+        // WF-01: Photo upload (auth via HMAC token หรือ JWT)
+        $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'upload', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'list',   'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-orders/photo-token', 'controller' => 'PhotoUploadController', 'method' => 'photoToken', 'verb' => 'GET'];
 
         // Item Conditions routes
         $this->routes[] = ['route' => 'item-conditions', 'controller' => 'ItemConditionsController', 'method' => 'getConditions', 'verb' => 'GET'];
