@@ -32,5 +32,17 @@ node_modules/
 
 # OpenCode
 .opencode/
+
+# Dev tooling
+.codegraph/
+.mcp.json
+
+# Uploads (runtime data — not committed)
+code/uploads/
+
+# Document screenshots/samples
+login-screenshot.png
+
+# Backups
 backups/
 *.pdf
