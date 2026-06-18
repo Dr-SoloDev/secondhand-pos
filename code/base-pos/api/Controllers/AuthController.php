@@ -81,6 +81,25 @@ class AuthController extends Controller
         // Remove password before sending response
         unset($user['password']);
 
+        // F2: Set httpOnly cookie for JWT (browser sends automatically)
+        $cookieExpiry = time() + JWT_EXPIRY;
+        setcookie('posToken', $token, [
+            'expires' => $cookieExpiry,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Strict',
+            'secure' => false, // dev mode — no HTTPS
+        ]);
+
+        // F2: Set non-httpOnly cookie for user data (JS-accessible for UI)
+        setcookie('posUser', json_encode($user), [
+            'expires' => $cookieExpiry,
+            'path' => '/',
+            'httponly' => false,
+            'samesite' => 'Strict',
+            'secure' => false,
+        ]);
+
         Response::success('Login successful', [
             'token' => $token,
             'user' => $user
@@ -122,13 +141,34 @@ class AuthController extends Controller
 
     public function logout()
     {
-        $headers = getallheaders();
-        $token = substr($headers['Authorization'] ?? '', 7);
+        // F2: Try cookie first, then Authorization header (backward compat)
+        $token = $_COOKIE['posToken'] ?? '';
+        if (empty($token)) {
+            $headers = getallheaders();
+            $token = substr($headers['Authorization'] ?? '', 7);
+        }
+
         $decoded = TokenService::validate($token);
 
         if ($decoded && isset($decoded['jti'])) {
             TokenService::revokeToken($decoded['jti'], $decoded['exp']);
         }
+
+        // F2: Clear cookies
+        setcookie('posToken', '', [
+            'expires' => time() - 3600,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Strict',
+            'secure' => false,
+        ]);
+        setcookie('posUser', '', [
+            'expires' => time() - 3600,
+            'path' => '/',
+            'httponly' => false,
+            'samesite' => 'Strict',
+            'secure' => false,
+        ]);
 
         Response::success('Logged out successfully');
     }

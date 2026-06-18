@@ -42,15 +42,21 @@ class Router
         $action = $uriParts[1] ?? '';
 
         if (!isset($publicRoutes["$module/$action"])) {
-            $headers = getallheaders();
-            $authHeader = $headers['Authorization'] ?? '';
+            // F2: Try httpOnly cookie first, then Authorization header (backward compat)
+            $token = $_COOKIE['posToken'] ?? '';
 
-            if (empty($authHeader) || strpos($authHeader, 'Bearer ') !== 0) {
-                Response::error('Authentication required', 401);
-                exit;
+            if (empty($token)) {
+                $headers = getallheaders();
+                $authHeader = $headers['Authorization'] ?? '';
+
+                if (empty($authHeader) || strpos($authHeader, 'Bearer ') !== 0) {
+                    Response::error('Authentication required', 401);
+                    exit;
+                }
+
+                $token = substr($authHeader, 7);
             }
 
-            $token = substr($authHeader, 7);
             $decoded = TokenService::validate($token);
 
             if (!$decoded) {

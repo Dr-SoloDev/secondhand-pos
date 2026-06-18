@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
-  // Check authentication
-  const token = localStorage.getItem('posToken');
-  if (!token) {
+  // Check authentication — use posUser (still in localStorage); token is in httpOnly cookie
+  const authUserJson = localStorage.getItem('posUser');
+  if (!authUserJson) {
     window.location.href = `${basePath}/index.html`;
     return;
   }
@@ -40,8 +40,13 @@ document.addEventListener('DOMContentLoaded', function() {
   // Change password button
   const changePasswordBtn = document.getElementById('changePasswordBtn');
   if (changePasswordBtn) {
-    changePasswordBtn.addEventListener('click', function(e) {
+    changePasswordBtn.addEventListener('click', async function(e) {
       e.preventDefault();
+      try {
+        await fetch(`${apiPath}/auth/logout`, { method: 'POST' });
+      } catch (err) {
+        console.error('Logout API error:', err);
+      }
       localStorage.removeItem('posToken');
       localStorage.removeItem('posUser');
       window.location.href = `${basePath}/index.html`;
@@ -61,8 +66,13 @@ document.addEventListener('DOMContentLoaded', function() {
   // Logout button
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
-    logoutBtn.addEventListener('click', function(e) {
+    logoutBtn.addEventListener('click', async function(e) {
       e.preventDefault();
+      try {
+        await fetch(`${apiPath}/auth/logout`, { method: 'POST' });
+      } catch (err) {
+        console.error('Logout API error:', err);
+      }
       localStorage.removeItem('posToken');
       localStorage.removeItem('posUser');
       window.location.href = `${basePath}/index.html`;
@@ -72,9 +82,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ตรวจสอบ auth และ return user object — redirect ถ้าไม่ได้ login
 async function requireAuth() {
-  const token = localStorage.getItem('posToken');
   const userJson = localStorage.getItem('posUser');
-  if (!token || !userJson) {
+  if (!userJson) {
     window.location.href = `${basePath}/index.html`;
     return null;
   }
@@ -92,10 +101,10 @@ async function requireAuth() {
 
 // API Request helper
 async function apiRequest(endpoint, method = 'GET', data = null) {
-  const token = localStorage.getItem('posToken');
   const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    // F2: JWT is in httpOnly cookie — browser sends automatically
+    // Backward compat: old Bearer header system still works via Router.php
   };
 
   const options = {
@@ -131,7 +140,8 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 }
 
 function escapeHtml(s) {
-  return String(s == null ? "" : s).replace(/&/g,"\// Format currencyamp;").replace(/</g,"\// Format currencylt;").replace(/>/g,"\// Format currencygt;").replace(/"/g,"\// Format currencyquot;");
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // Format currency

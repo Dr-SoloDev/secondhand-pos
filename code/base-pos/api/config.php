@@ -10,7 +10,7 @@ if (!defined('APP_ACCESS')) {
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'pos_system');
 define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_PASS', getenv('DB_PASS') ?: '***REDACTED***');
 define('DB_CHARSET', 'utf8mb4');
 
 // API settings

@@ -470,8 +470,9 @@ function printTransfer(t) {
 }
 
 document.addEventListener('DOMContentLoaded', init);
-document.getElementById('logoutBtn')?.addEventListener('click', e => {
+document.getElementById('logoutBtn')?.addEventListener('click', async e => {
   e.preventDefault();
+  try { await fetch(apiPath+'/auth/logout', {method:'POST'}); } catch(e) { console.error(e); }
   localStorage.removeItem('posToken'); localStorage.removeItem('posUser');
   window.location.href = '../index.html';
 });

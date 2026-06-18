@@ -33,8 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
       .then(response => response.json())
       .then(data => {
         if (data.status === 'success') {
-          // Save token and user info
-          localStorage.setItem('posToken', data.data.token);
+          // F2: Save user info (token is in httpOnly cookie, set by PHP)
           localStorage.setItem('posUser', JSON.stringify(data.data.user));
 
           // Redirect based on role
