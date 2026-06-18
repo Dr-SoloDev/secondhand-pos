@@ -52,16 +52,15 @@
 
 1. สร้างฐานข้อมูลใหม่ชื่อ `pos_system` (หรือชื่ออื่นตามที่ต้องการ)
 2. นำเข้าไฟล์ SQL จาก `/database/pos_system.sql` เพื่อสร้างตารางและข้อมูลเริ่มต้น
-3. แก้ไขการตั้งค่าการเชื่อมต่อฐานข้อมูลในไฟล์ `/api/config.php`:
-   ```php
-   define('DB_HOST', 'localhost');
-   define('DB_NAME', 'pos_system'); // ชื่อฐานข้อมูลที่สร้าง
-   define('DB_USER', 'root'); // ชื่อผู้ใช้ MySQL
-   define('DB_PASS', ''); // รหัสผ่าน MySQL
-   ```
-4. ตั้งค่าคีย์ความปลอดภัยสำหรับ JWT:
-   ```php
-   define('JWT_SECRET', 'your-secret-key-change-this-in-production');
+3. ตั้งค่า environment variables (ห้ามใส่ค่าลงใน `config.php` โดยตรง):
+   ```bash
+   # Docker: ใส่ใน docker-compose.yml หรือ .env
+   DB_HOST=localhost
+   DB_NAME=pos_system
+   DB_USER=root
+   DB_PASS=your_db_password        # REQUIRED
+   JWT_SECRET=your_jwt_secret      # REQUIRED — สร้างด้วย: openssl rand -hex 32
+   APP_ENV=production              # เปิด HTTPS-only cookie ใน production
    ```
 5. แก้ไขการตั้งค่า basePath ของ Javascript ตามโฟลเดอร์ที่ติดตั้งโปรแกรม ที่ `/assets/js/config.js`
 ```javascript
