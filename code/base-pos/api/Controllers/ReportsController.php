@@ -19,7 +19,6 @@ class ReportsController extends Controller
     public function getDashboardStats()
     {
         $this->requireAuth();
-        // SECURITY: non-admin บังคับ branch ของตัวเอง
         $branchId = isset($_GET['branch_id']) && is_numeric($_GET['branch_id'])
             ? intval($_GET['branch_id']) : null;
         $userBranch = $this->enforceBranchScope();
@@ -36,6 +35,7 @@ class ReportsController extends Controller
     public function getSalesChart()
     {
         $this->requireAuth();
+        $this->enforceBranchScope();
         $period = isset($_GET['period']) ? $this->sanitizeInput($_GET['period']) : 'week';
 
         $reportService = new ReportService();
@@ -47,6 +47,7 @@ class ReportsController extends Controller
     public function getPurchaseChart()
     {
         $this->requireAuth();
+        $this->enforceBranchScope();
         $period = isset($_GET['period']) ? $this->sanitizeInput($_GET['period']) : 'week';
 
         $reportService = new ReportService();
@@ -58,6 +59,7 @@ class ReportsController extends Controller
     public function getRecentPurchases()
     {
         $this->requireAuth();
+        $this->enforceBranchScope();
         $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
 
         $reportService = new ReportService();
@@ -69,6 +71,7 @@ class ReportsController extends Controller
     public function getRecentSales()
     {
         $this->requireAuth();
+        $this->enforceBranchScope();
         $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
 
         $reportService = new ReportService();
@@ -80,7 +83,7 @@ class ReportsController extends Controller
     public function getSalesReport()
     {
         $this->requireAuth();
-        // Get filter params
+        $this->enforceBranchScope();
         $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
         $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
         $groupBy = isset($_GET['group_by']) ? $this->sanitizeInput($_GET['group_by']) : 'day';
@@ -94,7 +97,7 @@ class ReportsController extends Controller
     public function getProductSales()
     {
         $this->requireAuth();
-        // Get filter params
+        $this->enforceBranchScope();
         $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
         $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
         $categoryId = isset($_GET['category_id']) ? intval($_GET['category_id']) : null;
@@ -109,7 +112,7 @@ class ReportsController extends Controller
     public function getInventoryReport()
     {
         $this->requireAuth();
-        // Get filter params
+        $this->enforceBranchScope();
         $categoryId = isset($_GET['category_id']) ? intval($_GET['category_id']) : null;
         $stockStatus = isset($_GET['stock_status']) ? $this->sanitizeInput($_GET['stock_status']) : null;
 
@@ -122,7 +125,7 @@ class ReportsController extends Controller
     public function getCashierPerformance()
     {
         $this->requireAuth();
-        // Get filter params
+        $this->enforceBranchScope();
         $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
         $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
         $userId = isset($_GET['user_id']) ? intval($_GET['user_id']) : null;
@@ -136,6 +139,7 @@ class ReportsController extends Controller
     public function getRecentSaleLots()
     {
         $this->requireAuth();
+        $this->enforceBranchScope();
         $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
 
         $reportService = new ReportService();
@@ -147,6 +151,7 @@ class ReportsController extends Controller
     public function getPurchaseReport()
     {
         $this->requireAuth();
+        $this->enforceBranchScope();
         $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
         $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
         $groupBy = isset($_GET['group_by']) ? $this->sanitizeInput($_GET['group_by']) : 'day';
@@ -160,6 +165,7 @@ class ReportsController extends Controller
     public function getSaleLotReport()
     {
         $this->requireAuth();
+        $this->enforceBranchScope();
         $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
         $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
         $groupBy = isset($_GET['group_by']) ? $this->sanitizeInput($_GET['group_by']) : 'day';
@@ -173,6 +179,7 @@ class ReportsController extends Controller
     public function getSaleLotChart()
     {
         $this->requireAuth();
+        $this->enforceBranchScope();
         $period = isset($_GET['period']) ? $this->sanitizeInput($_GET['period']) : 'week';
 
         $reportService = new ReportService();
@@ -184,7 +191,7 @@ class ReportsController extends Controller
     public function getTaxReport()
     {
         $this->requireAuth();
-        // Get filter params
+        $this->enforceBranchScope();
         $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
         $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
         $period = isset($_GET['period']) ? $this->sanitizeInput($_GET['period']) : 'daily';

@@ -81,29 +81,24 @@ class AuthController extends Controller
         // Remove password before sending response
         unset($user['password']);
 
-        // F2: Set httpOnly cookie for JWT (browser sends automatically)
         $cookieExpiry = time() + JWT_EXPIRY;
+        $secure = getenv('APP_ENV') === 'production';
         setcookie('posToken', $token, [
             'expires' => $cookieExpiry,
             'path' => '/',
             'httponly' => true,
             'samesite' => 'Strict',
-            'secure' => false, // dev mode — no HTTPS
+            'secure' => $secure,
         ]);
-
-        // F2: Set non-httpOnly cookie for user data (JS-accessible for UI)
         setcookie('posUser', json_encode($user), [
             'expires' => $cookieExpiry,
             'path' => '/',
             'httponly' => false,
             'samesite' => 'Strict',
-            'secure' => false,
+            'secure' => $secure,
         ]);
 
-        Response::success('Login successful', [
-            'token' => $token,
-            'user' => $user
-        ]);
+        Response::success('Login successful', ['user' => $user]);
     }
 
     public function verify()
@@ -155,19 +150,20 @@ class AuthController extends Controller
         }
 
         // F2: Clear cookies
+        $secure = getenv('APP_ENV') === 'production';
         setcookie('posToken', '', [
             'expires' => time() - 3600,
             'path' => '/',
             'httponly' => true,
             'samesite' => 'Strict',
-            'secure' => false,
+            'secure' => $secure,
         ]);
         setcookie('posUser', '', [
             'expires' => time() - 3600,
             'path' => '/',
             'httponly' => false,
             'samesite' => 'Strict',
-            'secure' => false,
+            'secure' => $secure,
         ]);
 
         Response::success('Logged out successfully');

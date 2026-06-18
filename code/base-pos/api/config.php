@@ -10,7 +10,12 @@ if (!defined('APP_ACCESS')) {
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'pos_system');
 define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '***REDACTED***');
+define('DB_PASS', getenv('DB_PASS') ?: (function() {
+    error_log('CRITICAL: DB_PASS environment variable is not set');
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Server configuration error']);
+    exit;
+})());
 define('DB_CHARSET', 'utf8mb4');
 
 // API settings
