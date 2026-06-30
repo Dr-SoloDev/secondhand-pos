@@ -342,6 +342,7 @@ window.removeFromCart = function(idx) {
   delete pendingItemPhotos[cart[idx]._tempId];
   cart.splice(idx, 1);
   renderCart();
+  updatePhotoUI();
 };
 
 function renderCart() {
@@ -449,6 +450,8 @@ function clearAll() {
   // Reset photo state
   pendingItemPhotos = {};
   pendingSellerIdPhoto = null;
+  resetSellerPhotoUI();
+  updatePhotoUI();
 
   document.getElementById('selectedSellerBox').innerHTML = '<div class="text-muted" style="font-size:13px">ยังไม่ได้เลือกผู้ขาย</div>';
   document.getElementById('poNotes').value = '';
@@ -744,10 +747,7 @@ function openNewSellerModal() {
 
   // Reset ID card photo
   pendingSellerIdPhoto = null;
-  document.getElementById('sellerIdPhotoPreview').style.display = 'none';
-  const btn = document.getElementById('sellerIdPhotoBtn');
-  btn.textContent = '+';
-  btn.classList.remove('has-photo');
+  resetSellerPhotoUI();
 }
 
 async function saveNewSeller() {
@@ -912,6 +912,7 @@ function confirmPhoto() {
     // Close camera
     closeCamera();
     renderCart(); // refresh to show ✓
+    updatePhotoUI(); // refresh FAB badge + photo strip
 
     showUploadToast('📸 ถ่ายรูปสำเร็จ', 1500);
   }, 'image/jpeg', 0.85);
@@ -931,15 +932,80 @@ function retryPhoto() {
 
 // ── Show ID card photo preview ─────────────────────────────
 function showSellerIdPhotoPreview(file) {
-  const preview = document.getElementById('sellerIdPhotoPreview');
-  const thumb = document.getElementById('sellerIdPhotoThumb');
-  const btn = document.getElementById('sellerIdPhotoBtn');
+  const area = document.getElementById('sellerPhotoArea');
+  const icon = document.getElementById('sellerPhotoIcon');
+  const title = document.getElementById('sellerPhotoTitle');
+  const sub = document.getElementById('sellerPhotoSub');
+  const thumb = document.getElementById('sellerPhotoThumb');
 
-  preview.style.display = 'block';
+  area.classList.add('has-photo');
+  icon.textContent = '✅';
+  title.textContent = 'ถ่ายรูปบัตรประชาชนแล้ว';
+  sub.textContent = 'แตะเพื่อเปลี่ยนรูป | คลิกที่รูปเพื่อลบ';
   thumb.src = URL.createObjectURL(file);
-  btn.textContent = '✓';
-  btn.classList.add('has-photo');
+  thumb.style.display = 'block';
 }
+
+function resetSellerPhotoUI() {
+  const area = document.getElementById('sellerPhotoArea');
+  const icon = document.getElementById('sellerPhotoIcon');
+  const title = document.getElementById('sellerPhotoTitle');
+  const sub = document.getElementById('sellerPhotoSub');
+  const thumb = document.getElementById('sellerPhotoThumb');
+
+  area.classList.remove('has-photo');
+  icon.textContent = '📇';
+  title.textContent = '📸 เพิ่มรูปถ่ายบัตรประชาชน';
+  sub.textContent = 'แตะเพื่อถ่ายรูป หรือเลือกรูป';
+  thumb.style.display = 'none';
+  thumb.src = '';
+}
+
+// ── Update FAB Badge + Photo Strip ──────────────────────
+function updatePhotoUI() {
+  const tempIds = Object.keys(pendingItemPhotos);
+  const count = tempIds.length;
+  const badge = document.getElementById('fabBadge');
+  const fab = document.getElementById('fabCameraBtn');
+
+  // FAB badge
+  if (count > 0) {
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = 'flex';
+    fab.classList.add('has-photos');
+  } else {
+    badge.style.display = 'none';
+    fab.classList.remove('has-photos');
+  }
+
+  // Photo strip
+  const wrap = document.getElementById('photoStripWrap');
+  const strip = document.getElementById('photoStrip');
+  const countEl = document.getElementById('photoStripCount');
+
+  if (count > 0) {
+    wrap.classList.add('show');
+    countEl.textContent = `📸 ${count} รูป`;
+    strip.innerHTML = tempIds.map(tempId => {
+      const file = pendingItemPhotos[tempId];
+      const url = URL.createObjectURL(file);
+      return `<div class="photo-strip-item">
+        <div class="photo-thumb" style="background-image:url(${url});background-size:cover;background-position:center" onclick="removePendingPhoto('${tempId}')"></div>
+        <span class="photo-strip-remove" onclick="removePendingPhoto('${tempId}')">&times;</span>
+      </div>`;
+    }).join('');
+  } else {
+    wrap.classList.remove('show');
+    strip.innerHTML = '';
+  }
+}
+
+// ── Remove pending photo ────────────────────────────────
+window.removePendingPhoto = function(tempId) {
+  delete pendingItemPhotos[tempId];
+  updatePhotoUI();
+  renderCart();
+};
 
 // ── Upload seller ID card photo ────────────────────────────
 async function uploadSellerIdPhoto(sellerId, file) {
@@ -1058,6 +1124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     e.target.value = ''; // reset so same file can be re-selected
+    updatePhotoUI();
     showUploadToast('🖼️ เลือกรูปสำเร็จ', 1500);
   });
 
@@ -1080,5 +1147,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('sellerIdPhotoBtn');
     btn.textContent = '+';
     btn.classList.remove('has-photo');
+  });
+
+  // FAB Camera Button
+  document.getElementById('fabCameraBtn').addEventListener('click', () => {
+    const itemCount = Object.keys(pendingItemPhotos).length;
+    if (itemCount > 0 || cart.length > 0) {
+      openPhotoPicker('item', cart.length > 0 ? cart[0]._tempId : 'new');
+    } else {
+      openPhotoPicker('new-item', 'new');
+    }
+  });
+
+  // Seller Photo Area (improved)
+  document.getElementById('sellerPhotoArea').addEventListener('click', () => {
+    openPhotoPicker('seller-id', 0);
+  });
+  document.getElementById('sellerPhotoThumb').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (confirm('ลบรูปบัตรประชาชน?')) {
+      pendingSellerIdPhoto = null;
+      resetSellerPhotoUI();
+    }
   });
 });

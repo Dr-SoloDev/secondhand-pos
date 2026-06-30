@@ -40,8 +40,6 @@
   background: transparent;
   position: relative;
   transition: all 0.2s var(--pp-ease);
-
-  /* idle state */
   border: 2px dashed var(--pp-border);
   color: var(--pp-muted);
   font-size: 16px;
@@ -52,11 +50,7 @@
   background: var(--pp-accent-soft);
   color: var(--pp-accent);
 }
-.btn-photo-picker:active {
-  transform: scale(0.90);
-}
-
-/* Has photo → solid green ring */
+.btn-photo-picker:active { transform: scale(0.90); }
 .btn-photo-picker.has-photo {
   border-style: solid;
   border-color: var(--pp-success);
@@ -64,21 +58,11 @@
   color: var(--pp-success);
   font-size: 13px;
 }
-
-/* Small variant (cart rows) */
-.btn-photo-picker-sm {
-  width: 26px;
-  height: 26px;
-  font-size: 12px;
-  border-width: 1.5px;
-}
-.btn-photo-picker-sm.has-photo {
-  font-size: 11px;
-}
+.btn-photo-picker-sm { width: 26px; height: 26px; font-size: 12px; border-width: 1.5px; }
+.btn-photo-picker-sm.has-photo { font-size: 11px; }
 
 /* ==================================================================
    LAYER 2: BOTTOM SHEET — CHOOSE SOURCE
-   Clean card, minimal, spring-animated
    ================================================================== */
 .photo-sheet-overlay {
   position: fixed;
@@ -94,10 +78,7 @@
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
-.photo-sheet-overlay.show {
-  opacity: 1;
-  visibility: visible;
-}
+.photo-sheet-overlay.show { opacity: 1; visibility: visible; }
 
 .photo-sheet {
   background: var(--pp-surface);
@@ -109,25 +90,16 @@
   transition: transform 0.35s var(--pp-ease);
   box-shadow: 0 -8px 32px rgba(0,0,0,0.12);
 }
-.photo-sheet-overlay.show .photo-sheet {
-  transform: translateY(0);
-}
+.photo-sheet-overlay.show .photo-sheet { transform: translateY(0); }
 
-/* Drag handle */
 .photo-sheet-handle {
-  width: 36px;
-  height: 4px;
+  width: 36px; height: 4px;
   background: var(--pp-border);
   border-radius: 2px;
   margin: 0 auto 20px;
 }
 
-/* Options arranged in a clean vertical list */
-.photo-sheet-options {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.photo-sheet-options { display: flex; flex-direction: column; gap: 6px; }
 
 .photo-sheet-btn {
   display: flex;
@@ -149,213 +121,114 @@
 .photo-sheet-btn:hover { background: #f1f5f9; }
 .photo-sheet-btn:active { background: #e2e8f0; }
 
-/* Icon circle */
 .photo-sheet-btn-icon {
-  width: 42px;
-  height: 42px;
+  width: 42px; height: 42px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
 }
-.photo-sheet-btn-icon.camera   { background: var(--pp-accent-soft); color: var(--pp-accent); }
-.photo-sheet-btn-icon.gallery  { background: #fce7f3; color: #db2777; }
-.photo-sheet-btn-icon.cancel   { background: #fee2e2; color: #dc2626; }
+.photo-sheet-btn-icon.camera  { background: var(--pp-accent-soft); color: var(--pp-accent); }
+.photo-sheet-btn-icon.gallery { background: #fce7f3; color: #db2777; }
+.photo-sheet-btn-icon.cancel  { background: #fee2e2; color: #dc2626; }
 
-.photo-sheet-btn-label {
-  font-size: 12px;
-  color: var(--pp-muted);
-  margin-top: 1px;
-}
-
-/* Cancel button — visually separated */
+.photo-sheet-btn-label { font-size: 12px; color: var(--pp-muted); margin-top: 1px; }
 .photo-sheet-btn-cancel {
-  margin-top: 8px;
-  border-top: 1px solid var(--pp-border);
-  padding-top: 10px;
-  justify-content: center;
-  color: var(--pp-muted);
-  font-weight: 400;
+  margin-top: 8px; border-top: 1px solid var(--pp-border);
+  padding-top: 10px; justify-content: center;
+  color: var(--pp-muted); font-weight: 400;
 }
 
 /* ==================================================================
    LAYER 3: CAMERA / WEBCAM MODAL
-   Full-screen dark overlay, minimal controls
    ================================================================== */
 .camera-overlay {
-  position: fixed;
-  inset: 0;
-  background: #000;
-  z-index: 2100;
-  display: flex;
-  flex-direction: column;
-  opacity: 0;
-  visibility: hidden;
+  position: fixed; inset: 0; background: #000;
+  z-index: 2100; display: flex; flex-direction: column;
+  opacity: 0; visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
 }
-.camera-overlay.show {
-  opacity: 1;
-  visibility: visible;
-}
+.camera-overlay.show { opacity: 1; visibility: visible; }
 
-/* Top bar — minimal, translucent */
 .camera-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   padding: 12px 16px;
   background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
+  position: absolute; top: 0; left: 0; right: 0; z-index: 2;
 }
-.camera-header-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #fff;
-  letter-spacing: 0.3px;
-}
+.camera-header-title { font-size: 16px; font-weight: 600; color: #fff; letter-spacing: 0.3px; }
 .camera-close-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.15);
-  border: none;
-  color: #fff;
-  font-size: 22px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); border: none; color: #fff;
+  font-size: 22px; cursor: pointer; line-height: 1; padding: 0;
+  display: flex; align-items: center; justify-content: center;
   transition: background 0.15s;
-  line-height: 1;
-  padding: 0;
 }
 .camera-close-btn:hover { background: rgba(255,255,255,0.25); }
 
-/* Viewport fills the space */
 .camera-viewport {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
-  background: #000;
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative; background: #000;
 }
-.camera-viewport video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
+.camera-viewport video { width: 100%; height: 100%; object-fit: contain; }
 .camera-viewport canvas { display: none; }
 
-/* Flash overlay */
 .camera-flash {
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 3;
-  transition: opacity 0.08s ease;
+  position: absolute; inset: 0; background: #fff; opacity: 0;
+  pointer-events: none; z-index: 3; transition: opacity 0.08s ease;
 }
 .camera-flash.flash     { opacity: 0.7; }
 .camera-flash.flash-out { opacity: 0; transition: opacity 0.25s ease; }
 
-/* Bottom controls */
 .camera-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   padding: 24px 16px max(24px, env(safe-area-inset-bottom));
   background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
+  position: absolute; bottom: 0; left: 0; right: 0; z-index: 2;
 }
 
-/* Capture button — large circle with inner ring */
 .camera-capture-btn {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
+  width: 72px; height: 72px; border-radius: 50%;
   border: 4px solid rgba(255,255,255,0.85);
   background: rgba(255,255,255,0.15);
-  cursor: pointer;
-  position: relative;
+  cursor: pointer; position: relative; padding: 0;
   transition: transform 0.15s ease;
   -webkit-tap-highlight-color: transparent;
-  padding: 0;
 }
 .camera-capture-btn:active { transform: scale(0.92); }
 .camera-capture-btn::after {
   content: '';
-  position: absolute;
-  inset: 6px;
-  border-radius: 50%;
-  background: #fff;
+  position: absolute; inset: 6px; border-radius: 50%; background: #fff;
   transition: background 0.15s;
 }
 .camera-capture-btn:active::after { background: #e2e8f0; }
 
-/* ── Preview after capture ────────────────────────────── */
+/* Camera preview after capture */
 .camera-preview-overlay {
-  position: absolute;
-  inset: 0;
-  background: #000;
-  display: none;
-  z-index: 4;
+  position: absolute; inset: 0; background: #000;
+  display: none; z-index: 4;
 }
-.camera-preview-overlay.show {
-  display: flex;
-  flex-direction: column;
-}
-.camera-preview-overlay img {
-  flex: 1;
-  object-fit: contain;
-  width: 100%;
-}
+.camera-preview-overlay.show { display: flex; flex-direction: column; }
+.camera-preview-overlay img { flex: 1; object-fit: contain; width: 100%; }
 
 .camera-preview-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  padding: 16px max(16px, env(safe-area-inset-bottom));
+  display: flex; align-items: center; justify-content: center;
+  gap: 20px; padding: 16px max(16px, env(safe-area-inset-bottom));
   background: rgba(0,0,0,0.75);
 }
-
 .camera-retry-btn {
-  padding: 10px 28px;
-  border-radius: 24px;
+  padding: 10px 28px; border-radius: 24px;
   border: 1.5px solid rgba(255,255,255,0.3);
-  background: rgba(255,255,255,0.08);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
+  background: rgba(255,255,255,0.08); color: #fff;
+  font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit;
   transition: background 0.15s ease;
 }
 .camera-retry-btn:hover { background: rgba(255,255,255,0.16); }
 
 .camera-confirm-btn {
-  padding: 10px 32px;
-  border-radius: 24px;
-  border: none;
-  background: var(--pp-success);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
+  padding: 10px 32px; border-radius: 24px; border: none;
+  background: var(--pp-success); color: #fff; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
   transition: background 0.15s;
   box-shadow: 0 2px 12px rgba(22, 163, 74, 0.35);
 }
@@ -363,96 +236,49 @@
 .camera-confirm-btn:active { transform: scale(0.97); }
 
 /* ==================================================================
-   LAYER 4: THUMBNAIL PREVIEW & GALLERY
-   Square thumbnails with remove button
+   LAYER 4: THUMBNAIL PREVIEW & REMOVE
    ================================================================== */
-.photo-thumb-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-}
+.photo-thumb-wrap { display: inline-flex; align-items: center; gap: 6px; position: relative; }
 .photo-thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  object-fit: cover;
-  border: 2px solid var(--pp-border);
-  background: #f1f5f9;
-  cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s;
+  width: 44px; height: 44px; border-radius: 8px; object-fit: cover;
+  border: 2px solid var(--pp-border); background: #f1f5f9;
+  cursor: pointer; transition: transform 0.15s ease, border-color 0.15s;
 }
-.photo-thumb:hover {
-  transform: scale(1.08);
-  border-color: var(--pp-accent);
-}
+.photo-thumb:hover { transform: scale(1.08); border-color: var(--pp-accent); }
 
 .photo-thumb-remove {
-  position: absolute;
-  top: -7px;
-  right: -7px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #ef4444;
-  color: #fff;
-  border: 2px solid var(--pp-surface);
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-weight: 700;
-  padding: 0;
+  position: absolute; top: -7px; right: -7px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #ef4444; color: #fff; border: 2px solid var(--pp-surface);
+  font-size: 11px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-weight: 700; padding: 0;
   box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-  transition: transform 0.15s;
-  line-height: 1;
+  transition: transform 0.15s; line-height: 1;
 }
 .photo-thumb-remove:hover { transform: scale(1.15); }
 
 /* ==================================================================
    LAYER 5: UPLOAD PROGRESS & TOAST
-   Fixed-position notifications
    ================================================================== */
-
-/* Thin progress bar at top edge */
 .upload-progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  z-index: 2300;
-  display: none;
+  position: fixed; top: 0; left: 0; right: 0; height: 3px;
+  z-index: 2300; display: none;
 }
 .upload-progress.show { display: block; }
-
 .upload-progress-bar {
   height: 100%;
   background: linear-gradient(90deg, var(--pp-accent), var(--pp-success));
-  width: 0%;
-  transition: width 0.3s ease;
+  width: 0%; transition: width 0.3s ease;
   border-radius: 0 2px 2px 0;
 }
 
-/* Toast — bottom-center pill */
 .toast-upload {
-  position: fixed;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1e293b;
-  color: #fff;
-  padding: 10px 22px;
-  border-radius: 24px;
-  font-size: 14px;
-  font-weight: 500;
-  z-index: 2200;
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  background: #1e293b; color: #fff;
+  padding: 10px 22px; border-radius: 24px;
+  font-size: 14px; font-weight: 500; z-index: 2200;
   box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-  display: none;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
+  display: none; align-items: center; gap: 8px; white-space: nowrap;
   animation: toastUp 0.25s var(--pp-ease);
 }
 .toast-upload.show { display: flex; }
@@ -464,98 +290,197 @@
 .toast-upload.error   { background: #dc2626; }
 
 /* ==================================================================
-   LAYER 6: PO PHOTO GALLERY (AFTER SAVE)
-   Grid layout for reviewing uploaded photos
+   LAYER 6: PO PHOTO GALLERY (after save)
    ================================================================== */
 .po-photo-section {
-  background: var(--pp-surface);
-  border: 1px solid var(--pp-border);
-  border-radius: 10px;
-  padding: 14px 16px;
-  display: none;
+  background: var(--pp-surface); border: 1px solid var(--pp-border);
+  border-radius: 10px; padding: 14px 16px; display: none;
 }
 .po-photo-section.show { display: block; }
 
 .po-photo-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 12px;
 }
-.po-photo-header h3 {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--pp-text);
-  margin: 0;
-}
-.po-photo-header .photo-count {
-  font-size: 12px;
-  color: var(--pp-muted);
-  font-weight: 400;
-}
+.po-photo-header h3 { font-size: 14px; font-weight: 700; color: var(--pp-text); margin: 0; }
+.po-photo-header .photo-count { font-size: 12px; color: var(--pp-muted); font-weight: 400; }
 
-.po-photo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
-  gap: 8px;
-}
+.po-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; }
 
 .po-photo-add-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  aspect-ratio: 1;
-  border: 2px dashed var(--pp-border);
-  border-radius: 10px;
-  background: #fafafa;
-  cursor: pointer;
-  color: var(--pp-muted);
-  font-size: 11px;
-  transition: all 0.2s ease;
-  font-family: inherit;
-  padding: 0;
-  min-height: 68px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; aspect-ratio: 1;
+  border: 2px dashed var(--pp-border); border-radius: 10px;
+  background: #fafafa; cursor: pointer; color: var(--pp-muted);
+  font-size: 11px; transition: all 0.2s ease; font-family: inherit;
+  padding: 0; min-height: 68px;
 }
-.po-photo-add-btn:hover {
-  border-color: var(--pp-accent);
-  color: var(--pp-accent);
-  background: var(--pp-accent-soft);
-}
+.po-photo-add-btn:hover { border-color: var(--pp-accent); color: var(--pp-accent); background: var(--pp-accent-soft); }
 .po-photo-add-btn-icon { font-size: 22px; line-height: 1; }
 
 /* ==================================================================
-   RESPONSIVE: TABLET (≤768px) — larger touch targets
+   LAYER 7: FAB FLOATING BUTTON + BADGE
    ================================================================== */
-@media (max-width: 768px) {
-  .photo-sheet {
-    padding: 14px 16px max(16px, env(safe-area-inset-bottom));
-  }
-  .photo-sheet-btn {
-    padding: 14px 14px;
-    font-size: 15px;
-  }
-  .photo-sheet-btn-icon {
-    width: 44px;
-    height: 44px;
-    font-size: 20px;
-  }
-  .camera-capture-btn {
-    width: 64px;
-    height: 64px;
-  }
-  .camera-capture-btn::after { inset: 5px; }
-  .camera-footer {
-    padding: 20px 16px max(20px, env(safe-area-inset-bottom));
-  }
-  .po-photo-grid {
-    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  }
+.photo-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--pp-accent);
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+  cursor: pointer;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: all 0.25s var(--pp-ease);
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  line-height: 1;
+  font-family: inherit;
+}
+.photo-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 28px rgba(37, 99, 235, 0.5);
+}
+.photo-fab:active { transform: scale(0.94); }
+.photo-fab.has-photos {
+  animation: fabPulse 2s ease-in-out infinite;
+}
+@keyframes fabPulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4); }
+  50%      { box-shadow: 0 4px 28px rgba(37, 99, 235, 0.65); }
+}
+
+.photo-fab-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+  border: 2px solid #fff;
 }
 
 /* ==================================================================
-   RESPONSIVE: MOBILE (≤576px) — compact but readable
+   LAYER 8: PHOTO STRIP — pending photos preview below cart
+   ================================================================== */
+.photo-strip-wrap {
+  background: var(--pp-surface);
+  border: 1px solid var(--pp-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: none;
+  margin-top: 8px;
+}
+.photo-strip-wrap.show { display: block; }
+
+.photo-strip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.photo-strip-header .count { font-size: 13px; font-weight: 600; color: var(--pp-text); }
+.photo-strip-header .hint  { font-size: 12px; color: var(--pp-muted); }
+
+.photo-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.photo-strip::-webkit-scrollbar { height: 4px; }
+.photo-strip::-webkit-scrollbar-thumb { background: var(--pp-border); border-radius: 2px; }
+
+.photo-strip-item { position: relative; flex-shrink: 0; }
+.photo-strip-item .photo-thumb {
+  width: 52px; height: 52px; border-radius: 8px; object-fit: cover;
+  border: 2px solid var(--pp-border); background: #f1f5f9;
+  cursor: pointer; transition: transform 0.15s ease;
+}
+.photo-strip-item .photo-thumb:hover { transform: scale(1.06); border-color: var(--pp-accent); }
+
+.photo-strip-remove {
+  position: absolute; top: -6px; right: -6px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #ef4444; color: #fff; border: 2px solid var(--pp-surface);
+  font-size: 10px; font-weight: 700; display: flex; align-items: center;
+  justify-content: center; cursor: pointer; padding: 0; line-height: 1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.photo-strip-remove:hover { transform: scale(1.15); }
+
+.photo-strip-empty { font-size: 13px; color: var(--pp-muted); text-align: center; padding: 12px; }
+
+/* ==================================================================
+   LAYER 9: SELLER ID CARD PHOTO PLACEHOLDER
+   ================================================================== */
+.seller-photo-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 2px dashed var(--pp-border);
+  border-radius: var(--pp-radius);
+  cursor: pointer;
+  transition: all 0.2s var(--pp-ease);
+  margin-top: 6px;
+}
+.seller-photo-area:hover { border-color: var(--pp-accent); background: var(--pp-accent-soft); }
+.seller-photo-area.has-photo { border-style: solid; border-color: var(--pp-success); background: var(--pp-success-bg); }
+
+.seller-photo-icon {
+  width: 44px; height: 44px; border-radius: 8px;
+  background: var(--pp-border); display: flex; align-items: center;
+  justify-content: center; font-size: 22px; flex-shrink: 0;
+}
+.seller-photo-area.has-photo .seller-photo-icon { background: transparent; }
+
+.seller-photo-text { display: flex; flex-direction: column; gap: 2px; }
+.seller-photo-text .title { font-size: 14px; font-weight: 600; color: var(--pp-text); }
+.seller-photo-text .sub  { font-size: 12px; color: var(--pp-muted); }
+
+.seller-photo-thumb {
+  width: 48px; height: 48px; border-radius: 8px; object-fit: cover;
+  border: 2px solid var(--pp-success); flex-shrink: 0;
+}
+
+/* ==================================================================
+   RESPONSIVE: TABLET (≤768px)
+   ================================================================== */
+@media (max-width: 768px) {
+  .photo-sheet { padding: 14px 16px max(16px, env(safe-area-inset-bottom)); }
+  .photo-sheet-btn { padding: 14px 14px; font-size: 15px; }
+  .photo-sheet-btn-icon { width: 44px; height: 44px; font-size: 20px; }
+  .camera-capture-btn { width: 64px; height: 64px; }
+  .camera-capture-btn::after { inset: 5px; }
+  .camera-footer { padding: 20px 16px max(20px, env(safe-area-inset-bottom)); }
+  .po-photo-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
+  .photo-fab { bottom: 20px; right: 20px; width: 52px; height: 52px; font-size: 24px; }
+  .photo-strip-item .photo-thumb { width: 48px; height: 48px; }
+  .seller-photo-area { padding: 8px 12px; }
+}
+
+/* ==================================================================
+   RESPONSIVE: MOBILE (≤576px)
    ================================================================== */
 @media (max-width: 576px) {
   .camera-header { padding: 10px 14px; }
@@ -570,4 +495,9 @@
   .po-photo-grid { grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
   .btn-photo-picker { width: 28px; height: 28px; font-size: 14px; }
   .btn-photo-picker-sm { width: 24px; height: 24px; font-size: 11px; }
+  .photo-fab { bottom: 16px; right: 16px; width: 48px; height: 48px; font-size: 22px; }
+  .photo-fab-badge { min-width: 20px; height: 20px; font-size: 10px; }
+  .photo-strip-item .photo-thumb { width: 44px; height: 44px; }
+  .seller-photo-icon { width: 36px; height: 36px; font-size: 18px; }
+  .seller-photo-text .title { font-size: 13px; }
 }
