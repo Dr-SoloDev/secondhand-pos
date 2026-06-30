@@ -3,33 +3,11 @@ let branches = [];
 let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await checkAuth();
+  currentUser = await requireAuth();
+  if (!currentUser) return;
+  document.getElementById('currentUser').textContent = currentUser.username || '-';
   loadBranches();
 });
-
-async function checkAuth() {
-  const token = localStorage.getItem('posToken');
-  if (!token) {
-    window.location.href = '../index.html';
-    return;
-  }
-  try {
-    const res = await apiRequest('auth/verify', 'POST', { token });
-    if (res.status === 'success') {
-      // API ส่งกลับมาเป็น res.data.user ไม่ใช่ res.data
-      currentUser = res.data.user || res.data;
-      document.getElementById('currentUser').textContent = currentUser.username;
-    } else {
-      console.error('checkAuth - failed:', res);
-      localStorage.removeItem('posToken');
-      window.location.href = '../index.html';
-    }
-  } catch (err) {
-    console.error('checkAuth - error:', err);
-    localStorage.removeItem('posToken');
-    window.location.href = '../index.html';
-  }
-}
 
 async function loadBranches() {
   try {

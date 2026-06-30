@@ -105,6 +105,7 @@
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
         <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
         <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
         <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
@@ -192,6 +193,7 @@
                   <th class="text-right">สุทธิ</th>
                   <th class="text-right">ราคา/หน่วย</th>
                   <th class="text-right">รวม</th>
+                  <th style="width:36px;text-align:center">📷</th>
                   <th style="width:40px;text-align:center"></th>
                 </tr>
               </thead>
@@ -298,7 +300,16 @@
         </div>
         <div class="form-group">
           <label for="newIdCard">เลขบัตรประชาชน (13 หลัก)</label>
-          <input type="text" id="newIdCard" class="form-control" maxlength="13">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="newIdCard" class="form-control" maxlength="13" style="flex:1">
+            <button class="btn-photo-picker" id="sellerIdPhotoBtn" title="ถ่ายรูปบัตรประชาชน" type="button">+</button>
+          </div>
+          <div id="sellerIdPhotoPreview" style="display:none;margin-top:6px">
+            <div class="photo-thumb-wrap">
+              <img class="photo-thumb" id="sellerIdPhotoThumb" alt="รูปบัตร">
+              <span class="photo-thumb-remove" id="sellerIdPhotoRemove">&times;</span>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label for="newPhone">เบอร์โทรศัพท์</label>
@@ -340,6 +351,69 @@
       </div>
     </div>
   </div>
+
+  <input type="file" id="photoFileInput" class="photo-file-input" accept="image/*" capture="environment">
+
+  <!-- Photo Picker Bottom Sheet -->
+  <div class="photo-sheet-overlay" id="photoSheetOverlay">
+    <div class="photo-sheet">
+      <div class="photo-sheet-handle"></div>
+      <div class="photo-sheet-title">เพิ่มรูปภาพ</div>
+      <div class="photo-sheet-options">
+        <button class="photo-sheet-btn" id="sheetCameraBtn">
+          <span class="photo-sheet-btn-icon camera">📷</span>
+          <div>
+            <div>ถ่ายรูป</div>
+            <div class="photo-sheet-btn-label">ใช้กล้องเว็บแคม / กล้องมือถือ</div>
+          </div>
+        </button>
+        <button class="photo-sheet-btn" id="sheetGalleryBtn">
+          <span class="photo-sheet-btn-icon gallery">🖼️</span>
+          <div>
+            <div>เลือกรูป</div>
+            <div class="photo-sheet-btn-label">เลือกจากแกลเลอรี / เครื่อง</div>
+          </div>
+        </button>
+        <button class="photo-sheet-btn" id="sheetCancelBtn" style="margin-top:8px">
+          <span class="photo-sheet-btn-icon cancel-action">✕</span>
+          <div>
+            <div>ยกเลิก</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera / Webcam Modal -->
+  <div class="camera-overlay" id="cameraOverlay">
+    <div class="camera-header">
+      <span class="camera-header-title">📷 ถ่ายรูป</span>
+      <button class="camera-close-btn" id="cameraCloseBtn">&times;</button>
+    </div>
+    <div class="camera-viewport" id="cameraViewport">
+      <video id="cameraVideo" autoplay playsinline></video>
+      <canvas id="cameraCanvas"></canvas>
+      <div class="camera-flash" id="cameraFlash"></div>
+      <div class="camera-preview-overlay" id="cameraPreviewOverlay">
+        <img id="cameraPreviewImg" alt="preview">
+        <div class="camera-preview-actions">
+          <button class="camera-retry-btn" id="cameraRetryBtn">⟳ ถ่ายใหม่</button>
+          <button class="camera-confirm-btn" id="cameraConfirmBtn">✓ ใช้รูปนี้</button>
+        </div>
+      </div>
+    </div>
+    <div class="camera-footer">
+      <button class="camera-capture-btn" id="cameraCaptureBtn"></button>
+    </div>
+  </div>
+
+  <!-- Upload Progress Bar -->
+  <div class="upload-progress" id="uploadProgress">
+    <div class="upload-progress-bar" id="uploadProgressBar"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-upload" id="toastUpload"></div>
 
   <div id="notification-container"></div>
   <script src="../assets/js/config.js"></script>

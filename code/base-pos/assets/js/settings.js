@@ -177,9 +177,6 @@ async function restoreBackup() {
     // Using fetch directly for file upload
     const response = await fetch(`${apiPath}/settings/backup/restore`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('posToken')}`
-      },
       body: formData
     });
 
@@ -283,9 +280,7 @@ async function downloadBackup(filename) {
 
     // ใช้ fetch API พร้อมส่ง Authorization header
     const response = await fetch(downloadUrl, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('posToken')}`
-      }
+      credentials: 'include'
     });
 
     if (!response.ok) {

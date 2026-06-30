@@ -158,6 +158,7 @@ class Router
         $this->routes[] = ['route' => 'sellers/blacklist', 'controller' => 'SellersController', 'method' => 'blacklistSeller', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'sellers/unblacklist', 'controller' => 'SellersController', 'method' => 'unblacklistSeller', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'sellers/history', 'controller' => 'SellersController', 'method' => 'getSellerHistory', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sellers/photo', 'controller' => 'SellersController', 'method' => 'uploadPhoto', 'verb' => 'POST'];
 
         // Purchase Orders routes
         $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrders', 'verb' => 'GET'];

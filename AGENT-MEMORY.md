@@ -60,6 +60,13 @@
 
 **อย่า** เพิ่ม route sales/* กลับเข้าไปใน Router.php โดยไม่ได้ตัดสินใจก่อน
 
+### UX Task — Photo Capture Feature 🚀
+- [x] ✅ UX Requirements spec compiled → `docs/UX-REQUIREMENTS-PHOTO-CAPTURE.md`
+- [x] ✅ Architect Review (พี่ทรงศักดิ์) — อนุมัติ
+- [ ] 🎨 UX Team (08-design) — UI/UX Design
+- [ ] 🏗️ Engineering (ช่างฟูล) — Implementation
+- [ ] 🧪 QA — Testing
+
 ### Phase ถัดไป
 - [ ] Reports filter by branch
 - [ ] รายงาน: กำไรต่อชิ้น, สินค้าค้างนาน, เปรียบเทียบสาขา, Top 10 ผู้ขาย

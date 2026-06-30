@@ -15,13 +15,7 @@ async function init() {
   if (res.status === 'success') {
     branches = res.data?.items || res.data || [];
     const sel = document.getElementById('branchFilter');
-    const expBranch = document.getElementById('expBranch');
-    branches.forEach(b => {
-      const o1 = new Option(b.name, b.id);
-      const o2 = new Option(b.name, b.id);
-      sel.appendChild(o1);
-      expBranch.appendChild(o2);
-    });
+    branches.forEach(b => sel.appendChild(new Option(b.name, b.id)));
   }
 
   const now = new Date();
@@ -31,8 +25,6 @@ async function init() {
     yearSel.appendChild(new Option(`พ.ศ. ${y}`, y - 543));
   }
   document.getElementById('periodMonth').value = now.getMonth() + 1;
-  document.getElementById('expDate').value = now.toISOString().split('T')[0];
-
   document.getElementById('periodType').addEventListener('change', function() {
     document.getElementById('periodMonth').style.display = this.value === 'month' ? '' : 'none';
   });
@@ -54,13 +46,11 @@ async function loadSummary() {
     apiRequest(`financial/summary?${params}`, 'GET'),
     apiRequest(`financial/lot-revenues?${params}`, 'GET'),
     apiRequest(`financial/purchase-by-category?${params}`, 'GET'),
-    apiRequest(`financial/expenses?${params}`, 'GET'),
   ]);
 
   if (summaryRes.status === 'success') renderCards(summaryRes.data);
   if (lotsRes.status === 'success')    renderLotTable(lotsRes.data?.items || []);
   if (categoryRes.status === 'success') renderCategoryTable(categoryRes.data?.items || []);
-  if (expRes.status === 'success')     renderExpenseTable(expRes.data?.items || []);
 }
 
 function renderCards(data) {
@@ -82,62 +72,6 @@ function renderCards(data) {
   profitEl.textContent = (netProfit >= 0 ? '+' : '') + formatCurrency(netProfit);
   profitEl.className = 'value ' + (netProfit >= 0 ? 'income' : 'expense');
   document.getElementById('profitMargin').textContent = `margin ${margin}%`;
-}
-
-function renderExpenseTable(items) {
-  const tbody = document.getElementById('bizExpenseBody');
-  if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;padding:24px">ไม่มีข้อมูล</td></tr>';
-    return;
-  }
-  tbody.innerHTML = items.map(e => {
-    const branchName = branches.find(b => b.id == e.branch_id)?.name || `สาขา ${e.branch_id}`;
-    return `<tr>
-      <td>${e.expense_date || '-'}</td>
-      <td>${escapeHtml(branchName)}</td>
-      <td>${escapeHtml(e.category)}</td>
-      <td class="text-right" style="color:var(--color-danger)">${formatCurrency(e.amount)}</td>
-      <td style="font-size:12px;color:var(--color-text-light)">${escapeHtml(e.note || '-')}</td>
-      <td><button class="btn btn-sm" style="color:var(--color-danger);background:none;border:none;cursor:pointer;font-size:12px" onclick="deleteExpense(${e.id})">ลบ</button></td>
-    </tr>`;
-  }).join('');
-}
-
-function toggleExpenseForm() {
-  const wrap = document.getElementById('expenseFormWrap');
-  wrap.style.display = wrap.style.display === 'none' ? '' : 'none';
-}
-
-async function saveExpense() {
-  const branchId = document.getElementById('expBranch').value;
-  const date     = document.getElementById('expDate').value;
-  const category = document.getElementById('expCategory').value;
-  const amount   = parseFloat(document.getElementById('expAmount').value);
-  const note     = document.getElementById('expNote').value.trim();
-
-  if (!branchId || !date || !category || !(amount > 0)) {
-    showNotification('กรุณากรอกข้อมูลให้ครบ', 'error');
-    return;
-  }
-
-  const res = await apiRequest('financial/expenses', 'POST', { branch_id: parseInt(branchId), expense_date: date, category, amount, note });
-  if (res.status === 'success') {
-    showNotification('บันทึกแล้ว', 'success');
-    document.getElementById('expAmount').value = '';
-    document.getElementById('expNote').value = '';
-    loadSummary();
-  } else {
-    showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
-  }
-}
-
-async function deleteExpense(id) {
-  if (!confirm('ลบรายการนี้?')) return;
-  const res = await apiRequest(`financial/expenses?id=${id}`, 'DELETE');
-  if (res.status === 'success') {
-    showNotification('ลบแล้ว', 'success');
-    loadSummary();
-  }
 }
 
 function renderLotTable(items) {
@@ -191,9 +125,8 @@ async function exportCsv(type) {
   if (periodType === 'month') params += `&month=${month}`;
   if (branchId) params += `&branch_id=${branchId}`;
 
-  const token = localStorage.getItem('posToken');
   const res = await fetch(`${window.apiPath}/financial/export?${params}`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    credentials: 'include'
   });
   if (!res.ok) { showNotification('export ไม่สำเร็จ', 'error'); return; }
   const blob = await res.blob();

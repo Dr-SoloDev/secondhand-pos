@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ค่าใช้จ่ายประจำร้าน - ระบบรับซื้อของเก่า</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <i class="icon-cart"></i>
+          <span>รับซื้อของเก่า</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+        <li class="admin-only"><a href="expenses.html" class="active"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+        <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+        <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+      </ul>
+    </aside>
+
+    <div class="content-area">
+      <div class="topbar">
+        <div class="page-header" style="flex:1">
+          <h1 class="page-title">ค่าใช้จ่ายประจำร้าน</h1>
+        </div>
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="userName">-</span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Expense Form -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header">
+          <h2 class="card-title">เพิ่มรายการค่าใช้จ่าย</h2>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div>
+              <label style="font-size:12px;display:block;margin-bottom:4px">สาขา</label>
+              <select id="expBranch" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit"></select>
+            </div>
+            <div>
+              <label style="font-size:12px;display:block;margin-bottom:4px">วันที่</label>
+              <input type="date" id="expDate" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit">
+            </div>
+            <div>
+              <label style="font-size:12px;display:block;margin-bottom:4px">ประเภท</label>
+              <select id="expCategory" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit">
+                <option>ค่าไฟ</option>
+                <option>ค่าน้ำ</option>
+                <option>ค่าเช่า</option>
+                <option>ค่าเน็ต</option>
+                <option>ค่าน้ำมัน</option>
+                <option>เงินเดือนพนักงาน</option>
+                <option>อื่นๆ</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:12px;display:block;margin-bottom:4px">จำนวนเงิน (บาท)</label>
+              <input type="number" id="expAmount" min="0" step="0.01" placeholder="0.00" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;width:120px">
+            </div>
+            <div style="flex:1;min-width:150px">
+              <label style="font-size:12px;display:block;margin-bottom:4px">หมายเหตุ</label>
+              <input type="text" id="expNote" placeholder="(ไม่บังคับ)" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;width:100%">
+            </div>
+            <button class="btn btn-success" onclick="saveExpense()">บันทึก</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter + Table -->
+      <div class="card">
+        <div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 class="card-title" style="margin:0;flex:1">รายการค่าใช้จ่าย</h2>
+          <select id="filterMonth" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit">
+            <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
+            <option value="3">มีนาคม</option><option value="4">เมษายน</option>
+            <option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
+            <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option>
+            <option value="9">กันยายน</option><option value="10">ตุลาคม</option>
+            <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+          </select>
+          <select id="filterYear" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit"></select>
+          <select id="filterBranch" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit">
+            <option value="">ทุกสาขา</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="loadExpenses()">ดูข้อมูล</button>
+        </div>
+        <div class="card-body">
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>สาขา</th>
+                  <th>ประเภท</th>
+                  <th class="text-right">จำนวนเงิน</th>
+                  <th>หมายเหตุ</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="expenseBody">
+                <tr><td colspan="6" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="font-weight:600;padding:10px 12px">รวม</td>
+                  <td class="text-right" style="font-weight:700;color:var(--color-danger);padding:10px 12px" id="totalAmount">฿0.00</td>
+                  <td colspan="2"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.content-area -->
+  </div><!-- /.app-container -->
+
+  <div id="notification-container"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/expenses.js"></script>
+</body>
+</html>

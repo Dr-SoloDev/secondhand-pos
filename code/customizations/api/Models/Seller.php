@@ -10,7 +10,7 @@ class Seller extends Model
     {
         $query = "SELECT
                     id, id_card, full_name, phone, address, vehicle_plate,
-                    is_blacklisted, total_transactions, total_amount,
+                    id_card_photo, is_blacklisted, total_transactions, total_amount,
                     last_transaction_at, created_at, updated_at
                   FROM {$this->table}";
         

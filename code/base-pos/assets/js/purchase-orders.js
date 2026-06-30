@@ -7,6 +7,12 @@ let recentPOs = [];
 let globalTier = { level: null };
 let currentCatalogItem = null; // { id, name, unit, price, tierPrices: [] }
 
+// ===== Photo State =====
+let pendingItemPhotos = {};   // { [cartIndex]: File }
+let pendingSellerIdPhoto = null; // File | null
+let activePhotoTarget = null; // { type: 'item', index: N } | { type: 'seller-id' }
+let cameraStream = null;
+
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', async () => {
   await loadBranches();
@@ -300,6 +306,7 @@ function addItemToCart() {
 
   const netQty = Math.max(0, qty - deduct);
   cart.push({
+    _tempId: 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     catalog_id: parseInt(catalogId),
     item_name: name,
     category_id: catId ? parseInt(catId) : null,
@@ -331,6 +338,8 @@ function addItemToCart() {
 }
 
 window.removeFromCart = function(idx) {
+  // Remove associated photo
+  delete pendingItemPhotos[cart[idx]._tempId];
   cart.splice(idx, 1);
   renderCart();
 };
@@ -338,7 +347,7 @@ window.removeFromCart = function(idx) {
 function renderCart() {
   const tbody = document.querySelector('#cartTable tbody');
   if (cart.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;padding:24px 12px">ยังไม่มีรายการ</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:24px 12px">ยังไม่มีรายการ</td></tr>';
   } else {
     tbody.innerHTML = cart.map((it, i) => {
       const net = it.net_quantity ?? Math.max(0, (it.quantity || 0) - (it.weight_deduction || 0));
@@ -350,6 +359,12 @@ function renderCart() {
         <td class="text-right">${net.toFixed(2)}</td>
         <td class="text-right">${formatCurrency(it.unit_price)}</td>
         <td class="text-right"><strong>${formatCurrency(it.total_price)}</strong></td>
+        <td style="text-align:center">
+          <button class="btn-photo-picker btn-photo-picker-sm ${pendingItemPhotos[it._tempId] ? 'has-photo' : ''}"
+                  onclick="openPhotoPicker('item', '${it._tempId}')" title="ถ่ายรูปสินค้า" type="button">
+            ${pendingItemPhotos[it._tempId] ? '✓' : '+'}
+          </button>
+        </td>
         <td style="text-align:center"><button class="btn btn-sm btn-danger" onclick="removeFromCart(${i})" style="padding:2px 8px;font-size:12px">ลบ</button></td>
       </tr>`;
     }).join('');
@@ -398,8 +413,25 @@ async function savePurchaseOrder() {
   btn.innerHTML = '<i class="icon-additem"></i> บันทึกใบรับซื้อ';
 
   if (res.status === 'success') {
+    const poId = res.data.id;
     showNotification(`บันทึกสำเร็จ! เลขที่: ${res.data.reference_no} ยอดรวม ${formatCurrency(res.data.total_amount)}`, 'success');
-    showReceipt(res.data.id);
+
+    // อัปโหลดรูปสินค้าที่ถ่ายค้างไว้
+    const itemPhotoCount = Object.keys(pendingItemPhotos).length;
+    if (itemPhotoCount > 0) {
+      showUploadToast(`กำลังอัปโหลด ${itemPhotoCount} รูป...`);
+      showUploadProgress();
+      let uploaded = 0;
+      for (const [tempId, file] of Object.entries(pendingItemPhotos)) {
+        await uploadItemPhoto(poId, file);
+        uploaded++;
+        showUploadProgress((uploaded / itemPhotoCount) * 100);
+      }
+      hideUploadProgress();
+      showUploadToast(`✅ อัปโหลด ${itemPhotoCount} รูปเรียบร้อย`, 2000);
+    }
+
+    showReceipt(poId);
     clearAll();
     loadRecentPOs();
   } else {
@@ -413,6 +445,10 @@ function clearAll() {
   selectedSeller = null;
   globalTier = { level: null };
   currentCatalogItem = null;
+
+  // Reset photo state
+  pendingItemPhotos = {};
+  pendingSellerIdPhoto = null;
 
   document.getElementById('selectedSellerBox').innerHTML = '<div class="text-muted" style="font-size:13px">ยังไม่ได้เลือกผู้ขาย</div>';
   document.getElementById('poNotes').value = '';
@@ -698,12 +734,20 @@ function clearSeller() {
 }
 
 function openNewSellerModal() {
+  // Reset form
   document.getElementById('newSellerModal').classList.add('show');
   document.getElementById('newFullName').value = document.getElementById('searchSellerInput').value || '';
   document.getElementById('newIdCard').value = '';
   document.getElementById('newPhone').value = '';
   document.getElementById('newAddress').value = '';
   document.getElementById('newVehiclePlate').value = '';
+
+  // Reset ID card photo
+  pendingSellerIdPhoto = null;
+  document.getElementById('sellerIdPhotoPreview').style.display = 'none';
+  const btn = document.getElementById('sellerIdPhotoBtn');
+  btn.textContent = '+';
+  btn.classList.remove('has-photo');
 }
 
 async function saveNewSeller() {
@@ -720,9 +764,17 @@ async function saveNewSeller() {
   }
   const res = await apiRequest('sellers', 'POST', payload);
   if (res.status === 'success') {
+    const sellerId = res.data.id;
     showNotification('เพิ่มผู้ขายสำเร็จ', 'success');
+
+    // อัปโหลดรูปบัตรประชาชนถ้ามี
+    if (pendingSellerIdPhoto) {
+      await uploadSellerIdPhoto(sellerId, pendingSellerIdPhoto);
+      pendingSellerIdPhoto = null;
+    }
+
     document.getElementById('newSellerModal').classList.remove('show');
-    selectSeller({ ...payload, id: res.data.id, is_blacklisted: 0 });
+    selectSeller({ ...payload, id: sellerId, is_blacklisted: 0 });
   } else {
     showNotification(res.message || 'ผิดพลาด', 'error');
   }
@@ -747,3 +799,286 @@ function formatDateTime(s) {
 
 // banner removed — no-op
 function updateBranchBanner() {}
+
+// ================================================================
+// PHOTO PICKER MODULE — LINE-style "+" button, camera, upload
+// ================================================================
+
+// ── Open bottom sheet ──────────────────────────────────────
+window.openPhotoPicker = function(type, id) {
+  activePhotoTarget = { type, id };
+  document.getElementById('photoSheetOverlay').classList.add('show');
+};
+
+// ── Close bottom sheet ─────────────────────────────────────
+function closePhotoSheet() {
+  document.getElementById('photoSheetOverlay').classList.remove('show');
+  activePhotoTarget = null;
+}
+
+// ── Open camera (webcam / mobile camera) ───────────────────
+async function openCamera(facingMode = 'environment') {
+  closePhotoSheet();
+  const overlay = document.getElementById('cameraOverlay');
+  const video = document.getElementById('cameraVideo');
+  const preview = document.getElementById('cameraPreviewOverlay');
+
+  overlay.classList.add('show');
+  preview.classList.remove('show');
+
+  try {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+    }
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    });
+    video.srcObject = cameraStream;
+    video.play();
+  } catch (err) {
+    // ถ้า environment ไม่ได้ ให้ลอง user (selfie)
+    if (facingMode === 'environment') {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+        video.srcObject = cameraStream;
+        video.play();
+      } catch (err2) {
+        showNotification('ไม่สามารถเปิดกล้องได้: ' + err2.message, 'error');
+        overlay.classList.remove('show');
+      }
+    } else {
+      showNotification('ไม่สามารถเปิดกล้องได้: ' + err.message, 'error');
+      overlay.classList.remove('show');
+    }
+  }
+}
+
+// ── Stop camera stream ─────────────────────────────────────
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  const video = document.getElementById('cameraVideo');
+  video.srcObject = null;
+}
+
+// ── Capture photo from webcam ──────────────────────────────
+function capturePhoto() {
+  const video = document.getElementById('cameraVideo');
+  const canvas = document.getElementById('cameraCanvas');
+  const flash = document.getElementById('cameraFlash');
+
+  // Flash effect
+  flash.classList.remove('flash-out');
+  flash.classList.add('flash');
+  setTimeout(() => {
+    flash.classList.remove('flash');
+    flash.classList.add('flash-out');
+  }, 100);
+
+  canvas.width = video.videoWidth || 1280;
+  canvas.height = video.videoHeight || 720;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Show preview
+  const previewImg = document.getElementById('cameraPreviewImg');
+  previewImg.src = canvas.toDataURL('image/jpeg', 0.85);
+  document.getElementById('cameraPreviewOverlay').classList.add('show');
+}
+
+// ── Confirm captured photo ─────────────────────────────────
+function confirmPhoto() {
+  const canvas = document.getElementById('cameraCanvas');
+
+  // Convert canvas to File
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+    if (activePhotoTarget) {
+      if (activePhotoTarget.type === 'item') {
+        pendingItemPhotos[activePhotoTarget.id] = file;
+      } else if (activePhotoTarget.type === 'seller-id') {
+        pendingSellerIdPhoto = file;
+        showSellerIdPhotoPreview(file);
+      }
+    }
+
+    // Close camera
+    closeCamera();
+    renderCart(); // refresh to show ✓
+
+    showUploadToast('📸 ถ่ายรูปสำเร็จ', 1500);
+  }, 'image/jpeg', 0.85);
+}
+
+// ── Close camera overlay ───────────────────────────────────
+function closeCamera() {
+  stopCamera();
+  document.getElementById('cameraOverlay').classList.remove('show');
+  document.getElementById('cameraPreviewOverlay').classList.remove('show');
+}
+
+// ── Retry photo (go back to live view) ─────────────────────
+function retryPhoto() {
+  document.getElementById('cameraPreviewOverlay').classList.remove('show');
+}
+
+// ── Show ID card photo preview ─────────────────────────────
+function showSellerIdPhotoPreview(file) {
+  const preview = document.getElementById('sellerIdPhotoPreview');
+  const thumb = document.getElementById('sellerIdPhotoThumb');
+  const btn = document.getElementById('sellerIdPhotoBtn');
+
+  preview.style.display = 'block';
+  thumb.src = URL.createObjectURL(file);
+  btn.textContent = '✓';
+  btn.classList.add('has-photo');
+}
+
+// ── Upload seller ID card photo ────────────────────────────
+async function uploadSellerIdPhoto(sellerId, file) {
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  try {
+    const res = await fetch(`/api/index.php/sellers/photo?id=${sellerId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + getToken(),
+      },
+      body: formData,
+    });
+    const json = await res.json();
+    if (json.status === 'success') {
+      showUploadToast('✅ อัปโหลดรูปบัตรประชาชนสำเร็จ', 1500);
+    } else {
+      console.warn('Seller photo upload failed:', json);
+    }
+  } catch (err) {
+    console.error('Seller photo upload error:', err);
+  }
+}
+
+// ── Upload single item photo to PO ─────────────────────────
+async function uploadItemPhoto(poId, file) {
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  try {
+    const res = await fetch(`/api/index.php/purchase-orders/photos?id=${poId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + getToken(),
+      },
+      body: formData,
+    });
+    const json = await res.json();
+    if (json.status !== 'success') {
+      console.warn('Item photo upload failed:', json);
+    }
+    return json;
+  } catch (err) {
+    console.error('Item photo upload error:', err);
+  }
+}
+
+// ── Upload progress bar ────────────────────────────────────
+function showUploadProgress(percent) {
+  const bar = document.getElementById('uploadProgress');
+  const fill = document.getElementById('uploadProgressBar');
+  if (percent === undefined) {
+    bar.classList.add('show');
+    fill.style.width = '0%';
+  } else {
+    fill.style.width = Math.min(percent, 100) + '%';
+    if (percent >= 100) {
+      setTimeout(() => bar.classList.remove('show'), 600);
+    }
+  }
+}
+function hideUploadProgress() {
+  document.getElementById('uploadProgress').classList.remove('show');
+}
+
+// ── Upload toast ───────────────────────────────────────────
+function showUploadToast(msg, duration = 0) {
+  const el = document.getElementById('toastUpload');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (duration > 0) {
+    setTimeout(() => el.classList.remove('show'), duration);
+  }
+}
+
+// ── Get JWT token from storage ────────────────────────────
+function getToken() {
+  return localStorage.getItem('posToken') || sessionStorage.getItem('posToken') || '';
+}
+
+// ================================================================
+// PHOTO PICKER EVENT BINDINGS
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Bottom sheet: ถ่ายรูป
+  document.getElementById('sheetCameraBtn').addEventListener('click', () => {
+    openCamera('environment');
+  });
+
+  // Bottom sheet: เลือกรูป
+  document.getElementById('sheetGalleryBtn').addEventListener('click', () => {
+    closePhotoSheet();
+    document.getElementById('photoFileInput').click();
+  });
+
+  // Bottom sheet: ยกเลิก
+  document.getElementById('sheetCancelBtn').addEventListener('click', closePhotoSheet);
+  document.getElementById('photoSheetOverlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closePhotoSheet();
+  });
+
+  // File input change
+  document.getElementById('photoFileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (activePhotoTarget) {
+      if (activePhotoTarget.type === 'item') {
+        pendingItemPhotos[activePhotoTarget.id] = file;
+        renderCart();
+      } else if (activePhotoTarget.type === 'seller-id') {
+        pendingSellerIdPhoto = file;
+        showSellerIdPhotoPreview(file);
+      }
+    }
+
+    e.target.value = ''; // reset so same file can be re-selected
+    showUploadToast('🖼️ เลือกรูปสำเร็จ', 1500);
+  });
+
+  // Camera controls
+  document.getElementById('cameraCaptureBtn').addEventListener('click', capturePhoto);
+  document.getElementById('cameraConfirmBtn').addEventListener('click', confirmPhoto);
+  document.getElementById('cameraRetryBtn').addEventListener('click', retryPhoto);
+  document.getElementById('cameraCloseBtn').addEventListener('click', closeCamera);
+  document.getElementById('cameraOverlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeCamera();
+  });
+
+  // Seller ID card photo
+  document.getElementById('sellerIdPhotoBtn').addEventListener('click', () => {
+    openPhotoPicker('seller-id', 0);
+  });
+  document.getElementById('sellerIdPhotoRemove').addEventListener('click', () => {
+    pendingSellerIdPhoto = null;
+    document.getElementById('sellerIdPhotoPreview').style.display = 'none';
+    const btn = document.getElementById('sellerIdPhotoBtn');
+    btn.textContent = '+';
+    btn.classList.remove('has-photo');
+  });
+});

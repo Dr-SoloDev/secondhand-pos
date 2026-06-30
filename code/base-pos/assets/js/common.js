@@ -356,3 +356,19 @@ async function saveProfileChanges() {
   
   // Initialize sidebar toggle
   initSidebarToggle();
+
+  // Smooth sidebar navigation — fade content out before leaving page
+  document.querySelectorAll('.sidebar-menu a').forEach(link => {
+    link.addEventListener('click', function(e) {
+      const href = this.getAttribute('href');
+      if (!href || href === '#' || this.classList.contains('active')) return;
+      e.preventDefault();
+      const contentArea = document.querySelector('.content-area');
+      if (contentArea) {
+        contentArea.style.transition = 'opacity 120ms ease, transform 120ms ease';
+        contentArea.style.opacity = '0';
+        contentArea.style.transform = 'translateY(4px)';
+      }
+      setTimeout(() => { window.location.href = href; }, 130);
+    });
+  });

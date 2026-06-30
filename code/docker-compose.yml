@@ -10,7 +10,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: pos_system
       MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ***REDACTED***
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: Asia/Bangkok
     ports:
       - "3307:3306"
@@ -46,7 +46,7 @@ services:
       DB_HOST: db
       DB_NAME: pos_system
       DB_USER: ${MYSQL_USER}
-      DB_PASS: ***REDACTED***
+      DB_PASS: ${DB_PASS}
       JWT_SECRET: ${JWT_SECRET}
       TZ: Asia/Bangkok
     depends_on:

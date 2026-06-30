@@ -224,4 +224,148 @@ class SellersController extends Controller
             Response::error('ไม่สามารถยกเลิก Blacklist ได้', 400);
         }
     }
+
+    /**
+     * POST /api/sellers/photo?id=X - อัปโหลดรูปบัตรประชาชน
+     */
+    public function uploadPhoto($id = null)
+    {
+        $this->requireAuth();
+
+        if (!$id) {
+            $data = $this->getRequestData();
+            $id = $data['id'] ?? ($_GET['id'] ?? null);
+        }
+
+        $id = intval($id);
+        if ($id <= 0) {
+            Response::error('กรุณาระบุ ID ผู้ขาย', 400);
+        }
+
+        // ตรวจว่าผู้ขายมีอยู่จริง
+        $sellerModel = new Seller();
+        $seller = $sellerModel->getById($id);
+        if (!$seller) {
+            Response::error('ไม่พบผู้ขายนี้', 404);
+        }
+
+        // ตรวจ file upload
+        if (empty($_FILES['photo'])) {
+            Response::error('ไม่พบไฟล์รูป (field: photo)', 400);
+        }
+
+        $file = $_FILES['photo'];
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            Response::error('เกิดข้อผิดพลาดในการอัปโหลด', 400);
+        }
+
+        // จำกัดขนาด 10MB
+        $maxSize = 10 * 1024 * 1024;
+        if ($file['size'] > $maxSize) {
+            Response::error('ไฟล์ใหญ่เกิน 10 MB', 422);
+        }
+
+        // ตรวจ MIME
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        if (!in_array($mime, $allowedMimes, true)) {
+            Response::error('รองรับเฉพาะไฟล์ JPEG, PNG, WebP', 422);
+        }
+
+        // สร้าง path
+        $uploadBase = '/var/www/html/uploads/sellers';
+        $year = date('Y');
+        $month = date('m');
+        $dir = "{$uploadBase}/{$year}/{$month}";
+
+        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+            Response::error('ไม่สามารถสร้าง目录จัดเก็บได้', 500);
+        }
+
+        // ตรวจสอบพื้นที่ว่าง
+        if (disk_free_space($uploadBase) < 50 * 1024 * 1024) {
+            Response::error('พื้นที่จัดเก็บเต็ม กรุณาติดต่อผู้ดูแลระบบ', 507);
+        }
+
+        // สร้างชื่อไฟล์
+        $uuid = $id . '_' . bin2hex(random_bytes(8));
+        $filename = "{$uuid}.jpg";
+        $destPath = "{$dir}/{$filename}";
+        $urlPath = "/uploads/sellers/{$year}/{$month}/{$filename}";
+
+        // resize และบันทึก (reuse logic จาก PhotoUploadController)
+        $this->saveResizedImage($file['tmp_name'], $destPath);
+
+        // ลบรูปเก่าถ้ามี
+        if (!empty($seller['id_card_photo'])) {
+            $oldPath = $_SERVER['DOCUMENT_ROOT'] . $seller['id_card_photo'];
+            if (file_exists($oldPath)) {
+                @unlink($oldPath);
+            }
+        }
+
+        // อัปเดต DB
+        $db = Database::getInstance();
+        $db->query('UPDATE sellers SET id_card_photo = ? WHERE id = ?', [$urlPath, $id]);
+
+        Logger::logActivity(
+            $this->user['user_id'],
+            'upload_seller_photo',
+            "อัปโหลดรูปบัตรผู้ขาย ID: {$id}"
+        );
+
+        Response::success('อัปโหลดรูปบัตรสำเร็จ', [
+            'photo_url' => $urlPath,
+            'seller_id' => $id,
+        ]);
+    }
+
+    /**
+     * resize รูปภาพและบันทึกเป็น JPEG (max 1920px)
+     */
+    private function saveResizedImage(string $srcPath, string $destPath): bool
+    {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_file($finfo, $srcPath);
+        finfo_close($finfo);
+
+        $src = match ($mime) {
+            'image/jpeg' => imagecreatefromjpeg($srcPath),
+            'image/png'  => imagecreatefrompng($srcPath),
+            'image/webp' => imagecreatefromwebp($srcPath),
+            default      => false,
+        };
+
+        if (!$src) {
+            // fallback: copy ตรง
+            return copy($srcPath, $destPath);
+        }
+
+        $maxDim = 1920;
+        $w = imagesx($src);
+        $h = imagesy($src);
+
+        if ($w > $maxDim || $h > $maxDim) {
+            if ($w >= $h) {
+                $newW = $maxDim;
+                $newH = intval($h * $maxDim / $w);
+            } else {
+                $newH = $maxDim;
+                $newW = intval($w * $maxDim / $h);
+            }
+            $dst = imagecreatetruecolor($newW, $newH);
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $w, $h);
+            imagedestroy($src);
+            $src = $dst;
+        }
+
+        $ok = imagejpeg($src, $destPath, 85);
+        imagedestroy($src);
+        return $ok;
+    }
 }
