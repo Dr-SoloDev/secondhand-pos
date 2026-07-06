@@ -176,6 +176,167 @@ class SellersController extends Controller
     }
 
     /**
+     * GET /api/sellers/data-center?id=X
+     * ส่งข้อมูลทุกอย่างของผู้ขายกลับในครั้งเดียว
+     * - seller details (รวม id_card_photo, pdpa, blacklist)
+     * - all POs (ทุกรวม status)
+     * - items ของแต่ละ PO
+     * - photos (item photos) ของแต่ละ PO
+     * - สรุปยอดรวม
+     */
+    public function getSellerDataCenter()
+    {
+        $this->requireAuth();
+        $id = intval($_GET['id'] ?? 0);
+        if (!$id) { Response::error('ไม่พบ id', 400); return; }
+
+        $db = Database::getInstance();
+
+        // 1. Seller details
+        $sellerModel = new Seller();
+        $seller = $sellerModel->getById($id);
+        if (!$seller) {
+            Response::error('ไม่พบผู้ขายนี้', 404);
+            return;
+        }
+
+        // 2. All POs (ทุกสถานะ) พร้อมสาขา + พนักงาน
+        $pos = $db->fetchAll(
+            "SELECT po.*,
+                    b.name AS branch_name,
+                    b.code AS branch_code,
+                    u.full_name AS processed_by_name
+             FROM purchase_orders po
+             LEFT JOIN branches b ON po.branch_id = b.id
+             LEFT JOIN users u ON po.user_id = u.id
+             WHERE po.seller_id = ?
+             ORDER BY po.created_at DESC",
+            [$id]
+        );
+
+        // 3. Items + Photos สำหรับทุก PO ของผู้ขาย
+        $allItems = $db->fetchAll(
+            "SELECT poi.*,
+                    po.reference_no AS po_ref,
+                    po.id AS po_id,
+                    c.name AS category_name
+             FROM purchase_order_items poi
+             JOIN purchase_orders po ON poi.purchase_order_id = po.id
+             LEFT JOIN categories c ON poi.category_id = c.id
+             WHERE po.seller_id = ?
+             ORDER BY po.created_at DESC, poi.id ASC",
+            [$id]
+        );
+
+        $allPhotos = $db->fetchAll(
+            "SELECT pop.*,
+                    po.reference_no AS po_ref
+             FROM purchase_order_photos pop
+             JOIN purchase_orders po ON pop.purchase_order_id = po.id
+             WHERE po.seller_id = ?
+             ORDER BY pop.created_at ASC",
+            [$id]
+        );
+
+        // 4. จัดกลุ่ม items และ photos ตาม PO id
+        $itemsByPo = [];
+        foreach ($allItems as $item) {
+            $poId = $item['po_id'];
+            if (!isset($itemsByPo[$poId])) $itemsByPo[$poId] = [];
+            $itemsByPo[$poId][] = [
+                'id'              => $item['id'],
+                'item_name'       => $item['item_name'],
+                'quantity'        => $item['quantity'],
+                'weight_deduction'=> $item['weight_deduction'],
+                'unit'            => $item['unit'],
+                'unit_price'      => $item['unit_price'],
+                'total_price'     => $item['total_price'],
+                'category_name'   => $item['category_name'] ?? '',
+                'photo_path'      => $item['photo_path'] ?? null,
+                'notes'           => $item['notes'] ?? '',
+            ];
+        }
+
+        $photosByPo = [];
+        foreach ($allPhotos as $photo) {
+            $poId = $photo['purchase_order_id'];
+            if (!isset($photosByPo[$poId])) $photosByPo[$poId] = [];
+            $photosByPo[$poId][] = [
+                'id'         => $photo['id'],
+                'photo_path' => $photo['photo_path'],
+                'is_primary' => $photo['is_primary'],
+            ];
+        }
+
+        // 5. ประกอบ POs
+        $transactions = [];
+        $totalPos = 0;
+        $totalAmount = 0;
+        $totalItemsSold = 0;
+        $firstTransaction = null;
+        $lastTransaction = null;
+
+        foreach ($pos as $po) {
+            $poId = $po['id'];
+            $amount = floatval($po['total_amount']);
+
+            $transactions[] = [
+                'id'               => $poId,
+                'reference_no'     => $po['reference_no'],
+                'status'           => $po['status'],
+                'payment_method'   => $po['payment_method'],
+                'total_amount'     => $amount,
+                'total_items'      => intval($po['total_items']),
+                'branch_name'      => $po['branch_name'] ?? '',
+                'processed_by'     => $po['processed_by_name'] ?? '',
+                'notes'            => $po['notes'] ?? '',
+                'created_at'       => $po['created_at'],
+                'items'            => $itemsByPo[$poId] ?? [],
+                'photos'           => $photosByPo[$poId] ?? [],
+            ];
+
+            $totalPos++;
+            $totalAmount += $amount;
+            $totalItemsSold += intval($po['total_items']);
+            if ($firstTransaction === null || $po['created_at'] < $firstTransaction) {
+                $firstTransaction = $po['created_at'];
+            }
+            if ($lastTransaction === null || $po['created_at'] > $lastTransaction) {
+                $lastTransaction = $po['created_at'];
+            }
+        }
+
+        // 6. Response
+        Response::success('สำเร็จ', [
+            'seller' => [
+                'id'                 => $seller['id'],
+                'full_name'          => $seller['full_name'],
+                'id_card'            => $seller['id_card'] ?? '',
+                'phone'              => $seller['phone'] ?? '',
+                'address'            => $seller['address'] ?? '',
+                'vehicle_plate'      => $seller['vehicle_plate'] ?? '',
+                'id_card_photo'      => $seller['id_card_photo'] ?? '',
+                'pdpa_consented_at'  => $seller['pdpa_consented_at'] ?? null,
+                'is_blacklisted'     => $seller['is_blacklisted'] ?? 0,
+                'blacklist_reason'   => $seller['blacklist_reason'] ?? '',
+                'notes'              => $seller['notes'] ?? '',
+                'total_transactions' => $seller['total_transactions'] ?? 0,
+                'total_amount'       => $seller['total_amount'] ?? 0,
+                'last_transaction_at'=> $seller['last_transaction_at'] ?? null,
+                'created_at'         => $seller['created_at'] ?? null,
+            ],
+            'transactions' => $transactions,
+            'summary' => [
+                'total_pos'         => $totalPos,
+                'total_amount'      => $totalAmount,
+                'total_items_sold'  => $totalItemsSold,
+                'first_transaction' => $firstTransaction,
+                'last_transaction'  => $lastTransaction,
+            ],
+        ]);
+    }
+
+    /**
      * POST /api/sellers/blacklist - Blacklist ผู้ขาย
      */
     public function blacklistSeller()

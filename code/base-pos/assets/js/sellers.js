@@ -140,56 +140,205 @@ function editSeller(id) {
 }
 
 async function viewSeller(id) {
-    const seller = sellers.find(s => s.id === id);
-    if (!seller) return;
+    // Show modal with loading state
+    document.getElementById('viewSellerName').textContent = 'กำลังโหลด...';
+    document.getElementById('viewSellerTransactionList').innerHTML =
+        '<div style="text-align:center;color:#888;padding:20px">กำลังโหลด...</div>';
+    document.getElementById('viewSellerModal').classList.add('show');
 
-    // เปิด modal ก่อน แล้วโหลด history
+    const res = await apiRequest(`sellers/data-center?id=${id}`);
+    if (res.status !== 'success') {
+        document.getElementById('viewSellerName').textContent = 'เกิดข้อผิดพลาด';
+        document.getElementById('viewSellerTransactionList').innerHTML =
+            '<div style="text-align:center;color:#ef4444;padding:20px">ไม่สามารถโหลดข้อมูลได้</div>';
+        showNotification(res.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
+        return;
+    }
+
+    const { seller, transactions, summary } = res.data;
+
+    // ---- HEADER ----
     document.getElementById('viewSellerName').textContent = seller.full_name;
-    document.getElementById('viewSellerIdCard').textContent = formatIdCard(seller.id_card);
-    document.getElementById('viewSellerPhone').textContent = seller.phone || '-';
-    document.getElementById('viewSellerAddress').textContent = seller.address || '-';
 
+    const badge = document.getElementById('viewSellerBlacklistBadge');
+    if (seller.is_blacklisted) {
+        badge.style.display = 'inline-block';
+        badge.textContent = `⛔ ${seller.blacklist_reason || 'Blacklist'}`;
+    } else {
+        badge.style.display = 'none';
+    }
+
+    // ---- INFO GRID ----
+    document.getElementById('viewSellerIdCard').textContent = formatIdCard(seller.id_card) || '-';
+    document.getElementById('viewSellerPhone').textContent = seller.phone || '-';
+    document.getElementById('viewSellerVehicle').textContent = seller.vehicle_plate || '-';
+    document.getElementById('viewSellerAddress').textContent = seller.address || '-';
+    document.getElementById('viewSellerNotes').textContent = seller.notes || '-';
+
+    // PDPA
     const pdpaEl = document.getElementById('viewSellerPdpa');
     if (seller.pdpa_consented_at) {
-        const d = new Date(seller.pdpa_consented_at);
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        pdpaEl.textContent = `✓ วันที่ ${dd}/${mm}/${yyyy}`;
+        const d = safeDate(seller.pdpa_consented_at);
+        if (d && !isNaN(d.getTime())) {
+            pdpaEl.textContent = `✓ ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        } else {
+            pdpaEl.textContent = '✓ ยินยอม';
+        }
         pdpaEl.style.color = 'var(--color-success, #16a34a)';
     } else {
         pdpaEl.textContent = '-';
         pdpaEl.style.color = '';
     }
 
-    document.getElementById('viewSellerStats').textContent =
-        `มาขาย ${seller.total_transactions} ครั้ง · ยอดรวม ${formatNumber(seller.total_amount)} บาท · ล่าสุด ${seller.last_transaction_at ? formatDate(seller.last_transaction_at) : '-'}`;
-
-    const blacklistBadge = document.getElementById('viewSellerBlacklist');
-    if (seller.is_blacklisted) {
-        blacklistBadge.style.display = '';
-        blacklistBadge.textContent = `⛔ Blacklist: ${seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล'}`;
+    // ---- ID CARD PHOTO ----
+    const photoImg = document.getElementById('sellerDcIdPhoto');
+    const noPhoto = document.getElementById('sellerDcNoPhoto');
+    if (seller.id_card_photo) {
+        photoImg.src = seller.id_card_photo;
+        photoImg.style.display = 'block';
+        noPhoto.style.display = 'none';
     } else {
-        blacklistBadge.style.display = 'none';
+        photoImg.style.display = 'none';
+        noPhoto.style.display = 'block';
     }
 
-    document.getElementById('viewSellerHistoryBody').innerHTML =
-        '<tr><td colspan="4" style="text-align:center;color:#888">กำลังโหลด...</td></tr>';
-    document.getElementById('viewSellerModal').classList.add('show');
+    // ---- STATS BAR ----
+    document.getElementById('viewSellerStats').textContent =
+        `🛒 มาขาย ${summary.total_pos} ครั้ง · ${summary.total_items_sold} รายการ · ยอดรวม ${formatNumber(summary.total_amount)} บาท` +
+        (summary.first_transaction ? ` · ตั้งแต่ ${formatDate(summary.first_transaction)}` : '') +
+        (summary.last_transaction ? ` ถึง ${formatDate(summary.last_transaction)}` : '');
 
-    const res = await apiRequest(`sellers/history?id=${id}`);
-    const tbody = document.getElementById('viewSellerHistoryBody');
-    const items = res.status === 'success' ? (res.data.items || []) : [];
-    if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888">ยังไม่มีประวัติ</td></tr>';
+    // ---- BLACKLIST INFO ----
+    const blBar = document.getElementById('viewSellerBlacklist');
+    if (seller.is_blacklisted) {
+        blBar.style.display = 'block';
+        blBar.textContent = `⛔ Blacklist: ${seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล'}`;
+    } else {
+        blBar.style.display = 'none';
+    }
+
+    // ---- TRANSACTION LIST ----
+    document.getElementById('viewSellerPoCount').textContent = `(${transactions.length} รายการ)`;
+
+    const listEl = document.getElementById('viewSellerTransactionList');
+    if (!transactions.length) {
+        listEl.innerHTML = '<div style="text-align:center;color:#888;padding:30px 20px">ยังไม่มีประวัติการขาย</div>';
         return;
     }
-    tbody.innerHTML = items.map(po => `<tr>
-        <td style="font-size:12px;font-family:monospace">${escapeHtml(po.reference_no)}</td>
-        <td>${formatDate(po.created_at)}</td>
-        <td>${escapeHtml(po.branch_name || '-')}</td>
-        <td class="text-right"><strong>${formatNumber(po.total_amount)}</strong></td>
-    </tr>`).join('');
+
+    listEl.innerHTML = transactions.map((po, idx) => renderPoCard(po)).join('');
+}
+
+function renderPoCard(po) {
+    const statusBadge = po.status !== 'completed'
+        ? `<span class="badge badge-warning" style="font-size:10px;padding:1px 6px">${po.status}</span>`
+        : '';
+
+    // Items table
+    let itemsHtml = '';
+    if (po.items && po.items.length) {
+        itemsHtml = `
+            <table class="data-table" style="font-size:12px;margin-top:8px;width:100%">
+                <thead>
+                    <tr style="background:#f1f5f9">
+                        <th style="padding:4px 8px;text-align:left">รายการ</th>
+                        <th style="padding:4px 8px;text-align:center;width:80px">จำนวน</th>
+                        <th style="padding:4px 8px;text-align:right;width:90px">ราคา/หน่วย</th>
+                        <th style="padding:4px 8px;text-align:right;width:90px">รวม</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${po.items.map(item => {
+                        const qty = parseFloat(item.quantity);
+                        const ded = parseFloat(item.weight_deduction || 0);
+                        const qtyDisplay = ded > 0
+                            ? `${qty.toFixed(3)} <span style="color:#888;font-size:11px">(หัก ${ded.toFixed(3)})</span>`
+                            : qty.toFixed(3);
+                        return `<tr>
+                            <td style="padding:4px 8px">
+                                <strong>${escapeHtml(item.item_name)}</strong>
+                                ${item.category_name ? `<span style="color:#888;font-size:11px"> · ${escapeHtml(item.category_name)}</span>` : ''}
+                                ${item.notes ? `<div style="color:#888;font-size:11px">${escapeHtml(item.notes)}</div>` : ''}
+                            </td>
+                            <td style="padding:4px 8px;text-align:center">${qtyDisplay} ${escapeHtml(item.unit)}</td>
+                            <td style="padding:4px 8px;text-align:right">${formatNumber(item.unit_price)}</td>
+                            <td style="padding:4px 8px;text-align:right"><strong>${formatNumber(item.total_price)}</strong></td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    // Photos gallery
+    let photosHtml = '';
+    if (po.photos && po.photos.length) {
+        photosHtml = `
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0">
+                ${po.photos.map(p =>
+                    `<img src="${escapeHtml(p.photo_path)}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="คลิกดูรูปใหญ่">`
+                ).join('')}
+            </div>`;
+    }
+
+    const notesHtml = po.notes
+        ? `<div style="font-size:12px;color:#888;margin-top:6px">📝 ${escapeHtml(po.notes)}</div>`
+        : '';
+
+    return `
+        <div class="po-card" style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;overflow:hidden">
+            <div class="po-card-header" onclick="togglePoCard(this)"
+                 style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:#f8fafc;user-select:none;transition:background .15s"
+                 onmouseenter="this.style.background='#f1f5f9'"
+                 onmouseleave="this.style.background='#f8fafc'">
+                <span style="font-family:monospace;font-size:12px;font-weight:600;flex-shrink:0;color:#334155">${escapeHtml(po.reference_no)}</span>
+                <span style="font-size:12px;color:#64748b;flex-shrink:0">${formatDate(po.created_at)}</span>
+                <span style="font-size:12px;color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                    ${escapeHtml(po.branch_name)}${po.processed_by ? ' · ' + escapeHtml(po.processed_by) : ''}
+                </span>
+                <span style="font-weight:700;font-size:13px;flex-shrink:0;color:#1e293b">${formatNumber(po.total_amount)}</span>
+                ${statusBadge}
+                <span class="toggle-icon" style="font-size:10px;color:#94a3b8;transition:transform .2s;flex-shrink:0">▶</span>
+            </div>
+            <div class="po-card-body" style="display:none;padding:10px 12px 12px;border-top:1px solid #e2e8f0;background:#fff">
+                ${itemsHtml}
+                ${photosHtml}
+                ${notesHtml}
+            </div>
+        </div>`;
+}
+
+function togglePoCard(headerEl) {
+    const body = headerEl.nextElementSibling;
+    const icon = headerEl.querySelector('.toggle-icon');
+    const isOpen = body.style.display !== 'none' && body.style.display !== '';
+    body.style.display = isOpen ? 'none' : 'block';
+    icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+
+function expandPhoto(imgEl) {
+    const lb = document.getElementById('photoLightbox');
+    const lbImg = document.getElementById('lightboxImg');
+    if (imgEl && imgEl.src) {
+        lbImg.src = imgEl.src;
+        lb.classList.add('show');
+    }
+}
+
+function closeLightbox(event) {
+    if (event) event.stopPropagation();
+    document.getElementById('photoLightbox').classList.remove('show');
+}
+
+function closeViewSellerModal() {
+    document.getElementById('viewSellerModal').classList.remove('show');
+    // Reset transaction list for next open
+    document.getElementById('viewSellerTransactionList').innerHTML = '';
+}
+
+function safeDate(str) {
+    if (!str) return null;
+    const d = new Date(str.replace(' ', 'T'));
+    return isNaN(d.getTime()) ? null : d;
 }
 
 async function saveSeller() {
@@ -378,6 +527,8 @@ function escapeHtml(text) {
 window.onclick = function(event) {
     const modal = document.getElementById('sellerModal');
     if (event.target === modal) closeSellerModal();
+    const viewModal = document.getElementById('viewSellerModal');
+    if (event.target === viewModal) closeViewSellerModal();
 }
 
 document.getElementById('searchInput').addEventListener('keypress', function(e) {

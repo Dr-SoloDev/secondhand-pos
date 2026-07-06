@@ -10,7 +10,9 @@ class Seller extends Model
     {
         $query = "SELECT
                     id, id_card, full_name, phone, address, vehicle_plate,
-                    id_card_photo, is_blacklisted, total_transactions, total_amount,
+                    id_card_photo, is_blacklisted, blacklist_reason, blacklisted_at,
+                    notes,
+                    total_transactions, total_amount,
                     last_transaction_at, created_at, updated_at
                   FROM {$this->table}";
         
@@ -56,7 +58,8 @@ class Seller extends Model
     public function search($keyword)
     {
         $query = "SELECT id, id_card, full_name, phone, address, vehicle_plate,
-                         is_blacklisted, blacklist_reason, blacklisted_at,
+                         id_card_photo, is_blacklisted, blacklist_reason, blacklisted_at,
+                         notes,
                          total_transactions, total_amount, last_transaction_at
                   FROM {$this->table}
                   WHERE phone LIKE ? OR full_name LIKE ? OR id_card LIKE ?
