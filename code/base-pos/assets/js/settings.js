@@ -83,6 +83,8 @@ function populateSystemSettings(settings) {
 
 // Save store settings
 async function saveStoreSettings() {
+  const saveBtn = document.querySelector('#storeSettingsForm button[type="submit"]');
+  setButtonLoading(saveBtn, true);
   try {
     const form = document.getElementById('storeSettingsForm');
     const formData = new FormData(form);
@@ -106,11 +108,15 @@ async function saveStoreSettings() {
   } catch (error) {
     console.error('Error saving store settings:', error);
     showNotification('Error saving store settings', 'error');
+  } finally {
+    setButtonLoading(saveBtn, false);
   }
 }
 
 // Save system settings
 async function saveSystemSettings() {
+  const saveBtn = document.querySelector('#systemSettingsForm button[type="submit"]');
+  setButtonLoading(saveBtn, true);
   try {
     const form = document.getElementById('systemSettingsForm');
     const formData = new FormData(form);
@@ -132,11 +138,15 @@ async function saveSystemSettings() {
   } catch (error) {
     console.error('Error saving system settings:', error);
     showNotification('Error saving system settings', 'error');
+  } finally {
+    setButtonLoading(saveBtn, false);
   }
 }
 
 // Create database backup
 async function createBackup() {
+  const backupBtn = document.getElementById('createBackup');
+  setButtonLoading(backupBtn, true, 'กำลังสำรอง...');
   try {
     showNotification('Creating backup...', 'info');
 
@@ -151,6 +161,8 @@ async function createBackup() {
   } catch (error) {
     console.error('Error creating backup:', error);
     showNotification('Error creating backup', 'error');
+  } finally {
+    setButtonLoading(backupBtn, false);
   }
 }
 
@@ -205,6 +217,7 @@ async function restoreBackup() {
 // Load backup history
 async function loadBackupHistory() {
   try {
+    showTableLoading(document.querySelector('#backupsTable tbody'), 4, 4);
     const response = await apiRequest('settings/backup/history');
 
     if (response.status === 'success') {

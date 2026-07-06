@@ -46,11 +46,11 @@ try {
     // Process the request
     $router->dispatch();
 } catch (\Throwable $e) {
-    error_log('API Error: '.$e->getMessage());
+    error_log("[FATAL] " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
 
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => $e->getMessage()
+        'message' => 'Internal server error. Please contact administrator.'
     ]);
 }

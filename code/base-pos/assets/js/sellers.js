@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadSellers() {
     const includeBlacklisted = document.getElementById('showBlacklisted').checked;
     const query = includeBlacklisted ? '?include_blacklisted=true' : '';
+    showTableLoading('sellersTableBody', 9, 5);
     const result = await apiRequest(`sellers${query}`);
 
     if (result.status === 'success') {
@@ -50,11 +51,11 @@ function renderSellersTable() {
                 <td>${lastTransaction}</td>
                 <td>${statusBadge}</td>
                 <td>
-                    <button class="btn-sm btn-info" onclick="viewSeller(${seller.id})" title="ดูรายละเอียด">👁️</button>
-                    <button class="btn-sm btn-warning" onclick="editSeller(${seller.id})" title="แก้ไข">✏️</button>
+                    <button class="btn-sm btn-info" onclick="viewSeller(${seller.id})" title="ดูรายละเอียด"><i class="icon-search"></i></button>
+                    <button class="btn-sm btn-warning" onclick="editSeller(${seller.id})" title="แก้ไข"><i class="icon-edit"></i></button>
                     ${seller.is_blacklisted
                         ? `<button class="btn-sm btn-success" onclick="unblacklistSeller(${seller.id})" title="ยกเลิก Blacklist">✓</button>`
-                        : `<button class="btn-sm btn-danger" onclick="confirmBlacklist(${seller.id})" title="Blacklist">🚫</button>`
+                        : `<button class="btn-sm btn-danger" onclick="confirmBlacklist(${seller.id})" title="Blacklist">×</button>`
                     }
                 </td>
             </tr>
@@ -85,6 +86,11 @@ function openAddSellerModal() {
     document.getElementById('modalTitle').textContent = 'เพิ่มผู้ขาย';
     document.getElementById('sellerForm').reset();
     document.getElementById('sellerId').value = '';
+    const pdpaCheck = document.getElementById('pdpaConsent');
+    pdpaCheck.checked = false;
+    pdpaCheck.disabled = false;
+    document.getElementById('pdpaConsentText').textContent =
+        'ยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น';
     document.getElementById('sellerModal').classList.add('show');
 }
 
@@ -108,6 +114,11 @@ function editSeller(id) {
     document.getElementById('blacklistReason').value = currentSeller.blacklist_reason || '';
     document.getElementById('blacklistReasonGroup').style.display = bl ? '' : 'none';
 
+    const pdpaCheck = document.getElementById('pdpaConsent');
+    pdpaCheck.checked = true;
+    pdpaCheck.disabled = true;
+    document.getElementById('pdpaConsentText').textContent = 'ให้ความยินยอมแล้ว';
+
     document.getElementById('sellerModal').classList.add('show');
 }
 
@@ -120,6 +131,20 @@ async function viewSeller(id) {
     document.getElementById('viewSellerIdCard').textContent = formatIdCard(seller.id_card);
     document.getElementById('viewSellerPhone').textContent = seller.phone || '-';
     document.getElementById('viewSellerAddress').textContent = seller.address || '-';
+
+    const pdpaEl = document.getElementById('viewSellerPdpa');
+    if (seller.pdpa_consented_at) {
+        const d = new Date(seller.pdpa_consented_at);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        pdpaEl.textContent = `✓ วันที่ ${dd}/${mm}/${yyyy}`;
+        pdpaEl.style.color = 'var(--color-success, #16a34a)';
+    } else {
+        pdpaEl.textContent = '-';
+        pdpaEl.style.color = '';
+    }
+
     document.getElementById('viewSellerStats').textContent =
         `มาขาย ${seller.total_transactions} ครั้ง · ยอดรวม ${formatNumber(seller.total_amount)} บาท · ล่าสุด ${seller.last_transaction_at ? formatDate(seller.last_transaction_at) : '-'}`;
 
@@ -152,12 +177,14 @@ async function viewSeller(id) {
 
 async function saveSeller() {
     const sellerId = document.getElementById('sellerId').value;
+    const isEdit = sellerId !== '';
     const fullName = document.getElementById('fullName').value.trim();
     const phone = document.getElementById('phone').value.trim();
     const idCard = document.getElementById('idCard').value.replace(/[^0-9]/g, '');
     const address = document.getElementById('address').value.trim();
     const notes = document.getElementById('notes').value.trim();
     const isBlacklisted = document.getElementById('isBlacklisted').checked ? 1 : 0;
+    const pdpaConsent = document.getElementById('pdpaConsent').checked;
 
     if (!fullName) {
         showNotification('กรุณากรอกชื่อ-นามสกุล', 'error');
@@ -174,6 +201,11 @@ async function saveSeller() {
         return;
     }
 
+    if (!isEdit && !pdpaConsent) {
+        showNotification('กรุณายินยอมให้เก็บข้อมูลก่อน', 'error');
+        return;
+    }
+
     const data = {
         full_name: fullName,
         phone: phone || null,
@@ -182,9 +214,8 @@ async function saveSeller() {
         notes: notes || null,
         is_blacklisted: isBlacklisted,
         blacklist_reason: isBlacklisted ? (document.getElementById('blacklistReason').value.trim() || null) : null,
+        pdpa_consent: pdpaConsent,
     };
-
-    const isEdit = sellerId !== '';
 
     if (isEdit) {
         data.id = parseInt(sellerId);
@@ -193,14 +224,20 @@ async function saveSeller() {
     const endpoint = isEdit ? 'sellers/seller' : 'sellers';
     const method = isEdit ? 'PUT' : 'POST';
 
-    const result = await apiRequest(endpoint, method, data);
+    const saveBtn = document.querySelector('#sellerModal .btn-primary');
+    setButtonLoading(saveBtn, true);
+    try {
+        const result = await apiRequest(endpoint, method, data);
 
-    if (result.status === 'success') {
-        showNotification(isEdit ? 'แก้ไขข้อมูลสำเร็จ' : 'เพิ่มผู้ขายสำเร็จ', 'success');
-        closeSellerModal();
-        loadSellers();
-    } else {
-        showNotification(result.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+        if (result.status === 'success') {
+            showNotification(isEdit ? 'แก้ไขข้อมูลสำเร็จ' : 'เพิ่มผู้ขายสำเร็จ', 'success');
+            closeSellerModal();
+            loadSellers();
+        } else {
+            showNotification(result.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+        }
+    } finally {
+        setButtonLoading(saveBtn, false);
     }
 }
 
@@ -208,10 +245,39 @@ function confirmBlacklist(id) {
     const seller = sellers.find(s => s.id === id);
     if (!seller) return;
 
-    const reason = prompt(`ยืนยัน Blacklist: ${seller.full_name}\n\nกรุณาระบุเหตุผล:`);
-    if (reason === null) return;
+    // ใช้ Modal แทน prompt()
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+            <div class="modal-content" style="max-width:420px;width:90%;">
+                <div class="modal-header">
+                    <h3>⚠️ ยืนยัน Blacklist</h3>
+                    <button class="close-modal" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom:12px;">ผู้ขาย: <strong>${seller.full_name}</strong></p>
+                    <label for="blacklistReason">เหตุผลในการ Blacklist <span style="color:#ef4444;">*</span></label>
+                    <textarea id="blacklistReason" class="form-control" rows="3" placeholder="ระบุเหตุผล..." style="width:100%;margin-top:4px;"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">ยกเลิก</button>
+                    <button class="btn btn-danger" id="confirmBlacklistBtn">ยืนยัน Blacklist</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
 
-    blacklistSeller(id, reason);
+    document.getElementById('confirmBlacklistBtn').addEventListener('click', function() {
+        const reason = document.getElementById('blacklistReason').value.trim();
+        if (!reason) {
+            showNotification('กรุณาระบุเหตุผล', 'error');
+            return;
+        }
+        overlay.remove();
+        blacklistSeller(id, reason);
+    });
 }
 
 async function blacklistSeller(id, reason) {

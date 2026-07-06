@@ -55,6 +55,7 @@ async function initUserManagement() {
 // Load users from API
 async function loadUsers() {
   try {
+    showTableLoading(document.querySelector('#usersTable tbody'), 7, 5);
     const response = await apiRequest('users/all');
 
     if (response.status === 'success') {
@@ -398,6 +399,7 @@ async function changePassword() {
 // Load activity log
 async function loadActivityLog() {
   try {
+    showTableLoading(document.querySelector('#activityLogTable tbody'), 5, 5);
     const userId = document.getElementById('userActivityFilter').value;
 
     const params = new URLSearchParams({

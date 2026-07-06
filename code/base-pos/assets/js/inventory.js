@@ -25,28 +25,23 @@ let branches = [];
 
 async function initInventory() {
   try {
-    console.log('initInventory: loading branches...');
+    showTableLoading(document.querySelector('#inventoryTable tbody'), 10, 5);
     const branchRes = await apiRequest('branches');
     if (branchRes.status === 'success') {
       branches = branchRes.data;
-      console.log('Branches loaded:', branches.length);
       renderBranchDropdown();
     }
 
-    console.log('initInventory: loading categories...');
     const catRes = await apiRequest('inventory/categories');
     if (catRes.status === 'success') {
       categories = catRes.data;
-      console.log('Categories loaded:', categories.length);
       renderCategoryDropdowns();
       renderCategoryStock();
     }
 
-    console.log('initInventory: loading catalog...');
     const catalogRes = await apiRequest('purchase-catalog?include_inactive=true');
     if (catalogRes.status === 'success') {
       catalogItems = catalogRes.data;
-      console.log('Catalog items loaded:', catalogItems.length);
       renderCatalogItems(catalogItems);
     }
   } catch (error) {
@@ -58,7 +53,7 @@ async function initInventory() {
 function renderBranchDropdown() {
   const select = document.getElementById('branchFilterStock');
   if (!select) {
-    console.error('branchFilterStock select not found');
+    showNotification('ไม่พบตัวกรองสาขา', 'error');
     return;
   }
   // ลบตัวเลือกเก่าออก (เว้น "รวมทุกสาขา")
@@ -67,7 +62,6 @@ function renderBranchDropdown() {
   }
   // เพิ่มสาขา active
   const activeBranches = branches.filter(b => b.status === 'active');
-  console.log('Active branches:', activeBranches.length);
   activeBranches.forEach(b => {
     const opt = document.createElement('option');
     opt.value = b.id;
@@ -489,7 +483,9 @@ function escapeHtml(s) {
 }
 
 function showNotification(message, type) {
-  alert(message);
+  if (typeof window.appShowNotification === 'function') {
+    window.appShowNotification(message, type || 'info');
+  }
 }
 
 // === Helper Functions for Error States ===

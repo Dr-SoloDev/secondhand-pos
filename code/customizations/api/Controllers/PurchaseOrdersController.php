@@ -77,6 +77,14 @@ class PurchaseOrdersController extends Controller
     public function createPurchaseOrder()
     {
         $data = $this->getRequestData();
+
+        // Idempotency check — ป้องกัน PO ซ้ำ
+        $idempotencyKey = $data['idempotency_key'] ?? null;
+        if ($idempotencyKey) {
+            $idemp = new Idempotency();
+            $idemp->check($idempotencyKey, 'purchase-orders');
+        }
+
         $this->validateRequiredFields($data, ['branch_id', 'seller_id', 'items']);
 
         // SECURITY: non-admin สร้างได้เฉพาะสาขาตัวเอง
@@ -125,9 +133,47 @@ class PurchaseOrdersController extends Controller
             ];
         }
 
+        // QA-C2: ตรวจสอบผู้ขาย Blacklist ก่อนบันทึก PO
+        $sellerModel = new Seller();
+        $seller = $sellerModel->getById($cleanData['seller_id']);
+        if (!$seller) {
+            Response::error('ไม่พบข้อมูลผู้ขาย', 404);
+            return;
+        }
+        if ($seller['is_blacklisted']) {
+            $reason = !empty($seller['blacklist_reason']) ? " ({$seller['blacklist_reason']})" : '';
+            Response::error(
+                "ไม่สามารถสร้างใบรับซื้อได้ — ผู้ขายนี้ถูก Blacklist{$reason}",
+                403
+            );
+        }
+
+        // G2: สินค้าที่ต้องใช้ใบรับซื้อโลหะมีค่า — ตรวจว่าผู้ขายมีเลขบัตรประชาชนก่อนบันทึก
+        $categoryIds = array_values(array_unique(array_filter(array_column($cleanItems, 'category_id'))));
+        if (!empty($categoryIds)) {
+            $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
+            $preciousCategories = $this->db->fetchAll(
+                "SELECT id FROM categories WHERE id IN ({$placeholders}) AND requires_precious_receipt = 1",
+                $categoryIds
+            );
+            if (!empty($preciousCategories)) {
+                // Seller model already instantiated above for blacklist check
+                if (!$seller || empty($seller['id_card'])) {
+                    Response::error(
+                        'สินค้าประเภทโลหะมีค่า (ทองแดง/โลหะมีค่า) ต้องบันทึกเลขบัตรประชาชนของผู้ขายก่อนบันทึก PO',
+                        422
+                    );
+                }
+            }
+        }
+
         $model = new PurchaseOrder();
         try {
             $result = $model->createWithItems($cleanData, $cleanItems, $this->user['user_id']);
+            if ($idempotencyKey) {
+                $idemp->save($idempotencyKey, 'purchase-orders', ['id' => $result['id'], 'reference_no' => $result['reference_no']]);
+            }
+
             Logger::logActivity(
                 $this->user['user_id'],
                 'create_purchase_order',

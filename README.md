@@ -2,7 +2,7 @@
 
 **Junk Shop POS System** — Customized from [goragodwiriya/pos-system](https://github.com/goragodwiriya/pos-system) for 4-branch scrap buying business in Surin, Thailand.
 
-> Owner: Dr.solodev | Last Updated: 2026-06-01 | Status: MVP Complete
+> Owner: Dr.solodev | Last Updated: 2026-07-03 | Status: MVP Complete
 
 ---
 
@@ -25,17 +25,15 @@
 ```
 code/
 ├── base-pos/              # Core POS (goragodwiriya/pos-system) — patched in-place
-│   ├── api/               # PHP Backend (Router, Controllers, Models, Core)
+│   ├── api/               # PHP Backend (Router, Controllers, Models, Core, Services)
 │   ├── admin/             # Admin UI pages (active delivery target)
 │   ├── pos/               # POS terminal
-│   └── assets/            # CSS, JS (common.js, config.js)
+│   └── assets/            # CSS, JS (all admin JS in assets/js/)
 │
 └── customizations/        # Custom code loaded by autoloader
-    ├── api/Models/        # Branch, Seller, PurchaseOrder, SaleLot, PurchaseItemCatalog
-    ├── api/Controllers/   # Branches, Sellers, PurchaseOrders, SaleLots, PriceTiers, etc.
-    ├── api/Services/      # ReportService (report engine)
-    ├── database/          # 021 migrations + run-migrations.sh
-    └── frontend-react/    # DEPRECATED (React v2, no longer active)
+    ├── api/Models/        # Branch, Seller, PurchaseOrder, SaleLot, PurchaseItemCatalog, StockTransfer, BusinessExpense
+    ├── api/Controllers/   # Branches, Sellers, PurchaseOrders, SaleLots, PriceTiers, Catalog, StockTransfers, PhotoUpload, Financial
+    ├── database/          # 38 migrations + run-migrations.sh
 ```
 
 ### Stack
@@ -50,17 +48,23 @@ code/
 
 ### Core Business
 - **Purchase Orders (รับซื้อ):** Multi-item PO with catalog autocomplete, seller search, weight deduction, price tiers, receipt printing
-- **Sale Lots (ขาย Lot):** Full CRUD with draft/confirm/cancel, FIFO cost calculation, weighted average costing, profit tracking
-- **Sellers (ผู้ขาย):** ID card tracking, blacklist, duplicate detection, branch association
-- **Inventory:** Product management with SKU, categories linked to purchase catalog
-- **Price Tiers:** Dynamic tier pricing per catalog item (stored as JSON, add/remove levels)
+- **Sale Lots (ขาย Lot):** Full CRUD with draft/confirm/cancel, FIFO cost calculation, weighted average costing, profit tracking, actual revenue recording
+- **Stock Transfers (โอนสต็อก):** Transfer stock between branches, pending/confirm/cancel with logistics tracking
+- **Sellers (ผู้ขาย):** ID card tracking, blacklist with reason/timestamp, duplicate detection, branch association, photo upload
+- **Inventory:** Category-based stock tracking with alert thresholds, price tiers
+- **Catalog:** Master purchase catalog with auto-fill, price board, tier pricing (JSON)
+- **Business Expenses:** Track expenses per branch/category with CRUD
 
 ### Cross-cutting
 - Multi-branch support with data isolation
 - Role-based access (admin/manager/cashier) with JWT branch_id scoping
 - Responsive UI (desktop + tablet + mobile breakpoints)
-- Reports: purchase report, sale lot report, chart data, CSV export
+- Reports: purchase report, sale lot report, financial summary, chart data, CSV export
 - Dashboard: stat cards, sale lot chart, recent sale lots table
+- Photo upload via QR code (HMAC token handoff)
+- Financial dashboard: revenue, expenses, purchase totals, kg
+- Login rate limiting (IP-based, persistent)
+- JWT revocation via token blocklist
 
 ---
 
@@ -86,48 +90,62 @@ docker compose up -d
 ### Run Tests
 ```bash
 cd tests/api
-bash run.sh          # 47 tests — auth, branches, sellers, POs, sale lots, FIFO flow, catalog, price tiers
+bash run.sh          # 9 test functions, 54 assertions — auth, branches, sellers, POs, sale lots, FIFO flow, catalog, price tiers, inventory
 ```
 
 ---
 
 ## Database
 
-**21 migrations** in `customizations/database/migrations/001-021`:
+**38 migrations** in `customizations/database/migrations/`:
 
 | Area | Migrations | Key Tables |
 |------|-----------|------------|
 | Branches | 001, 021 | `branches` (cost_method: fifo/weighted) |
-| Sellers | 002, 011 | `sellers` (id_card, phone, vehicle_plate) |
-| Purchase Orders | 004, 008, 010, 013, 020 | `purchase_orders`, `purchase_order_items` |
-| Sale Lots | 009, 010, 017, 020 | `sale_lots`, `sale_lot_items` |
-| Catalog | 012, 015, 016 | `purchase_item_catalog` (tier_prices JSON) |
+| Sellers | 002, 011, 031 | `sellers` (id_card, phone, vehicle_plate, blacklist) |
+| Purchase Orders | 004, 008, 010, 013, 020, 036 | `purchase_orders`, `purchase_order_items`, `purchase_order_photos` |
+| Sale Lots | 009, 010, 017, 020, 029, 034, 035 | `sale_lots`, `sale_lot_items` |
+| Catalog | 012, 015, 016, 026 | `purchase_item_catalog` (tier_prices JSON) |
 | Price Tiers | 007 | `price_tiers` |
-| Seeds | 005, 006 | Categories + demo data |
+| Stock Transfers | 024, 025 | `stock_transfers` |
+| Business Expenses | 030 | `business_expenses` |
+| Categories | 022, 027, 028, 032, 033 | `categories` (alert_threshold, default_unit) |
+| Seeds | 005, 006 | Default categories + demo data |
+| Security | 037, 038 | `login_attempts`, `token_blocklist` |
 
 ---
 
 ## Project Status
 
-### ✅ Completed (Phases 1-3 + P0 Hardening)
-- All 21 database migrations
-- 6 custom Models + 7 custom Controllers + 1 Service
-- 47 automated tests (bash/curl) — all passing
+### ✅ Completed (All Phases + P0-P2 Hardening)
+- All 38 database migrations
+- 8 custom Models + 10 custom Controllers + 4 base Services
+- 9 test functions (54 assertions) — all passing
 - FIFO costing with atomic consumed_qty + TOCTOU FOR UPDATE locking
-- Weighted average cost (per-branch setting, migration 021)
-- 4 report endpoints + dashboard charts
+- Weighted average cost (per-branch cost_method)
+- Stock Transfers (pending → confirm/cancel with logistics)
+- Photo upload (HMAC token + QR-based mobile upload)
+- Business Expenses + Financial Summary dashboard
+- Actual revenue tracking on sale lots
+- Price board endpoint for all branches
+- Stock alert thresholds per category
+- Blacklist reason/timestamp tracking
+- Precious metals receipt flag
+- Token blocklist for JWT revocation
+- Login attempt rate limiting (IP-based)
+- Reports: purchase-report, sale-lot-report, sale-lot-chart, financial export, + more
+- Dashboard charts + recent sale lots
 - Responsive CSS (768px, 576px breakpoints)
 - Security: JWT in .env, Docker secrets externalized, CORS from env
 - Console cleanup: 9 console.log() removed
 - Bug fixes: PO cancel, SL reference_no collision, PDO execute→query
-- Tool Evaluator score: 7.9/10 (all P0 resolved)
 
 ### ⏳ Pending
 - PHPUnit test framework integration
 - HTTPS setup
-- Rate limiting on auth
 - Auto-generate PO from low-stock alerts
 - Tax/nightly batch reports
+- Dedicated test files for StockTransfers, Financial, PhotoUpload
 
 ---
 
@@ -136,8 +154,7 @@ bash run.sh          # 47 tests — auth, branches, sellers, POs, sale lots, FIF
 | File | Audience | Purpose |
 |------|----------|---------|
 | `AGENTS.md` | AI Agents | Full project context for Claude/Kimi |
-| `AGENT-MEMORY.md` | AI Agents | Session history + learnings |
-| `COMPLETION-REPORT.md` | Stakeholders | Phase completion summary |
+| `DESIGN.md` | Designers/Devs | UI design system (Google Stitch) |
 | `code/README.md` | Developers | Technical setup + code structure |
 | `01-project-brief.md` | All | Original project scope |
 | `05-research-report.md` | Developers | Base codebase analysis |

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>จัดการพนักงาน - รักษ์สะอาดรีไซเคิล</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon">
+          <span>รักษ์สะอาด</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li class="admin-only"><a href="employees.html" class="active"><i class="icon-users"></i><span>พนักงาน</span></a></li>
+        <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+        <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+        <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+      </ul>
+    </aside>
+
+    <div class="content-area">
+      <div class="topbar">
+        <div class="page-header" style="flex:1">
+          <h1 class="page-title">จัดการพนักงาน</h1>
+        </div>
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="currentUser">-</span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter + Add -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 class="card-title" style="margin:0;flex:1">รายชื่อพนักงาน</h2>
+          <input type="text" id="searchInput" placeholder="ค้นหาชื่อ/เบอร์/บัตรฯ" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;width:200px">
+          <select id="filterBranch" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit">
+            <option value="">ทุกสาขา</option>
+          </select>
+          <select id="filterStatus" style="padding:7px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit">
+            <option value="">ทุกสถานะ</option>
+            <option value="active">กำลังทำงาน</option>
+            <option value="inactive">ออกแล้ว</option>
+          </select>
+          <button class="btn btn-primary" onclick="openAddModal()">+ เพิ่มพนักงาน</button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="card-body">
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>ตำแหน่ง</th>
+                  <th>สาขา</th>
+                  <th>เบอร์โทร</th>
+                  <th class="text-right">เงินเดือน</th>
+                  <th class="text-right">ค่าแรงรายวัน</th>
+                  <th>เลขประกันสังคม</th>
+                  <th>วันที่เริ่ม</th>
+                  <th>สถานะ</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="employeeBody">
+                <tr><td colspan="10" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="pagination" style="margin-top:16px;display:flex;justify-content:center;gap:8px"></div>
+        </div>
+      </div>
+
+    </div><!-- /.content-area -->
+  </div><!-- /.app-container -->
+
+  <!-- Modal: Add/Edit Employee -->
+  <div class="modal" id="employeeModal">
+    <div class="modal-content" style="max-width:640px">
+      <div class="modal-header">
+        <h2 id="modalTitle">เพิ่มพนักงาน</h2>
+        <button class="close-modal" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="employeeForm">
+          <input type="hidden" id="employeeId">
+          <div class="form-group">
+            <label for="empBranch">สาขา <span class="required">*</span></label>
+            <select id="empBranch" required>
+              <option value="">-- เลือกสาขา --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="empName">ชื่อ-นามสกุล <span class="required">*</span></label>
+            <input type="text" id="empName" placeholder="ชื่อ-นามสกุลพนักงาน" required>
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <div class="form-group">
+                <label for="empPosition">ตำแหน่ง</label>
+                <input type="text" id="empPosition" placeholder="เช่น พนักงานชั่งน้ำหนัก">
+              </div>
+            </div>
+            <div class="form-col">
+              <div class="form-group">
+                <label for="empPhone">เบอร์โทร</label>
+                <input type="tel" id="empPhone" placeholder="08X-XXX-XXXX">
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="empIdCard">เลขบัตรประชาชน</label>
+            <input type="text" id="empIdCard" maxlength="13" placeholder="13 หลัก">
+          </div>
+          <div class="form-group">
+            <label for="empAddress">ที่อยู่</label>
+            <textarea id="empAddress" rows="2" placeholder="ที่อยู่ปัจจุบัน"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <div class="form-group">
+                <label for="empSalary">เงินเดือน (บาท)</label>
+                <input type="number" id="empSalary" min="0" step="0.01" placeholder="0.00">
+              </div>
+            </div>
+            <div class="form-col">
+              <div class="form-group">
+                <label for="empDailyWage">ค่าแรงรายวัน (บาท)</label>
+                <input type="number" id="empDailyWage" min="0" step="0.01" placeholder="0.00">
+              </div>
+            </div>
+          </div>
+          <fieldset style="border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:16px;margin-top:12px">
+            <legend style="font-weight:600;font-size:14px;padding:0 8px">ประกันสังคม</legend>
+            <div class="form-row">
+              <div class="form-col">
+                <div class="form-group">
+                  <label for="empSSONumber">เลขประกันสังคม</label>
+                  <input type="text" id="empSSONumber" placeholder="10 หลัก">
+                </div>
+              </div>
+              <div class="form-col">
+                <div class="form-group">
+                  <label for="empSSORate">อัตรา (%)</label>
+                  <input type="number" id="empSSORate" min="0" max="100" step="0.01" value="5" placeholder="5">
+                </div>
+              </div>
+            </div>
+          </fieldset>
+          <div class="form-row" style="margin-top:12px">
+            <div class="form-col">
+              <div class="form-group">
+                <label for="empStartDate">วันที่เริ่มงาน</label>
+                <input type="date" id="empStartDate">
+              </div>
+            </div>
+            <div class="form-col">
+              <div class="form-group">
+                <label for="empEndDate">วันที่ออก</label>
+                <input type="date" id="empEndDate">
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="empStatus">สถานะ</label>
+            <select id="empStatus">
+              <option value="active">กำลังทำงาน</option>
+              <option value="inactive">ออกแล้ว</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="empNotes">หมายเหตุ</label>
+            <textarea id="empNotes" rows="2" placeholder="หมายเหตุเพิ่มเติม"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveEmployee()">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Salary Expense -->
+  <div class="modal" id="salaryModal">
+    <div class="modal-content" style="max-width:480px">
+      <div class="modal-header">
+        <h2 id="salaryModalTitle">บันทึกเงินเดือน</h2>
+        <button class="close-modal" onclick="closeSalaryModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="salaryForm">
+          <input type="hidden" id="salaryEmployeeId">
+          <div class="form-group">
+            <label>พนักงาน</label>
+            <p id="salaryEmpName" style="font-weight:600;margin:4px 0 0;padding:8px 12px;background:var(--color-bg-muted);border-radius:var(--radius-sm)"></p>
+          </div>
+          <div class="form-group">
+            <label for="salaryMonth">เดือน <span class="required">*</span></label>
+            <input type="month" id="salaryMonth" required>
+          </div>
+          <div class="form-group">
+            <label for="salaryAmount">จำนวนเงิน (บาท) <span class="required">*</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="number" id="salaryAmount" min="0" step="0.01" required style="flex:1">
+              <button type="button" class="btn btn-sm btn-secondary" onclick="fillSalaryAmount()">ใช้เงินเดือน</button>
+            </div>
+            <small class="form-text">รวม SSO ที่หักแล้ว (เงินเดือน - ประกันสังคม)</small>
+          </div>
+          <div class="form-group">
+            <label for="salarySSOAmount">ประกันสังคมฝ่ายนายจ้าง (บาท)</label>
+            <input type="number" id="salarySSOAmount" min="0" step="0.01" placeholder="0.00">
+            <small class="form-text">ส่วนนายจ้างสมทบ (ถ้ามี)</small>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeSalaryModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveSalaryExpense()">บันทึกค่าใช้จ่าย</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notification-container"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/employees.js"></script>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
+</body>
+</html>

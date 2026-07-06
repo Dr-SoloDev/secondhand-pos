@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>โอนสต็อกระหว่างสาขา</title>
+  <title>โอนสต็อก - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css">
 </head>
 <body>
 <div class="app-container">
   <aside class="sidebar">
     <div class="sidebar-header">
-      <a href="index.html" class="sidebar-brand"><i class="icon-cart"></i><span>รับซื้อของเก่า</span></a>
+      <a href="index.html" class="sidebar-brand">
+        <img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon">
+        <span>รักษ์สะอาด</span>
+      </a>
     </div>
     <ul class="sidebar-menu">
       <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
@@ -19,9 +22,11 @@
       <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
       <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
       <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
-      <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
-        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+       <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
+       <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+      <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
       <li><a href="stock-transfers.html" class="active"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+      <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
       <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
       <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
       <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
@@ -34,7 +39,7 @@
       <div class="user-dropdown">
         <button class="user-dropdown-toggle">
           <div class="user-avatar"><i class="icon-user"></i></div>
-          <span class="user-name" id="userName">-</span>
+          <span class="user-name" id="currentUser">-</span>
           <i class="icon-down"></i>
         </button>
         <div class="user-dropdown-menu">
@@ -142,7 +147,7 @@
     <div id="printSlip" style="font-family:'Sarabun',sans-serif;font-size:13px;padding:12px"></div>
     <div id="printModalActions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button class="btn btn-secondary" onclick="document.getElementById('printModal').style.display='none'">ปิด</button>
-      <button class="btn btn-primary" onclick="window.print()">🖨️ พิมพ์</button>
+      <button class="btn btn-primary" onclick="window.print()">พิมพ์</button>
     </div>
   </div>
 </div>
@@ -183,7 +188,7 @@
     </div>
     <div class="modal-body" id="printTransferContent"></div>
     <div class="modal-footer">
-      <button class="btn btn-primary" onclick="window.print()">🖨 พิมพ์</button>
+      <button class="btn btn-primary" onclick="window.print()">พิมพ์</button>
       <button class="btn btn-secondary" onclick="document.getElementById('printTransferModal').classList.remove('show')">ปิด</button>
     </div>
   </div>
@@ -194,7 +199,7 @@
 async function init() {
   const user = await requireAuth();
   if (!user) return;
-  document.getElementById('userName').textContent = user.username || '-';
+  document.getElementById('currentUser').textContent = user.username || '-';
 
   const [branchRes, catRes] = await Promise.all([
     apiRequest('branches/active'),
@@ -224,6 +229,7 @@ async function init() {
 
 async function loadTransfers() {
   const status = document.getElementById('statusFilter').value;
+  showTableLoading('transfersBody', 14, 5);
   const res = await apiRequest(`stock-transfers${status ? '?status='+status : ''}`);
   const tbody = document.getElementById('transfersBody');
   const items = res.status === 'success' ? (res.data.items || []) : [];
@@ -248,8 +254,8 @@ async function loadTransfers() {
     const actions = t.status === 'pending'
       ? `<button class="btn btn-sm btn-success" onclick="openReceiveModal(${t.id},${t.weight_kg})">✓ ตรวจรับ</button>
          <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="cancelTransfer(${t.id})">ยกเลิก</button>
-         <button class="btn btn-sm btn-secondary" style="margin-left:4px" onclick='printTransfer(${JSON.stringify(t)})'>🖨️</button>`
-      : `<button class="btn btn-sm btn-secondary" onclick='printTransfer(${JSON.stringify(t)})'>🖨️</button>`;
+          <button class="btn btn-sm btn-secondary" style="margin-left:4px" onclick='printTransfer(${JSON.stringify(t)})'>พิมพ์</button>`
+      : `<button class="btn btn-sm btn-secondary" onclick='printTransfer(${JSON.stringify(t)})'>พิมพ์</button>`;
 
     return `<tr>
       <td style="font-family:monospace;font-size:12px">${escapeHtml(t.reference_no)}</td>
@@ -282,36 +288,42 @@ async function createTransfer() {
   if (fromId === toId) { showNotification('ต้นทางและปลายทางต้องต่างกัน', 'error'); return; }
   if (!(weight > 0))   { showNotification('กรุณาระบุน้ำหนัก', 'error'); return; }
 
-  const res = await apiRequest('stock-transfers', 'POST', {
-    from_branch_id: fromId, to_branch_id: toId, category_id: catId,
-    weight_kg: weight, note, transporter_name: transporter || null, vehicle_plate: vehicle || null,
-  });
+  const createBtn = document.querySelector('button[onclick="createTransfer()"]');
+  setButtonLoading(createBtn, true, 'กำลังสร้าง...');
+  try {
+    const res = await apiRequest('stock-transfers', 'POST', {
+      from_branch_id: fromId, to_branch_id: toId, category_id: catId,
+      weight_kg: weight, note, transporter_name: transporter || null, vehicle_plate: vehicle || null,
+    });
 
-  if (res.status === 'success') {
-    const fromSel = document.getElementById('fromBranch');
-    const toSel   = document.getElementById('toBranch');
-    const catSel  = document.getElementById('categorySelect');
-    const currentUser = JSON.parse(localStorage.getItem('posUser') || '{}');
-    printTransfer({
-      reference_no:      res.data.reference_no,
-      created_at:        new Date().toISOString().slice(0,10),
-      from_branch_name:  fromSel.options[fromSel.selectedIndex]?.text || '-',
-      to_branch_name:    toSel.options[toSel.selectedIndex]?.text || '-',
-      category_name:     catSel.options[catSel.selectedIndex]?.text || '-',
-      weight_kg:         weight,
-      transporter_name:  transporter || null,
-      vehicle_plate:     vehicle || null,
-      note:              note || null,
-      created_by_name:   currentUser.full_name || currentUser.username || '-',
-      status:            'pending',
-    });
-    ['weightKg','transferNote','transporterName','vehiclePlate'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-    loadTransfers();
-    printTransfer(res.data);
-  } else {
-    showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+    if (res.status === 'success') {
+      const fromSel = document.getElementById('fromBranch');
+      const toSel   = document.getElementById('toBranch');
+      const catSel  = document.getElementById('categorySelect');
+      const currentUser = JSON.parse(localStorage.getItem('posUser') || '{}');
+      printTransfer({
+        reference_no:      res.data.reference_no,
+        created_at:        new Date().toISOString().slice(0,10),
+        from_branch_name:  fromSel.options[fromSel.selectedIndex]?.text || '-',
+        to_branch_name:    toSel.options[toSel.selectedIndex]?.text || '-',
+        category_name:     catSel.options[catSel.selectedIndex]?.text || '-',
+        weight_kg:         weight,
+        transporter_name:  transporter || null,
+        vehicle_plate:     vehicle || null,
+        note:              note || null,
+        created_by_name:   currentUser.full_name || currentUser.username || '-',
+        status:            'pending',
+      });
+      ['weightKg','transferNote','transporterName','vehiclePlate'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      loadTransfers();
+      printTransfer(res.data);
+    } else {
+      showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+    }
+  } finally {
+    setButtonLoading(createBtn, false);
   }
 }
 
@@ -346,16 +358,22 @@ async function submitReceive() {
   const mismatch = Math.abs(receivedWeight - orderedWeight) > 0.001;
   if (mismatch && !receiveNote) { showNotification('น้ำหนักไม่ตรง — กรุณาระบุหมายเหตุ', 'error'); return; }
 
-  const res = await apiRequest('stock-transfers/confirm', 'POST', {
-    id, received_weight_kg: receivedWeight, receive_note: receiveNote || null,
-  });
+  const submitBtn = document.querySelector('#receiveModal .btn-success');
+  setButtonLoading(submitBtn, true, 'กำลังยืนยัน...');
+  try {
+    const res = await apiRequest('stock-transfers/confirm', 'POST', {
+      id, received_weight_kg: receivedWeight, receive_note: receiveNote || null,
+    });
 
-  if (res.status === 'success') {
-    showNotification('ตรวจรับสินค้าแล้ว', 'success');
-    closeReceiveModal();
-    loadTransfers();
-  } else {
-    showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+    if (res.status === 'success') {
+      showNotification('ตรวจรับสินค้าแล้ว', 'success');
+      closeReceiveModal();
+      loadTransfers();
+    } else {
+      showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+    }
+  } finally {
+    setButtonLoading(submitBtn, false);
   }
 }
 
@@ -426,7 +444,7 @@ function printTransfer(t) {
     </style>
     <div style="font-family:'Sarabun',sans-serif;font-size:12px;padding:8px 4px">
       <div style="border:2px solid #222;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:8px">
-        <div style="font-size:16px;font-weight:800;letter-spacing:1px">ใบโอนสต็อก</div>
+        <div style="font-size:16px;font-weight:800;letter-spacing:0">ใบโอนสต็อก</div>
         <div style="font-size:11px;color:#444;margin-top:2px">Stock Transfer</div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px">
@@ -474,9 +492,10 @@ document.addEventListener('DOMContentLoaded', init);
 document.getElementById('logoutBtn')?.addEventListener('click', async e => {
   e.preventDefault();
   try { await fetch(apiPath+'/auth/logout', {method:'POST'}); } catch(e) { console.error(e); }
-  localStorage.removeItem('posToken'); localStorage.removeItem('posUser');
+  localStorage.removeItem('posUser');
   window.location.href = '../index.html';
 });
 </script>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
 </body>
 </html>

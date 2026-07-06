@@ -205,6 +205,7 @@ async function generateSalesReport() {
     }
 
     showNotification('Generating sales report...', 'info');
+    showTableLoading(document.querySelector('#salesReportTable tbody'), 8, 5);
 
     const response = await apiRequest(`reports/sales-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
 
@@ -331,6 +332,7 @@ async function generateProductsReport() {
     }
 
     showNotification('Generating product sales report...', 'info');
+    showTableLoading(document.querySelector('#productsReportTable tbody'), 8, 5);
 
     const params = new URLSearchParams({
       date_from: dateFrom,
@@ -480,6 +482,7 @@ async function generateInventoryReport() {
     const stockStatus = document.getElementById('inventoryStatus').value;
 
     showNotification('Generating inventory report...', 'info');
+    showTableLoading(document.querySelector('#inventoryReportTable tbody'), 10, 5);
 
     const params = new URLSearchParams();
 
@@ -645,6 +648,7 @@ async function generateCashierReport() {
     }
 
     showNotification('Generating cashier performance report...', 'info');
+    showTableLoading(document.querySelector('#cashierReportTable tbody'), 6, 5);
 
     const params = new URLSearchParams({
       date_from: dateFrom,
@@ -797,6 +801,7 @@ async function generatePurchaseReport() {
     }
 
     showNotification('Generating purchase report...', 'info');
+    showTableLoading(document.querySelector('#purchaseReportTable tbody'), 6, 5);
 
     const response = await apiRequest(`reports/purchase-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
 
@@ -897,6 +902,7 @@ async function generateSalelotReport() {
     }
 
     showNotification('Generating sale lot report...', 'info');
+    showTableLoading(document.querySelector('#salelotReportTable tbody'), 8, 5);
 
     const response = await apiRequest(`reports/sale-lot-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
 
@@ -1009,6 +1015,7 @@ async function generateTaxReport() {
     }
 
     showNotification('Generating tax report...', 'info');
+    showTableLoading(document.querySelector('#taxReportTable tbody'), 6, 5);
 
     const params = new URLSearchParams({
       date_from: dateFrom,

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>500 - เกิดข้อผิดพลาด | รักษ์สะอาดรีไซเคิล</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    body { margin: 0; background: #f8fafc; color: #1f2937; }
+    .error-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+    .error-box { width: min(100%, 420px); }
+    .error-code { font-size: 72px; line-height: 1; font-weight: 800; color: #fca5a5; }
+    .error-title { margin: 16px 0 8px; font-size: 22px; font-weight: 700; }
+    .error-message { margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.7; }
+    .error-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main class="error-page">
+    <div class="error-box">
+      <div class="error-code">500</div>
+      <h1 class="error-title">เกิดข้อผิดพลาดในระบบ</h1>
+      <p class="error-message">เซิร์ฟเวอร์พบปัญหาที่ไม่คาดคิด กรุณาลองใหม่อีกครั้ง หากปัญหายังคงอยู่ โปรดแจ้งผู้ดูแลระบบ</p>
+      <div class="error-actions">
+        <a href="index.html" class="btn btn-primary">กลับหน้าหลัก</a>
+        <button type="button" class="btn btn-secondary" onclick="location.reload()">ลองใหม่</button>
+      </div>
+    </div>
+  </main>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
+</body>
+</html>

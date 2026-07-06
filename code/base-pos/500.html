@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>500 - ระบบขัดข้อง | รักษ์สะอาดรีไซเคิล</title>
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    body { margin: 0; background: #f8fafc; color: #1f2937; }
+    .error-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+    .error-box { width: min(100%, 440px); }
+    .error-code { font-size: 72px; line-height: 1; font-weight: 800; color: #cbd5e1; }
+    .error-title { margin: 16px 0 8px; font-size: 22px; font-weight: 700; }
+    .error-message { margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.7; }
+    .error-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main class="error-page">
+    <div class="error-box">
+      <div class="error-code">500</div>
+      <h1 class="error-title">ระบบมีข้อผิดพลาดชั่วคราว</h1>
+      <p class="error-message">กรุณาลองใหม่ในอีกสักครู่ หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ</p>
+      <div class="error-actions">
+        <button type="button" class="btn btn-primary" onclick="location.reload()">ลองใหม่</button>
+        <a href="admin/index.html" class="btn btn-secondary">กลับหน้าหลัก</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

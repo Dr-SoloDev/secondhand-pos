@@ -3,99 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>รับซื้อของ - ระบบรับซื้อของเก่า</title>
+  <title>รับซื้อของ - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css">
-  <style>
-    /* ===== PO Page Layout ===== */
-    .po-page { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-
-    /* Row 1: สาขา + บิล */
-    .po-top-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px;
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      padding: 12px 16px;
-    }
-    .po-branch-group { display: flex; flex-direction: column; gap: 4px; min-width: 220px; max-width: 280px; }
-    .po-branch-group label { font-size: 12px; font-weight: 600; color: #6b7280; }
-    .po-branch-group select { height: 40px; line-height: 1.5; padding: 6px 10px; }
-    .po-tier-group { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-    .po-tier-group label { font-size: 12px; font-weight: 600; color: #6b7280; }
-    #globalTierButtons { display: flex; gap: 8px; flex-wrap: wrap; }
-
-    /* Row 2: Add item — ทุกช่องในแถวเดียว */
-    .po-add-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 8px;
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      padding: 10px 16px;
-    }
-    .po-add-row .field-group { display: flex; flex-direction: column; gap: 3px; }
-    .po-add-row .field-group label { font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap; }
-    .po-add-row .field-group input { height: 36px; }
-    .po-field-name { flex: 2; min-width: 200px; position: relative; }
-    .po-field-num { width: 90px; }
-    .po-field-preview {
-      font-size: 14px; font-weight: 700; color: #059669;
-      white-space: nowrap; align-self: center;
-      padding-top: 18px;
-      min-width: 72px; text-align: right;
-    }
-    .btn-add-item {
-      height: 36px; white-space: nowrap; align-self: flex-end;
-      padding: 0 16px; font-weight: 700;
-    }
-
-    /* Cart table */
-    .po-cart-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-    .po-cart-card .cart-summary {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 8px 16px; background: #f9fafb; border-top: 1px solid #e5e7eb;
-      font-size: 13px;
-    }
-    .cart-total-amount { font-size: 20px; font-weight: 800; color: #059669; }
-
-    /* Bottom row */
-    .po-bottom-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-    }
-    .po-bottom-card {
-      background: #fff; border: 1px solid #e5e7eb;
-      border-radius: 10px; padding: 12px 14px;
-      display: flex; flex-direction: column; gap: 8px;
-    }
-    .po-bottom-card h3 { font-size: 12px; font-weight: 700; color: #6b7280; margin: 0; text-transform: uppercase; letter-spacing: .5px; }
-    .po-actions { display: flex; gap: 8px; margin-top: auto; }
-    .po-actions .btn { flex: 1; height: 42px; font-size: 14px; font-weight: 700; }
-    .po-actions .btn-save { flex: 2; }
-
-    /* Recent POs */
-    .po-recent { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-    .po-recent-header { padding: 10px 16px; border-bottom: 1px solid #e5e7eb; font-weight: 700; font-size: 13px; color: #374151; }
-
-    @media (max-width: 768px) {
-      .po-top-row { flex-wrap: wrap; }
-      .po-add-row { flex-wrap: wrap; }
-      .po-add-row .field-group { min-width: calc(50% - 8px); }
-      .po-bottom-row { grid-template-columns: 1fr; }
-    }
-  </style>
 </head>
 <body>
   <div class="app-container">
     <aside class="sidebar">
       <div class="sidebar-header">
         <a href="index.html" class="sidebar-brand">
-          <i class="icon-cart"></i>
-          <span>รับซื้อของเก่า</span>
+          <img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon">
+          <span>รักษ์สะอาด</span>
         </a>
       </div>
       <ul class="sidebar-menu">
@@ -105,7 +22,8 @@
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
-        <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+         <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
+         <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
         <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
         <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
         <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
@@ -132,7 +50,7 @@
       </div>
 
       <div class="page-header">
-        <h1>รับซื้อของเก่า</h1>
+        <h1>รับซื้อของ</h1>
       </div>
 
       <div class="po-page">
@@ -151,33 +69,52 @@
         </div>
 
         <!-- ===== Row 2: เพิ่มสินค้า inline ===== -->
-        <div class="po-add-row">
-          <div class="field-group po-field-name">
-            <label>รหัส / ชื่อสินค้า</label>
+        <!-- แถว 1: ชื่อสินค้า + หน่วย -->
+        <div class="po-field-row">
+          <div class="po-field po-field-name">
+            <label>สินค้า</label>
             <div style="position:relative">
               <input type="text" id="itemName" class="form-control" autocomplete="off"
                      placeholder="พิมพ์รหัสหรือชื่อ เช่น WM01, เครื่องซักผ้า">
               <input type="hidden" id="itemCatalogId" value="">
               <input type="hidden" id="itemCategoryId" value="">
-              <input type="hidden" id="itemUnit" value="ชิ้น">
+              <input type="hidden" id="itemUnitPrice" value="0">
               <div id="itemCatalogResults" class="seller-results"></div>
             </div>
             <select id="itemCategorySelect" style="display:none"></select>
           </div>
-          <div class="field-group po-field-num">
+          <div class="po-field po-field-unit">
+            <label>หน่วย</label>
+            <input type="text" id="itemUnit" value="กก." readonly tabindex="-1" style="background:#f5f5f5">
+          </div>
+        </div>
+        <!-- แถว 2: น้ำหนัก + หักน้ำหนัก + ราคา + รวม + ถ่ายรูป + เพิ่ม -->
+        <div class="po-field-row">
+          <div class="po-field po-field-weight">
             <label>น้ำหนัก (กก.)</label>
-            <input type="number" id="itemQuantity" class="form-control" min="0" step="0.01" value="1">
+            <input type="number" id="itemQuantity" step="0.01" min="0" placeholder="0.00">
           </div>
-          <div class="field-group po-field-num">
-            <label>หัก (กก.)</label>
-            <input type="number" id="itemWeightDeduct" class="form-control" min="0" step="0.01" value="0">
+          <div class="po-field po-field-deduct">
+            <label>หักน้ำหนัก (กก.)</label>
+            <input type="number" id="itemWeightDeduct" step="0.01" min="0" placeholder="0.00">
           </div>
-          <div class="field-group po-field-num">
-            <label>ราคา/หน่วย (฿)</label>
-            <input type="number" id="itemUnitPrice" class="form-control" min="0" step="0.01" value="0">
+          <div class="po-field po-field-price-display">
+            <label style="color:#6b7280">ราคา/กก. <span style="font-size:10px;font-weight:400;color:#9ca3af">(auto)</span></label>
+            <div id="itemPriceDisplay" class="auto-price-display" tabindex="-1">—</div>
           </div>
-          <div id="itemTotalPreview" class="po-field-preview">฿0.00</div>
-          <button class="btn btn-primary btn-add-item" id="addItemBtn">+ เพิ่ม</button>
+          <div class="po-field po-field-total">
+            <label>รวม</label>
+            <div id="itemTotalPreview" class="auto-price-display">เลือกสินค้า</div>
+          </div>
+          <div class="po-field po-field-photo">
+            <label>&nbsp;</label>
+            <button id="itemPhotoBtn" class="btn-photo-picker" title="ถ่ายรูปสินค้า" type="button" tabindex="-1">📷</button>
+            <span id="itemPhotoIndicator"></span>
+          </div>
+          <div class="po-field po-field-addbtn">
+            <label>&nbsp;</label>
+            <button id="addItemBtn" class="btn btn-primary" type="button">+ เพิ่ม</button>
+          </div>
         </div>
 
         <!-- ===== ตาราง Cart ===== -->
@@ -193,7 +130,7 @@
                   <th class="text-right">สุทธิ</th>
                   <th class="text-right">ราคา/หน่วย</th>
                   <th class="text-right">รวม</th>
-                  <th style="width:36px;text-align:center">📷</th>
+                  <th style="width:36px;text-align:center">รูป</th>
                   <th style="width:40px;text-align:center"></th>
                 </tr>
               </thead>
@@ -201,7 +138,7 @@
             </table>
           </div>
           <div class="cart-summary">
-            <div id="cartTotalItems" style="color:#6b7280">0 ชิ้น (0 รายการ)</div>
+            <div id="cartTotalItems" style="color:#6b7280">0 กก. (0 รายการ)</div>
             <div>ยอดรวมจ่าย: <span id="cartTotalAmount" class="cart-total-amount">฿0.00</span></div>
           </div>
         </div>
@@ -210,9 +147,9 @@
         <div class="po-bottom-row">
 
           <!-- ผู้ขาย -->
-          <div class="po-bottom-card">
+          <div class="po-bottom-card" id="poSellerCard">
             <h3><i class="icon-user"></i> ผู้ขาย</h3>
-            <div>
+            <div style="flex:1">
               <label style="font-size:12px;color:#6b7280;font-weight:600">ค้นหา (ชื่อ / เลขบัตร / เบอร์)</label>
               <div class="seller-search-box" style="margin-top:4px">
                 <input type="text" id="searchSellerInput" class="form-control" placeholder="พิมพ์เพื่อค้นหา...">
@@ -222,6 +159,12 @@
             <div id="selectedSellerBox">
               <div class="text-muted" style="font-size:13px">ยังไม่ได้เลือกผู้ขาย</div>
             </div>
+            <div class="precious-actions" id="preciousActions" style="display:none">
+              <button class="btn btn-sm btn-secondary" id="sigBtn" style="font-size:12px;border-color:#ef4444;color:#ef4444">
+                ✍️ เซ็นรับรอง
+              </button>
+              <span id="sigStatus" style="font-size:11px;color:#888;margin-left:4px">ยังไม่เซ็น</span>
+            </div>
             <button class="btn btn-sm btn-secondary" id="createNewSellerBtn" style="align-self:flex-start">
               <i class="icon-additem"></i> + ผู้ขายใหม่
             </button>
@@ -230,22 +173,30 @@
           <!-- วิธีจ่าย + หมายเหตุ -->
           <div class="po-bottom-card">
             <h3><i class="icon-price"></i> รายละเอียดบิล</h3>
-            <div class="form-group" style="margin:0">
-              <label style="font-size:12px;color:#6b7280;font-weight:600">วิธีจ่าย</label>
-              <select id="paymentMethod" class="form-control mt-1">
-                <option value="cash">เงินสด</option>
-                <option value="bank_transfer">โอนธนาคาร</option>
-              </select>
-            </div>
-            <div class="form-group" style="margin:0">
-              <label style="font-size:12px;color:#6b7280;font-weight:600">หมายเหตุ</label>
-              <textarea id="poNotes" class="form-control mt-1" rows="3" placeholder="(ไม่บังคับ)"></textarea>
+            <div style="flex:1">
+              <div class="form-group" style="margin:0">
+                <label style="font-size:12px;color:#6b7280;font-weight:600">วิธีจ่าย</label>
+                <select id="paymentMethod" class="form-control mt-1">
+                  <option value="cash">เงินสด</option>
+                  <option value="bank_transfer">โอนธนาคาร</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label style="font-size:12px;color:#6b7280;font-weight:600">หมายเหตุ</label>
+                <textarea id="poNotes" class="form-control mt-1" rows="3" placeholder="(ไม่บังคับ)"></textarea>
+              </div>
             </div>
           </div>
 
           <!-- ปุ่มบันทึก -->
-          <div class="po-bottom-card" style="justify-content:flex-end">
-            <div style="text-align:right;margin-bottom:8px">
+          <div class="po-bottom-card">
+            <div style="flex:1">
+              <div style="font-size:11px;color:#059669;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                <span>✅</span>
+                <span>พร้อมบันทึก — ทุกครั้งที่มีการรับซื้อ ระบบปฏิบัติตาม พ.ร.บ.รับซื้อของเก่า ทุกประการ</span>
+              </div>
+            </div>
+            <div style="text-align:right">
               <div style="font-size:13px;color:#6b7280">ยอดรวม</div>
               <div style="font-size:28px;font-weight:800;color:#059669" id="cartTotalAmountBig">฿0.00</div>
             </div>
@@ -269,7 +220,7 @@
                   <th>เลขที่</th>
                   <th>สาขา</th>
                   <th>ผู้ขาย</th>
-                  <th class="text-right">ชิ้น</th>
+                  <th class="text-right">กก.</th>
                   <th class="text-right">ยอด</th>
                   <th>วันที่</th>
                 </tr>
@@ -282,7 +233,7 @@
         <!-- Photo Strip — pending photos preview -->
         <div class="photo-strip-wrap" id="photoStripWrap">
           <div class="photo-strip-header">
-            <span class="count" id="photoStripCount">📸 0 รูป</span>
+            <span class="count" id="photoStripCount"><i class="icon-image"></i> 0 รูป</span>
             <span class="hint">แตะเพื่อลบ</span>
           </div>
           <div class="photo-strip" id="photoStrip"></div>
@@ -311,9 +262,9 @@
           <input type="text" id="newIdCard" class="form-control" maxlength="13">
           <!-- Seller ID Card Photo Area -->
           <div class="seller-photo-area" id="sellerPhotoArea">
-            <div class="seller-photo-icon" id="sellerPhotoIcon">📇</div>
+            <div class="seller-photo-icon" id="sellerPhotoIcon"><i class="icon-image"></i></div>
             <div class="seller-photo-text">
-              <span class="title" id="sellerPhotoTitle">📸 เพิ่มรูปถ่ายบัตรประชาชน</span>
+              <span class="title" id="sellerPhotoTitle"><i class="icon-image"></i> เพิ่มรูปถ่ายบัตรประชาชน</span>
               <span class="sub" id="sellerPhotoSub">แตะเพื่อถ่ายรูป หรือเลือกรูป</span>
             </div>
             <img class="seller-photo-thumb" id="sellerPhotoThumb" style="display:none" alt="รูปบัตร">
@@ -350,7 +301,7 @@
       <div class="modal-body" id="viewPOContent"></div>
       <!-- WF-01: QR code section (hidden เวลาพิมพ์) -->
       <div id="poQrSection" style="display:none;text-align:center;padding:12px 0;border-top:1px dashed #ccc;margin:0 16px 8px">
-        <div style="font-size:13px;color:#555;margin-bottom:8px">📱 สแกนเพื่อถ่ายรูปสินค้าผ่านมือถือ</div>
+        <div style="font-size:13px;color:#555;margin-bottom:8px">สแกนเพื่อถ่ายรูปสินค้าผ่านมือถือ</div>
         <div id="poQrCanvas" style="display:inline-block"></div>
         <div id="poQrHint" style="font-size:11px;color:#888;margin-top:6px">ลิงก์ใช้ได้ 24 ชั่วโมง</div>
       </div>
@@ -361,9 +312,39 @@
     </div>
   </div>
 
+  <!-- ===== Signature Modal ===== -->
+  <div class="modal" id="signatureModal">
+    <div class="modal-content modal-sm">
+      <div class="modal-header">
+        <h2>เซ็นรับรอง</h2>
+        <button class="close-modal" id="signatureModalClose">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center">
+        <p style="font-size:13px;color:#555;margin-bottom:12px">
+          ข้าพเจ้ายืนยันว่าสินค้าที่นำมาขายในวันนี้เป็นของผู้ขายโดยสุจริต
+        </p>
+        <div class="sig-canvas-wrap">
+          <canvas id="sigCanvas" width="360" height="140"></canvas>
+          <div class="sig-placeholder" id="sigPlaceholder">เซ็นตรงนี้</div>
+        </div>
+        <button class="btn btn-sm btn-secondary" id="sigClearBtn" type="button" style="margin-top:8px">ล้างลายเซ็น</button>
+        <div class="sig-pc-fallback" id="sigPcFallback">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="sigConfirmCheckbox">
+            ✅ ข้าพเจ้ายืนยันความเป็นเจ้าของสินค้าโดยสุจริต
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="sigSkipBtn">ข้าม (ไม่ต้องเซ็น)</button>
+        <button class="btn btn-primary" id="sigConfirmBtn">ยืนยันลายเซ็น</button>
+      </div>
+    </div>
+  </div>
+
   <!-- FAB: Floating Camera Button -->
   <button class="photo-fab" id="fabCameraBtn" title="ถ่ายรูปสินค้า">
-    📷
+    <i class="icon-image"></i>
     <span class="photo-fab-badge" id="fabBadge" style="display:none">0</span>
   </button>
 
@@ -376,14 +357,14 @@
       <div class="photo-sheet-title">เพิ่มรูปภาพ</div>
       <div class="photo-sheet-options">
         <button class="photo-sheet-btn" id="sheetCameraBtn">
-          <span class="photo-sheet-btn-icon camera">📷</span>
+          <span class="photo-sheet-btn-icon camera"><i class="icon-image"></i></span>
           <div>
             <div>ถ่ายรูป</div>
             <div class="photo-sheet-btn-label">ใช้กล้องเว็บแคม / กล้องมือถือ</div>
           </div>
         </button>
         <button class="photo-sheet-btn" id="sheetGalleryBtn">
-          <span class="photo-sheet-btn-icon gallery">🖼️</span>
+          <span class="photo-sheet-btn-icon gallery"><i class="icon-gallery"></i></span>
           <div>
             <div>เลือกรูป</div>
             <div class="photo-sheet-btn-label">เลือกจากแกลเลอรี / เครื่อง</div>
@@ -402,7 +383,7 @@
   <!-- Camera / Webcam Modal -->
   <div class="camera-overlay" id="cameraOverlay">
     <div class="camera-header">
-      <span class="camera-header-title">📷 ถ่ายรูป</span>
+      <span class="camera-header-title"><i class="icon-image"></i> ถ่ายรูป</span>
       <button class="camera-close-btn" id="cameraCloseBtn">&times;</button>
     </div>
     <div class="camera-viewport" id="cameraViewport">
@@ -435,16 +416,7 @@
   <script src="../assets/js/common.js"></script>
   <script src="../assets/js/vendor/qrcode.min.js"></script>
   <script src="../assets/js/purchase-orders.js?v=20260614"></script>
-  <script>
-    // sync ยอดรวม big display
-    const cartTotalAmountBig = document.getElementById('cartTotalAmountBig');
-    const cartTotalAmount    = document.getElementById('cartTotalAmount');
-    if (cartTotalAmountBig && cartTotalAmount) {
-      new MutationObserver(() => {
-        cartTotalAmountBig.textContent = cartTotalAmount.textContent;
-      }).observe(cartTotalAmount, { childList: true, characterData: true, subtree: true });
-    }
-  </script>
   <script src="../assets/js/animations.js"></script>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
 </body>
 </html>

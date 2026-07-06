@@ -41,9 +41,10 @@ class SaleLot extends Model
         );
 
         foreach ($items as &$row) {
+            $row['transport_cost'] = (float)($row['transport_cost'] ?? 0);
             $expenses = json_decode($row['expenses'] ?? '[]', true) ?: [];
             $row['expenses'] = $expenses;
-            $totalExpenses = array_sum(array_column($expenses, 'amount'));
+            $totalExpenses = array_sum(array_column($expenses, 'amount')) + $row['transport_cost'];
             $row['total_expenses'] = $totalExpenses;
             $row['net_profit'] = (float)$row['total_amount'] - (float)$row['total_cost'] - $totalExpenses;
         }
@@ -69,9 +70,10 @@ class SaleLot extends Model
         );
         if (!$lot) return null;
 
+        $lot['transport_cost'] = (float)($lot['transport_cost'] ?? 0);
         $expenses = json_decode($lot['expenses'] ?? '[]', true) ?: [];
         $lot['expenses'] = $expenses;
-        $totalExpenses = array_sum(array_column($expenses, 'amount'));
+        $totalExpenses = array_sum(array_column($expenses, 'amount')) + $lot['transport_cost'];
 
         $lot['items'] = $this->db->fetchAll(
             "SELECT sli.*, c.name AS category_name
@@ -153,16 +155,17 @@ class SaleLot extends Model
             $referenceNo = $this->generateReferenceNo($branchId);
 
             $lotId = $this->insert([
-                'reference_no' => $referenceNo,
-                'branch_id'    => $branchId,
-                'buyer_name'   => trim((string)$data['buyer_name']),
-                'sale_date'    => $data['sale_date'],
-                'total_amount' => $totalAmount,
-                'total_cost'   => $totalCost,
-                'status'       => $data['status'] ?? 'draft',
-                'notes'        => isset($data['notes']) ? trim((string)$data['notes']) : null,
-                'expenses'     => isset($data['expenses']) ? json_encode($data['expenses']) : null,
-                'created_by'   => $data['created_by'] ?? null,
+                'reference_no'  => $referenceNo,
+                'branch_id'     => $branchId,
+                'buyer_name'    => trim((string)$data['buyer_name']),
+                'sale_date'     => $data['sale_date'],
+                'total_amount'  => $totalAmount,
+                'total_cost'    => $totalCost,
+                'transport_cost' => (float)($data['transport_cost'] ?? 0),
+                'status'        => $data['status'] ?? 'draft',
+                'notes'         => isset($data['notes']) ? trim((string)$data['notes']) : null,
+                'expenses'      => isset($data['expenses']) ? json_encode($data['expenses']) : null,
+                'created_by'    => $data['created_by'] ?? null,
             ]);
 
             foreach ($preparedItems as $item) {
@@ -244,13 +247,14 @@ class SaleLot extends Model
             // การเปลี่ยนสถานะต้องผ่าน updateStatus() ที่ตัดสต็อกถูกต้อง
             $this->db->query(
                 "UPDATE {$this->table}
-                 SET buyer_name = ?, sale_date = ?, total_amount = ?, total_cost = ?, notes = ?, expenses = ?, status = 'draft', updated_at = NOW()
+                 SET buyer_name = ?, sale_date = ?, total_amount = ?, total_cost = ?, transport_cost = ?, notes = ?, expenses = ?, status = 'draft', updated_at = NOW()
                  WHERE id = ?",
                 [
                     trim((string)($data['buyer_name'] ?? $lot['buyer_name'] ?? '')),
                     $data['sale_date'],
                     $totalAmount,
                     $totalCost,
+                    (float)($data['transport_cost'] ?? 0),
                     isset($data['notes']) ? trim((string)$data['notes']) : null,
                     isset($data['expenses']) ? json_encode($data['expenses']) : null,
                     $id,
@@ -324,13 +328,14 @@ class SaleLot extends Model
 
             $this->db->query(
                 "UPDATE {$this->table}
-                 SET buyer_name=?, sale_date=?, total_amount=?, total_cost=?, notes=?, expenses=?, updated_by=?, updated_at=NOW()
+                 SET buyer_name=?, sale_date=?, total_amount=?, total_cost=?, transport_cost=?, notes=?, expenses=?, updated_by=?, updated_at=NOW()
                  WHERE id=?",
                 [
                     trim((string)$data['buyer_name']),
                     $data['sale_date'],
                     $totalAmount,
                     $totalCost,
+                    (float)($data['transport_cost'] ?? 0),
                     isset($data['notes']) ? trim((string)$data['notes']) : null,
                     isset($data['expenses']) ? json_encode($data['expenses']) : null,
                     $data['updated_by'] ?? null,

@@ -77,8 +77,14 @@ class SellersController extends Controller
             $data['id_card'] = $idCard;
         }
 
+        // Stamp PDPA consent timestamp on first consent
+        if (!empty($data['pdpa_consent'])) {
+            $data['pdpa_consented_at'] = date('Y-m-d H:i:s');
+        }
+        unset($data['pdpa_consent']);
+
         $sellerModel = new Seller();
-        
+
         try {
             $sellerId = $sellerModel->create($data);
             
@@ -124,6 +130,15 @@ class SellersController extends Controller
         }
 
         $sellerModel = new Seller();
+
+        // Only stamp pdpa_consented_at once — if consent given and not yet recorded
+        if (!empty($data['pdpa_consent'])) {
+            $current = $sellerModel->getById($id);
+            if ($current && $current['pdpa_consented_at'] === null) {
+                $data['pdpa_consented_at'] = date('Y-m-d H:i:s');
+            }
+        }
+        unset($data['pdpa_consent']);
 
         try {
             $sellerModel->update($id, $data);

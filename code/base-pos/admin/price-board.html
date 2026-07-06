@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>บอร์ดราคารับซื้อ</title>
+  <title>บอร์ดราคา - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css">
   <style>
     @media print {
@@ -20,7 +20,7 @@
     .category-section { margin-bottom: 20px; }
     .category-title {
       font-size: 13px; font-weight: 700; text-transform: uppercase;
-      color: #888; letter-spacing: 0.05em;
+      color: #888; letter-spacing: 0;
       border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-bottom: 8px;
     }
     .price-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -40,7 +40,8 @@
   <aside class="sidebar no-print">
     <div class="sidebar-header">
       <a href="index.html" class="sidebar-brand">
-        <i class="icon-cart"></i><span>รับซื้อของเก่า</span>
+        <img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon">
+        <span>รักษ์สะอาด</span>
       </a>
     </div>
     <ul class="sidebar-menu">
@@ -50,8 +51,11 @@
       <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
       <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
       <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
-      <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
-        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+       <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
+       <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+      <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+      <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+      <li class="admin-only"><a href="price-board.html" class="active"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
       <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
       <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
       <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
@@ -67,11 +71,11 @@
         <select id="branchSelect" class="no-print" style="padding:7px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-family:inherit;font-size:14px">
           <option value="">ทุกสาขา</option>
         </select>
-        <button class="btn btn-primary no-print" onclick="window.print()">🖨 พิมพ์บอร์ดราคา</button>
+        <button class="btn btn-primary no-print" onclick="window.print()">พิมพ์บอร์ดราคา</button>
         <div class="user-dropdown no-print">
           <button class="user-dropdown-toggle">
             <div class="user-avatar"><i class="icon-user"></i></div>
-            <span class="user-name" id="userName">-</span>
+            <span class="user-name" id="currentUser">-</span>
             <i class="icon-down"></i>
           </button>
           <div class="user-dropdown-menu">
@@ -175,5 +179,6 @@ function escapeHtml(s) {
 
 document.addEventListener('DOMContentLoaded', init);
 </script>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
 </body>
 </html>

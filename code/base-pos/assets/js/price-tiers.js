@@ -64,7 +64,7 @@ function renderPriceTiersTable(items) {
                     </button>
                 </td>
                 <td>
-                    <button class="btn-primary btn-sm" onclick="savePriceTier(${item.id})">💾 บันทึก</button>
+                    <button class="btn-primary btn-sm" onclick="savePriceTier(${item.id})">บันทึก</button>
                 </td>
             </tr>
         `;

@@ -9,7 +9,7 @@ class StockTransfersController extends Controller
         if ($user['role'] !== 'admin') {
             $filters['from_branch_id'] = $user['branch_id'];
         }
-        if (!empty($_GET['status'])) $filters['status'] = $_GET['status'];
+        if (!empty($_GET['status'])) $filters['status'] = $this->sanitizeInput($_GET['status']);
         Response::success('สำเร็จ', ['items' => (new StockTransfer())->getAll($filters)]);
     }
 

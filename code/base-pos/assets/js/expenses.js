@@ -39,8 +39,13 @@ async function loadExpenses() {
   let params = `period=month&year=${year}&month=${month}`;
   if (branchId) params += `&branch_id=${branchId}`;
 
+  showTableLoading('expenseBody', 6, 5);
   const res = await apiRequest(`financial/expenses?${params}`, 'GET');
-  if (res.status === 'success') renderTable(res.data?.items || []);
+  if (res.status === 'success') {
+    renderTable(res.data?.items || []);
+  } else {
+    showNotification(res.message || 'โหลดค่าใช้จ่ายไม่สำเร็จ', 'error');
+  }
 }
 
 function renderTable(items) {
@@ -77,14 +82,20 @@ async function saveExpense() {
     return;
   }
 
-  const res = await apiRequest('financial/expenses', 'POST', { branch_id: parseInt(branchId), expense_date: date, category, amount, note });
-  if (res.status === 'success') {
-    showNotification('บันทึกแล้ว', 'success');
-    document.getElementById('expAmount').value = '';
-    document.getElementById('expNote').value = '';
-    loadExpenses();
-  } else {
-    showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+  const saveBtn = document.querySelector('button[onclick="saveExpense()"]');
+  setButtonLoading(saveBtn, true);
+  try {
+    const res = await apiRequest('financial/expenses', 'POST', { branch_id: parseInt(branchId), expense_date: date, category, amount, note });
+    if (res.status === 'success') {
+      showNotification('บันทึกแล้ว', 'success');
+      document.getElementById('expAmount').value = '';
+      document.getElementById('expNote').value = '';
+      loadExpenses();
+    } else {
+      showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
+    }
+  } finally {
+    setButtonLoading(saveBtn, false);
   }
 }
 
@@ -94,6 +105,8 @@ async function deleteExpense(id) {
   if (res.status === 'success') {
     showNotification('ลบแล้ว', 'success');
     loadExpenses();
+  } else {
+    showNotification(res.message || 'ลบไม่สำเร็จ', 'error');
   }
 }
 

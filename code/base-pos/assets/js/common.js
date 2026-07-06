@@ -1,4 +1,37 @@
+const API_REQUEST_TIMEOUT_MS = 15000;
+let pendingApiRequests = 0;
+let slowApiRequestTimer = null;
+
+// === Cart State Protection ===
+// ป้องกันข้อมูลหายเมื่อ token expire
+
+function saveCartState(cartState) {
+  sessionStorage.setItem('cart_backup', JSON.stringify(cartState));
+  sessionStorage.setItem('cart_backup_time', Date.now());
+}
+
+function restoreCartState() {
+  const saved = sessionStorage.getItem('cart_backup');
+  const savedTime = sessionStorage.getItem('cart_backup_time');
+  if (saved && savedTime && (Date.now() - parseInt(savedTime) < 30 * 60 * 1000)) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      clearCartState();
+      return null;
+    }
+  }
+  return null;
+}
+
+function clearCartState() {
+  sessionStorage.removeItem('cart_backup');
+  sessionStorage.removeItem('cart_backup_time');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+  initOfflineBanner();
+
   // Check authentication — use posUser (still in localStorage); token is in httpOnly cookie
   const authUserJson = localStorage.getItem('posUser');
   if (!authUserJson) {
@@ -47,7 +80,6 @@ document.addEventListener('DOMContentLoaded', function() {
       } catch (err) {
         console.error('Logout API error:', err);
       }
-      localStorage.removeItem('posToken');
       localStorage.removeItem('posUser');
       window.location.href = `${basePath}/index.html`;
     });
@@ -73,7 +105,6 @@ document.addEventListener('DOMContentLoaded', function() {
       } catch (err) {
         console.error('Logout API error:', err);
       }
-      localStorage.removeItem('posToken');
       localStorage.removeItem('posUser');
       window.location.href = `${basePath}/index.html`;
     });
@@ -101,6 +132,8 @@ async function requireAuth() {
 
 // API Request helper
 async function apiRequest(endpoint, method = 'GET', data = null) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
   const headers = {
     'Content-Type': 'application/json',
     // F2: JWT is in httpOnly cookie — browser sends automatically
@@ -109,23 +142,42 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 
   const options = {
     method,
-    headers
+    headers,
+    signal: controller.signal
   };
 
-  if (data && (method === 'POST' || method === 'PUT')) {
+  if (data && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     options.body = JSON.stringify(data);
   }
 
+  beginApiLoading();
+
   try {
     const response = await fetch(`${apiPath}/${endpoint}`, options);
-    const result = await response.json();
+    const responseText = await response.text();
+    let result = {};
+
+    if (responseText) {
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error('รูปแบบข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง');
+      }
+    }
 
     if (!response.ok) {
       // Handle unauthorized (token expired)
       if (response.status === 401) {
-        localStorage.removeItem('posToken');
+        // Save cart state before redirect
+        const cartData = window.getCurrentCartState?.();
+        if (cartData) saveCartState(cartData);
+
+        // Clear auth
         localStorage.removeItem('posUser');
-        window.location.href = `${basePath}/index.html`;
+        document.cookie = 'posToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = 'posUser=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+
+        window.location.href = `${basePath}/index.html?expired=1`;
         return {status: 'error', message: 'Session expired. Please login again.'};
       }
 
@@ -134,8 +186,21 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 
     return result;
   } catch (error) {
-    console.error('API Request Error:', error);
+    if (error.name === 'AbortError') {
+      showNotification('การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่', 'error');
+      return {status: 'error', message: 'Request timeout'};
+    }
+
+    if (!navigator.onLine) {
+      showNotification('ไม่มีการเชื่อมต่ออินเทอร์เน็ต กรุณาตรวจสอบสัญญาณ', 'error');
+      return {status: 'error', message: 'Offline'};
+    }
+
+    showNotification(error.message || 'ไม่สามารถเชื่อมต่อระบบได้', 'error');
     return {status: 'error', message: error.message};
+  } finally {
+    clearTimeout(timeoutId);
+    endApiLoading();
   }
 }
 
@@ -154,16 +219,20 @@ function formatCurrency(amount) {
 }
 
 function showNotification(message, type = 'info') {
-  const container = document.getElementById('notification-container');
-
-  if (!container) return;
+  const container = getNotificationContainer();
 
   const notification = document.createElement('div');
   notification.className = `notification notification-${type}`;
-  notification.innerHTML = `
-      <div class="notification-message">${message}</div>
-      <button class="notification-close">&times;</button>
-  `;
+  const messageEl = document.createElement('div');
+  messageEl.className = 'notification-message';
+  messageEl.textContent = message;
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'notification-close';
+  closeBtn.type = 'button';
+  closeBtn.setAttribute('aria-label', 'ปิดการแจ้งเตือน');
+  closeBtn.innerHTML = '&times;';
+  notification.appendChild(messageEl);
+  notification.appendChild(closeBtn);
 
   container.appendChild(notification);
 
@@ -175,15 +244,124 @@ function showNotification(message, type = 'info') {
   }, 5000);
 
   // Close button
-  const closeBtn = notification.querySelector('.notification-close');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      if (notification.parentNode) {
-        notification.parentNode.removeChild(notification);
-      }
-    });
+  closeBtn.addEventListener('click', () => {
+    if (notification.parentNode) {
+      notification.parentNode.removeChild(notification);
+    }
+  });
+}
+
+function getNotificationContainer() {
+  let container = document.getElementById('notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+function beginApiLoading() {
+  pendingApiRequests += 1;
+  if (!slowApiRequestTimer) {
+    slowApiRequestTimer = setTimeout(() => {
+      if (pendingApiRequests > 0) showGlobalLoading();
+    }, 2000);
   }
 }
+
+function endApiLoading() {
+  pendingApiRequests = Math.max(0, pendingApiRequests - 1);
+  if (pendingApiRequests === 0) {
+    clearTimeout(slowApiRequestTimer);
+    slowApiRequestTimer = null;
+    hideGlobalLoading();
+  }
+}
+
+function showGlobalLoading(message = 'กำลังโหลด...') {
+  let overlay = document.getElementById('globalLoadingOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'globalLoadingOverlay';
+    overlay.innerHTML = `
+      <div class="global-loading-box">
+        <div class="spinner" aria-hidden="true"></div>
+        <div class="global-loading-message"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  overlay.querySelector('.global-loading-message').textContent = message;
+  overlay.classList.add('show');
+}
+
+function hideGlobalLoading() {
+  const overlay = document.getElementById('globalLoadingOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function showTableLoading(target, columns = 4, rows = 5) {
+  const tbody = typeof target === 'string' ? document.getElementById(target) : target;
+  if (!tbody) return;
+  const safeColumns = Math.max(1, Number(columns) || 1);
+  const safeRows = Math.max(1, Number(rows) || 1);
+  tbody.innerHTML = Array.from({ length: safeRows }, (_, index) => `
+    <tr class="skeleton-table-row">
+      <td colspan="${safeColumns}">
+        <div class="skeleton-row" style="width:${index === safeRows - 1 ? 60 : 100}%"></div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function setButtonLoading(button, isLoading, loadingText = 'กำลังบันทึก...') {
+  const btn = typeof button === 'string' ? document.getElementById(button) : button;
+  if (!btn) return;
+
+  if (isLoading) {
+    btn.dataset.originalHtml = btn.dataset.originalHtml || btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = loadingText;
+    btn.classList.add('is-loading-text');
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.originalHtml || btn.innerHTML;
+    delete btn.dataset.originalHtml;
+    btn.classList.remove('is-loading-text');
+  }
+}
+
+function initOfflineBanner() {
+  if (document.getElementById('offlineBanner')) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'offlineBanner';
+  banner.textContent = 'ไม่มีการเชื่อมต่ออินเทอร์เน็ต - ข้อมูลอาจไม่ถูกบันทึก';
+  document.body.prepend(banner);
+
+  const updateStatus = () => {
+    banner.classList.toggle('show', !navigator.onLine);
+  };
+
+  window.addEventListener('online', () => {
+    updateStatus();
+    showNotification('กลับมาออนไลน์แล้ว', 'success');
+  });
+  window.addEventListener('offline', () => {
+    updateStatus();
+    showNotification('ไม่มีการเชื่อมต่ออินเทอร์เน็ต', 'warning');
+  });
+
+  updateStatus();
+}
+
+window.appShowNotification = showNotification;
+window.showTableLoading = showTableLoading;
+window.setButtonLoading = setButtonLoading;
+// Loading overlay aliases — call these from page scripts
+window.showLoading = showGlobalLoading;
+window.hideLoading = hideGlobalLoading;
 
 function openProfileModal() {
   // ตรวจสอบว่า modal มีอยู่แล้วหรือไม่

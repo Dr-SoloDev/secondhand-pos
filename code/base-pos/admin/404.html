@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 - ไม่พบหน้า | รักษ์สะอาดรีไซเคิล</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    body { margin: 0; background: #f8fafc; color: #1f2937; }
+    .error-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+    .error-box { width: min(100%, 420px); }
+    .error-code { font-size: 72px; line-height: 1; font-weight: 800; color: #cbd5e1; }
+    .error-title { margin: 16px 0 8px; font-size: 22px; font-weight: 700; }
+    .error-message { margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.7; }
+    .error-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main class="error-page">
+    <div class="error-box">
+      <div class="error-code">404</div>
+      <h1 class="error-title">ไม่พบหน้าที่คุณต้องการ</h1>
+      <p class="error-message">หน้าที่คุณกำลังมองหาอาจถูกลบ เปลี่ยนชื่อ หรือไม่มีอยู่ในระบบ กรุณาตรวจสอบลิงก์อีกครั้ง</p>
+      <div class="error-actions">
+        <a href="index.html" class="btn btn-primary">กลับหน้าหลัก</a>
+        <button type="button" class="btn btn-secondary" onclick="history.back()">ย้อนกลับ</button>
+      </div>
+    </div>
+  </main>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
+</body>
+</html>

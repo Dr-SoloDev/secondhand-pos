@@ -156,7 +156,7 @@
   background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
   position: absolute; top: 0; left: 0; right: 0; z-index: 2;
 }
-.camera-header-title { font-size: 16px; font-weight: 600; color: #fff; letter-spacing: 0.3px; }
+.camera-header-title { font-size: 16px; font-weight: 600; color: #fff; letter-spacing: 0; }
 .camera-close-btn {
   width: 36px; height: 36px; border-radius: 50%;
   background: rgba(255,255,255,0.15); border: none; color: #fff;

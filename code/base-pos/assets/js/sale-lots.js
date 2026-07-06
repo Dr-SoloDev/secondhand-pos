@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('searchInput').addEventListener('input', debounce(() => renderLots(), 250));
 
+  calcTransportNet();
+
   document.querySelectorAll('.close-modal').forEach(b => {
     b.addEventListener('click', e => {
       e.target.closest('.modal').classList.remove('show');
@@ -77,8 +79,13 @@ async function loadCategories() {
 }
 
 async function loadLots() {
+  showTableLoading('lotTableBody', 9, 5);
   const res = await apiRequest('sale-lots');
-  if (res.status !== 'success') { showNotification('โหลดข้อมูลไม่สำเร็จ', 'error'); return; }
+  if (res.status !== 'success') {
+    document.getElementById('lotTableBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:24px">โหลดข้อมูลไม่สำเร็จ</td></tr>';
+    showNotification('โหลดข้อมูลไม่สำเร็จ', 'error');
+    return;
+  }
   lots = res.data?.items || [];
   renderLots();
 }
@@ -99,7 +106,9 @@ function renderLots() {
   }
 
   tbody.innerHTML = filtered.map(lot => {
+    const transport = parseFloat(lot.transport_cost || 0);
     const profit = parseFloat(lot.total_amount || 0) - parseFloat(lot.total_cost || 0);
+    const netProfit = profit - transport;
     const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
     const profitSign = profit >= 0 ? '+' : '';
     return `<tr>
@@ -114,7 +123,10 @@ function renderLots() {
           : `<span style="color:var(--color-text-lighter);font-size:12px">ยังไม่บันทึก</span>`
         }
       </td>
-      <td class="text-right"><span class="${profitClass}">${profitSign}${formatCurrency(profit)}</span></td>
+      <td class="text-right">
+        <span class="${profitClass}">${profitSign}${formatCurrency(profit)}</span>
+        ${transport > 0 ? `<br><span style="font-size:10px;color:#888">สุทธิ ${profitSign}${formatCurrency(netProfit)}</span>` : ''}
+      </td>
       <td>${statusBadgeHtml(lot.status)}</td>
       <td>
         <div class="action-cell">
@@ -291,6 +303,11 @@ function renderExpenses() {
   calcExpensesTotal();
 }
 
+function calcTransportNet() {
+  const transport = parseFloat(document.getElementById('transportCost').value) || 0;
+  document.getElementById('transportCostDisplay').textContent = formatCurrency(transport);
+}
+
 function calcExpensesTotal() {
   const el = document.getElementById('totalExpensesDisplay');
   if (!el) return;
@@ -303,6 +320,7 @@ function resetForm() {
   document.getElementById('buyerName').value = '';
   document.getElementById('saleDate').value = new Date().toISOString().slice(0, 10);
   document.getElementById('branchSelect').value = '';
+  document.getElementById('transportCost').value = '0';
   document.getElementById('lotNotes').value = '';
   document.getElementById('saveError').style.display = 'none';
   document.getElementById('saveError').textContent = '';
@@ -311,6 +329,7 @@ function resetForm() {
   editId = null;
   renderLineItems();
   renderExpenses();
+  calcTransportNet();
 }
 
 async function openModal(id) {
@@ -334,7 +353,9 @@ async function openModal(id) {
     document.getElementById('buyerName').value = d.buyer_name || '';
     document.getElementById('saleDate').value = d.sale_date ? d.sale_date.slice(0, 10) : new Date().toISOString().slice(0, 10);
     document.getElementById('branchSelect').value = d.branch_id || '';
+    document.getElementById('transportCost').value = d.transport_cost || '0';
     document.getElementById('lotNotes').value = d.notes || '';
+    calcTransportNet();
 
     lineItems = (d.items || []).map(it => ({
       key: Date.now() + Math.random(),
@@ -379,10 +400,15 @@ async function saveLot() {
 
   const validExpenses = expenses.filter(it => it.description && parseFloat(it.amount) > 0);
 
+  const transportCost = parseFloat(document.getElementById('transportCost').value) || 0;
+
+  const idempotencyKey = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+
   const payload = {
     buyer_name: buyerName,
     sale_date: saleDate,
     branch_id: parseInt(branchId),
+    transport_cost: transportCost,
     notes: notes || null,
     expenses: validExpenses.length > 0 ? validExpenses.map(it => ({
       description: it.description.trim(),
@@ -396,6 +422,7 @@ async function saveLot() {
       quantity_kg: parseFloat(it.quantity_kg),
       unit_price: parseFloat(it.unit_price) || 0,
     })),
+    idempotency_key: idempotencyKey,
   };
 
   const btn = document.getElementById('saveLotBtn');
@@ -480,8 +507,10 @@ async function viewLot(id) {
   const profit = parseFloat(lot.total_amount || 0) - parseFloat(lot.total_cost || 0);
   const marginPct = lot.total_amount > 0 ? ((profit / lot.total_amount) * 100).toFixed(1) : '0.0';
 
+  const lotTransport = parseFloat(lot.transport_cost || 0);
   const lotExpenses = lot.expenses || [];
-  const totalExpenses = lot.profit_breakdown?.total_expenses || lotExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const otherExpenses = lotExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  const totalExpenses = lot.profit_breakdown?.total_expenses || otherExpenses + lotTransport;
   const netProfit = lot.profit_breakdown?.net_profit || profit - totalExpenses;
 
   const html = `
@@ -527,9 +556,14 @@ async function viewLot(id) {
           </div>
         </div>
       </div>
-      ${lotExpenses.length > 0 ? `
       <hr>
       <div style="font-size:14px;font-weight:500;margin-bottom:6px">ค่าใช้จ่าย</div>
+      ${lotTransport > 0 ? `
+      <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">
+        <span style="color:var(--color-text-light)">🚛 ค่าขนส่ง</span>
+        <span>${formatCurrency(lotTransport)}</span>
+      </div>
+      ` : ''}
       ${lotExpenses.map(e => `
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">
           <span style="color:var(--color-text-light)">${escapeHtml(e.description)}</span>
@@ -549,7 +583,6 @@ async function viewLot(id) {
           </div>
         </div>
       </div>
-      ` : ''}
       ${lot.notes ? `<div style="margin-top:8px"><strong>หมายเหตุ:</strong> ${escapeHtml(lot.notes)}</div>` : ''}
     </div>
   `;

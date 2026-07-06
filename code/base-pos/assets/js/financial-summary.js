@@ -42,7 +42,10 @@ async function loadSummary() {
   if (periodType === 'month') params += `&month=${month}`;
   if (branchId) params += `&branch_id=${branchId}`;
 
-  const [summaryRes, lotsRes, categoryRes, expRes] = await Promise.all([
+  showTableLoading('lotRevenueBody', 7, 5);
+  showTableLoading('categoryBody', 4, 5);
+
+  const [summaryRes, lotsRes, categoryRes] = await Promise.all([
     apiRequest(`financial/summary?${params}`, 'GET'),
     apiRequest(`financial/lot-revenues?${params}`, 'GET'),
     apiRequest(`financial/purchase-by-category?${params}`, 'GET'),
@@ -76,6 +79,11 @@ function renderCards(data) {
 
 function renderLotTable(items) {
   const tbody = document.getElementById('lotRevenueBody');
+  items = [...items].sort((a, b) => {
+    const aDate = a.actual_revenue_date || a.sale_date || '';
+    const bDate = b.actual_revenue_date || b.sale_date || '';
+    return bDate.localeCompare(aDate);
+  });
   if (!items.length) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:24px">ไม่มีข้อมูล</td></tr>';
     return;
@@ -144,7 +152,6 @@ async function exportCsv(type) {
 document.addEventListener('DOMContentLoaded', init);
 document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
   e.preventDefault();
-  localStorage.removeItem('posToken');
   localStorage.removeItem('posUser');
   window.location.href = '../index.html';
 });

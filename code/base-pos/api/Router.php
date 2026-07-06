@@ -211,6 +211,15 @@ class Router
         $this->routes[] = ['route' => 'stock-transfers',         'controller' => 'StockTransfersController', 'method' => 'store',   'verb' => 'POST'];
         $this->routes[] = ['route' => 'stock-transfers/confirm', 'controller' => 'StockTransfersController', 'method' => 'confirm', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'stock-transfers/cancel',  'controller' => 'StockTransfersController', 'method' => 'cancel',  'verb' => 'POST'];
+
+        // Employee routes
+        $this->routes[] = ['route' => 'employees',                   'controller' => 'EmployeesController', 'method' => 'index',               'verb' => 'GET'];
+        $this->routes[] = ['route' => 'employees',                   'controller' => 'EmployeesController', 'method' => 'store',               'verb' => 'POST'];
+        $this->routes[] = ['route' => 'employees/employee',          'controller' => 'EmployeesController', 'method' => 'show',                'verb' => 'GET'];
+        $this->routes[] = ['route' => 'employees/employee',          'controller' => 'EmployeesController', 'method' => 'update',              'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'employees/employee',          'controller' => 'EmployeesController', 'method' => 'destroy',             'verb' => 'DELETE'];
+        $this->routes[] = ['route' => 'employees/salary-expense',     'controller' => 'EmployeesController', 'method' => 'createSalaryExpense', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'employees/sso-expense',       'controller' => 'EmployeesController', 'method' => 'createSSOExpense',    'verb' => 'POST'];
     }
 
     public function dispatch()

@@ -15,6 +15,7 @@ spl_autoload_register(function ($className) {
         $customizations.'/Controllers/',
         $customizations.'/Models/',
         $customizations.'/Services/',
+        $customizations.'/Helpers/',
     ];
 
     // Check each directory

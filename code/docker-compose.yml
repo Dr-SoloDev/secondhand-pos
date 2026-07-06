@@ -16,9 +16,7 @@ services:
       - "3307:3306"
     volumes:
       - db_data:/var/lib/mysql
-      - ./base-pos/database/pos_system.sql:/docker-entrypoint-initdb.d/01-base-schema.sql:ro
-      - ./customizations/database/migrations:/docker-entrypoint-initdb.d/migrations:ro
-      - ./docker/mysql-init.sh:/docker-entrypoint-initdb.d/99-run-migrations.sh:ro
+      - ./docker/entrypoint:/docker-entrypoint-initdb.d:ro
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
@@ -53,22 +51,43 @@ services:
       db:
         condition: service_healthy
 
+  # phpMyAdmin disabled in production — security risk
+  # # ============================================================
+  # # phpMyAdmin (Database Management UI)
+  # # ============================================================
+  # phpmyadmin:
+  #   image: phpmyadmin:latest
+  #   container_name: scrap-pos-pma
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8081:80"
+  #   environment:
+  #     PMA_HOST: db
+  #     PMA_USER: ${PMA_USER}
+  #     PMA_PASSWORD: ${PMA_PASSWORD}
+  #     UPLOAD_LIMIT: 64M
+  #   depends_on:
+  #     - db
+
   # ============================================================
-  # phpMyAdmin (Database Management UI)
+  # Caddy (Reverse Proxy + Automatic SSL/TLS)
+  # HTTPS: set DOMAIN and ACME_EMAIL in .env
   # ============================================================
-  phpmyadmin:
-    image: phpmyadmin:latest
-    container_name: scrap-pos-pma
+  caddy:
+    image: caddy:2
+    container_name: scrap-pos-caddy
     restart: unless-stopped
     ports:
-      - "8081:80"
-    environment:
-      PMA_HOST: db
-      PMA_USER: ${PMA_USER}
-      PMA_PASSWORD: ${PMA_PASSWORD}
-      UPLOAD_LIMIT: 64M
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
-      - db
+      - web
 
 volumes:
   db_data:
+  caddy_data:
+  caddy_config:

@@ -22,10 +22,11 @@ class PurchaseItemCatalog extends Model
     public function getAll($includeInactive = false)
     {
         $query = "SELECT c.id, c.code, c.name, c.category_id, c.default_unit,
-                         c.default_price, c.tier_prices, c.is_active, c.notes,
-                         cat.name AS category_name
-                  FROM {$this->table} c
-                  LEFT JOIN categories cat ON cat.id = c.category_id";
+	                         c.default_price, c.tier_prices, c.is_active, c.notes,
+	                         c.requires_id_card,
+	                         cat.name AS category_name, cat.requires_precious_receipt
+	                  FROM {$this->table} c
+	                  LEFT JOIN categories cat ON cat.id = c.category_id";
         if (!$includeInactive) {
             $query .= " WHERE c.is_active = 1";
         }
@@ -38,9 +39,10 @@ class PurchaseItemCatalog extends Model
     {
         $limit = max(1, min(50, (int)$limit));
         $query = "SELECT c.id, c.code, c.name, c.category_id, c.default_unit,
-                         c.default_price, c.tier_prices,
-                         cat.name AS category_name
-                  FROM {$this->table} c
+	                         c.default_price, c.tier_prices,
+	                         c.requires_id_card,
+	                         cat.name AS category_name, cat.requires_precious_receipt
+	                  FROM {$this->table} c
                   LEFT JOIN categories cat ON cat.id = c.category_id
                   WHERE c.is_active = 1
                     AND (c.code LIKE ? OR c.name LIKE ?)
@@ -86,6 +88,7 @@ class PurchaseItemCatalog extends Model
             'tier_prices' => $tiers ? json_encode(self::sanitizeTiers($tiers), JSON_UNESCAPED_UNICODE) : '[]',
             'is_active' => $data['is_active'] ?? 1,
             'notes' => $data['notes'] ?? null,
+            'requires_id_card' => isset($data['requires_id_card']) ? (int)(bool)$data['requires_id_card'] : 0,
         ]);
     }
 
@@ -101,9 +104,9 @@ class PurchaseItemCatalog extends Model
             }
         }
         $updateData = [];
-        foreach (['code','name','category_id','default_unit','default_price','is_active','notes'] as $f) {
+        foreach (['code','name','category_id','default_unit','default_price','is_active','notes','requires_id_card'] as $f) {
             if (array_key_exists($f, $data)) {
-                $updateData[$f] = $data[$f];
+                $updateData[$f] = ($f === 'requires_id_card') ? (int)(bool)$data[$f] : $data[$f];
             }
         }
         if (isset($data['tiers']) || isset($data['tier_prices'])) {

@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadBranches() {
   try {
+    showTableLoading('branchesTableBody', 7, 5);
     const res = await apiRequest('branches');
     if (res.status === 'success') {
       branches = res.data || [];
@@ -19,7 +20,6 @@ async function loadBranches() {
       showNotification('ไม่สามารถโหลดข้อมูลสาขาได้', 'error');
     }
   } catch (err) {
-    console.error('Load branches error:', err);
     showNotification('เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
   }
 }
@@ -107,6 +107,8 @@ async function saveBranch() {
     manager_name: document.getElementById('branchManager').value.trim() || null,
   };
 
+  const saveBtn = document.querySelector('#branchModal .btn-primary');
+  setButtonLoading(saveBtn, true);
   try {
     const res = branchId
       ? await apiRequest(`branches/branch?id=${branchId}`, 'PUT', data)
@@ -122,8 +124,9 @@ async function saveBranch() {
       showNotification(res.message || 'ไม่สามารถบันทึกข้อมูลได้', 'error');
     }
   } catch (err) {
-    console.error('Save branch error:', err);
     showNotification('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+  } finally {
+    setButtonLoading(saveBtn, false);
   }
 }
 
@@ -135,22 +138,14 @@ function escapeHtml(text) {
 }
 
 function showNotification(message, type = 'info') {
-  const container = document.getElementById('notification-container');
-  const notif = document.createElement('div');
-  notif.className = `notification notification-${type}`;
-  notif.textContent = message;
-  container.appendChild(notif);
-  setTimeout(() => notif.classList.add('show'), 10);
-  setTimeout(() => {
-    notif.classList.remove('show');
-    setTimeout(() => notif.remove(), 300);
-  }, 3000);
+  if (typeof window.appShowNotification === 'function') {
+    window.appShowNotification(message, type);
+  }
 }
 
 // Logout
 document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
   e.preventDefault();
-  localStorage.removeItem('posToken');
   localStorage.removeItem('posUser');
   window.location.href = '../index.html';
 });

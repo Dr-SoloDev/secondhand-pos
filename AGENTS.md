@@ -1,7 +1,7 @@
 # Secondhand POS — AI Agent Context
 
 > ระบบจัดการร้านรับซื้อของเก่า (Junk Shop POS)
-> Owner: Dr.solodev | Last Updated: 2026-06-01 (UI: tier buttons + stock card)
+> Owner: Dr.solodev | Last Updated: 2026-07-03
 
 ---
 
@@ -26,24 +26,28 @@
 
 ```
 code/
-├── base-pos/              # Core POS (goragodwiriya/pos-system) — patched
-│   ├── api/               # PHP Backend — ทั้ง core (built-in controllers) + custom controllers registered
+├── base-pos/              # Core POS (goragodwiriya/pos-system) — patched in-place
+│   ├── api/               # PHP Backend — core + custom controllers registered
 │   │   ├── Router.php     # **All routes registered here** (core + custom)
 │   │   ├── Controller.php # Base controller class (custom controllers extend this)
 │   │   ├── config.php     # DB config, JWT secret
 │   │   ├── autoload.php   # PSR-4 autoloader (loads core + custom controllers/models)
 │   │   ├── Core/          # Database, Auth, Response, Model, Logger
+│   │   ├── Services/      # ReportService, TokenService, BackupService, ValidationService
 │   │   ├── Models/        # Built-in: Inventory, Product, Sale, SaleItem, Category, User, Customer, ActivityLog, Setting
 │   │   └── Controllers/   # Built-in: Auth, Inventory, Sales, Users, Settings, Customers, Reports
-│   ├── admin/             # **Admin pages** — updated in-place
+│   ├── admin/             # Admin HTML pages
 │   ├── pos/               # POS terminal
-│   └── assets/            # CSS, JS (common.js, config.js)
+│   └── assets/            # CSS, JS (all admin JS in assets/js/)
 │
-└── customizations/        # Custom code (mounted INTO base-pos via autoloader)
-    ├── api/Models/        # Custom: Branch, Seller, ItemCondition, PurchaseOrder, PurchaseItemCatalog, SaleLot
-    ├── api/Controllers/   # Custom: Branches, Sellers, PurchaseOrders, ItemConditions, PriceTiers, PurchaseItemCatalog, SaleLots
-    ├── database/migrations/  # 021 migrations (numbered sequentially)
-    └── frontend-react/    # DEPRECATED — React v2 app, no longer active delivery target
+├── customizations/        # Custom code (mounted INTO base-pos via autoloader)
+│   ├── api/Models/        # 8 Models: Branch, Seller, ItemCondition, PurchaseOrder, PurchaseItemCatalog, SaleLot, StockTransfer, BusinessExpense
+│   ├── api/Controllers/   # 10 Controllers: Branches, Sellers, PurchaseOrders, ItemConditions, PriceTiers, PurchaseItemCatalog, SaleLots, StockTransfers, PhotoUpload, Financial
+│   ├── database/          # 38 migrations + run-migrations.sh
+│
+├── tests/api/             # 9 test functions (54 assertions) — bash/curl
+├── uploads/purchase-orders/  # Photo uploads (WF-01)
+└── database/              # security-migrations.sql
 ```
 
 ### Key Design Decisions
@@ -53,9 +57,10 @@ code/
    - `base-pos/api/Controllers/` and `base-pos/api/Models/`
    - `customizations/api/Controllers/` and `customizations/api/Models/`
 3. **Router** (`base-pos/api/Router.php`) — ALL routes registered here (both core + custom)
-4. **Config** (`base-pos/assets/js/config.js`) — `window.apiPath = '/api/index.php'`
-5. **API Helper** (`base-pos/assets/js/common.js`) — `apiRequest(endpoint, method, data)` calls `${apiPath}/${endpoint}`
-6. **No framework** — Vanilla PHP + Vanilla JS (no jQuery, no React for base-pos)
+4. **JS Admin files** stored in `base-pos/assets/js/` (not `admin/`)
+5. **Config** (`base-pos/assets/js/config.js`) — `window.apiPath = '/api/index.php'`
+6. **API Helper** (`base-pos/assets/js/common.js`) — `apiRequest(endpoint, method, data)` calls `${apiPath}/${endpoint}`
+7. **No framework** — Vanilla PHP + Vanilla JS (no jQuery, no React for base-pos)
 
 ---
 
@@ -77,11 +82,9 @@ code/
 | 013 | — | REPLACE condition_id with weight_deduction in purchase_order_items |
 | 015 | `purchase_item_catalog` | ADD price_tier1/2/3 columns (fixed 3 tiers) |
 | 016 | `purchase_item_catalog` | ADD tier_prices JSON column (dynamic tiers, replaces price_tier1/2/3) |
-| 017 | — | ADD expenses JSON to sale_lots |
-| 018 | — | Rename tier labels to "บิล1/2/3" (was duplicate 017) |
-| 019 | — | (No-op / placeholder) |
 | 020 | — | FIFO indexes + atomic conditional UPDATE for consumed_qty |
 | 021 | `branches` | ADD cost_method ENUM('fifo','weighted') default 'fifo' |
+| 036 | `purchase_order_photos` | ADD purchase_order_id FK + make item_id nullable |
 
 ### Sale Lot Tables
 
@@ -89,22 +92,61 @@ code/
 |-----------|-------|---------|
 | 009 | `sale_lots` | ขาย Lot — reference_no (SO-YYYYMMDD-NNN), buyer, branch, total_amount, total_cost, profit (GENERATED), status (draft/confirmed/cancelled) |
 | 009 | `sale_lot_items` | รายการใน Lot — category_id, qty_kg, unit_price, subtotal (GENERATED), fifo_cost |
-| 010 | — | consumed_qty tracking for FIFO costing |
+| 029 | `sale_lots` | ADD actual_revenue, actual_revenue_note, actual_revenue_date |
+| 034 | `sale_lot_items` | ADD catalog_id + item_name, category_id nullable |
+| 035 | `sale_lots` | ADD updated_by FK |
+
+### Stock Transfer Tables
+
+| Migration | Table | Purpose |
+|-----------|-------|---------|
+| 024 | `stock_transfers` | โอนสต็อกระหว่างสาขา — from/to branch, category, weight_kg, status (pending/confirmed/cancelled) |
+| 025 | `stock_transfers` | ADD logistics fields: transporter_name, vehicle_plate, received_weight_kg, receive_note |
+
+### Business Expenses
+
+| Migration | Table | Purpose |
+|-----------|-------|---------|
+| 030 | `business_expenses` | ค่าใช้จ่ายธุรกิจ — branch, date, category, amount, note |
+
+### Categories & Catalog
+
+| Migration | Table | Purpose |
+|-----------|-------|---------|
+| 022 | `categories` | ADD branch_id (later reverted by 027) |
+| 026 | `purchase_item_catalog` | Populate category_id from purchase history |
+| 027 | `categories` | Merge duplicate per-branch categories → global unique names |
+| 028 | `categories` | ADD default_unit (e.g. 'กก.', 'ลัง') |
+| 032 | `categories` | ADD requires_precious_receipt flag |
+| 033 | `categories` | ADD alert_threshold for low-stock alerts |
+
+### Sellers
+
+| Migration | Table | Purpose |
+|-----------|-------|---------|
+| 031 | `sellers` | ADD blacklist_reason, blacklisted_at |
+
+### Security / Auth
+
+| Migration | Table | Purpose |
+|-----------|-------|---------|
+| 037 | `login_attempts` | IP-based rate limiting (persistent, replaces file-based) |
+| 038 | `token_blocklist` | JWT revocation (jti + expiry index) |
 
 ### Seed Data
 
 | Migration | Content |
 |-----------|---------|
-| 005 | Default categories (พลาสติก, กระดาษ, เหล็ก, อลูมิเนียม, ทองแดง, ทองเหลือง, สแตนเลส, แก้ว, ยาง, อิเล็กทรอนิกส์, แบตเตอรี่) |
-| 006 | Demo data |
+| 005 | Default categories (พลาสติก, กระดาษ, เหล็ก, etc.) |
+| 006 | Demo data (duplicate number — two files: `006_change_to_three_tier_pricing.sql` + `006_seed_demo_data.sql`) |
 
 ### Key Column Notes
 
-- `products.category_id` → FK to `categories(id)` with `ON DELETE SET NULL` (cannot convert to free-text)
 - `sale_lots.profit` = `GENERATED ALWAYS AS (total_amount - total_cost) STORED`
 - `sale_lot_items.subtotal` = `GENERATED ALWAYS AS (quantity_kg * unit_price) STORED`
-- `sale_lots.reference_no` format: `SO-{BRANCH_CODE}-YYYYMMDD-NNN` (per branch, per day sequential — branch_code added by BUG-07 fix)
-- `purchase_orders.reference_no` format: `PO-B{BRANCH_ID}-YYYYMMDD-NNN` (per branch, per day sequential)
+- `sale_lots.reference_no` format: `SO-{BRANCH_CODE}-YYYYMMDD-NNN`
+- `purchase_orders.reference_no` format: `PO-B{BRANCH_ID}-YYYYMMDD-NNN`
+- `stock_transfers.reference_no` auto-generated `TF-{BRANCH_CODE}-YYYYMMDD-NNN`
 
 ---
 
@@ -112,88 +154,143 @@ code/
 
 ### Core System (built-in)
 ```
-GET    /auth/login, /auth/verify           # Authentication
-GET    /inventory/categories, /products     # Inventory management
-POST   /inventory/categories, /products     # CRUD
-GET    /inventory/category, /product        # Single resource
-PUT    /inventory/category, /product        # Update
-DELETE /inventory/category, /product        # Delete
-GET    /inventory/low-stock, /transactions  # Stock monitoring
-POST   /sales/create                        # Retail sales
-GET    /sales/list, /details, /export       # Sales history
-POST   /sales/void                          # Void sale
-GET    /reports/dashboard-stats, /sales-chart, /recent-sales, ...
-GET    /reports/purchase-report             # Purchase report (with filters + CSV)
-GET    /reports/sale-lot-report             # Sale lot report (with filters + CSV)
-GET    /reports/sale-lot-chart              # Sale lot chart data
-GET    /reports/recent-sale-lots            # Recent sale lots for dashboard
-GET    /users/all, /users/user              # User management
-POST   /users, /users/change-password       # CRUD + profile
-GET    /customers, /customers/customer      # Customer management
-GET    /settings/store, /settings/system    # Settings
-GET    /settings/backup/*                   # Backup management
+GET    /auth/login, /auth/verify                  # Authentication
+POST   /auth/logout                               # Logout (revoke token)
+GET    /inventory/categories, /products           # Inventory management
+POST   /inventory/categories, /products           # CRUD
+POST   /inventory/set-threshold                   # Set stock alert threshold
+GET    /inventory/stock-alerts                    # Get stock alerts
+GET    /inventory/category, /product              # Single resource
+PUT    /inventory/category, /product              # Update
+DELETE /inventory/category, /product              # Delete
+GET    /inventory/low-stock, /transactions        # Stock monitoring
+POST   /sales/create                              # Retail sales
+GET    /sales/list, /details, /export             # Sales history
+POST   /sales/void                                # Void sale
+GET    /reports/dashboard-stats                   # Dashboard
+GET    /reports/sales-chart, /purchase-chart      # Charts
+GET    /reports/recent-sales, /recent-purchases, /recent-sale-lots
+GET    /reports/sales-report, /product-sales, /inventory-report
+GET    /reports/cashier-performance, /tax-report
+GET    /reports/purchase-report, /sale-lot-report, /sale-lot-chart
+GET    /users/all, /users/user                    # User management
+POST   /users, /users/change-password             # CRUD + profile
+GET    /users/profile, /users/activity-log        # Profile + audit
+PUT    /users/profile, /users/change-own-password # Self-service
+GET    /customers, /customers/customer            # Customer management
+POST   /customers                                 # Create customer
+GET    /settings/store, /settings/system          # Settings
+POST   /settings/store, /settings/system          # Update
+POST   /settings/backup/create, /restore          # Backup
+GET    /settings/backup/history, /download        # Backup management
+POST   /settings/backup/delete                    # Delete backup
 ```
 
 ### Custom — Purchase Orders
 ```
-GET    /purchase-orders                     # List with filters (?branch_id=&status=&limit=)
-POST   /purchase-orders                     # Create (branch_id, seller_id, items[], payment_method, notes)
-GET    /purchase-orders/order?id=           # Get single PO with items
-POST   /purchase-orders/cancel?id=          # Cancel PO (restore stock)
+GET    /purchase-orders                           # List with filters (?branch_id=&status=&limit=)
+POST   /purchase-orders                           # Create (branch_id, seller_id, items[], payment_method, notes)
+GET    /purchase-orders/order?id=                 # Get single PO with items
+POST   /purchase-orders/cancel?id=                # Cancel PO (restore stock)
+POST   /purchase-orders/photos                    # Upload photo (HMAC or JWT)
+GET    /purchase-orders/photos                    # List photos for PO
+GET    /purchase-orders/photo-token               # Generate HMAC token for QR handoff
 ```
 
 ### Custom — Purchase Catalog
 ```
-GET    /purchase-catalog                    # List all catalog items
-POST   /purchase-catalog                    # Create item
-GET    /purchase-catalog/search?q=          # Search by code or name (auto-fill on exact match)
-GET    /purchase-catalog/item?id=           # Get single item
-PUT    /purchase-catalog/item?id=           # Update item
+GET    /purchase-catalog                          # List all catalog items
+POST   /purchase-catalog                          # Create item
+GET    /purchase-catalog/search?q=                # Search by code or name
+GET    /purchase-catalog/item?id=                 # Get single item
+PUT    /purchase-catalog/item?id=                 # Update item
+DELETE /purchase-catalog/item?id=                 # Delete item
+POST   /purchase-catalog/update-category          # Bulk update category
+GET    /purchase-catalog/price-board              # Price board data (all branches)
 ```
 
 ### Custom — Sale Lots
 ```
-GET    /sale-lots                           # List with filters (?branch_id=&status=&date_from=&date_to=)
-POST   /sale-lots                           # Create (branch_id, buyer_name, sale_date, items[], notes)
-GET    /sale-lots/sale-lot?id=              # Get single lot with items + profit_breakdown
-PUT    /sale-lots/sale-lot?id=              # Update (draft only)
-DELETE /sale-lots/sale-lot?id=              # Delete (draft only)
-POST   /sale-lots/confirm?id=               # Confirm → deduct FIFO stock
-POST   /sale-lots/cancel?id=                # Cancel → restore stock
+GET    /sale-lots                                 # List with filters
+POST   /sale-lots                                 # Create (auto-confirm or draft)
+GET    /sale-lots/sale-lot?id=                    # Get single lot with items + profit_breakdown
+PUT    /sale-lots/sale-lot?id=                    # Update (draft only)
+DELETE /sale-lots/sale-lot?id=                    # Delete (draft only)
+POST   /sale-lots/confirm?id=                     # Confirm → deduct FIFO stock
+POST   /sale-lots/cancel?id=                      # Cancel → restore stock
+POST   /sale-lots/record-revenue?id=              # Record actual revenue (actual_revenue)
+```
+
+### Custom — Stock Transfers
+```
+GET    /stock-transfers                           # List with filters (?status=)
+POST   /stock-transfers                           # Create transfer (from_branch, to_branch, category, weight)
+POST   /stock-transfers/confirm                   # Confirm transfer (deduct from, add to)
+POST   /stock-transfers/cancel                    # Cancel transfer (pending only)
+```
+
+### Custom — Financial Summary (admin only)
+```
+GET    /financial/summary                         # Dashboard cards: purchase total, revenue, expenses, kg, lot count
+GET    /financial/lot-revenues                    # Lot revenue breakdown
+GET    /financial/purchase-by-category            # Purchase spending by category
+GET    /financial/expenses                        # List business expenses
+POST   /financial/expenses                        # Create business expense
+DELETE /financial/expenses                        # Delete business expense
+GET    /financial/export                          # Export CSV
 ```
 
 ### Custom — Support
 ```
-GET    /branches, /branches/active          # Branch list
-GET    /branches/summary                    # Branch summary
-GET    /sellers, /sellers/search?q=         # Seller list / search
-POST   /sellers                             # Create seller
-PUT    /sellers/seller?id=                  # Update seller
-POST   /sellers/blacklist, /unblacklist     # Blacklist management
-GET    /item-conditions                     # (deprecated)
-GET    /price-tiers                         # Get categories with tier prices
-PUT    /price-tiers/category?id=            # Update tier prices per category
+GET    /branches, /branches/active                # Branch list
+GET    /branches/summary                          # Branch summary
+POST   /branches                                  # Create branch
+GET    /branches/branch, PUT /branches/branch     # Single branch CRUD
+GET    /sellers, /sellers/search?q=               # Seller list / search
+POST   /sellers                                   # Create seller
+GET    /sellers/seller                            # Get seller
+PUT    /sellers/seller                            # Update seller
+POST   /sellers/blacklist, /unblacklist           # Blacklist management
+GET    /sellers/history                           # Seller purchase history
+POST   /sellers/photo                             # Upload seller photo
+GET    /item-conditions                           # (deprecated)
+GET    /price-tiers                               # Get categories with tier prices
+POST   /price-tiers                               # Create catalog item (via price-tiers)
+PUT    /price-tiers/category?id=                  # Update tier prices per category
 ```
 
 ---
 
 ## UI Structure (PHP Base POS — Active)
 
-### Admin Pages — `code/base-pos/admin/`
+### Admin Pages — `code/base-pos/admin/` (JS in `code/base-pos/assets/js/`)
 | Page | JS | Purpose |
 |------|-----|---------|
-| `index.html` | `dashboard.js` | Dashboard with stats |
+| `index.html` | `dashboard.js` | Dashboard with stats + charts |
 | `purchase-orders.html` | `purchase-orders.js` | **รับซื้อของ** — catalog autocomplete, seller search, item table, PO creation |
 | `sale-lots.html` | `sale-lots.js` | **ขาย Lot** — create/edit/confirm/delete lots, line items, profit tracking |
-| `sellers.html` | `sellers.js` | Seller management (CRUD, blacklist) |
-| `inventory.html` | `inventory.js` | Products + Categories + Price Tiers |
-| `price-tiers.html` | `price-tiers.js` | Price tier management per category |
+| `sellers.html` | `sellers.js` | Seller management (CRUD, blacklist, photo) |
+| `inventory.html` | `inventory.js` | Products + Categories + Price Tiers + Stock Alerts |
+| `price-tiers.html` | `price-tiers.js` | Price tier management per catalog item |
+| `price-board.html` | — | Price board display (embedded via price-tiers.js?) |
+| `branches.html` | `branches.js` | Branch management (CRUD + cost_method) |
+| `stock-transfers.html` | — | Stock transfers between branches |
+| `expenses.html` | `expenses.js` | Business expenses management |
+| `financial-summary.html` | `financial-summary.js` | Financial dashboard (admin) |
 | `sales.html` | `sales.js` | Retail sales history |
-| `reports.html` | `reports.js` | Various reports |
-| `settings.html` | `settings.js` | System settings |
-| `users.html` | `users.js` | User management |
+| `reports.html` | `reports.js` | Various reports (purchase, sale lot, charts, CSV export) |
+| `settings.html` | `settings.js` | System settings + backup management |
+| `users.html` | `users.js` | User management + activity log |
 
-### POS Terminal — `code/base-pos/pos/index.html` → `pos.js`
+### Other JS
+| JS | Purpose |
+|------|---------|
+| `common.js` | `apiRequest()`, `formatCurrency()`, `showNotification()`, login/logout |
+| `config.js` | `window.apiPath = '/api/index.php'` |
+| `login.js` | Login page |
+| `animations.js` | UI micro-interactions |
+| `photo-upload.js` | Photo upload widget (WF-01) |
+| `pos.js` | POS terminal (`code/base-pos/pos/`) |
 
 ---
 
@@ -204,46 +301,59 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 1. Select branch → search/select seller (or create new)
 2. Search catalog item by code/name → auto-fill category + unit
 3. Enter: weight (kg), weight deduction (kg), unit price
-4. **Before adding items**: select price tier first (buttons show actual labels/prices from catalog item)
-5. Click "เพิ่มรายการ" → item added to cart table, tier level stays selected
-6. Next item auto-gets same tier price — no need to re-select
-6. Repeat steps 2-5 for multiple items
-7. Set payment method + notes
-8. Click "บันทึกใบรับซื้อ"
-9. System: generates PO-YYYYMMDD-NNN, records items, updates inventory
-10. Receipt modal shown
+4. Select price tier first → price auto-fills on all items
+5. Add multiple items to cart table
+6. Set payment method + notes
+7. Save → generates PO reference, records items, updates inventory
+8. Receipt modal shown
 ```
 
 ### Sale Lot (ขาย Lot)
 ```
-1. Open modal: enter buyer name, sale date, select branch
-2. Add line items: select category, enter kg, enter price/kg
-3. Click "+ เพิ่มรายการ" for more items
-4. System: calculates subtotal, shows running total
-5. Click "บันทึก Lot ขาย" → confirm dialog
-6. Lot saved as 'draft'
-9. From list: ยืนยัน → deducts FIFO stock from PO items
-10. From list: แก้ไข → only available for draft
-11. From list: ลบ → only available for draft
+1. Create modal: buyer name, date, branch, line items
+2. Each item: select category (or catalog item), enter kg, enter price/kg
+3. Save as 'draft' or auto-confirm
+4. From list: ยืนยัน → deducts FIFO stock from PO items
+5. From list: แก้ไข → draft only
+6. From list: ลบ → draft/cancelled only
+7. Record actual revenue after payment received
+```
+
+### Stock Transfer (โอนสต็อก)
+```
+1. Select from_branch → to_branch (must differ)
+2. Select category, enter weight_kg
+3. Optional: transporter_name, vehicle_plate
+4. Save as 'pending'
+5. Confirm → deducts from from_branch, adds to to_branch
+6. Cancel → pending only
+```
+
+### Photo Upload (WF-01)
+```
+1. PO created → QR code printed on receipt
+2. QR encodes HMAC token + PO ID
+3. Staff scans QR with phone → uploads photos
+4. Photos stored in uploads/purchase-orders/{po_id}/
+5. Also uploadable via staff JWT auth from admin UI
 ```
 
 ### Catalog Auto-fill
 ```
 1. User types in catalog search input
 2. System searches purchase_item_catalog by code OR name
-3. If exact match (code or name = input): auto-fills category, unit, default price
-4. If multiple results: dropdown shown, user clicks to select
+3. If exact match: auto-fills category, unit, default price
+4. If multiple results: dropdown shown
 5. Items MUST be selected from catalog — no free-text items allowed
 ```
 
 ### FIFO Costing (sale_lots → purchase_order_items)
 ```
-1. On lot confirm: calculate cost for each lot item by consuming PO items
-2. Consume oldest PO items first (FIFO by created_at)
-3. Update consumed_qty on purchase_order_items (atomic conditional UPDATE for race safety)
-4. On lot cancel: restore consumed_qty using LIFO (atomic conditional UPDATE)
-5. profit = total_amount - total_cost (GENERATED column)
-6. TOCTOU protection: SELECT ... FOR UPDATE locks the lot row at transaction start
+1. On lot confirm: consume oldest PO items first (FIFO by created_at)
+2. Atomic conditional UPDATE for consumed_qty (race safety)
+3. On lot cancel: restore consumed_qty using LIFO
+4. profit = total_amount - total_cost (GENERATED column)
+5. TOCTOU protection: SELECT ... FOR UPDATE locks lot row
 ```
 
 ---
@@ -251,42 +361,41 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 ## Development State
 
 ### ✅ Completed
-- All 21 database migrations created and documented
-- All custom Models + Controllers built
-- Code review hardening (2026-05-28): 5 blockers + 4 medium + 1 bonus bug fixed — PO/SL scope checks, JWT branch_id, FIFO regression, ID card validation, CORS env, backup perms, input validation, tier sanitize
-- Inventory SKU/cost field fixes: removed cost_price field (ทุนมาจาก PO), SKU manual entry (ตัวเลข 1, 2, 3...), null category_id handling
-- Inventory stock card: real-time category stock_kg display with visual bar graph
-- Inventory table: changed from `products` (retail) to `purchase_item_catalog` — shows catalog items with tier prices, CRUD via modal, search/filter by category/status
-- Sellers duplicate entry: error propagation from model to controller for duplicate id_card/phone
-- Router has ALL routes registered
-- Purchase Orders page (PHP): catalog autocomplete, seller search, item row + cart table, dynamic tier buttons (select tier first → price auto-fill on all items)
-- Sale Lots page (PHP): full CRUD with modal, line items, confirm/delete, profit display
-- Sidebar: "ขาย Lot" link added to all admin pages
-- Price Tiers: dynamic tier pricing (add/remove levels per catalog item, stored as JSON)
-- Purchase Item Catalog: master catalog management
-- Reports: 4 new endpoints (purchase-report, sale-lot-report, sale-lot-chart, recent-sale-lots)
-- Dashboard: 3 new stat cards + sale lot chart + recent sale lots table
-- Responsive CSS: breakpoints at 768px and 576px
-- Weighted average cost: per-branch cost_method (fifo/weighted), migration 021
-- FIFO race fix: atomic conditional UPDATE for consumed_qty, migration 020
-- TOCTOU fix: FOR UPDATE locking in SaleLot confirm/cancel flow
-- Security: JWT_SECRET moved to .env, all Docker credentials to .env (docker-compose.yml)
-- Console cleanup: 9 console.log() calls removed from 3 JS files
-- Test suite: expanded from 33→58 tests (47→58 this session) — PO cancel, FIFO confirm/cancel/cost, duplicate phone seller, PO invalid branch, blacklist/unblacklist seller, overstock confirm rejection, update/delete draft lot
-- Bug fixes: PO cancel undefined method (PurchaseOrder::updateStatus), SL reference_no collision (branch code in prefix), deductStock/restoreStock execute→query, index.php catch(Exception) → catch(\Throwable)
-- Build: all 58 tests pass
+- All 38 database migrations
+- 8 custom Models + 10 custom Controllers + 4 base Services
+- 9 test functions (54 assertions) — all passing
+- FIFO costing with atomic consumed_qty + TOCTOU FOR UPDATE locking
+- Weighted average cost (per-branch cost_method)
+- Stock Transfers between branches (pending → confirm/cancel)
+- Photo upload (WF-01): HMAC token + QR-based mobile upload
+- Business Expenses tracking
+- Financial Summary dashboard (revenue, expenses, purchase totals, kg)
+- Actual revenue tracking on sale lots
+- Price board endpoint for all branches
+- Stock alert thresholds per category
+- Blacklist reason/timestamp tracking
+- Precious metals receipt flag
+- Token blocklist for JWT revocation
+- Login attempt rate limiting (IP-based)
+- Reports: purchase-report, sale-lot-report, sale-lot-chart, + more
+- Dashboard charts + recent sale lots
+- Responsive CSS (768px, 576px breakpoints)
+- JWT in .env, Docker secrets externalized, CORS from env
+- Console cleanup: 9 console.log() removed
+- Bug fixes: PO cancel, SL reference_no collision, PDO execute→query
+- ReportsController expanded with multiple new endpoint
 
 ### ⏳ Pending / Future
-- Auto-generate purchase from catalog low-stock alerts
-- Tax/nightly batch reports
-- PHPUnit test framework integration (currently bash/curl)
+- Auto-generate PO from catalog low-stock alerts
+- PHPUnit test framework integration
 - HTTPS setup
-- Rate limiting on auth endpoint
+- Rate limiting on auth (partially done via login_attempts table)
+- Tax/nightly batch reports
 
 ### 🔴 Known Issues
 - `item-conditions` is deprecated in favor of `weight_deduction` but old UI still references it
-- No validation for duplicate seller ID card
 - FIFO cost calculation recalculates on every confirm (no cost locking — mitigated by FOR UPDATE)
+- No dedicated test file for StockTransfers, Financial, PhotoUpload, BusinessExpenses
 
 ---
 
@@ -296,7 +405,7 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 - **PHP:** Psr-4-ish (namespaces not strict, files auto-loaded by path)
 - **JS:** Vanilla ES6, no jQuery, no framework
 - **CSS:** Custom properties in `:root`, BEM-ish naming, utility classes prefixed `.text-`, `.badge-`
-- **Database:** Migrations numbered sequentially (`NNN_description.sql`)
+- **Database:** Migrations numbered sequentially (NNN_description.sql)
 
 ### Naming
 - Routes: `kebab-case/action` (e.g. `purchase-orders/order`)
@@ -308,7 +417,7 @@ PUT    /price-tiers/category?id=            # Update tier prices per category
 ### API Patterns
 - Method: `apiRequest(endpoint, method, data)` → `fetch('/api/index.php/' + endpoint, ...)`
 - Response: `{ status: 'success'|'error', data: ..., message: '...' }`
-- Auth: Bearer JWT token in Authorization header
+- Auth: Bearer JWT token in Authorization header (or httpOnly cookie)
 - Single resource: `?id=` query param pattern (e.g. `sale-lots/sale-lot?id=123`)
 
 ### Route Registration Pattern
@@ -322,8 +431,9 @@ $this->routes[] = ['route' => 'resource/action', 'controller' => 'FooController'
 ### Migration Strategy
 - **DO NOT** modify `base-pos/database/pos_system.sql`
 - All changes in `customizations/database/migrations/`
-- Run via `run-migrations.sh`
+- Run via `run-migrations.sh` from `code/` directory
 - Run migrations in numerical order
+- Guard clauses (`IF NOT EXISTS`, `@col_exists`) for idempotent re-runs
 
 ---
 
@@ -333,11 +443,14 @@ $this->routes[] = ['route' => 'resource/action', 'controller' => 'FooController'
 | File | Routes |
 |------|--------|
 | `BranchesController.php` | branches CRUD + active + summary |
-| `SellersController.php` | sellers CRUD + search + blacklist |
+| `SellersController.php` | sellers CRUD + search + blacklist + history + photo |
 | `PurchaseOrdersController.php` | purchase-orders CRUD + cancel |
-| `PurchaseItemCatalogController.php` | catalog CRUD + search |
-| `SaleLotsController.php` | sale-lots CRUD + confirm + cancel |
-| `PriceTiersController.php` | price-tiers CRUD per category |
+| `PurchaseItemCatalogController.php` | catalog CRUD + search + update-category + price-board |
+| `SaleLotsController.php` | sale-lots CRUD + confirm + cancel + record-revenue |
+| `PriceTiersController.php` | price-tiers CRUD per category + create catalog item |
+| `StockTransfersController.php` | stock-transfers CRUD + confirm + cancel |
+| `PhotoUploadController.php` | purchase-orders photo upload/list + photo-token |
+| `FinancialController.php` | financial summary + lot-revenues + purchase-by-category + expenses + export |
 | `ItemConditionsController.php` | (deprecated) conditions list |
 
 ### Custom Models — `code/customizations/api/Models/`
@@ -348,17 +461,23 @@ $this->routes[] = ['route' => 'resource/action', 'controller' => 'FooController'
 | `PurchaseOrder.php` | purchase_orders + items + FIFO cost |
 | `PurchaseItemCatalog.php` | purchase_item_catalog |
 | `SaleLot.php` | sale_lots + items + FIFO cost |
+| `StockTransfer.php` | stock_transfers |
+| `BusinessExpense.php` | business_expenses |
 | `ItemCondition.php` | item_conditions |
 
 ### Key Helper Files
 | File | Role |
 |------|------|
 | `base-pos/assets/js/config.js` | `window.apiPath = '/api/index.php'` |
-| `base-pos/assets/js/common.js` | `apiRequest()`, `formatCurrency()`, `showNotification()`, login/logout |
+| `base-pos/assets/js/common.js` | `apiRequest()`, `formatCurrency()`, `showNotification()` |
+| `base-pos/assets/js/login.js` | Login page |
 | `base-pos/assets/css/styles.css` | All CSS custom properties + component styles |
 | `base-pos/api/autoload.php` | PSR-4 autoloader for both base-pos and customizations |
 | `base-pos/api/Router.php` | Route registration + dispatch + auth |
-| `customizations/api/Services/ReportService.php` | Report engine — purchase-report, sale-lot-report, sale-lot-chart |
+| `base-pos/api/Services/ReportService.php` | Report engine |
+| `base-pos/api/Services/TokenService.php` | JWT token handling |
+| `base-pos/api/Services/BackupService.php` | Backup/restore logic |
+| `base-pos/api/Services/ValidationService.php` | Input validation helpers |
 
 ---
 
@@ -367,6 +486,7 @@ $this->routes[] = ['route' => 'resource/action', 'controller' => 'FooController'
 ### Server URL
 - Admin: `http://localhost:8080/admin/`
 - API: `http://localhost:8080/api/index.php/`
+- phpMyAdmin: `http://localhost:8081/`
 - Default login: admin / admin
 
 ### Common JS Patterns
@@ -381,4 +501,11 @@ showNotification('ผิดพลาด', 'error');
 
 // Format currency
 formatCurrency(1234.50);  // "฿1,234.50"
+```
+
+### Run Tests
+```bash
+cd tests/api
+bash run.sh          # 9 test functions, 54 assertions
+bash run.sh auth sellers  # Run specific test groups
 ```

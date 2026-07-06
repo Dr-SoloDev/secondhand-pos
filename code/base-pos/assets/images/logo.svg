@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 70" fill="none">
+  <!-- SoloCorp OS Logo — Navy Enterprise -->
+  <defs>
+    <linearGradient id="gradAccent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ICON: Simplified hexagon (SoloCorp OS Hexagon Nexus) -->
+  <g transform="translate(8,8)">
+    <polygon points="22,0 44,12.7 44,38.1 22,50.8 0,38.1 0,12.7"
+             fill="#0F172A" stroke="#3B82F6" stroke-width="1.5"/>
+    <polygon points="22,6 38,15.3 38,33.9 22,43.2 6,33.9 6,15.3"
+             fill="none" stroke="#6366F1" stroke-width="1" opacity="0.4"/>
+    <!-- S-node in center -->
+    <path d="M14,18 Q22,16 22,22 Q22,28 30,28" stroke="url(#gradAccent)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+    <path d="M14,25 Q22,23 22,29 Q22,35 30,35" stroke="url(#gradAccent)" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.5"/>
+    <circle cx="14" cy="18" r="2" fill="#3B82F6"/>
+    <circle cx="30" cy="28" r="2" fill="#6366F1"/>
+    <circle cx="22" cy="25" r="1.5" fill="#F8FAFC" opacity="0.8"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="62" y="32" font-family="'Inter',sans-serif" font-size="20" font-weight="700" fill="#F8FAFC">SoloCorp</text>
+  <text x="150" y="32" font-family="'Inter',sans-serif" font-size="20" font-weight="200" fill="#64748B">OS</text>
+
+  <!-- Divider line -->
+  <line x1="62" y1="40" x2="178" y2="40" stroke="url(#gradAccent)" stroke-width="0.8" opacity="0.5"/>
+
+  <!-- Subtitle -->
+  <text x="62" y="54" font-family="'Inter',sans-serif" font-size="7.5" font-weight="400" fill="#94A3B8" letter-spacing="0.5">SECONDHAND POS SYSTEM</text>
+</svg>

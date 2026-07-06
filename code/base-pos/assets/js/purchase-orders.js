@@ -7,11 +7,75 @@ let recentPOs = [];
 let globalTier = { level: null };
 let currentCatalogItem = null; // { id, name, unit, price, tierPrices: [] }
 
+// ===== Signature State =====
+let pendingSignatureDataUrl = null; // data URL of signature or null
+let pendingSignatureBlob = null;    // Blob for upload
+let isDrawing = false;
+
 // ===== Photo State =====
 let pendingItemPhotos = {};   // { [cartIndex]: File }
 let pendingSellerIdPhoto = null; // File | null
+let pendingNewItemPhoto = null; // File | null — ถ่ายตอนคีย์ก่อนกดเพิ่ม
 let activePhotoTarget = null; // { type: 'item', index: N } | { type: 'seller-id' }
 let cameraStream = null;
+
+// === Cart State Export (สำหรับ common.js save ก่อน 401) ===
+window.getCurrentCartState = function() {
+  if (cart.length === 0 && !selectedSeller) return null;
+  return {
+    branch_id: document.getElementById('branchSelect')?.value,
+    seller: selectedSeller,
+    items: cart,
+    tier: globalTier,
+    hasSignature: !!pendingSignatureDataUrl,
+  };
+};
+
+function restoreCartFromBackup() {
+  const saved = restoreCartState();
+  if (!saved) return;
+
+  const confirmed = confirm(
+    '⚠️ พบข้อมูลที่ยังไม่ได้บันทึกจาก session ก่อนหน้า\n' +
+    `(${saved.items?.length || 0} รายการ, ผู้ขาย: ${saved.seller?.full_name || 'ไม่มี'})\n\n` +
+    'ต้องการกู้คืนข้อมูลหรือไม่?'
+  );
+
+  if (!confirmed) {
+    clearCartState();
+    return;
+  }
+
+  // Restore branch
+  if (saved.branch_id) {
+    document.getElementById('branchSelect').value = saved.branch_id;
+  }
+
+  // Restore seller
+  if (saved.seller) {
+    selectSeller(saved.seller);
+    // selectSeller ภายในเรียก doSelectSeller
+    doSelectSeller(saved.seller);
+  }
+
+  // Restore cart items
+  if (saved.items?.length) {
+    cart = saved.items;
+    renderCart();
+  }
+
+  // Restore tier
+  if (saved.tier?.level) {
+    globalTier.level = saved.tier.level;
+    const btns = document.querySelectorAll('.global-tier-btn');
+    if (btns[saved.tier.level - 1]) {
+      setTierActive(btns[saved.tier.level - 1], saved.tier.level);
+    }
+  }
+
+  clearCartState();
+  showNotification('กู้คืนข้อมูลสำเร็จ', 'success');
+}
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -19,6 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadCategories();
   await loadRecentPOs();
   buildTierButtons([]);
+  restoreCartFromBackup();
 
   document.getElementById('searchSellerInput').addEventListener('input', debounce(searchSellers, 300));
   document.getElementById('createNewSellerBtn').addEventListener('click', openNewSellerModal);
@@ -27,16 +92,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('savePOBtn').addEventListener('click', savePurchaseOrder);
   document.getElementById('clearPOBtn').addEventListener('click', clearAll);
 
+  // IMP-6: Keyboard shortcut Ctrl+Enter = บันทึกใบรับซื้อ
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      const saveBtn = document.getElementById('savePOBtn');
+      if (saveBtn && !saveBtn.disabled) {
+        e.preventDefault();
+        savePurchaseOrder();
+      }
+    }
+  });
+
   document.querySelectorAll('.close-modal').forEach(b =>
     b.addEventListener('click', e => e.target.closest('.modal').classList.remove('show'))
   );
 
-  document.getElementById('itemUnitPrice').addEventListener('input', updateItemTotal);
   document.getElementById('itemQuantity').addEventListener('input', updateItemTotal);
   document.getElementById('itemWeightDeduct').addEventListener('input', updateItemTotal);
   document.getElementById('itemCategorySelect').addEventListener('change', saveCategoryToCatalog);
-  document.getElementById('itemName').addEventListener('input', debounce(searchCatalog, 250));
-  document.getElementById('itemName').addEventListener('input', onItemNameChanged);
+  document.getElementById('itemName').addEventListener('input', debounce(function() {
+    const q = this.value.trim();
+    if (currentCatalogItem && currentCatalogItem.name !== q) {
+      clearCatalogSelection();
+    }
+    if (q.length >= 1) {
+      searchCatalogImmediate(q);
+    } else {
+      closeCatalogDropdown();
+    }
+  }, 250));
 
   document.addEventListener('click', e => {
     if (!e.target.closest('#itemName') && !e.target.closest('#itemCatalogResults')) {
@@ -148,22 +232,24 @@ function applyTierToPrice(tierPrices) {
   if (!globalTier.level || !Array.isArray(tierPrices)) return;
   const tp = tierPrices[globalTier.level - 1];
   if (tp && tp.price > 0) {
-    document.getElementById('itemUnitPrice').value = parseFloat(tp.price).toFixed(2);
+    updatePriceDisplay(parseFloat(tp.price));
     updateItemTotal();
   }
 }
 
 // ===== Item Search =====
-function onItemNameChanged() {
-  // เคลียร์ catalog item เมื่อ user พิมพ์ใหม่
+function clearCatalogSelection() {
   document.getElementById('itemCatalogId').value = '';
   document.getElementById('itemCategoryId').value = '';
   document.getElementById('itemCategorySelect').value = '';
-  document.getElementById('itemUnit').value = 'ชิ้น';
+  document.getElementById('itemUnit').value = 'กก.';
   document.getElementById('itemUnitPrice').value = '0';
-  document.getElementById('itemTotalPreview').textContent = 'เลือกสินค้าจากแคตาล็อก';
+  document.getElementById('itemPriceDisplay').textContent = '—';
+  document.getElementById('itemPriceDisplay').style.color = '#999';
+  document.getElementById('itemTotalPreview').textContent = 'เลือกสินค้า';
   document.getElementById('itemTotalPreview').style.color = '#999';
   currentCatalogItem = null;
+  resetItemPhotoBtn();
   buildTierButtons([]);
 }
 
@@ -173,8 +259,7 @@ function closeCatalogDropdown() {
   box.style.display = 'none';
 }
 
-async function searchCatalog() {
-  const q = document.getElementById('itemName').value.trim();
+async function searchCatalogImmediate(q) {
   const box = document.getElementById('itemCatalogResults');
   if (q.length < 1) { closeCatalogDropdown(); return; }
 
@@ -231,6 +316,8 @@ function selectCatalogItem(item) {
     catId: item.category_id || '',
     catName: item.category_name || '',
     tierPrices,
+    requiresPreciousReceipt: item.requires_precious_receipt == 1,
+    requiresIdCard: item.requires_id_card == 1,
   };
 
   // fill fields
@@ -257,13 +344,14 @@ function selectCatalogItem(item) {
   // rebuild tier buttons พร้อมราคาจาก item นี้
   buildTierButtons(tierPrices);
 
-  // set ราคา: ใช้ tier ที่ active อยู่ ถ้าไม่มีใช้ base price
+  // auto-fill price → แสดงใน priceDisplay (read-only)
+  let price = 0;
   if (globalTier.level && tierPrices[globalTier.level - 1]?.price > 0) {
-    document.getElementById('itemUnitPrice').value = parseFloat(tierPrices[globalTier.level - 1].price).toFixed(2);
+    price = parseFloat(tierPrices[globalTier.level - 1].price);
   } else {
-    document.getElementById('itemUnitPrice').value =
-      currentCatalogItem.price > 0 ? currentCatalogItem.price.toFixed(2) : '0';
+    price = currentCatalogItem.price > 0 ? currentCatalogItem.price : 0;
   }
+  updatePriceDisplay(price);
 
   // reset น้ำหนัก
   document.getElementById('itemQuantity').value = '1';
@@ -271,19 +359,37 @@ function selectCatalogItem(item) {
   updateItemTotal();
 }
 
+// ===== Price Display (read-only, auto-fill from tier) =====
+function updatePriceDisplay(price) {
+  const el = document.getElementById('itemPriceDisplay');
+  if (price > 0) {
+    el.textContent = formatCurrency(price);
+    el.style.color = '#059669';
+    el.style.fontWeight = '700';
+  } else {
+    el.textContent = '—';
+    el.style.color = '#999';
+  }
+  document.getElementById('itemUnitPrice').value = price.toFixed(2);
+}
+
 // ===== Item Total Preview =====
 function updateItemTotal() {
   const q = parseFloat(document.getElementById('itemQuantity').value || 0);
   const d = parseFloat(document.getElementById('itemWeightDeduct').value || 0);
-  const p = parseFloat(document.getElementById('itemUnitPrice').value || 0);
   const net = Math.max(0, q - d);
-  const el = document.getElementById('itemTotalPreview');
+  const priceEl = document.getElementById('itemPriceDisplay');
+  const priceText = priceEl.textContent.replace(/[^0-9.]/g, '');
+  const p = parseFloat(priceText) || 0;
+
+  const totalEl = document.getElementById('itemTotalPreview');
   if (q > 0 && p > 0) {
-    el.style.color = '#333';
-    el.innerHTML = `รวม: <strong>${formatCurrency(net * p)}</strong> (น้ำหนักสุทธิ์ ${net.toFixed(2)} กก.)`;
+    totalEl.textContent = formatCurrency(net * p);
+    totalEl.style.color = '#059669';
+    totalEl.style.fontWeight = '700';
   } else {
-    el.style.color = '#999';
-    el.textContent = q === 0 ? 'กรุณากำหนดน้ำหนัก' : 'กรุณาเลือกระดับราคา (บิล)';
+    totalEl.textContent = q === 0 ? 'กำหนดน้ำหนัก' : 'เลือกราคา (บิล)';
+    totalEl.style.color = '#999';
   }
 }
 
@@ -305,8 +411,18 @@ function addItemToCart() {
   if (price <= 0) { showNotification('ราคาต้องมากกว่า 0 — กรุณาเลือกระดับบิลก่อน', 'error'); return; }
 
   const netQty = Math.max(0, qty - deduct);
+  const tempId = 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+  // associate pending photo ถ้ามี
+  if (pendingNewItemPhoto) {
+    pendingItemPhotos[tempId] = pendingNewItemPhoto;
+    pendingNewItemPhoto = null;
+  }
+
+  const isPrecious = currentCatalogItem?.requiresPreciousReceipt || false;
+  const isIdCard = currentCatalogItem?.requiresIdCard || false;
   cart.push({
-    _tempId: 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    _tempId: tempId,
     catalog_id: parseInt(catalogId),
     item_name: name,
     category_id: catId ? parseInt(catId) : null,
@@ -317,10 +433,13 @@ function addItemToCart() {
     unit_price: price,
     total_price: netQty * price,
     price_tier: globalTier.level || null,
+    requires_precious_receipt: isPrecious ? 1 : 0,
+    requires_id_card: isIdCard ? 1 : 0,
     notes: '',
   });
 
   // reset form item (คง globalTier ไว้)
+  resetItemPhotoBtn();
   document.getElementById('itemName').value = '';
   document.getElementById('itemCatalogId').value = '';
   document.getElementById('itemCategoryId').value = '';
@@ -330,11 +449,11 @@ function addItemToCart() {
   document.getElementById('itemWeightDeduct').value = '0';
   document.getElementById('itemTotalPreview').textContent = 'เลือกสินค้าจากแคตาล็อก';
   document.getElementById('itemTotalPreview').style.color = '#999';
-  document.getElementById('itemUnit').value = 'กก.';
   currentCatalogItem = null;
   buildTierButtons([]); // reset tier button label (ไม่ reset globalTier.level)
 
   renderCart();
+  saveCartState(window.getCurrentCartState());
 }
 
 window.removeFromCart = function(idx) {
@@ -343,6 +462,9 @@ window.removeFromCart = function(idx) {
   cart.splice(idx, 1);
   renderCart();
   updatePhotoUI();
+  updatePreciousWarning();
+  updateIdCardWarning();
+  saveCartState(window.getCurrentCartState());
 };
 
 function renderCart() {
@@ -373,7 +495,125 @@ function renderCart() {
   const total = cart.reduce((s, it) => s + it.total_price, 0);
   const totalKg = cart.reduce((s, it) => s + (it.net_quantity ?? it.quantity), 0);
   document.getElementById('cartTotalAmount').textContent = formatCurrency(total);
+  const big = document.getElementById('cartTotalAmountBig');
+  if (big) big.textContent = formatCurrency(total);
   document.getElementById('cartTotalItems').textContent = `${totalKg.toFixed(2)} กก. (${cart.length} รายการ)`;
+
+  updatePreciousWarning();
+  updateIdCardWarning();
+}
+
+function updateIdCardWarning() {
+  const hasIdCard = cart.some(it => it.requires_id_card == 1);
+  const sellerCard = document.getElementById('poSellerCard');
+  if (!sellerCard) return;
+
+  let warn = sellerCard.querySelector('.id-card-warning');
+  if (hasIdCard) {
+    if (!warn) {
+      warn = document.createElement('div');
+      warn.className = 'id-card-warning';
+      warn.style.cssText = 'padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;line-height:1.5;margin-bottom:4px;';
+      warn.innerHTML = '<span style="color:#b45309;font-weight:600">⚠️ สินค้าต้องใช้บัตรประชาชน: กรุณากรอกเลขบัตรประชาชนผู้ขายก่อนบันทึก</span>';
+      sellerCard.insertBefore(warn, sellerCard.firstChild);
+    }
+  } else {
+    if (warn) warn.remove();
+  }
+}
+
+function updatePreciousWarning() {
+  const hasPrecious = cart.some(it => it.requires_precious_receipt == 1);
+  const sellerCard = document.getElementById('poSellerCard');
+  if (!sellerCard) return;
+
+  let warn = sellerCard.querySelector('.precious-warning');
+  let actions = document.getElementById('preciousActions');
+  if (hasPrecious) {
+    if (!warn) {
+      warn = document.createElement('div');
+      warn.className = 'precious-warning';
+      warn.innerHTML = '<span style="color:#059669;font-weight:600">✅ พร้อมรับซื้อ — แค่ถ่ายบัตรประชาชน + เซ็นรับรองก็เสร็จ</span>';
+      sellerCard.insertBefore(warn, sellerCard.firstChild);
+    }
+    if (actions) actions.style.display = 'flex';
+  } else {
+    if (warn) warn.remove();
+    if (actions) actions.style.display = 'none';
+  }
+}
+
+// ===== Pre-Flight Checklist (IMP-1) =====
+function showPreFlightChecklist() {
+  return new Promise((resolve) => {
+    const hasPrecious = cart.some(it => it.requires_precious_receipt == 1);
+    const hasIdCardRequired = cart.some(it => it.requires_id_card == 1);
+    const sellerComplete = !!(selectedSeller.full_name && selectedSeller.phone);
+    const signatureOk = !hasPrecious || !!pendingSignatureDataUrl;
+    const hasPhotos = Object.keys(pendingItemPhotos).length > 0;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:460px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+          <div style="font-size:28px">✅</div>
+          <div>
+            <div style="font-size:18px;font-weight:700">ตรวจสอบก่อนบันทึก</div>
+            <div style="font-size:13px;color:#6b7280">กรุณาตรวจสอบข้อมูลให้พร้อมก่อนบันทึก</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+          <div class="checklist-item" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:${sellerComplete ? '#f0fdf4' : '#fef2f2'};border-radius:8px">
+            <span style="font-size:18px">${sellerComplete ? '✅' : '⚠️'}</span>
+            <span style="font-size:14px">ผู้ขาย: <strong>${escapeHtml(selectedSeller.full_name)}</strong> ${sellerComplete ? '' : '(ข้อมูลไม่ครบ — ควรมีเบอร์โทร)'}</span>
+          </div>
+          <div class="checklist-item" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f0fdf4;border-radius:8px">
+            <span style="font-size:18px">✅</span>
+            <span style="font-size:14px">สินค้า: <strong>${cart.length}</strong> รายการ</span>
+          </div>
+          <div class="checklist-item" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:${signatureOk ? '#f0fdf4' : '#fef2f2'};border-radius:8px">
+            <span style="font-size:18px">${signatureOk ? '✅' : '⚠️'}</span>
+            <span style="font-size:14px">ลายเซ็นรับรอง: ${hasPrecious ? '<strong>จำเป็น</strong> (สินค้าโลหะมีค่า)' : '<strong>ไม่จำเป็น</strong>'}</span>
+          </div>
+          <div class="checklist-item" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f0fdf4;border-radius:8px">
+            <span style="font-size:18px">${hasPhotos ? '✅' : '⏭️'}</span>
+            <span style="font-size:14px">รูปถ่ายสินค้า: ${hasPhotos ? '<strong>' + Object.keys(pendingItemPhotos).length + ' รูป</strong>' : '<span style="color:#888">ไม่ได้ถ่าย</span>'}</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:14px">
+            <input type="checkbox" id="checklistConfirm" style="margin-top:2px;width:16px;height:16px">
+            <span>ฉันตรวจสอบข้อมูลข้างต้นแล้วว่าถูกต้อง และพร้อมบันทึกใบรับซื้อ</span>
+          </label>
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-secondary" id="checklistCancelBtn">ตรวจสอบอีกครั้ง</button>
+          <button class="btn btn-primary" id="checklistSaveBtn" disabled style="opacity:0.6">บันทึกใบรับซื้อ</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    // Enable save button only when checkbox is checked
+    document.getElementById('checklistConfirm').addEventListener('change', function() {
+      const btn = document.getElementById('checklistSaveBtn');
+      btn.disabled = !this.checked;
+      btn.style.opacity = this.checked ? '1' : '0.6';
+    });
+
+    document.getElementById('checklistCancelBtn').onclick = () => {
+      overlay.remove();
+      resolve(false);
+    };
+    document.getElementById('checklistSaveBtn').onclick = () => {
+      overlay.remove();
+      resolve(true);
+    };
+  });
 }
 
 // ===== Save PO =====
@@ -381,10 +621,38 @@ async function savePurchaseOrder() {
   if (!selectedSeller) { showNotification('กรุณาเลือกผู้ขาย', 'error'); return; }
   if (cart.length === 0) { showNotification('กรุณาเพิ่มรายการสินค้า', 'error'); return; }
 
+  // Rule A: ทุก order ต้องมีข้อมูลผู้ขายอย่างน้อย 1 อย่าง (ชื่อ/เบอร์/ทะเบียน/รูป)
+  const hasAnySeller = !!(selectedSeller.full_name || selectedSeller.phone || selectedSeller.vehicle_plate || pendingSellerIdPhoto || selectedSeller.id_card_photo);
+  if (!hasAnySeller) {
+    showNotification('⚠️ กรุณาให้ข้อมูลผู้ขายอย่างน้อย 1 อย่าง (ชื่อ / เบอร์โทร / ทะเบียนรถ / รูปถ่าย)', 'error');
+    return;
+  }
+
+  // Rule B: signature บังคับเฉพาะ โลหะมีค่า/ทองแดง (ม.357 — รับรองของได้มาโดยสุจริต)
+  const hasPrecious = cart.some(it => it.requires_precious_receipt == 1);
+  if (hasPrecious && !pendingSignatureDataUrl) {
+    showNotification('⚠️ สินค้าโลหะมีค่า/ทองแดง — กรุณาเซ็นรับรองว่าของได้มาโดยสุจริตก่อนบันทึก', 'error');
+    return;
+  }
+
+  // ตรวจสอบสินค้าต้องใช้บัตรประชาชน (requires_id_card)
+  const hasIdCard = cart.some(it => it.requires_id_card == 1);
+  if (hasIdCard && !selectedSeller.id_card) {
+    showNotification('⚠️ สินค้ารายการนี้ต้องใช้บัตรประชาชน — กรุณากรอกเลขบัตรประชาชนผู้ขายก่อนบันทึก', 'error');
+    document.getElementById('searchSellerInput').focus();
+    return;
+  }
+
   // WF-03: soft reminder ก่อน save ถ้าเป็น blacklist seller (ไม่ block)
   if (selectedSeller.is_blacklisted == 1) {
     showNotification('⚠️ กำลังบันทึก PO ให้ผู้ขายที่อยู่ในบัญชีดำ', 'warning');
   }
+
+  // IMP-1: Pre-flight checklist ก่อนบันทึก
+  const checklistConfirmed = await showPreFlightChecklist();
+  if (!checklistConfirmed) return;
+
+  const idempotencyKey = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 
   const payload = {
     branch_id: parseInt(document.getElementById('branchSelect').value),
@@ -403,6 +671,7 @@ async function savePurchaseOrder() {
       price_tier: it.price_tier,
       notes: it.notes,
     })),
+    idempotency_key: idempotencyKey,
   };
 
   const btn = document.getElementById('savePOBtn');
@@ -416,6 +685,11 @@ async function savePurchaseOrder() {
   if (res.status === 'success') {
     const poId = res.data.id;
     showNotification(`บันทึกสำเร็จ! เลขที่: ${res.data.reference_no} ยอดรวม ${formatCurrency(res.data.total_amount)}`, 'success');
+
+    // อัปโหลดลายเซ็น
+    if (pendingSignatureBlob) {
+      await uploadItemPhoto(poId, pendingSignatureBlob);
+    }
 
     // อัปโหลดรูปสินค้าที่ถ่ายค้างไว้
     const itemPhotoCount = Object.keys(pendingItemPhotos).length;
@@ -450,6 +724,9 @@ function clearAll() {
   // Reset photo state
   pendingItemPhotos = {};
   pendingSellerIdPhoto = null;
+  pendingSignatureDataUrl = null;
+  pendingSignatureBlob = null;
+  resetItemPhotoBtn();
   resetSellerPhotoUI();
   updatePhotoUI();
 
@@ -467,14 +744,27 @@ function clearAll() {
   document.getElementById('globalTierInfo').textContent = 'ยังไม่ได้เลือก — จะใช้ราคาปกติ';
   buildTierButtons([]);
   renderCart();
+  updatePreciousWarning();
+  updateIdCardWarning();
+  // Reset signature UI
+  const sigStatus = document.getElementById('sigStatus');
+  if (sigStatus) {
+    sigStatus.textContent = 'ยังไม่เซ็น';
+    sigStatus.style.color = '#888';
+  }
+  clearCartState();
 }
 
 // ===== Recent POs =====
 async function loadRecentPOs() {
-  const res = await apiRequest('purchase-orders?limit=10');
-  if (res.status !== 'success') return;
-  recentPOs = res.data.items || [];
   const tbody = document.querySelector('#recentPOTable tbody');
+  showTableLoading(tbody, 6, 4);
+  const res = await apiRequest('purchase-orders?limit=10');
+  if (res.status !== 'success') {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888">โหลดใบรับซื้อล่าสุดไม่สำเร็จ</td></tr>';
+    return;
+  }
+  recentPOs = res.data.items || [];
   if (recentPOs.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888">ยังไม่มีใบรับซื้อ</td></tr>';
     return;
@@ -514,7 +804,7 @@ window.showReceipt = async function(id) {
 
   const billBody = `
     <div style="border:2px solid #222;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:8px">
-      <div style="font-size:16px;font-weight:800;letter-spacing:1px">ใบรับซื้อของเก่า</div>
+      <div style="font-size:16px;font-weight:800;letter-spacing:0">ใบรับซื้อของเก่า</div>
       <div style="font-size:12px;color:#444;margin-top:2px">${escapeHtml(po.branch_name)} &nbsp;·&nbsp; สาขา ${escapeHtml(po.branch_code)}</div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:6px">
@@ -538,7 +828,7 @@ window.showReceipt = async function(id) {
       <tbody>${itemRows}</tbody>
     </table>
     <div style="margin-top:8px;padding:6px 8px;background:#222;color:#fff;border-radius:3px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:11px;opacity:.8">${po.payment_method === 'cash' ? '💵 เงินสด' : '🏦 โอนธนาคาร'}</span>
+      <span style="font-size:11px;opacity:.8">${po.payment_method === 'cash' ? 'เงินสด' : 'โอนธนาคาร'}</span>
       <span style="font-size:15px;font-weight:800">฿ ${formatCurrency(po.total_amount)}</span>
     </div>
     <div style="font-size:10.5px;text-align:center;margin-top:8px;color:#666;border-top:1px dashed #ccc;padding-top:6px;line-height:1.8">
@@ -564,7 +854,7 @@ window.showReceipt = async function(id) {
       </div>
     </div>
     <div style="border:1.5px dashed #999;border-radius:4px;height:90px;margin-top:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;flex-direction:column;gap:4px">
-      <span>📎</span>
+      <span><i class="icon-image"></i></span>
       <span>แนบสำเนาบัตรประชาชน / ภาพถ่ายที่นี่</span>
     </div>` : '';
 
@@ -903,6 +1193,9 @@ function confirmPhoto() {
     if (activePhotoTarget) {
       if (activePhotoTarget.type === 'item') {
         pendingItemPhotos[activePhotoTarget.id] = file;
+      } else if (activePhotoTarget.type === 'new-item') {
+        pendingNewItemPhoto = file;
+        showItemPhotoIndicator(file);
       } else if (activePhotoTarget.type === 'seller-id') {
         pendingSellerIdPhoto = file;
         showSellerIdPhotoPreview(file);
@@ -914,7 +1207,7 @@ function confirmPhoto() {
     renderCart(); // refresh to show ✓
     updatePhotoUI(); // refresh FAB badge + photo strip
 
-    showUploadToast('📸 ถ่ายรูปสำเร็จ', 1500);
+    showUploadToast('ถ่ายรูปสำเร็จ', 1500);
   }, 'image/jpeg', 0.85);
 }
 
@@ -954,8 +1247,8 @@ function resetSellerPhotoUI() {
   const thumb = document.getElementById('sellerPhotoThumb');
 
   area.classList.remove('has-photo');
-  icon.textContent = '📇';
-  title.textContent = '📸 เพิ่มรูปถ่ายบัตรประชาชน';
+  icon.innerHTML = '<i class="icon-image"></i>';
+  title.textContent = 'เพิ่มรูปถ่ายบัตรประชาชน';
   sub.textContent = 'แตะเพื่อถ่ายรูป หรือเลือกรูป';
   thumb.style.display = 'none';
   thumb.src = '';
@@ -985,7 +1278,7 @@ function updatePhotoUI() {
 
   if (count > 0) {
     wrap.classList.add('show');
-    countEl.textContent = `📸 ${count} รูป`;
+    countEl.innerHTML = `<i class="icon-image"></i> ${count} รูป`;
     strip.innerHTML = tempIds.map(tempId => {
       const file = pendingItemPhotos[tempId];
       const url = URL.createObjectURL(file);
@@ -998,6 +1291,22 @@ function updatePhotoUI() {
     wrap.classList.remove('show');
     strip.innerHTML = '';
   }
+}
+
+// ── Show/hide photo indicator in add-row ────────────────
+function showItemPhotoIndicator(file) {
+  const indicator = document.getElementById('itemPhotoIndicator');
+  const btn = document.getElementById('itemPhotoBtn');
+  indicator.textContent = '✓';
+  btn.classList.add('has-photo');
+}
+
+function resetItemPhotoBtn() {
+  pendingNewItemPhoto = null;
+  const indicator = document.getElementById('itemPhotoIndicator');
+  const btn = document.getElementById('itemPhotoBtn');
+  indicator.textContent = '';
+  btn.classList.remove('has-photo');
 }
 
 // ── Remove pending photo ────────────────────────────────
@@ -1016,13 +1325,12 @@ async function uploadSellerIdPhoto(sellerId, file) {
     const res = await fetch(`/api/index.php/sellers/photo?id=${sellerId}`, {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + getToken(),
       },
       body: formData,
     });
     const json = await res.json();
     if (json.status === 'success') {
-      showUploadToast('✅ อัปโหลดรูปบัตรประชาชนสำเร็จ', 1500);
+      showUploadToast('อัปโหลดรูปบัตรประชาชนสำเร็จ', 1500);
     } else {
       console.warn('Seller photo upload failed:', json);
     }
@@ -1040,7 +1348,6 @@ async function uploadItemPhoto(poId, file) {
     const res = await fetch(`/api/index.php/purchase-orders/photos?id=${poId}`, {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + getToken(),
       },
       body: formData,
     });
@@ -1082,11 +1389,6 @@ function showUploadToast(msg, duration = 0) {
   }
 }
 
-// ── Get JWT token from storage ────────────────────────────
-function getToken() {
-  return localStorage.getItem('posToken') || sessionStorage.getItem('posToken') || '';
-}
-
 // ================================================================
 // PHOTO PICKER EVENT BINDINGS
 // ================================================================
@@ -1117,6 +1419,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activePhotoTarget.type === 'item') {
         pendingItemPhotos[activePhotoTarget.id] = file;
         renderCart();
+      } else if (activePhotoTarget.type === 'new-item') {
+        pendingNewItemPhoto = file;
+        showItemPhotoIndicator(file);
       } else if (activePhotoTarget.type === 'seller-id') {
         pendingSellerIdPhoto = file;
         showSellerIdPhotoPreview(file);
@@ -1125,7 +1430,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     e.target.value = ''; // reset so same file can be re-selected
     updatePhotoUI();
-    showUploadToast('🖼️ เลือกรูปสำเร็จ', 1500);
+    showUploadToast('เลือกรูปสำเร็จ', 1500);
+  });
+
+  // Item photo button (add-row)
+  document.getElementById('itemPhotoBtn').addEventListener('click', () => {
+    if (!document.getElementById('itemName').value.trim()) {
+      showNotification('กรุณาเลือกสินค้าก่อน', 'error');
+      return;
+    }
+    openPhotoPicker('new-item', 'addrow');
   });
 
   // Camera controls
@@ -1136,6 +1450,154 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cameraOverlay').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeCamera();
   });
+
+  // ── Signature Modal ──────────────────────────────────────
+  function openSignatureModal() {
+    const modal = document.getElementById('signatureModal');
+    const canvas = document.getElementById('sigCanvas');
+    const ctx = canvas.getContext('2d');
+    const placeholder = document.getElementById('sigPlaceholder');
+
+    // ถ้ามี signature เก่า แสดงไว้
+    if (pendingSignatureDataUrl) {
+      const img = new Image();
+      img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        placeholder.style.display = 'none';
+      };
+      img.src = pendingSignatureDataUrl;
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      placeholder.style.display = 'block';
+    }
+
+    // ซ่อนปุ่มข้ามถ้า cart มีโลหะมีค่า/ทองแดง (Rule B — ต้องเซ็นเสมอ)
+    const hasPreciousNow = cart.some(it => it.requires_precious_receipt == 1);
+    document.getElementById('sigSkipBtn').style.display = hasPreciousNow ? 'none' : '';
+
+    modal.classList.add('show');
+  }
+
+  document.getElementById('sigBtn').addEventListener('click', openSignatureModal);
+
+  // Canvas drawing
+  function initSignatureCanvas() {
+    const canvas = document.getElementById('sigCanvas');
+    const ctx = canvas.getContext('2d');
+    const placeholder = document.getElementById('sigPlaceholder');
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      if (e.touches) {
+        return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+      }
+      return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+    }
+
+    function startDraw(e) {
+      e.preventDefault();
+      isDrawing = true;
+      placeholder.style.display = 'none';
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+
+    function draw(e) {
+      e.preventDefault();
+      if (!isDrawing) return;
+      const pos = getPos(e);
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#000';
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+
+    function endDraw(e) {
+      e.preventDefault();
+      isDrawing = false;
+      ctx.beginPath();
+    }
+
+    // Mouse
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', endDraw);
+    canvas.addEventListener('mouseleave', endDraw);
+
+    // Touch
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', endDraw, { passive: false });
+  }
+
+  initSignatureCanvas();
+
+  document.getElementById('sigClearBtn').addEventListener('click', () => {
+    const canvas = document.getElementById('sigCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById('sigPlaceholder').style.display = 'block';
+    pendingSignatureDataUrl = null;
+    pendingSignatureBlob = null;
+  });
+
+  document.getElementById('sigConfirmBtn').addEventListener('click', () => {
+    const canvas = document.getElementById('sigCanvas');
+    const checkbox = document.getElementById('sigConfirmCheckbox');
+
+    // ตรวจสอบ: วาดหรือ checkbox
+    const isEmpty = isCanvasBlank(canvas);
+    if (isEmpty && !checkbox.checked) {
+      showNotification('กรุณาเซ็น หรือติ๊กยืนยัน', 'error');
+      return;
+    }
+
+    if (!isEmpty) {
+      pendingSignatureDataUrl = canvas.toDataURL('image/png');
+      canvas.toBlob((blob) => {
+        pendingSignatureBlob = new File([blob], 'signature.png', { type: 'image/png' });
+      });
+    } else {
+      // checkbox fallback
+      pendingSignatureDataUrl = '__checkbox_confirm__';
+      pendingSignatureBlob = null;
+    }
+
+    document.getElementById('signatureModal').classList.remove('show');
+    document.getElementById('sigStatus').textContent = '✅ เซ็นแล้ว';
+    document.getElementById('sigStatus').style.color = '#22c55e';
+    showNotification('ยืนยันลายเซ็นสำเร็จ', 'success');
+  });
+
+  document.getElementById('sigSkipBtn').addEventListener('click', () => {
+    document.getElementById('signatureModal').classList.remove('show');
+  });
+
+  // Close modal on overlay click
+  document.getElementById('signatureModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+      document.getElementById('signatureModal').classList.remove('show');
+    }
+  });
+  document.getElementById('signatureModalClose').addEventListener('click', () => {
+    document.getElementById('signatureModal').classList.remove('show');
+  });
+
+  function isCanvasBlank(canvas) {
+    const ctx = canvas.getContext('2d');
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] !== 0) return false;
+    }
+    return true;
+  }
 
   // Seller ID card photo
   document.getElementById('sellerIdPhotoBtn').addEventListener('click', () => {

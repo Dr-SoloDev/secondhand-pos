@@ -66,10 +66,35 @@ class Seller extends Model
     }
 
     /**
+     * ตรวจสอบ Checksum เลขบัตรประชาชนไทย (13 หลัก)
+     */
+    public function validateIdCard($idCard)
+    {
+        $idCard = preg_replace('/[^0-9]/', '', $idCard);
+        if (strlen($idCard) !== 13) {
+            throw new Exception('เลขบัตรประชาชนต้องมี 13 หลัก');
+        }
+        $sum = 0;
+        for ($i = 0; $i < 12; $i++) {
+            $sum += (int)$idCard[$i] * (13 - $i);
+        }
+        $checkDigit = (11 - ($sum % 11)) % 10;
+        if ((int)$idCard[12] !== $checkDigit) {
+            throw new Exception('เลขบัตรประชาชนไม่ถูกต้อง (ตรวจสอบเลขหลักสุดท้าย)');
+        }
+        return true;
+    }
+
+    /**
      * เพิ่มผู้ขายใหม่
      */
     public function create($data)
     {
+        // ตรวจสอบ Checksum เลขบัตรประชาชน
+        if (!empty($data['id_card'])) {
+            $this->validateIdCard($data['id_card']);
+        }
+
         // ตรวจสอบบัตรประชาชนซ้ำ
         if (!empty($data['id_card'])) {
             $exists = $this->findByIdCard($data['id_card']);
@@ -105,6 +130,11 @@ class Seller extends Model
         $seller = $this->getById($id);
         if (!$seller) {
             throw new Exception('ไม่พบผู้ขายนี้');
+        }
+
+        // ตรวจสอบ Checksum เลขบัตรประชาชน (ถ้ามีการเปลี่ยน)
+        if (!empty($data['id_card']) && $data['id_card'] !== $seller['id_card']) {
+            $this->validateIdCard($data['id_card']);
         }
 
         // ตรวจสอบบัตรประชาชนซ้ำ (ถ้ามีการเปลี่ยน)

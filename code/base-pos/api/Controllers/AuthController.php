@@ -93,7 +93,7 @@ class AuthController extends Controller
         setcookie('posUser', json_encode($user), [
             'expires' => $cookieExpiry,
             'path' => '/',
-            'httponly' => false,
+            'httponly' => true,
             'samesite' => 'Strict',
             'secure' => $secure,
         ]);
@@ -103,13 +103,20 @@ class AuthController extends Controller
 
     public function verify()
     {
-        // Get data
+        // Get data (backward compat: token in body)
         $data = $this->getRequestData();
+        $token = isset($data['token']) ? $data['token'] : '';
 
-        // Validate input
-        $this->validateRequiredFields($data, ['token']);
+        // Fallback to cookie
+        if (empty($token)) {
+            $token = $_COOKIE['posToken'] ?? '';
+        }
 
-        $token = $data['token'];
+        if (empty($token)) {
+            Response::error('Token is required', 401);
+            exit;
+        }
+
         $decoded = TokenService::validate($token);
 
         if (!$decoded) {
@@ -161,8 +168,8 @@ class AuthController extends Controller
         setcookie('posUser', '', [
             'expires' => time() - 3600,
             'path' => '/',
-            'httponly' => false,
-            'samesite' => 'Strict',
+            'httponly' => true,
+            'samesite' => 'strict',
             'secure' => $secure,
         ]);
 

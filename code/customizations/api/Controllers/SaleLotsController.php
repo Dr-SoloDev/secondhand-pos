@@ -52,6 +52,14 @@ class SaleLotsController extends Controller
     {
         $this->requireAuth(['admin', 'manager']);
         $data = $this->getRequestData();
+
+        // Idempotency check — ป้องกัน Sale Lot ซ้ำ
+        $idempotencyKey = $data['idempotency_key'] ?? null;
+        if ($idempotencyKey) {
+            $idemp = new Idempotency();
+            $idemp->check($idempotencyKey, 'sale-lots');
+        }
+
         $this->validateRequiredFields($data, ['branch_id', 'buyer_name', 'sale_date', 'items']);
 
         if (!is_array($data['items']) || count($data['items']) === 0) {
@@ -59,13 +67,14 @@ class SaleLotsController extends Controller
         }
 
         $cleanData = [
-            'branch_id'  => intval($data['branch_id']),
-            'buyer_name' => trim((string)$data['buyer_name']),
-            'sale_date'  => $this->sanitizeInput($data['sale_date']),
-            'status'     => 'confirmed',
-            'notes'      => isset($data['notes']) ? trim((string)$data['notes']) : null,
-            'expenses'   => $data['expenses'] ?? null,
-            'created_by' => $this->user['user_id'] ?? null,
+            'branch_id'      => intval($data['branch_id']),
+            'buyer_name'     => trim((string)$data['buyer_name']),
+            'sale_date'      => $this->sanitizeInput($data['sale_date']),
+            'status'         => 'confirmed',
+            'notes'          => isset($data['notes']) ? trim((string)$data['notes']) : null,
+            'transport_cost' => (float)($data['transport_cost'] ?? 0),
+            'expenses'       => $data['expenses'] ?? null,
+            'created_by'     => $this->user['user_id'] ?? null,
         ];
 
         $cleanItems = [];
@@ -88,6 +97,10 @@ class SaleLotsController extends Controller
         try {
             $result = $model->create($cleanData);
             $model->deductStock($result['id']);
+            if ($idempotencyKey) {
+                $idemp->save($idempotencyKey, 'sale-lots', ['id' => $result['id'], 'reference_no' => $result['reference_no']]);
+            }
+
             Logger::logActivity(
                 $this->user['user_id'],
                 'create_sale_lot',
@@ -138,12 +151,13 @@ class SaleLotsController extends Controller
         }
 
         $cleanData = [
-            'buyer_name'  => trim((string)$data['buyer_name']),
-            'sale_date'   => $this->sanitizeInput($data['sale_date']),
-            'notes'       => isset($data['notes']) ? trim((string)$data['notes']) : null,
-            'expenses'    => $data['expenses'] ?? null,
-            'items'       => $cleanItems,
-            'updated_by'  => $this->user['user_id'] ?? null,
+            'buyer_name'     => trim((string)$data['buyer_name']),
+            'sale_date'      => $this->sanitizeInput($data['sale_date']),
+            'notes'          => isset($data['notes']) ? trim((string)$data['notes']) : null,
+            'transport_cost' => (float)($data['transport_cost'] ?? 0),
+            'expenses'       => $data['expenses'] ?? null,
+            'items'          => $cleanItems,
+            'updated_by'     => $this->user['user_id'] ?? null,
         ];
 
         try {

@@ -138,3 +138,31 @@ label {
   box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.08);
   outline: none;
 }
+
+/* Password toggle wrapper */
+.password-wrapper {
+  position: relative;
+}
+.password-wrapper .form-control {
+  padding-right: 44px;
+}
+.password-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--color-text-light);
+  cursor: pointer;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition);
+}
+.password-toggle:hover {
+  color: var(--color-primary);
+  background: var(--color-bg);
+}

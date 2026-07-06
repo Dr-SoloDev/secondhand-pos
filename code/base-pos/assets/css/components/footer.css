@@ -1,0 +1,30 @@
+/* Footer — Powered by SoloCorp OS */
+.footer-powered {
+  text-align: center;
+  padding: 12px 16px;
+  font-size: 11px;
+  color: #64748B;
+  border-top: 1px solid #1E293B;
+  margin-top: auto;
+  background: #0F172A;
+  letter-spacing: 0.3px;
+}
+
+.footer-powered strong {
+  color: #3B82F6;
+  font-weight: 600;
+}
+
+/* Login page footer */
+.login-footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 11px;
+  color: #64748B;
+  letter-spacing: 0.3px;
+  margin-top: -24px;
+}
+
+.login-footer strong {
+  color: #3B82F6;
+}

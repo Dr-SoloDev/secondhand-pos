@@ -73,6 +73,10 @@
   font-size: 22px;
   color: var(--color-primary);
 }
+.sidebar-brand img.sidebar-logo-icon {
+  width: 28px;
+  height: 28px;
+}
 .sidebar-menu {
   padding: 8px 0;
   list-style: none;
@@ -670,7 +674,7 @@
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   line-height: 1.1;
 }
 
@@ -707,4 +711,203 @@
 /* Warm-tinted shadow override */
 .user-dropdown-menu {
   box-shadow: 0 10px 25px rgba(217, 119, 6, 0.06), 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* === Day 4 UX Frontend Responsive Polish === */
+.page-header h1 {
+  letter-spacing: 0;
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    display: block;
+  }
+
+  .content-area {
+    max-width: 100vw;
+    margin-left: 0;
+    padding: 12px;
+    overflow-x: hidden;
+  }
+
+  .content-area > * {
+    max-width: 100%;
+  }
+
+  .topbar {
+    height: auto;
+    min-height: 56px;
+    margin: -12px -12px 16px -12px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .hamburger-btn {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    margin-right: 4px;
+  }
+
+  .sidebar {
+    width: min(82vw, 280px);
+    height: 100dvh;
+    overflow-y: auto;
+  }
+
+  .sidebar-menu a {
+    min-height: 44px;
+  }
+
+  .user-dropdown {
+    margin-left: auto;
+  }
+
+  .user-dropdown-toggle {
+    min-height: 44px;
+  }
+
+  .page-header {
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .page-header h1 {
+    font-size: 22px;
+  }
+
+  .card-header,
+  .card-tools,
+  .filters,
+  .search-bar {
+    min-width: 0;
+  }
+
+  .card-tools {
+    gap: 8px;
+  }
+
+  .modal-content {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    margin: 12px auto;
+    overflow-y: auto;
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .modal-footer .btn {
+    flex: 1 1 auto;
+  }
+
+  .form-row {
+    flex-wrap: wrap;
+  }
+
+  .form-col {
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  input,
+  select,
+  textarea,
+  .form-control {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .topbar {
+    align-items: center;
+  }
+
+  .user-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-header h1 {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-card {
+    min-width: 0;
+  }
+
+  .stat-value {
+    overflow-wrap: anywhere;
+  }
+
+  .filters .form-control,
+  .search-bar input[type="text"],
+  .search-bar .btn {
+    width: 100%;
+  }
+
+  .btn-group {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* === Global Loading Overlay (used by showGlobalLoading / showLoading) === */
+#globalLoadingOverlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-loading-overlay);
+}
+#globalLoadingOverlay.show {
+  display: flex;
+}
+.global-loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: 28px 36px;
+  box-shadow: var(--shadow-lg);
+}
+.global-loading-box .spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--color-primary-lighter);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.global-loading-message {
+  font-size: 14px;
+  color: var(--color-text-light);
+  font-weight: 500;
 }
