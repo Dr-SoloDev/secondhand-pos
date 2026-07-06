@@ -350,33 +350,37 @@
 
   <input type="file" id="photoFileInput" class="photo-file-input" accept="image/*" capture="environment">
 
-  <!-- Photo Picker Bottom Sheet -->
+   <!-- Photo Picker Bottom Sheet -->
   <div class="photo-sheet-overlay" id="photoSheetOverlay">
     <div class="photo-sheet">
       <div class="photo-sheet-handle"></div>
-      <div class="photo-sheet-title">เพิ่มรูปภาพ</div>
+      <div class="photo-sheet-header-row">
+        <div class="photo-sheet-title">เพิ่มรูปภาพ</div>
+        <button class="photo-sheet-close-btn" id="sheetCloseBtn">&times;</button>
+      </div>
       <div class="photo-sheet-options">
         <button class="photo-sheet-btn" id="sheetCameraBtn">
-          <span class="photo-sheet-btn-icon camera"><i class="icon-image"></i></span>
+          <span class="photo-sheet-btn-icon camera">📷</span>
           <div>
-            <div>ถ่ายรูป</div>
+            <div class="photo-sheet-btn-main">ถ่ายรูป</div>
             <div class="photo-sheet-btn-label">ใช้กล้องเว็บแคม / กล้องมือถือ</div>
           </div>
         </button>
         <button class="photo-sheet-btn" id="sheetGalleryBtn">
-          <span class="photo-sheet-btn-icon gallery"><i class="icon-gallery"></i></span>
+          <span class="photo-sheet-btn-icon gallery">🖼️</span>
           <div>
-            <div>เลือกรูป</div>
-            <div class="photo-sheet-btn-label">เลือกจากแกลเลอรี / เครื่อง</div>
-          </div>
-        </button>
-        <button class="photo-sheet-btn" id="sheetCancelBtn" style="margin-top:8px">
-          <span class="photo-sheet-btn-icon cancel-action">✕</span>
-          <div>
-            <div>ยกเลิก</div>
+            <div class="photo-sheet-btn-main">เลือกรูปจากแกลเลอรี</div>
+            <div class="photo-sheet-btn-label">เลือกจากเครื่อง หรือมือถือ</div>
           </div>
         </button>
       </div>
+      <div class="photo-sheet-divider"></div>
+      <button class="photo-sheet-btn photo-sheet-btn-cancel" id="sheetCancelBtn">
+        <span class="photo-sheet-btn-icon cancel-action">✕</span>
+        <div>
+          <div class="photo-sheet-btn-main">ยกเลิก</div>
+        </div>
+      </button>
     </div>
   </div>
 

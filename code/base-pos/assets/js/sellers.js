@@ -1,5 +1,6 @@
 let sellers = [];
 let currentSeller = null;
+let pendingSellerIdPhoto = null; // File | null
 
 document.addEventListener('DOMContentLoaded', function() {
     loadSellers();
@@ -7,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('isBlacklisted').addEventListener('change', function() {
         document.getElementById('blacklistReasonGroup').style.display = this.checked ? '' : 'none';
     });
+
+    // Photo upload for seller ID card
+    initSellerPhotoUpload();
 });
 
 async function loadSellers() {
@@ -91,6 +95,7 @@ function openAddSellerModal() {
     pdpaCheck.disabled = false;
     document.getElementById('pdpaConsentText').textContent =
         'ยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น';
+    resetSellerPhoto();
     document.getElementById('sellerModal').classList.add('show');
 }
 
@@ -118,6 +123,18 @@ function editSeller(id) {
     pdpaCheck.checked = true;
     pdpaCheck.disabled = true;
     document.getElementById('pdpaConsentText').textContent = 'ให้ความยินยอมแล้ว';
+
+    // Show existing ID card photo if available
+    resetSellerPhoto();
+    if (currentSeller.id_card_photo) {
+        const thumb = document.getElementById('sellerPhotoThumb');
+        const area = document.getElementById('sellerPhotoArea');
+        thumb.src = currentSeller.id_card_photo;
+        thumb.style.display = 'block';
+        area.classList.add('has-photo');
+        document.getElementById('sellerPhotoIcon').style.display = 'none';
+        document.querySelector('#sellerPhotoArea .seller-photo-text').style.display = 'none';
+    }
 
     document.getElementById('sellerModal').classList.add('show');
 }
@@ -257,8 +274,8 @@ function confirmBlacklist(id) {
                 </div>
                 <div class="modal-body">
                     <p style="margin-bottom:12px;">ผู้ขาย: <strong>${seller.full_name}</strong></p>
-                    <label for="blacklistReason">เหตุผลในการ Blacklist <span style="color:#ef4444;">*</span></label>
-                    <textarea id="blacklistReason" class="form-control" rows="3" placeholder="ระบุเหตุผล..." style="width:100%;margin-top:4px;"></textarea>
+                    <label for="blacklistReasonConfirm">เหตุผลในการ Blacklist <span style="color:#ef4444;">*</span></label>
+                    <textarea id="blacklistReasonConfirm" class="form-control" rows="3" placeholder="ระบุเหตุผล..." style="width:100%;margin-top:4px;"></textarea>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">ยกเลิก</button>
@@ -270,7 +287,7 @@ function confirmBlacklist(id) {
     document.body.appendChild(overlay);
 
     document.getElementById('confirmBlacklistBtn').addEventListener('click', function() {
-        const reason = document.getElementById('blacklistReason').value.trim();
+        const reason = document.getElementById('blacklistReasonConfirm').value.trim();
         if (!reason) {
             showNotification('กรุณาระบุเหตุผล', 'error');
             return;
@@ -308,6 +325,7 @@ function closeSellerModal() {
     document.getElementById('sellerModal').classList.remove('show');
     document.getElementById('sellerForm').reset();
     currentSeller = null;
+    resetSellerPhoto();
 }
 
 function formatIdCard(idCard) {
@@ -335,7 +353,9 @@ function setupIdCardFormatter() {
 
 function formatDate(dateString) {
     if (!dateString) return '-';
-    const date = new Date(dateString);
+    // Safari-safe: replace space with T for ISO 8601
+    const date = new Date(dateString.replace(' ', 'T'));
+    if (isNaN(date.getTime())) return dateString;
     return date.toLocaleDateString('th-TH', {
         year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
@@ -363,3 +383,74 @@ window.onclick = function(event) {
 document.getElementById('searchInput').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') searchSellers();
 });
+
+// ===== Photo Upload =====
+let sellerPhotoFileInput = null;
+
+function initSellerPhotoUpload() {
+    // Create hidden file input
+    sellerPhotoFileInput = document.createElement('input');
+    sellerPhotoFileInput.type = 'file';
+    sellerPhotoFileInput.accept = 'image/*';
+    sellerPhotoFileInput.style.display = 'none';
+    sellerPhotoFileInput.id = 'sellerPhotoFileInput';
+    document.body.appendChild(sellerPhotoFileInput);
+
+    const area = document.getElementById('sellerPhotoArea');
+    const thumb = document.getElementById('sellerPhotoThumb');
+    const removeBtn = document.getElementById('sellerPhotoRemove');
+
+    if (!area) return; // Not on sellers page
+
+    // Click area → open file picker
+    area.addEventListener('click', function(e) {
+        if (e.target === removeBtn || removeBtn?.contains(e.target)) return;
+        sellerPhotoFileInput.click();
+    });
+
+    // File selected → show preview
+    sellerPhotoFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        pendingSellerIdPhoto = file;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            thumb.src = ev.target.result;
+            thumb.style.display = 'block';
+            area.classList.add('has-photo');
+            removeBtn.style.display = 'flex';
+            document.getElementById('sellerPhotoIcon').style.display = 'none';
+            document.querySelector('#sellerPhotoArea .seller-photo-text').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Remove button → clear photo
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            pendingSellerIdPhoto = null;
+            thumb.style.display = 'none';
+            area.classList.remove('has-photo');
+            removeBtn.style.display = 'none';
+            document.getElementById('sellerPhotoIcon').style.display = 'flex';
+            document.querySelector('#sellerPhotoArea .seller-photo-text').style.display = 'flex';
+            sellerPhotoFileInput.value = '';
+        });
+    }
+}
+
+function resetSellerPhoto() {
+    pendingSellerIdPhoto = null;
+    const thumb = document.getElementById('sellerPhotoThumb');
+    const removeBtn = document.getElementById('sellerPhotoRemove');
+    const area = document.getElementById('sellerPhotoArea');
+    if (thumb) { thumb.style.display = 'none'; thumb.src = ''; }
+    if (removeBtn) removeBtn.style.display = 'none';
+    if (area) area.classList.remove('has-photo');
+    const icon = document.getElementById('sellerPhotoIcon');
+    const text = document.querySelector('#sellerPhotoArea .seller-photo-text');
+    if (icon) icon.style.display = 'flex';
+    if (text) text.style.display = 'flex';
+    if (sellerPhotoFileInput) sellerPhotoFileInput.value = '';
+}

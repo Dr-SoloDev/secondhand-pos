@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ผู้ขาย - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css">
+  <link rel="stylesheet" href="../assets/css/components/photo-picker.css">
 </head>
 <body>
   <div class="app-container">
@@ -160,12 +161,27 @@
             <label for="notes">หมายเหตุ</label>
             <textarea id="notes" class="form-control" rows="2" placeholder="เช่น ลักษณะพิเศษ, ประวัติ"></textarea>
           </div>
-          <div class="form-group" id="pdpaConsentGroup" style="background:var(--color-bg-subtle,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:6px;padding:10px 12px">
-            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0">
-              <input type="checkbox" id="pdpaConsent" style="margin-top:3px;flex-shrink:0">
-              <span id="pdpaConsentText" style="font-size:13px;line-height:1.5;color:var(--color-text,#1e293b)">ยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น</span>
-            </label>
-          </div>
+           <!-- ID Card Photo Upload -->
+           <div class="form-group">
+             <label>รูปถ่ายบัตรประชาชน</label>
+             <div class="seller-photo-area" id="sellerPhotoArea">
+               <div class="seller-photo-icon" id="sellerPhotoIcon">
+                 <i class="icon-image" style="font-size:24px"></i>
+               </div>
+               <div class="seller-photo-text">
+                 <span class="title"><i class="icon-image"></i> เพิ่มรูปถ่ายบัตรประชาชน</span>
+                 <span class="sub">แตะเพื่อถ่ายรูป หรือเลือกรูป</span>
+               </div>
+               <img class="seller-photo-thumb" id="sellerPhotoThumb" style="display:none" alt="รูปบัตร">
+               <button class="photo-thumb-remove" id="sellerPhotoRemove" style="display:none" title="ลบรูป">×</button>
+             </div>
+           </div>
+           <div class="form-group" id="pdpaConsentGroup" style="background:var(--color-bg-subtle,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:6px;padding:10px 12px">
+             <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0">
+               <input type="checkbox" id="pdpaConsent" style="margin-top:3px;flex-shrink:0">
+               <span id="pdpaConsentText" style="font-size:13px;line-height:1.5;color:var(--color-text,#1e293b)">ยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น</span>
+             </label>
+           </div>
           <div class="form-group">
             <label>
               <input type="checkbox" id="isBlacklisted">

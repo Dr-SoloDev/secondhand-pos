@@ -1406,6 +1406,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Bottom sheet: ยกเลิก
   document.getElementById('sheetCancelBtn').addEventListener('click', closePhotoSheet);
+  const sheetCloseBtn = document.getElementById('sheetCloseBtn');
+  if (sheetCloseBtn) sheetCloseBtn.addEventListener('click', closePhotoSheet);
   document.getElementById('photoSheetOverlay').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closePhotoSheet();
   });
