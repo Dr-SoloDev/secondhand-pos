@@ -102,7 +102,6 @@ Sprint 1 (ก่อน deploy):
 
 Sprint 2 (หลัง deploy สัปดาห์แรก):
   G5 → Dashboard 4 สาขา
-  G6 → บอร์ดราคาพิมพ์ได้
   G8 → Export CSV
 
 Sprint 3 (เดือน 2):
