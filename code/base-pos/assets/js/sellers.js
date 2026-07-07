@@ -241,7 +241,7 @@ function renderPoCard(po) {
             <table class="data-table" style="font-size:12px;margin-top:8px;width:100%">
                 <thead>
                     <tr style="background:#f1f5f9">
-                        <th style="padding:4px 8px;text-align:left">รายการ</th>
+                        <th style="padding:4px 8px;text-align:left">รายการ <span style="color:#888;font-weight:normal;font-size:11px">(📸 ถ้ามีรูป)</span></th>
                         <th style="padding:4px 8px;text-align:center;width:80px">จำนวน</th>
                         <th style="padding:4px 8px;text-align:right;width:90px">ราคา/หน่วย</th>
                         <th style="padding:4px 8px;text-align:right;width:90px">รวม</th>
@@ -254,11 +254,24 @@ function renderPoCard(po) {
                         const qtyDisplay = ded > 0
                             ? `${qty.toFixed(3)} <span style="color:#888;font-size:11px">(หัก ${ded.toFixed(3)})</span>`
                             : qty.toFixed(3);
+
+                        // Per-item photo thumbnails
+                        const itemPhotosHtml = (item.photos && item.photos.length)
+                            ? `<div style="display:flex;gap:3px;margin-top:4px">
+                                ${item.photos.map(p =>
+                                    `<img src="${escapeHtml(p.photo_path)}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="รูปสินค้าชิ้นนี้">`
+                                ).join('')}
+                               </div>`
+                            : (item.photo_path
+                                ? `<div style="margin-top:4px"><img src="${escapeHtml(item.photo_path)}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="รูปสินค้าชิ้นนี้"></div>`
+                                : '');
+
                         return `<tr>
                             <td style="padding:4px 8px">
                                 <strong>${escapeHtml(item.item_name)}</strong>
                                 ${item.category_name ? `<span style="color:#888;font-size:11px"> · ${escapeHtml(item.category_name)}</span>` : ''}
                                 ${item.notes ? `<div style="color:#888;font-size:11px">${escapeHtml(item.notes)}</div>` : ''}
+                                ${itemPhotosHtml}
                             </td>
                             <td style="padding:4px 8px;text-align:center">${qtyDisplay} ${escapeHtml(item.unit)}</td>
                             <td style="padding:4px 8px;text-align:right">${formatNumber(item.unit_price)}</td>
@@ -269,12 +282,14 @@ function renderPoCard(po) {
             </table>`;
     }
 
-    // Photos gallery
+    // Photos gallery (only PO-level photos; item photos shown inline above)
+    const poLevelPhotos = (po.photos || []).filter(p => !p.item_id);
     let photosHtml = '';
-    if (po.photos && po.photos.length) {
+    if (poLevelPhotos.length) {
         photosHtml = `
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0">
-                ${po.photos.map(p =>
+                <span style="font-size:11px;color:#888;width:100%;margin-bottom:4px">📸 รูปรวมของบิลนี้</span>
+                ${poLevelPhotos.map(p =>
                     `<img src="${escapeHtml(p.photo_path)}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="คลิกดูรูปใหญ่">`
                 ).join('')}
             </div>`;

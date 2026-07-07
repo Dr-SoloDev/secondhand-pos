@@ -258,14 +258,29 @@ class SellersController extends Controller
         }
 
         $photosByPo = [];
+        $photosByItem = [];
         foreach ($allPhotos as $photo) {
             $poId = $photo['purchase_order_id'];
+            $itemId = $photo['purchase_order_item_id'];
+
+            // Group by PO (for gallery)
             if (!isset($photosByPo[$poId])) $photosByPo[$poId] = [];
             $photosByPo[$poId][] = [
                 'id'         => $photo['id'],
                 'photo_path' => $photo['photo_path'],
                 'is_primary' => $photo['is_primary'],
+                'item_id'    => $itemId,
             ];
+
+            // Group by Item (for inline thumbnail)
+            if ($itemId) {
+                if (!isset($photosByItem[$itemId])) $photosByItem[$itemId] = [];
+                $photosByItem[$itemId][] = [
+                    'id'         => $photo['id'],
+                    'photo_path' => $photo['photo_path'],
+                    'is_primary' => $photo['is_primary'],
+                ];
+            }
         }
 
         // 5. ประกอบ POs
@@ -280,6 +295,14 @@ class SellersController extends Controller
             $poId = $po['id'];
             $amount = floatval($po['total_amount']);
 
+            $poItems = $itemsByPo[$poId] ?? [];
+            // Attach item-level photos to each item
+            foreach ($poItems as &$item) {
+                $itemId = $item['id'];
+                $item['photos'] = $photosByItem[$itemId] ?? [];
+            }
+            unset($item);
+
             $transactions[] = [
                 'id'               => $poId,
                 'reference_no'     => $po['reference_no'],
@@ -291,7 +314,7 @@ class SellersController extends Controller
                 'processed_by'     => $po['processed_by_name'] ?? '',
                 'notes'            => $po['notes'] ?? '',
                 'created_at'       => $po['created_at'],
-                'items'            => $itemsByPo[$poId] ?? [],
+                'items'            => $poItems,
                 'photos'           => $photosByPo[$poId] ?? [],
             ];
 
