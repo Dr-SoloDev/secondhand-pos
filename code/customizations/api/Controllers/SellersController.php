@@ -48,8 +48,11 @@ class SellersController extends Controller
             Response::error('กรุณาระบุคำค้นหา', 400);
         }
 
+        $includeBlacklisted = isset($_GET['include_blacklisted'])
+                              && $_GET['include_blacklisted'] === 'true';
+
         $sellerModel = new Seller();
-        $results = $sellerModel->search($keyword);
+        $results = $sellerModel->search($keyword, $includeBlacklisted);
 
         Response::success('ค้นหาสำเร็จ', $results);
     }
@@ -318,7 +321,10 @@ class SellersController extends Controller
                 'photos'           => $photosByPo[$poId] ?? [],
             ];
 
-            $totalPos++;
+            // total_pos นับเฉพาะ completed เท่านั้น (ตามที่ seller-history.html แสดง)
+            if ($po['status'] === 'completed') {
+                $totalPos++;
+            }
             $totalAmount += $amount;
             $totalItemsSold += intval($po['total_items']);
             if ($firstTransaction === null || $po['created_at'] < $firstTransaction) {

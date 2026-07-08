@@ -180,6 +180,9 @@ class SaleLot extends Model
                 ]);
             }
 
+            // ตัดสต็อกภายใน transaction เดียวกัน — ป้องกัน create สำเร็จแต่ deductStock ล้มเหลว
+            $this->deductStock($lotId);
+
             $this->db->commit();
             return ['id' => $lotId, 'reference_no' => $referenceNo, 'total_amount' => $totalAmount, 'total_cost' => $totalCost];
         } catch (Exception $e) {

@@ -60,6 +60,14 @@ class SaleLotsController extends Controller
             $idemp->check($idempotencyKey, 'sale-lots');
         }
 
+        // SECURITY: non-admin บังคับ scope ที่ branch ของตัวเอง — ห้ามสร้าง Sale Lot ให้สาขาอื่น
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$data['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์สร้าง Sale Lot สำหรับสาขานี้', 403);
+            }
+        }
+
         $this->validateRequiredFields($data, ['branch_id', 'buyer_name', 'sale_date', 'items']);
 
         if (!is_array($data['items']) || count($data['items']) === 0) {
@@ -96,7 +104,6 @@ class SaleLotsController extends Controller
         $model = new SaleLot();
         try {
             $result = $model->create($cleanData);
-            $model->deductStock($result['id']);
             if ($idempotencyKey) {
                 $idemp->save($idempotencyKey, 'sale-lots', ['id' => $result['id'], 'reference_no' => $result['reference_no']]);
             }

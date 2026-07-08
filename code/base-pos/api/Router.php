@@ -51,7 +51,6 @@ class Router
 
                 if (empty($authHeader) || strpos($authHeader, 'Bearer ') !== 0) {
                     Response::error('Authentication required', 401);
-                    exit;
                 }
 
                 $token = substr($authHeader, 7);
@@ -61,7 +60,6 @@ class Router
 
             if (!$decoded) {
                 Response::error('Invalid or expired token', 401);
-                exit;
             }
 
             // Store user data
@@ -72,8 +70,10 @@ class Router
     public function registerRoutes()
     {
         // Auth routes
-        $this->routes[] = ['route' => 'auth/login', 'controller' => 'AuthController', 'method' => 'login'];
-        $this->routes[] = ['route' => 'auth/verify', 'controller' => 'AuthController', 'method' => 'verify'];
+        $this->routes[] = ['route' => 'auth/login', 'controller' => 'AuthController', 'method' => 'login', 'verb' => 'POST'];
+        // Accept GET (cookie) or POST (body token) for backward compat
+        $this->routes[] = ['route' => 'auth/verify', 'controller' => 'AuthController', 'method' => 'verify', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'auth/verify', 'controller' => 'AuthController', 'method' => 'verify', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'auth/logout', 'controller' => 'AuthController', 'method' => 'logout', 'verb' => 'POST'];
 
         // Inventory routes
@@ -165,6 +165,7 @@ class Router
         $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrders', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'createPurchaseOrder', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'purchase-orders/order', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrder', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-orders/print', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrderForPrint', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders/cancel', 'controller' => 'PurchaseOrdersController', 'method' => 'cancelPurchaseOrder', 'verb' => 'POST'];
         // WF-01: Photo upload (auth via HMAC token หรือ JWT)
         $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'upload', 'verb' => 'POST'];
@@ -248,14 +249,13 @@ class Router
 
         if (!$matchedRoute) {
             Response::error('Endpoint not found or method not allowed', 404);
-            exit;
         }
 
-        // Get ID from query string or URL path
+        // Get ID from query string (primary) or URL path (numeric only)
         $uriParts = explode('/', trim($requestUri, '/'));
-        $pathId = $uriParts[2] ?? null;
+        $pathId = isset($uriParts[2]) && is_numeric($uriParts[2]) ? $uriParts[2] : null;
         $queryId = isset($_GET['id']) ? $_GET['id'] : null;
-        $id = $pathId ?? $queryId;
+        $id = $queryId ?? $pathId;
 
         // Convert ID to integer if numeric
         if ($id !== null && is_numeric($id)) {
@@ -268,14 +268,12 @@ class Router
 
         if (!class_exists($controllerName)) {
             Response::error("Controller not found", 500);
-            exit;
         }
 
         $controller = new $controllerName($this->user);
 
         if (!method_exists($controller, $methodName)) {
             Response::error("Method not found in controller", 500);
-            exit;
         }
 
         $controller->$methodName($id);

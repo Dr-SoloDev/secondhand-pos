@@ -3,15 +3,15 @@
   text-align: center;
   padding: 12px 16px;
   font-size: 11px;
-  color: #64748B;
-  border-top: 1px solid #1E293B;
+  color: var(--color-text-light);
+  border-top: 1px solid var(--color-gray-700);
   margin-top: auto;
-  background: #0F172A;
+  background: var(--color-sidebar-header);
   letter-spacing: 0.3px;
 }
 
 .footer-powered strong {
-  color: #3B82F6;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -20,11 +20,11 @@
   text-align: center;
   padding: 16px;
   font-size: 11px;
-  color: #64748B;
+  color: var(--color-text-light);
   letter-spacing: 0.3px;
   margin-top: -24px;
 }
 
 .login-footer strong {
-  color: #3B82F6;
+  color: var(--color-primary);
 }

@@ -101,7 +101,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 99999;
+  z-index: calc(var(--z-notification) + 10);
   background: var(--color-danger);
   color: var(--color-white);
   text-align: center;
@@ -113,37 +113,6 @@
 
 #offlineBanner.show {
   display: block;
-}
-
-#globalLoadingOverlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 99998;
-  align-items: center;
-  justify-content: center;
-  background: rgba(248, 250, 252, 0.58);
-  pointer-events: none;
-}
-
-#globalLoadingOverlay.show {
-  display: flex;
-}
-
-.global-loading-box {
-  min-width: 160px;
-  padding: 18px 20px;
-  border-radius: var(--radius-md);
-  background: var(--color-white);
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--color-border);
-  text-align: center;
-}
-
-.global-loading-message {
-  margin-top: 10px;
-  color: var(--color-text-light);
-  font-size: 13px;
 }
 
 @media (max-width: 576px) {

@@ -19,7 +19,7 @@
       <ul class="sidebar-menu">
         <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
         <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
-        <li><a href="sellers.html" class="active"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+        <li><a href="sellers.html" class="active"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
@@ -70,7 +70,7 @@
           <div class="filters">
             <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
               <input type="checkbox" id="showBlacklisted" onchange="loadSellers()">
-              แสดง Blacklist
+              แสดงบัญชีดำ
             </label>
           </div>
           <div class="table-container">
@@ -106,7 +106,7 @@
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <h2 id="viewSellerName" style="margin:0">-</h2>
-          <span id="viewSellerBlacklistBadge" style="display:none" class="badge badge-danger">⛔ Blacklist</span>
+          <span id="viewSellerBlacklistBadge" style="display:none" class="badge badge-danger">⛔ บัญชีดำ</span>
         </div>
         <button class="close-modal" onclick="closeViewSellerModal()">&times;</button>
       </div>
@@ -134,7 +134,7 @@
         <div id="viewSellerStats" style="font-size:13px;color:#555;margin-bottom:12px;padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px"></div>
 
         <!-- Blacklist Info -->
-        <div id="viewSellerBlacklist" style="display:none;background:#fff5f5;border:1px solid #fca5a5;border-radius:6px;padding:8px 12px;margin-bottom:12px;color:#c00;font-size:13px">⛔ Blacklist: ไม่ได้ระบุเหตุผล</div>
+        <div id="viewSellerBlacklist" style="display:none;background:#fff5f5;border:1px solid #fca5a5;border-radius:6px;padding:8px 12px;margin-bottom:12px;color:#c00;font-size:13px">⛔ บัญชีดำ: ไม่ได้ระบุเหตุผล</div>
 
         <!-- Transaction History -->
         <div style="font-weight:600;margin-bottom:8px;font-size:14px">
@@ -168,18 +168,19 @@
           <input type="hidden" id="sellerId">
           <div class="form-group">
             <label for="fullName">ชื่อ-นามสกุล <span class="required">*</span></label>
-            <input type="text" id="fullName" class="form-control" required>
+            <input type="text" id="fullName" class="form-control" placeholder="เช่น สมชาย ใจดี" required>
           </div>
           <div class="form-row">
             <div class="form-col">
-              <label for="phone">เบอร์โทรศัพท์ <span class="required">*</span></label>
-              <input type="tel" id="phone" class="form-control" placeholder="08X-XXX-XXXX" required>
+              <label for="phone">เบอร์โทรศัพท์</label>
+              <input type="tel" id="phone" class="form-control" placeholder="08X-XXX-XXXX">
             </div>
             <div class="form-col">
-              <label for="idCard">เลขบัตรประชาชน <span class="required">*</span></label>
-              <input type="text" id="idCard" class="form-control" placeholder="X-XXXX-XXXXX-XX-X" maxlength="17" required>
+              <label for="idCard">เลขบัตรประชาชน</label>
+              <input type="text" id="idCard" class="form-control" placeholder="X-XXXX-XXXXX-XX-X" maxlength="17">
             </div>
           </div>
+          <small class="form-hint">* กรอกอย่างใดอย่างหนึ่ง</small>
           <div class="form-group">
             <label for="address">ที่อยู่</label>
             <textarea id="address" class="form-control" rows="3"></textarea>
@@ -188,6 +189,16 @@
             <label for="notes">หมายเหตุ</label>
             <textarea id="notes" class="form-control" rows="2" placeholder="เช่น ลักษณะพิเศษ, ประวัติ"></textarea>
           </div>
+          <div class="form-group">
+            <label for="vehiclePlate">ทะเบียนรถ</label>
+            <input type="text" id="vehiclePlate" class="form-control" placeholder="เช่น กข 1234 กรุงเทพฯ">
+          </div>
+           <div class="form-group" id="pdpaConsentGroup" style="background:var(--color-bg-subtle,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:6px;padding:10px 12px">
+             <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0">
+               <input type="checkbox" id="pdpaConsent" style="margin-top:3px;flex-shrink:0">
+               <span id="pdpaConsentText" style="font-size:13px;line-height:1.5;color:var(--color-text,#1e293b)">ยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น</span>
+             </label>
+           </div>
            <!-- ID Card Photo Upload -->
            <div class="form-group">
              <label>รูปถ่ายบัตรประชาชน</label>
@@ -203,20 +214,14 @@
                <button class="photo-thumb-remove" id="sellerPhotoRemove" style="display:none" title="ลบรูป">×</button>
              </div>
            </div>
-           <div class="form-group" id="pdpaConsentGroup" style="background:var(--color-bg-subtle,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:6px;padding:10px 12px">
-             <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0">
-               <input type="checkbox" id="pdpaConsent" style="margin-top:3px;flex-shrink:0">
-               <span id="pdpaConsentText" style="font-size:13px;line-height:1.5;color:var(--color-text,#1e293b)">ยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น</span>
-             </label>
-           </div>
           <div class="form-group">
             <label>
               <input type="checkbox" id="isBlacklisted">
-              <span class="text-danger">Blacklist (ห้ามรับซื้อ)</span>
+              <span class="text-danger">บัญชีดำ (ห้ามรับซื้อ)</span>
             </label>
           </div>
           <div class="form-group" id="blacklistReasonGroup" style="display:none">
-            <label for="blacklistReason">เหตุผล Blacklist</label>
+            <label for="blacklistReason">เหตุผลที่ขึ้นบัญชีดำ</label>
             <input type="text" id="blacklistReason" class="form-control" placeholder="เช่น ของโจร, เช็คยืนยันแล้ว">
           </div>
         </form>
@@ -233,6 +238,6 @@
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
   <script src="../assets/js/sellers.js"></script>
-<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 </body>
 </html>

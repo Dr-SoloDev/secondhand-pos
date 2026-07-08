@@ -18,7 +18,7 @@
       <ul class="sidebar-menu">
         <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
         <li><a href="purchase-orders.html" class="active"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
-        <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
@@ -49,8 +49,15 @@
         </div>
       </div>
 
-      <div class="page-header">
-        <h1>รับซื้อของ</h1>
+      <div class="page-header po-page-header">
+        <div>
+          <h1>รับซื้อของ</h1>
+          <p>ทำรายการรับซื้อหน้าร้าน</p>
+        </div>
+        <div class="po-header-status" aria-label="สถานะหน้าจอ">
+          <span>โหมดหน้าร้าน</span>
+          <strong>พร้อมรับซื้อ</strong>
+        </div>
       </div>
 
       <div class="po-page">
@@ -64,61 +71,71 @@
           <div class="po-tier-group">
             <label>ระดับราคา (บิล)</label>
             <div id="globalTierButtons"></div>
-          <div id="globalTierInfo" style="font-size:12px;color:#6b7280;margin-top:4px">ยังไม่ได้เลือก — จะใช้ราคาปกติ</div>
+            <div id="globalTierInfo" class="po-tier-info">ยังไม่ได้เลือก — จะใช้ราคาปกติ</div>
           </div>
         </div>
 
         <!-- ===== Row 2: เพิ่มสินค้า inline ===== -->
-        <!-- แถว 1: ชื่อสินค้า + หน่วย -->
-        <div class="po-field-row">
-          <div class="po-field po-field-name">
-            <label>สินค้า</label>
-            <div style="position:relative">
-              <input type="text" id="itemName" class="form-control" autocomplete="off"
-                     placeholder="พิมพ์รหัสหรือชื่อ เช่น WM01, เครื่องซักผ้า">
-              <input type="hidden" id="itemCatalogId" value="">
-              <input type="hidden" id="itemCategoryId" value="">
-              <input type="hidden" id="itemUnitPrice" value="0">
-              <div id="itemCatalogResults" class="seller-results"></div>
+        <div class="po-entry-card">
+          <div class="po-card-header">
+            <h2>เพิ่มรายการรับซื้อ</h2>
+          </div>
+          <!-- แถว 1: ชื่อสินค้า + หน่วย -->
+          <div class="po-field-row">
+            <div class="po-field po-field-name">
+              <label>สินค้า</label>
+              <div class="po-search-wrap">
+                <input type="text" id="itemName" class="form-control" autocomplete="off"
+                       placeholder="พิมพ์รหัสหรือชื่อ เช่น WM01, เครื่องซักผ้า">
+                <input type="hidden" id="itemCatalogId" value="">
+                <input type="hidden" id="itemCategoryId" value="">
+                <input type="hidden" id="itemUnitPrice" value="0">
+                <div id="itemCatalogResults" class="seller-results"></div>
+              </div>
+              <select id="itemCategorySelect" style="display:none"></select>
             </div>
-            <select id="itemCategorySelect" style="display:none"></select>
+            <div class="po-field po-field-unit">
+              <label>หน่วย</label>
+              <input type="text" id="itemUnit" value="กก." readonly tabindex="-1">
+            </div>
           </div>
-          <div class="po-field po-field-unit">
-            <label>หน่วย</label>
-            <input type="text" id="itemUnit" value="กก." readonly tabindex="-1" style="background:#f5f5f5">
-          </div>
-        </div>
-        <!-- แถว 2: น้ำหนัก + หักน้ำหนัก + ราคา + รวม + ถ่ายรูป + เพิ่ม -->
-        <div class="po-field-row">
-          <div class="po-field po-field-weight">
-            <label>น้ำหนัก (กก.)</label>
-            <input type="number" id="itemQuantity" step="0.01" min="0" placeholder="0.00">
-          </div>
-          <div class="po-field po-field-deduct">
-            <label>หักน้ำหนัก (กก.)</label>
-            <input type="number" id="itemWeightDeduct" step="0.01" min="0" placeholder="0.00">
-          </div>
-          <div class="po-field po-field-price-display">
-            <label style="color:#6b7280">ราคา/กก. <span style="font-size:10px;font-weight:400;color:#9ca3af">(auto)</span></label>
-            <div id="itemPriceDisplay" class="auto-price-display" tabindex="-1">—</div>
-          </div>
-          <div class="po-field po-field-total">
-            <label>รวม</label>
-            <div id="itemTotalPreview" class="auto-price-display">เลือกสินค้า</div>
-          </div>
-          <div class="po-field po-field-photo">
-            <label>&nbsp;</label>
-            <button id="itemPhotoBtn" class="btn-photo-picker" title="ถ่ายรูปสินค้า" type="button" tabindex="-1">📷</button>
-            <span id="itemPhotoIndicator"></span>
-          </div>
-          <div class="po-field po-field-addbtn">
-            <label>&nbsp;</label>
-            <button id="addItemBtn" class="btn btn-primary" type="button">+ เพิ่ม</button>
+          <!-- แถว 2: น้ำหนัก + หักน้ำหนัก + ราคา + รวม + ถ่ายรูป + เพิ่ม -->
+          <div class="po-field-row po-measure-row">
+            <div class="po-field po-field-weight">
+              <label>น้ำหนัก (กก.)</label>
+              <input type="number" id="itemQuantity" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div class="po-field po-field-deduct">
+              <label>หักน้ำหนัก (กก.)</label>
+              <input type="number" id="itemWeightDeduct" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div class="po-field po-field-price-display">
+              <label>ราคา/กก. <span>(auto)</span></label>
+              <div id="itemPriceDisplay" class="auto-price-display" tabindex="-1">—</div>
+            </div>
+            <div class="po-field po-field-total">
+              <label>รวม</label>
+              <div id="itemTotalPreview" class="auto-price-display">เลือกสินค้า</div>
+            </div>
+            <div class="po-field po-field-photo">
+              <label>&nbsp;</label>
+              <div class="po-photo-wrap">
+                <button id="itemPhotoBtn" class="btn-photo-picker" title="ถ่ายรูปสินค้า" type="button" tabindex="-1">📷</button>
+                <span id="itemPhotoIndicator" class="photo-badge" style="display:none"></span>
+              </div>
+            </div>
+            <div class="po-field po-field-addbtn">
+              <label>&nbsp;</label>
+              <button id="addItemBtn" class="btn btn-primary" type="button">+ เพิ่ม</button>
+            </div>
           </div>
         </div>
 
         <!-- ===== ตาราง Cart ===== -->
         <div class="po-cart-card">
+          <div class="po-card-header">
+            <h2>รายการในใบรับซื้อ</h2>
+          </div>
           <div class="table-container">
             <table class="data-table" id="cartTable">
               <thead>
@@ -138,7 +155,8 @@
             </table>
           </div>
           <div class="cart-summary">
-            <div id="cartTotalItems" style="color:#6b7280">0 กก. (0 รายการ)</div>
+            <div id="cartTotalItems">0 กก. (0 รายการ)</div>
+            <div id="cartPhotoCount"><i class="icon-image"></i> <span id="cartPhotoNum">0</span> รูป</div>
             <div>ยอดรวมจ่าย: <span id="cartTotalAmount" class="cart-total-amount">฿0.00</span></div>
           </div>
         </div>
@@ -150,8 +168,8 @@
           <div class="po-bottom-card" id="poSellerCard">
             <h3><i class="icon-user"></i> ผู้ขาย</h3>
             <div style="flex:1">
-              <label style="font-size:12px;color:#6b7280;font-weight:600">ค้นหา (ชื่อ / เลขบัตร / เบอร์)</label>
-              <div class="seller-search-box" style="margin-top:4px">
+              <label class="po-small-label">ค้นหา (ชื่อ / เลขบัตร)</label>
+              <div class="seller-search-box">
                 <input type="text" id="searchSellerInput" class="form-control" placeholder="พิมพ์เพื่อค้นหา...">
                 <div id="sellerSearchResults" class="seller-results"></div>
               </div>
@@ -174,31 +192,31 @@
           <div class="po-bottom-card">
             <h3><i class="icon-price"></i> รายละเอียดบิล</h3>
             <div style="flex:1">
-              <div class="form-group" style="margin:0">
-                <label style="font-size:12px;color:#6b7280;font-weight:600">วิธีจ่าย</label>
+              <div class="form-group po-compact-group">
+                <label class="po-small-label">วิธีจ่าย</label>
                 <select id="paymentMethod" class="form-control mt-1">
                   <option value="cash">เงินสด</option>
                   <option value="bank_transfer">โอนธนาคาร</option>
                 </select>
               </div>
-              <div class="form-group" style="margin:0">
-                <label style="font-size:12px;color:#6b7280;font-weight:600">หมายเหตุ</label>
+              <div class="form-group po-compact-group">
+                <label class="po-small-label">หมายเหตุ</label>
                 <textarea id="poNotes" class="form-control mt-1" rows="3" placeholder="(ไม่บังคับ)"></textarea>
               </div>
             </div>
           </div>
 
           <!-- ปุ่มบันทึก -->
-          <div class="po-bottom-card">
+          <div class="po-bottom-card po-save-card">
             <div style="flex:1">
-              <div style="font-size:11px;color:#059669;margin-bottom:4px;display:flex;align-items:center;gap:4px">
-                <span>✅</span>
+              <div class="po-compliance-note">
+                <span aria-hidden="true">✓</span>
                 <span>พร้อมบันทึก — ทุกครั้งที่มีการรับซื้อ ระบบปฏิบัติตาม พ.ร.บ.รับซื้อของเก่า ทุกประการ</span>
               </div>
             </div>
-            <div style="text-align:right">
-              <div style="font-size:13px;color:#6b7280">ยอดรวม</div>
-              <div style="font-size:28px;font-weight:800;color:#059669" id="cartTotalAmountBig">฿0.00</div>
+            <div class="po-total-panel">
+              <div>ยอดรวม</div>
+              <strong id="cartTotalAmountBig">฿0.00</strong>
             </div>
             <div class="po-actions">
               <button class="btn btn-secondary" id="clearPOBtn">ล้าง</button>
@@ -220,7 +238,7 @@
                   <th>เลขที่</th>
                   <th>สาขา</th>
                   <th>ผู้ขาย</th>
-                  <th class="text-right">กก.</th>
+                  <th class="text-right">รายการ</th>
                   <th class="text-right">ยอด</th>
                   <th>วันที่</th>
                 </tr>
@@ -306,7 +324,7 @@
         <div id="poQrHint" style="font-size:11px;color:#888;margin-top:6px">ลิงก์ใช้ได้ 24 ชั่วโมง</div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary" onclick="window.print()">พิมพ์</button>
+        <button class="btn btn-primary" id="btnOpenPrint">พิมพ์ใบรับซื้อ</button>
         <button class="btn btn-secondary close-modal">ปิด</button>
       </div>
     </div>
@@ -342,8 +360,8 @@
     </div>
   </div>
 
-  <!-- FAB: Floating Camera Button -->
-  <button class="photo-fab" id="fabCameraBtn" title="ถ่ายรูปสินค้า">
+  <!-- FAB: hidden — photo count moved inline to cart-summary -->
+  <button class="photo-fab" id="fabCameraBtn" style="display:none" title="ถ่ายรูปสินค้า">
     <i class="icon-image"></i>
     <span class="photo-fab-badge" id="fabBadge" style="display:none">0</span>
   </button>
@@ -421,6 +439,6 @@
   <script src="../assets/js/vendor/qrcode.min.js"></script>
   <script src="../assets/js/purchase-orders.js?v=20260614"></script>
   <script src="../assets/js/animations.js"></script>
-<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 </body>
 </html>

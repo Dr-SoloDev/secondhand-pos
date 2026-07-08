@@ -31,13 +31,17 @@ function renderSellersTable() {
     const tbody = document.getElementById('sellersTableBody');
 
     if (sellers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center">ไม่พบข้อมูลผู้ขาย</td></tr>';
+        const keyword = document.getElementById('searchInput').value.trim();
+        const msg = keyword.length >= 2
+            ? `ไม่พบผู้ขายที่ค้นหา "${escapeHtml(keyword)}"`
+            : 'ยังไม่มีข้อมูลผู้ขาย';
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center">${msg}</td></tr>`;
         return;
     }
 
     tbody.innerHTML = sellers.map(seller => {
         const statusBadge = seller.is_blacklisted
-            ? '<span class="badge badge-danger">Blacklist</span>'
+            ? `<span class="badge badge-danger" title="${escapeHtml(seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล')}">⚠️ บัญชีดำ</span>`
             : '<span class="badge badge-success">ปกติ</span>';
 
         const lastTransaction = seller.last_transaction_at
@@ -50,16 +54,17 @@ function renderSellersTable() {
                 <td>${escapeHtml(seller.full_name)}</td>
                 <td>${escapeHtml(seller.phone || '-')}</td>
                 <td>${formatIdCard(seller.id_card)}</td>
-                <td class="text-center">${seller.total_transactions}</td>
+                <td class="text-center">${seller.total_transactions ?? '-'}</td>
                 <td class="text-right">${formatNumber(seller.total_amount)}</td>
                 <td>${lastTransaction}</td>
                 <td>${statusBadge}</td>
                 <td>
                     <button class="btn-sm btn-info" onclick="viewSeller(${seller.id})" title="ดูรายละเอียด"><i class="icon-search"></i></button>
+                    <a class="btn-sm btn-secondary" href="seller-history.html?id=${seller.id}" title="ประวัติการขาย" style="display:inline-flex;align-items:center;text-decoration:none"><i class="icon-report"></i></a>
                     <button class="btn-sm btn-warning" onclick="editSeller(${seller.id})" title="แก้ไข"><i class="icon-edit"></i></button>
                     ${seller.is_blacklisted
-                        ? `<button class="btn-sm btn-success" onclick="unblacklistSeller(${seller.id})" title="ยกเลิก Blacklist">✓</button>`
-                        : `<button class="btn-sm btn-danger" onclick="confirmBlacklist(${seller.id})" title="Blacklist">×</button>`
+                        ? `<button class="btn-sm btn-success" onclick="unblacklistSeller(${seller.id})" title="ยกเลิกบัญชีดำ">✓</button>`
+                        : `<button class="btn-sm btn-danger" onclick="confirmBlacklist(${seller.id})" title="ขึ้นบัญชีดำ">×</button>`
                     }
                 </td>
             </tr>
@@ -75,10 +80,18 @@ async function searchSellers() {
         return;
     }
 
-    const result = await apiRequest(`sellers/search?q=${encodeURIComponent(keyword)}`);
+    const includeBlacklisted = document.getElementById('showBlacklisted').checked;
+    const result = await apiRequest(`sellers/search?q=${encodeURIComponent(keyword)}${includeBlacklisted ? '&include_blacklisted=true' : ''}`);
 
     if (result.status === 'success') {
-        sellers = result.data;
+        sellers = (result.data || []).map(s => ({
+            ...s,
+            full_name: s.name,
+            id_card: s.national_id,
+            total_transactions: s.total_transactions ?? 0,
+            total_amount: s.total_amount ?? 0,
+            last_transaction_at: s.last_transaction_at ?? null,
+        }));
         renderSellersTable();
     } else {
         showNotification(result.message || 'เกิดข้อผิดพลาดในการค้นหา', 'error');
@@ -90,6 +103,7 @@ function openAddSellerModal() {
     document.getElementById('modalTitle').textContent = 'เพิ่มผู้ขาย';
     document.getElementById('sellerForm').reset();
     document.getElementById('sellerId').value = '';
+    document.getElementById('blacklistReasonGroup').style.display = 'none';
     const pdpaCheck = document.getElementById('pdpaConsent');
     pdpaCheck.checked = false;
     pdpaCheck.disabled = false;
@@ -114,6 +128,7 @@ function editSeller(id) {
     document.getElementById('idCard').value = formatIdCard(currentSeller.id_card);
     document.getElementById('address').value = currentSeller.address || '';
     document.getElementById('notes').value = currentSeller.notes || '';
+    document.getElementById('vehiclePlate').value = currentSeller.vehicle_plate || '';
     const bl = currentSeller.is_blacklisted == 1;
     document.getElementById('isBlacklisted').checked = bl;
     document.getElementById('blacklistReason').value = currentSeller.blacklist_reason || '';
@@ -140,8 +155,15 @@ function editSeller(id) {
 }
 
 async function viewSeller(id) {
-    // Show modal with loading state
+    // Show modal with loading state — clear stale data first
     document.getElementById('viewSellerName').textContent = 'กำลังโหลด...';
+    document.getElementById('viewSellerBlacklistBadge').style.display = 'none';
+    document.getElementById('viewSellerStats').textContent = '';
+    document.getElementById('viewSellerIdCard').textContent = '-';
+    document.getElementById('viewSellerPhone').textContent = '-';
+    document.getElementById('viewSellerVehicle').textContent = '-';
+    document.getElementById('viewSellerAddress').textContent = '-';
+    document.getElementById('viewSellerNotes').textContent = '-';
     document.getElementById('viewSellerTransactionList').innerHTML =
         '<div style="text-align:center;color:#888;padding:20px">กำลังโหลด...</div>';
     document.getElementById('viewSellerModal').classList.add('show');
@@ -163,7 +185,7 @@ async function viewSeller(id) {
     const badge = document.getElementById('viewSellerBlacklistBadge');
     if (seller.is_blacklisted) {
         badge.style.display = 'inline-block';
-        badge.textContent = `⛔ ${seller.blacklist_reason || 'Blacklist'}`;
+        badge.textContent = `⛔ ${seller.blacklist_reason || 'ไม่ระบุเหตุผล'}`;
     } else {
         badge.style.display = 'none';
     }
@@ -212,16 +234,17 @@ async function viewSeller(id) {
     const blBar = document.getElementById('viewSellerBlacklist');
     if (seller.is_blacklisted) {
         blBar.style.display = 'block';
-        blBar.textContent = `⛔ Blacklist: ${seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล'}`;
+        blBar.textContent = `⛔ บัญชีดำ: ${seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล'}`;
     } else {
         blBar.style.display = 'none';
     }
 
     // ---- TRANSACTION LIST ----
-    document.getElementById('viewSellerPoCount').textContent = `(${transactions.length} รายการ)`;
+    const safeTransactions = transactions || [];
+    document.getElementById('viewSellerPoCount').textContent = `(${safeTransactions.length} รายการ)`;
 
     const listEl = document.getElementById('viewSellerTransactionList');
-    if (!transactions.length) {
+    if (!safeTransactions.length) {
         listEl.innerHTML = '<div style="text-align:center;color:#888;padding:30px 20px">ยังไม่มีประวัติการขาย</div>';
         return;
     }
@@ -387,19 +410,21 @@ async function saveSeller() {
         return;
     }
 
+    const vehiclePlate = document.getElementById('vehiclePlate').value.trim();
     const data = {
         full_name: fullName,
         phone: phone || null,
         id_card: idCard || null,
         address: address || null,
         notes: notes || null,
+        vehicle_plate: vehiclePlate || null,
         is_blacklisted: isBlacklisted,
         blacklist_reason: isBlacklisted ? (document.getElementById('blacklistReason').value.trim() || null) : null,
         pdpa_consent: pdpaConsent,
     };
 
     if (isEdit) {
-        data.id = parseInt(sellerId);
+        data.id = parseInt(sellerId, 10);
     }
 
     const endpoint = isEdit ? 'sellers/seller' : 'sellers';
@@ -411,6 +436,17 @@ async function saveSeller() {
         const result = await apiRequest(endpoint, method, data);
 
         if (result.status === 'success') {
+            const savedId = isEdit ? parseInt(sellerId, 10) : result.data?.id;
+            if (pendingSellerIdPhoto && savedId) {
+                const fd = new FormData();
+                fd.append('photo', pendingSellerIdPhoto);
+                await fetch(`${window.apiPath}/sellers/photo?id=${savedId}`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: fd,
+                });
+                pendingSellerIdPhoto = null;
+            }
             showNotification(isEdit ? 'แก้ไขข้อมูลสำเร็จ' : 'เพิ่มผู้ขายสำเร็จ', 'success');
             closeSellerModal();
             loadSellers();
@@ -433,17 +469,17 @@ function confirmBlacklist(id) {
         <div class="modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
             <div class="modal-content" style="max-width:420px;width:90%;">
                 <div class="modal-header">
-                    <h3>⚠️ ยืนยัน Blacklist</h3>
+                    <h3>⚠️ ยืนยันบัญชีดำ</h3>
                     <button class="close-modal" onclick="this.closest('.modal-overlay').remove()">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p style="margin-bottom:12px;">ผู้ขาย: <strong>${seller.full_name}</strong></p>
-                    <label for="blacklistReasonConfirm">เหตุผลในการ Blacklist <span style="color:#ef4444;">*</span></label>
+                    <p style="margin-bottom:12px;">ผู้ขาย: <strong>${escapeHtml(seller.full_name)}</strong></p>
+                    <label for="blacklistReasonConfirm">เหตุผลที่ขึ้นบัญชีดำ <span style="color:#ef4444;">*</span></label>
                     <textarea id="blacklistReasonConfirm" class="form-control" rows="3" placeholder="ระบุเหตุผล..." style="width:100%;margin-top:4px;"></textarea>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">ยกเลิก</button>
-                    <button class="btn btn-danger" id="confirmBlacklistBtn">ยืนยัน Blacklist</button>
+                    <button class="btn btn-danger" id="confirmBlacklistBtn">ยืนยันบัญชีดำ</button>
                 </div>
             </div>
         </div>
@@ -461,27 +497,72 @@ function confirmBlacklist(id) {
     });
 }
 
-async function blacklistSeller(id, reason) {
-    const result = await apiRequest('sellers/blacklist', 'POST', { id, reason });
+let _blacklistInProgress = false;
 
-    if (result.status === 'success') {
-        showNotification('Blacklist ผู้ขายสำเร็จ', 'success');
-        loadSellers();
-    } else {
-        showNotification(result.message || 'เกิดข้อผิดพลาด', 'error');
+async function blacklistSeller(id, reason) {
+    if (_blacklistInProgress) return;
+    _blacklistInProgress = true;
+    try {
+        const result = await apiRequest('sellers/blacklist', 'POST', { id, reason });
+        if (result.status === 'success') {
+            showNotification('ขึ้นบัญชีดำผู้ขายสำเร็จ', 'success');
+            loadSellers();
+        } else {
+            showNotification(result.message || 'เกิดข้อผิดพลาด', 'error');
+        }
+    } finally {
+        _blacklistInProgress = false;
     }
 }
 
 async function unblacklistSeller(id) {
-    if (!confirm('ยืนยันการยกเลิก Blacklist?')) return;
+    if (_blacklistInProgress) return;
+    const seller = sellers.find(s => s.id === id);
+    const sellerName = seller ? seller.full_name : `#${id}`;
+    showUnblacklistModal(id, sellerName);
+}
 
-    const result = await apiRequest('sellers/unblacklist', 'POST', { id });
+function showUnblacklistModal(sellerId, sellerName) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+            <div class="modal-content" style="max-width:420px;width:90%;">
+                <div class="modal-header">
+                    <h3>✓ ยืนยันยกเลิกบัญชีดำ</h3>
+                    <button class="close-modal" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>ยืนยันการยกเลิกบัญชีดำผู้ขาย: <strong>${escapeHtml(sellerName)}</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">ยกเลิก</button>
+                    <button class="btn btn-success" id="confirmUnblacklistBtn">ยืนยัน</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
 
-    if (result.status === 'success') {
-        showNotification('ยกเลิก Blacklist สำเร็จ', 'success');
-        loadSellers();
-    } else {
-        showNotification(result.message || 'เกิดข้อผิดพลาด', 'error');
+    document.getElementById('confirmUnblacklistBtn').addEventListener('click', function() {
+        overlay.remove();
+        _doUnblacklist(sellerId);
+    });
+}
+
+async function _doUnblacklist(id) {
+    if (_blacklistInProgress) return;
+    _blacklistInProgress = true;
+    try {
+        const result = await apiRequest('sellers/unblacklist', 'POST', { id });
+        if (result.status === 'success') {
+            showNotification('ยกเลิกบัญชีดำสำเร็จ', 'success');
+            loadSellers();
+        } else {
+            showNotification(result.message || 'เกิดข้อผิดพลาด', 'error');
+        }
+    } finally {
+        _blacklistInProgress = false;
     }
 }
 
@@ -539,12 +620,12 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-window.onclick = function(event) {
+window.addEventListener('click', function(event) {
     const modal = document.getElementById('sellerModal');
     if (event.target === modal) closeSellerModal();
     const viewModal = document.getElementById('viewSellerModal');
     if (event.target === viewModal) closeViewSellerModal();
-}
+});
 
 document.getElementById('searchInput').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') searchSellers();

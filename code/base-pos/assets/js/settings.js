@@ -59,7 +59,7 @@ async function loadSettings() {
     }
   } catch (error) {
     console.error('Failed to load settings:', error);
-    showNotification('Error loading settings', 'error');
+    showNotification('โหลดการตั้งค่าไม่สำเร็จ', 'error');
   }
 }
 
@@ -107,7 +107,7 @@ async function saveStoreSettings() {
     }
   } catch (error) {
     console.error('Error saving store settings:', error);
-    showNotification('Error saving store settings', 'error');
+    showNotification('บันทึกข้อมูลร้านค้าไม่สำเร็จ', 'error');
   } finally {
     setButtonLoading(saveBtn, false);
   }
@@ -137,7 +137,7 @@ async function saveSystemSettings() {
     }
   } catch (error) {
     console.error('Error saving system settings:', error);
-    showNotification('Error saving system settings', 'error');
+    showNotification('บันทึกค่าระบบไม่สำเร็จ', 'error');
   } finally {
     setButtonLoading(saveBtn, false);
   }
@@ -148,7 +148,7 @@ async function createBackup() {
   const backupBtn = document.getElementById('createBackup');
   setButtonLoading(backupBtn, true, 'กำลังสำรอง...');
   try {
-    showNotification('Creating backup...', 'info');
+    showNotification('กำลังสร้างข้อมูลสำรอง...', 'info');
 
     const response = await apiRequest('settings/backup/create', 'POST');
 
@@ -160,7 +160,7 @@ async function createBackup() {
     }
   } catch (error) {
     console.error('Error creating backup:', error);
-    showNotification('Error creating backup', 'error');
+    showNotification('สร้างข้อมูลสำรองไม่สำเร็จ', 'error');
   } finally {
     setButtonLoading(backupBtn, false);
   }
@@ -176,7 +176,7 @@ async function restoreBackup() {
   try {
     const fileInput = document.getElementById('backupFileInput');
     if (!fileInput.files || fileInput.files.length === 0) {
-      showNotification('Please select a backup file', 'error');
+      showNotification('กรุณาเลือกไฟล์สำรอง', 'error');
       return;
     }
 
@@ -184,7 +184,7 @@ async function restoreBackup() {
     const formData = new FormData();
     formData.append('backup_file', file);
 
-    showNotification('Restoring backup...', 'info');
+    showNotification('กำลังกู้คืนข้อมูล...', 'info');
 
     // Using fetch directly for file upload
     const response = await fetch(`${apiPath}/settings/backup/restore`, {
@@ -210,7 +210,7 @@ async function restoreBackup() {
     }
   } catch (error) {
     console.error('Error restoring backup:', error);
-    showNotification('Error restoring backup', 'error');
+    showNotification('กู้คืนข้อมูลไม่สำเร็จ', 'error');
   }
 }
 
@@ -223,11 +223,11 @@ async function loadBackupHistory() {
     if (response.status === 'success') {
       renderBackupHistory(response.data);
     } else {
-      showNotification(response.message || 'Failed to load backup history', 'error');
+      showNotification(response.message || 'โหลดประวัติสำรองไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error loading backup history:', error);
-    showNotification('Error loading backup history', 'error');
+    showNotification('โหลดประวัติสำรองไม่สำเร็จ', 'error');
   }
 }
 
@@ -246,7 +246,7 @@ function renderBackupHistory(backups) {
   backups.forEach(backup => {
     const row = document.createElement('tr');
 
-    const date = new Date(backup.created_at).toLocaleString();
+    const date = new Date(backup.created_at.replace(' ', 'T')).toLocaleString();
     const size = formatFileSize(backup.size);
 
     row.innerHTML = `
@@ -286,7 +286,7 @@ function renderBackupHistory(backups) {
 async function downloadBackup(filename) {
   try {
     // แสดงการแจ้งเตือนว่ากำลังดาวน์โหลด
-    showNotification('Downloading backup...', 'info');
+    showNotification('กำลังดาวน์โหลด...', 'info');
 
     // สร้าง URL สำหรับดาวน์โหลด
     const downloadUrl = `${apiPath}/settings/backup/download?filename=${filename}`;
@@ -324,10 +324,10 @@ async function downloadBackup(filename) {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
 
-    showNotification('Backup downloaded successfully', 'success');
+    showNotification('ดาวน์โหลดสำเร็จ', 'success');
   } catch (error) {
     console.error('Error downloading backup:', error);
-    showNotification(`Error downloading backup: ${error.message}`, 'error');
+    showNotification('ดาวน์โหลดไม่สำเร็จ: ' + error.message, 'error');
   }
 }
 
@@ -345,7 +345,7 @@ async function deleteBackup(filename) {
       }
     } catch (error) {
       console.error('Error deleting backup:', error);
-      showNotification('Error deleting backup', 'error');
+      showNotification('ลบข้อมูลสำรองไม่สำเร็จ', 'error');
     }
   }
 }

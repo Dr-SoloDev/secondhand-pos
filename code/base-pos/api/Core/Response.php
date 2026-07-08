@@ -33,11 +33,11 @@ class Response
     {
         $response = [
             'status' => $status,
-            'message' => $message
+            'message' => TextEncoding::repairMojibake($message)
         ];
 
         if ($data !== null) {
-            $response['data'] = $data;
+            $response['data'] = TextEncoding::normalize($data);
         }
 
         return json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -93,7 +93,7 @@ class Response
         header('Cache-Control: must-revalidate');
         header('Pragma: public');
         header('Content-Length: '.filesize($realPath));
-        ob_clean();
+        if (ob_get_level()) ob_clean();
         flush();
         readfile($realPath);
         exit;

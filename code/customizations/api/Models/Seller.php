@@ -53,17 +53,28 @@ class Seller extends Model
     }
 
     /**
-     * ค้นหาผู้ขาย (เบอร์โทร หรือ ชื่อ)
+     * ค้นหาผู้ขาย — autocomplete by full_name, id_card, or phone
      */
-    public function search($keyword)
+    public function search($keyword, $includeBlacklisted = false)
     {
-        $query = "SELECT id, id_card, full_name, phone, address, vehicle_plate,
-                         id_card_photo, is_blacklisted, blacklist_reason, blacklisted_at,
-                         notes,
-                         total_transactions, total_amount, last_transaction_at
+        $query = "SELECT id,
+                         full_name            AS name,
+                         id_card              AS national_id,
+                         phone,
+                         id_card_photo,
+                         vehicle_plate,
+                         is_blacklisted,
+                         blacklist_reason,
+                         blacklisted_at,
+                         total_transactions,
+                         total_amount,
+                         last_transaction_at
                   FROM {$this->table}
-                  WHERE phone LIKE ? OR full_name LIKE ? OR id_card LIKE ?
-                  ORDER BY created_at DESC LIMIT 20";
+                  WHERE (full_name LIKE ? OR id_card LIKE ? OR phone LIKE ?)";
+        if (!$includeBlacklisted) {
+            $query .= " AND is_blacklisted = 0";
+        }
+        $query .= " ORDER BY full_name ASC LIMIT 20";
         $t = "%{$keyword}%";
         return $this->db->fetchAll($query, [$t, $t, $t]);
     }

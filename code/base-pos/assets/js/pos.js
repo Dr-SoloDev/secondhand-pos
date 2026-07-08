@@ -58,7 +58,7 @@ async function initPOS() {
 
   } catch (error) {
     console.error('Failed to initialize POS:', error);
-    showNotification('Error initializing POS system', 'error');
+    showNotification('เริ่มต้นระบบ POS ไม่สำเร็จ', 'error');
   }
 }
 
@@ -184,7 +184,7 @@ function scanBarcode() {
   if (product) {
     addToCart(product);
   } else {
-    showNotification('Product not found', 'error');
+    showNotification('ไม่พบสินค้า', 'error');
   }
 }
 
@@ -253,21 +253,21 @@ function renderCart() {
   // Add event listeners to quantity buttons
   container.querySelectorAll('.qty-btn.decrease').forEach(button => {
     button.addEventListener('click', function() {
-      const index = parseInt(this.dataset.index);
+      const index = parseInt(this.dataset.index, 10);
       decreaseQuantity(index);
     });
   });
 
   container.querySelectorAll('.qty-btn.increase').forEach(button => {
     button.addEventListener('click', function() {
-      const index = parseInt(this.dataset.index);
+      const index = parseInt(this.dataset.index, 10);
       increaseQuantity(index);
     });
   });
 
   container.querySelectorAll('.remove-item').forEach(button => {
     button.addEventListener('click', function() {
-      const index = parseInt(this.dataset.index);
+      const index = parseInt(this.dataset.index, 10);
       removeCartItem(index);
     });
   });
@@ -331,7 +331,7 @@ function cancelOrder() {
     renderCart();
     updateOrderSummary();
     document.getElementById('discountInput').value = 0;
-    showNotification('Order cancelled', 'info');
+    showNotification('ยกเลิกรายการแล้ว', 'info');
   }
 }
 
@@ -440,20 +440,20 @@ async function processPayment() {
       showReceipt(response.data);
       showNotification('รายการขายสำเร็จ', 'success');
     } else {
-      showNotification(response.message || 'Payment processing failed', 'error');
+      showNotification(response.message || 'ดำเนินการชำระเงินไม่สำเร็จ', 'error');
     }
 
   } catch (error) {
     console.error('Payment processing error:', error);
-    showNotification('An error occurred during payment processing', 'error');
+    showNotification('เกิดข้อผิดพลาดในการชำระเงิน', 'error');
   }
 }
 
 // Show receipt
 function showReceipt(saleData) {
   const receiptContainer = document.getElementById('receipt');
-  const date = new Date(saleData.created_at).toLocaleDateString();
-  const time = new Date(saleData.created_at).toLocaleTimeString();
+  const date = new Date(saleData.created_at.replace(' ', 'T')).toLocaleDateString();
+  const time = new Date(saleData.created_at.replace(' ', 'T')).toLocaleTimeString();
 
   let itemsHtml = '';
   saleData.items.forEach(item => {

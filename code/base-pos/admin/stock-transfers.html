@@ -18,7 +18,7 @@
     <ul class="sidebar-menu">
       <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
       <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
-      <li><a href="sellers.html"><i class="icon-users"></i><span>ประวัติลูกค้า</span></a></li>
+      <li><a href="sellers.html"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
       <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
       <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
       <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
@@ -413,8 +413,6 @@ function printTransfer(t) {
     </div>
     <div style="text-align:center;font-size:10px;color:#aaa;margin-top:8px">สถานะ: ${statusTh}</div>`;
 
-  document.getElementById('printModal').style.display = 'flex';
-}
 
 async function cancelTransfer(id) {
   if (!confirm('ยืนยันการยกเลิกใบโอนนี้?')) return;
@@ -445,7 +443,7 @@ function printTransfer(t) {
     <div style="font-family:'Sarabun',sans-serif;font-size:12px;padding:8px 4px">
       <div style="border:2px solid #222;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:8px">
         <div style="font-size:16px;font-weight:800;letter-spacing:0">ใบโอนสต็อก</div>
-        <div style="font-size:11px;color:#444;margin-top:2px">Stock Transfer</div>
+        <div style="font-size:11px;color:#444;margin-top:2px">ใบโอนสต็อก</div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px">
         <span>เลขที่ <strong>${escapeHtml(t.reference_no||'-')}</strong></span>
@@ -496,6 +494,6 @@ document.getElementById('logoutBtn')?.addEventListener('click', async e => {
   window.location.href = '../index.html';
 });
 </script>
-<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> </body>mdash; Secondhand POS System</div>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 </body>
 </html>

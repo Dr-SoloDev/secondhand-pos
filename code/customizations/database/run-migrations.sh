@@ -5,7 +5,7 @@
 # Usage: ./run-migrations.sh [db_user] [db_password]
 # ============================================================
 
-set -e
+set -euo pipefail
 
 DB_USER="${1:-root}"
 DB_PASS="${2:-}"
@@ -24,11 +24,9 @@ if ! command -v mysql &> /dev/null; then
     exit 1
 fi
 
-if [ -z "$DB_PASS" ]; then
-    MYSQL_CMD="mysql -u $DB_USER --default-character-set=utf8mb4"
-else
-    MYSQL_CMD="mysql -u $DB_USER -p$DB_PASS --default-character-set=utf8mb4"
-fi
+# Export password for all mysql commands (reduces process-listing exposure)
+export MYSQL_PWD="$DB_PASS"
+MYSQL_CMD="mysql -u $DB_USER --default-character-set=utf8mb4"
 
 echo ""
 echo "📦 Step 1: ติดตั้ง base schema"
@@ -53,6 +51,12 @@ for migration in "$MIGRATIONS_DIR"/*.sql; do
     [ -f "$migration" ] || continue
     filename=$(basename "$migration")
     version="${filename%%_*}"
+
+    # Validate version format
+    if [[ ! "$version" =~ ^[0-9]+[a-z]?$ ]]; then
+        echo "   ❌ Invalid version: $version (from $filename)"
+        exit 1
+    fi
 
     already_run=$($MYSQL_CMD --silent --skip-column-names $DB_NAME \
         -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$version';" 2>/dev/null || echo "0")

@@ -185,4 +185,43 @@ class PurchaseOrdersController extends Controller
             Response::error('สร้างใบรับซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
+
+    /**
+     * GET /api/purchase-orders/print?id=X
+     * ข้อมูล PO สำหรับพิมพ์ใบรับซื้อ — includes is_precious_metal flag
+     */
+    public function getPurchaseOrderForPrint()
+    {
+        $this->requireAuth();
+        $id = intval($_GET['id'] ?? 0);
+        if (!$id) Response::error('กรุณาระบุรหัสใบรับซื้อ', 400);
+
+        $model = new PurchaseOrder();
+        $po = $model->getById($id);
+        if (!$po) Response::error('ไม่พบใบรับซื้อ', 404);
+
+        // SECURITY: non-admin ดูได้เฉพาะ PO ของสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$po['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์เข้าถึงใบรับซื้อนี้', 403);
+            }
+        }
+
+        // G2-E2: detect precious metal — requires_precious_receipt flag หรือ category name มีคำว่า ทองแดง
+        $isPreciousMetal = false;
+        foreach ($po['items'] as $item) {
+            if (!empty($item['requires_precious_receipt'])) {
+                $isPreciousMetal = true;
+                break;
+            }
+            if (!empty($item['category_name']) && mb_strpos($item['category_name'], 'ทองแดง') !== false) {
+                $isPreciousMetal = true;
+                break;
+            }
+        }
+
+        $po['is_precious_metal'] = $isPreciousMetal;
+        Response::success('สำเร็จ', $po);
+    }
 }

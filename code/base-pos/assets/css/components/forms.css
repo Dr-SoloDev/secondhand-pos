@@ -44,21 +44,10 @@ select.form-control {
   background-position: right 12px center;
   padding-right: 36px;
 }
-.form-row {
-  display: flex;
-  flex-wrap: wrap;
-  margin-right: -8px;
-  margin-left: -8px;
-}
-.form-col {
-  flex: 1;
-  padding: 0 8px;
-  margin-bottom: 12px;
-  min-width: 0;
-}
 .form-actions {
   margin-top: 20px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
 }
@@ -85,6 +74,7 @@ label {
   display: flex;
   gap: 16px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .form-col {

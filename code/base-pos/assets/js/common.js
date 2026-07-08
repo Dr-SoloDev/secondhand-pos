@@ -13,7 +13,7 @@ function saveCartState(cartState) {
 function restoreCartState() {
   const saved = sessionStorage.getItem('cart_backup');
   const savedTime = sessionStorage.getItem('cart_backup_time');
-  if (saved && savedTime && (Date.now() - parseInt(savedTime) < 30 * 60 * 1000)) {
+  if (saved && savedTime && (Date.now() - parseInt(savedTime, 10) < 30 * 60 * 1000)) {
     try {
       return JSON.parse(saved);
     } catch (e) {

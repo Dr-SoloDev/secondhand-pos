@@ -47,6 +47,12 @@ services:
       DB_PASS: ${DB_PASS}
       JWT_SECRET: ${JWT_SECRET}
       TZ: Asia/Bangkok
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:80/api/index.php/auth/verify"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
@@ -72,11 +78,15 @@ services:
   # ============================================================
   # Caddy (Reverse Proxy + Automatic SSL/TLS)
   # HTTPS: set DOMAIN and ACME_EMAIL in .env
+  # Dev: skip with `docker compose up -d` (access :8080 directly)
+  # Prod: `docker compose --profile caddy up -d`
   # ============================================================
   caddy:
     image: caddy:2
     container_name: scrap-pos-caddy
     restart: unless-stopped
+    profiles:
+      - caddy
     ports:
       - "80:80"
       - "443:443"

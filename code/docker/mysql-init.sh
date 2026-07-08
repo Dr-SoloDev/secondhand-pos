@@ -4,7 +4,7 @@
 # รัน migration เรียงตามลำดับ พร้อม schema_migrations tracking
 # (ข้ามอันที่รันแล้ว — idempotent runner)
 # ============================================================
-set -e
+set -euo pipefail
 
 echo "=========================================="
 echo " Running Secondhand POS migrations..."
@@ -17,8 +17,11 @@ if [ ! -d "$MIGRATIONS_DIR" ]; then
     exit 0
 fi
 
+# Export password once to avoid multiple exposures in process listings
+export MYSQL_PWD="${MYSQL_ROOT_PASSWORD}"
+
 # สร้างตาราง schema_migrations ถ้ายังไม่มี
-mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 pos_system <<'SQL'
+mysql -uroot --default-character-set=utf8mb4 pos_system <<'SQL'
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version    VARCHAR(10)  NOT NULL PRIMARY KEY,
   filename   VARCHAR(255) NOT NULL,
@@ -34,8 +37,14 @@ for migration in "$MIGRATIONS_DIR"/*.sql; do
     filename=$(basename "$migration")
     version="${filename%%_*}"   # ดึงเลข เช่น "024" จาก "024_add_stock_transfers.sql"
 
+    # Validate version format
+    if [[ ! "$version" =~ ^[0-9]+[a-z]?$ ]]; then
+        echo "  ❌ Invalid version: $version (from $filename)"
+        exit 1
+    fi
+
     # ตรวจว่ารันแล้วหรือยัง
-    already_run=$(mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --silent --skip-column-names \
+    already_run=$(mysql -uroot --silent --skip-column-names \
         -e "SELECT COUNT(*) FROM pos_system.schema_migrations WHERE version='$version';" 2>/dev/null || echo "0")
 
     if [ "$already_run" -gt 0 ]; then
@@ -44,8 +53,8 @@ for migration in "$MIGRATIONS_DIR"/*.sql; do
     fi
 
     echo "  → Running: $filename"
-    if mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 pos_system < "$migration"; then
-        mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 pos_system \
+    if mysql -uroot --default-character-set=utf8mb4 pos_system < "$migration"; then
+        mysql -uroot --default-character-set=utf8mb4 pos_system \
             -e "INSERT INTO schema_migrations (version, filename) VALUES ('$version', '$filename');"
         echo "  ✅ Done: $filename"
     else

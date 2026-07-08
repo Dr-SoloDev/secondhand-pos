@@ -8,7 +8,7 @@
   margin: 0;
   padding: 0;
   background: #f4f6f8;
-  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  font-family: var(--font-main);
   min-height: 100vh;
   display: flex;
   align-items: flex-start;
@@ -34,7 +34,7 @@
   width: 48px;
   height: 48px;
   border: 4px solid #e0e0e0;
-  border-top-color: #1976d2;
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -142,13 +142,13 @@
   gap: 10px;
   width: 100%;
   min-height: 120px;
-  background: #1976d2;
+  background: var(--color-primary);
   color: #fff;
   border-radius: 16px;
   cursor: pointer;
   font-size: 18px;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4);
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.4);
   transition: transform 0.1s, box-shadow 0.1s;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -156,7 +156,7 @@
 
 .btn-camera:active {
   transform: scale(0.97);
-  box-shadow: 0 2px 6px rgba(25, 118, 210, 0.3);
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
 }
 
 .camera-icon {
@@ -179,14 +179,14 @@
 }
 
 .btn-cancel-photo {
-  background: #e0e0e0;
-  color: #333;
+  background: var(--color-gray-200);
+  color: var(--color-text);
 }
 
 .btn-upload {
-  background: #43a047;
+  background: var(--color-primary);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(67, 160, 71, 0.35);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.35);
 }
 
 .btn-cancel-photo:active,
@@ -207,7 +207,7 @@
   bottom: 32px;
   left: 50%;
   transform: translateX(-50%);
-  background: #43a047;
+  background: var(--color-primary);
   color: #fff;
   padding: 12px 24px;
   border-radius: 24px;

@@ -39,7 +39,8 @@ class Controller
 
     protected function getRequestData()
     {
-        return json_decode(file_get_contents('php://input'), true);
+        $data = json_decode(file_get_contents('php://input'), true);
+        return TextEncoding::normalize($data);
     }
 
     /**
@@ -67,6 +68,7 @@ class Controller
         }
 
         if (is_string($data)) {
+            $data = TextEncoding::repairMojibake($data);
             $data = strip_tags($data);
             $data = trim($data);
             if (mb_strlen($data) > $maxLength) {

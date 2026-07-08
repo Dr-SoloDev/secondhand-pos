@@ -3,6 +3,7 @@ class CustomersController extends Controller
 {
     public function getCustomers()
     {
+        $this->requireAuth();
         // Get pagination params
         $pagination = $this->getPaginationParams();
 
@@ -22,6 +23,7 @@ class CustomersController extends Controller
 
     public function createCustomer()
     {
+        $this->requireAuth();
         // Get and validate request data
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['name']);
@@ -59,6 +61,7 @@ class CustomersController extends Controller
      */
     public function getCustomer($id)
     {
+        $this->requireAuth();
         if (!$id) {
             Response::error('Customer ID is required', 400);
         }
@@ -78,6 +81,7 @@ class CustomersController extends Controller
      */
     public function updateCustomer($id)
     {
+        $this->requireAuth(['admin', 'manager']);
         if (!$id) {
             Response::error('Customer ID is required', 400);
         }

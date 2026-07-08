@@ -14,15 +14,16 @@ class ReportService
     public function getDashboardStats($branchId = null)
     {
         // WF-04: optional branch filter
-        $bWhere = $branchId ? " AND branch_id = " . intval($branchId) : "";
-        $bWhereSL = $branchId ? " AND branch_id = " . intval($branchId) : "";
+        $bWhere = $branchId ? " AND branch_id = ?" : "";
+        $bWhereSL = $branchId ? " AND branch_id = ?" : "";
 
         // Today's purchase total (รับซื้อวันนี้)
         $todayPurchases = $this->db->fetchColumn(
             "SELECT COALESCE(SUM(total_amount), 0) as total
               FROM purchase_orders
               WHERE DATE(created_at) = CURDATE()
-              AND status != 'cancelled'" . $bWhere
+              AND status != 'cancelled'" . $bWhere,
+            $branchId ? [$branchId] : []
         );
 
         // Today's purchase orders count (ใบรับซื้อวันนี้)
@@ -30,7 +31,8 @@ class ReportService
             "SELECT COUNT(*)
               FROM purchase_orders
               WHERE DATE(created_at) = CURDATE()
-              AND status != 'cancelled'" . $bWhere
+              AND status != 'cancelled'" . $bWhere,
+            $branchId ? [$branchId] : []
         );
 
         // Total sellers (ผู้ขายทั้งหมด — ไม่กรองตาม branch)
@@ -42,7 +44,8 @@ class ReportService
         $pendingPO = $this->db->fetchColumn(
             "SELECT COUNT(*)
               FROM purchase_orders
-              WHERE status = 'draft'" . $bWhere
+              WHERE status = 'draft'" . $bWhere,
+            $branchId ? [$branchId] : []
         );
 
         // Also keep sales stats for reference
@@ -50,7 +53,8 @@ class ReportService
             "SELECT COALESCE(SUM(grand_total), 0) as total
               FROM sales
               WHERE DATE(created_at) = CURDATE()
-              AND payment_status != 'voided'"
+              AND payment_status != 'voided'" . $bWhere,
+            $branchId ? [$branchId] : []
         );
 
         // Low stock count
@@ -58,7 +62,8 @@ class ReportService
             "SELECT COUNT(*)
               FROM products
               WHERE quantity <= low_stock_threshold
-              AND status = 'active'"
+              AND status = 'active'" . $bWhere,
+            $branchId ? [$branchId] : []
         );
 
         // Sale lot stats
@@ -66,7 +71,8 @@ class ReportService
             "SELECT COALESCE(SUM(total_amount), 0)
               FROM sale_lots
               WHERE DATE(sale_date) = CURDATE()
-              AND status = 'confirmed'" . $bWhereSL
+              AND status = 'confirmed'" . $bWhereSL,
+            $branchId ? [$branchId] : []
         );
 
         $monthSaleLotProfit = $this->db->fetchColumn(
@@ -74,13 +80,15 @@ class ReportService
               FROM sale_lots
               WHERE MONTH(sale_date) = MONTH(CURDATE())
               AND YEAR(sale_date) = YEAR(CURDATE())
-              AND status = 'confirmed'" . $bWhereSL
+              AND status = 'confirmed'" . $bWhereSL,
+            $branchId ? [$branchId] : []
         );
 
         $pendingSaleLots = $this->db->fetchColumn(
             "SELECT COUNT(*)
               FROM sale_lots
-              WHERE status = 'draft'" . $bWhereSL
+              WHERE status = 'draft'" . $bWhereSL,
+            $branchId ? [$branchId] : []
         );
 
         return [
@@ -96,8 +104,14 @@ class ReportService
         ];
     }
 
-    public function getRecentPurchases($limit = 10)
+    public function getRecentPurchases($limit = 10, $branchId = null)
     {
+        $branchFilter = $branchId ? 'AND po.branch_id = ?' : '';
+        $params = [$limit];
+        if ($branchId) {
+            $params[] = $branchId;
+        }
+
         return $this->db->fetchAll(
             "SELECT
                 po.*,
@@ -108,16 +122,19 @@ class ReportService
             LEFT JOIN sellers s ON po.seller_id = s.id
             LEFT JOIN users u ON po.user_id = u.id
             LEFT JOIN branches b ON po.branch_id = b.id
+            WHERE 1=1 $branchFilter
             ORDER BY po.created_at DESC
             LIMIT ?",
-            [$limit]
+            $params
         );
     }
 
-    public function getPurchaseChartData($period = 'week')
+    public function getPurchaseChartData($period = 'week', $branchId = null)
     {
         $labels = [];
         $purchaseData = [];
+
+        $branchFilter = $branchId ? 'AND branch_id = ?' : '';
 
         switch ($period) {
             case 'week':
@@ -129,8 +146,10 @@ class ReportService
                     WHERE
                         created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
                         AND status != 'cancelled'
+                        $branchFilter
                     GROUP BY DATE(created_at)
-                    ORDER BY po_date ASC"
+                    ORDER BY po_date ASC",
+                    $branchId ? [$branchId] : []
                 );
 
                 for ($i = 6; $i >= 0; $i--) {
@@ -157,8 +176,10 @@ class ReportService
                         MONTH(created_at) = MONTH(CURDATE())
                         AND YEAR(created_at) = YEAR(CURDATE())
                         AND status != 'cancelled'
+                        $branchFilter
                     GROUP BY DATE(created_at)
-                    ORDER BY po_date ASC"
+                    ORDER BY po_date ASC",
+                    $branchId ? [$branchId] : []
                 );
 
                 $daysInMonth = date('t');
@@ -185,8 +206,10 @@ class ReportService
                     WHERE
                         YEAR(created_at) = YEAR(CURDATE())
                         AND status != 'cancelled'
+                        $branchFilter
                     GROUP BY po_month
-                    ORDER BY po_month ASC"
+                    ORDER BY po_month ASC",
+                    $branchId ? [$branchId] : []
                 );
 
                 for ($i = 1; $i <= 12; $i++) {
@@ -213,14 +236,15 @@ class ReportService
     /**
      * @param $period
      */
-    public function getSalesChartData($period = 'week')
+    public function getSalesChartData($period = 'week', $branchId = null)
     {
         $labels = [];
         $salesData = [];
 
+        $branchFilter = $branchId ? 'AND branch_id = ?' : '';
+
         switch ($period) {
             case 'week':
-                // Get sales for the last 7 days
                 $result = $this->db->fetchAll(
                     "SELECT
                 DATE(created_at) as sale_date,
@@ -229,18 +253,18 @@ class ReportService
             WHERE
                 created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
                 AND payment_status != 'voided'
+                $branchFilter
             GROUP BY DATE(created_at)
-            ORDER BY sale_date ASC"
+            ORDER BY sale_date ASC",
+                    $branchId ? [$branchId] : []
                 );
 
-                // Create an array for the last 7 days
                 for ($i = 6; $i >= 0; $i--) {
                     $date = date('Y-m-d', strtotime("-$i days"));
                     $labels[] = $date;
-                    $salesData[] = 0; // Default to 0
+                    $salesData[] = 0;
                 }
 
-                // Fill in actual data
                 foreach ($result as $row) {
                     $dateIndex = array_search($row['sale_date'], $labels);
                     if ($dateIndex !== false) {
@@ -250,7 +274,6 @@ class ReportService
                 break;
 
             case 'month':
-                // Get sales for the current month by day
                 $result = $this->db->fetchAll(
                     "SELECT
                 DATE(created_at) as sale_date,
@@ -260,19 +283,19 @@ class ReportService
                 MONTH(created_at) = MONTH(CURDATE())
                 AND YEAR(created_at) = YEAR(CURDATE())
                 AND payment_status != 'voided'
+                $branchFilter
             GROUP BY DATE(created_at)
-            ORDER BY sale_date ASC"
+            ORDER BY sale_date ASC",
+                    $branchId ? [$branchId] : []
                 );
 
-                // Create an array for each day of the current month
                 $daysInMonth = date('t');
                 for ($i = 1; $i <= $daysInMonth; $i++) {
                     $date = date('Y-m-').sprintf('%02d', $i);
                     $labels[] = $date;
-                    $salesData[] = 0; // Default to 0
+                    $salesData[] = 0;
                 }
 
-                // Fill in actual data
                 foreach ($result as $row) {
                     $dateIndex = array_search($row['sale_date'], $labels);
                     if ($dateIndex !== false) {
@@ -282,7 +305,6 @@ class ReportService
                 break;
 
             case 'year':
-                // Get sales for each month of the current year
                 $result = $this->db->fetchAll(
                     "SELECT
                 DATE_FORMAT(created_at, '%Y-%m-01') as sale_month,
@@ -291,18 +313,18 @@ class ReportService
             WHERE
                 YEAR(created_at) = YEAR(CURDATE())
                 AND payment_status != 'voided'
+                $branchFilter
             GROUP BY sale_month
-            ORDER BY sale_month ASC"
+            ORDER BY sale_month ASC",
+                    $branchId ? [$branchId] : []
                 );
 
-                // Create an array for each month of the year
                 for ($i = 1; $i <= 12; $i++) {
                     $month = date('Y-').sprintf('%02d', $i).'-01';
                     $labels[] = $month;
-                    $salesData[] = 0; // Default to 0
+                    $salesData[] = 0;
                 }
 
-                // Fill in actual data
                 foreach ($result as $row) {
                     $dateIndex = array_search($row['sale_month'], $labels);
                     if ($dateIndex !== false) {
@@ -325,8 +347,14 @@ class ReportService
      * @param $limit
      * @return mixed
      */
-    public function getRecentSales($limit = 10)
+    public function getRecentSales($limit = 10, $branchId = null)
     {
+        $branchFilter = $branchId ? 'AND s.branch_id = ?' : '';
+        $params = [$limit];
+        if ($branchId) {
+            $params[] = $branchId;
+        }
+
         return $this->db->fetchAll(
             "SELECT
         s.*,
@@ -334,9 +362,10 @@ class ReportService
         (SELECT COUNT(*) FROM sale_items WHERE sale_id = s.id) as item_count
     FROM sales s
     LEFT JOIN customers c ON s.customer_id = c.id
+    WHERE 1=1 $branchFilter
     ORDER BY s.created_at DESC
     LIMIT ?",
-            [$limit]
+            $params
         );
     }
 
@@ -345,8 +374,14 @@ class ReportService
      * @param $dateTo
      * @param $groupBy
      */
-    public function getSalesReport($dateFrom, $dateTo, $groupBy = 'day')
+    public function getSalesReport($dateFrom, $dateTo, $groupBy = 'day', $branchId = null)
     {
+        $branchFilter = $branchId ? 'AND s.branch_id = ?' : '';
+        $params = [$dateFrom, $dateTo];
+        if ($branchId) {
+            $params[] = $branchId;
+        }
+
         // Determine SQL grouping based on groupBy parameter
         switch ($groupBy) {
             case 'day':
@@ -378,9 +413,10 @@ class ReportService
     WHERE
         DATE(s.created_at) BETWEEN ? AND ?
         AND s.payment_status != 'voided'
+        $branchFilter
     GROUP BY {$groupFormat}
     ORDER BY {$labelFormat} ASC",
-            [$dateFrom, $dateTo]
+            $params
         );
 
         // Calculate totals
@@ -422,7 +458,7 @@ class ReportService
      * @param null $limit
      * @return mixed
      */
-    public function getProductSalesReport($dateFrom, $dateTo, $categoryId = null, $limit = 20)
+    public function getProductSalesReport($dateFrom, $dateTo, $categoryId = null, $limit = 20, $branchId = null)
     {
         $conditions = [
             "DATE(s.created_at) BETWEEN ? AND ?",
@@ -433,6 +469,11 @@ class ReportService
         if ($categoryId) {
             $conditions[] = "p.category_id = ?";
             $params[] = $categoryId;
+        }
+
+        if ($branchId) {
+            $conditions[] = "s.branch_id = ?";
+            $params[] = $branchId;
         }
 
         $whereClause = " WHERE ".implode(' AND ', $conditions);
@@ -467,7 +508,7 @@ class ReportService
      * @param $categoryId
      * @param null $stockStatus
      */
-    public function getInventoryReport($categoryId = null, $stockStatus = null)
+    public function getInventoryReport($categoryId = null, $stockStatus = null, $branchId = null)
     {
         $conditions = ["p.status = 'active'"];
         $params = [];
@@ -486,6 +527,11 @@ class ReportService
                     $conditions[] = "p.quantity <= 0";
                     break;
             }
+        }
+
+        if ($branchId) {
+            $conditions[] = "p.branch_id = ?";
+            $params[] = $branchId;
         }
 
         $whereClause = " WHERE ".implode(' AND ', $conditions);
@@ -543,7 +589,7 @@ class ReportService
      * @param $dateTo
      * @param $userId
      */
-    public function getCashierPerformanceReport($dateFrom, $dateTo, $userId = null)
+    public function getCashierPerformanceReport($dateFrom, $dateTo, $userId = null, $branchId = null)
     {
         $conditions = ["DATE(s.created_at) BETWEEN ? AND ?"];
         $params = [$dateFrom, $dateTo];
@@ -555,6 +601,20 @@ class ReportService
 
         $whereClause = !empty($conditions) ? " WHERE ".implode(' AND ', $conditions) : "";
 
+        $branchFilterS2 = $branchId ? 'AND s2.branch_id = ?' : '';
+        $branchFilterDirect = $branchId ? 'AND branch_id = ?' : '';
+        $branchFilterJoin = $branchId ? 'AND s.branch_id = ?' : '';
+
+        // Build params: 3 date pairs, each optionally followed by branchId
+        $subqueryParams = [];
+        foreach (range(1, 3) as $i) {
+            $subqueryParams[] = $dateFrom;
+            $subqueryParams[] = $dateTo;
+            if ($branchId) {
+                $subqueryParams[] = $branchId;
+            }
+        }
+
         $cashiers = $this->db->fetchAll(
             "SELECT
         u.id, u.username, u.full_name,
@@ -563,18 +623,20 @@ class ReportService
         JOIN sales s2 ON si.sale_id = s2.id
         WHERE s2.user_id = u.id
         AND DATE(s2.created_at) BETWEEN ? AND ?
-        AND s2.payment_status != 'voided') as items_sold,
+        AND s2.payment_status != 'voided'
+        $branchFilterS2) as items_sold,
         SUM(CASE WHEN s.payment_status != 'voided' THEN s.grand_total ELSE 0 END) as total_sales,
         (SELECT COUNT(*) FROM sales
         WHERE user_id = u.id
         AND payment_status = 'voided'
-        AND DATE(created_at) BETWEEN ? AND ?) as cancelled_orders
+        AND DATE(created_at) BETWEEN ? AND ?
+        $branchFilterDirect) as cancelled_orders
     FROM users u
-    LEFT JOIN sales s ON u.id = s.user_id AND DATE(s.created_at) BETWEEN ? AND ?
+    LEFT JOIN sales s ON u.id = s.user_id AND DATE(s.created_at) BETWEEN ? AND ? $branchFilterJoin
     WHERE u.role IN ('admin', 'manager', 'cashier')
     GROUP BY u.id, u.username, u.full_name
     ORDER BY total_sales DESC",
-            array_merge([$dateFrom, $dateTo, $dateFrom, $dateTo, $dateFrom, $dateTo], $params)
+            array_merge($subqueryParams, $params)
         );
 
         // Ensure proper data types
@@ -595,8 +657,14 @@ class ReportService
         ];
     }
 
-    public function getRecentSaleLots($limit = 10)
+    public function getRecentSaleLots($limit = 10, $branchId = null)
     {
+        $branchFilter = $branchId ? 'AND sl.branch_id = ?' : '';
+        $params = [$limit];
+        if ($branchId) {
+            $params[] = $branchId;
+        }
+
         return $this->db->fetchAll(
             "SELECT
                 sl.*,
@@ -606,14 +674,21 @@ class ReportService
             FROM sale_lots sl
             LEFT JOIN branches b ON sl.branch_id = b.id
             LEFT JOIN users u ON sl.created_by = u.id
+            WHERE 1=1 $branchFilter
             ORDER BY sl.created_at DESC
             LIMIT ?",
-            [$limit]
+            $params
         );
     }
 
-    public function getPurchaseReport($dateFrom, $dateTo, $groupBy = 'day')
+    public function getPurchaseReport($dateFrom, $dateTo, $groupBy = 'day', $branchId = null)
     {
+        $branchFilter = $branchId ? 'AND po.branch_id = ?' : '';
+        $params = [$dateFrom, $dateTo];
+        if ($branchId) {
+            $params[] = $branchId;
+        }
+
         switch ($groupBy) {
             case 'day':
                 $groupFormat = 'DATE(po.created_at)';
@@ -641,9 +716,10 @@ class ReportService
             WHERE
                 DATE(po.created_at) BETWEEN ? AND ?
                 AND po.status != 'cancelled'
+                $branchFilter
             GROUP BY {$groupFormat}
             ORDER BY {$labelFormat} ASC",
-            [$dateFrom, $dateTo]
+            $params
         );
 
         $totalOrders = 0;
@@ -668,8 +744,14 @@ class ReportService
         ];
     }
 
-    public function getSaleLotReport($dateFrom, $dateTo, $groupBy = 'day')
+    public function getSaleLotReport($dateFrom, $dateTo, $groupBy = 'day', $branchId = null)
     {
+        $branchFilter = $branchId ? 'AND sl.branch_id = ?' : '';
+        $params = [$dateFrom, $dateTo];
+        if ($branchId) {
+            $params[] = $branchId;
+        }
+
         switch ($groupBy) {
             case 'day':
                 $groupFormat = 'DATE(sl.sale_date)';
@@ -698,9 +780,10 @@ class ReportService
             WHERE
                 DATE(sl.sale_date) BETWEEN ? AND ?
                 AND sl.status = 'confirmed'
+                $branchFilter
             GROUP BY {$groupFormat}
             ORDER BY {$labelFormat} ASC",
-            [$dateFrom, $dateTo]
+            $params
         );
 
         $totalLots = 0;
@@ -731,11 +814,13 @@ class ReportService
         ];
     }
 
-    public function getSaleLotChartData($period = 'week')
+    public function getSaleLotChartData($period = 'week', $branchId = null)
     {
         $labels = [];
         $amountData = [];
         $profitData = [];
+
+        $branchFilter = $branchId ? 'AND branch_id = ?' : '';
 
         switch ($period) {
             case 'week':
@@ -748,8 +833,10 @@ class ReportService
                     WHERE
                         sale_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
                         AND status = 'confirmed'
+                        $branchFilter
                     GROUP BY DATE(sale_date)
-                    ORDER BY sl_date ASC"
+                    ORDER BY sl_date ASC",
+                    $branchId ? [$branchId] : []
                 );
 
                 for ($i = 6; $i >= 0; $i--) {
@@ -779,8 +866,10 @@ class ReportService
                         MONTH(sale_date) = MONTH(CURDATE())
                         AND YEAR(sale_date) = YEAR(CURDATE())
                         AND status = 'confirmed'
+                        $branchFilter
                     GROUP BY DATE(sale_date)
-                    ORDER BY sl_date ASC"
+                    ORDER BY sl_date ASC",
+                    $branchId ? [$branchId] : []
                 );
 
                 $daysInMonth = date('t');
@@ -810,8 +899,10 @@ class ReportService
                     WHERE
                         YEAR(sale_date) = YEAR(CURDATE())
                         AND status = 'confirmed'
+                        $branchFilter
                     GROUP BY sl_month
-                    ORDER BY sl_month ASC"
+                    ORDER BY sl_month ASC",
+                    $branchId ? [$branchId] : []
                 );
 
                 for ($i = 1; $i <= 12; $i++) {
@@ -843,8 +934,14 @@ class ReportService
      * @param $dateTo
      * @param $period
      */
-    public function getTaxReport($dateFrom, $dateTo, $period = 'daily')
+    public function getTaxReport($dateFrom, $dateTo, $period = 'daily', $branchId = null)
     {
+        $branchFilter = $branchId ? 'AND branch_id = ?' : '';
+        $params = [$dateFrom, $dateTo];
+        if ($branchId) {
+            $params[] = $branchId;
+        }
+
         // Determine SQL grouping based on period
         switch ($period) {
             case 'daily':
@@ -873,9 +970,10 @@ class ReportService
     WHERE
         DATE(created_at) BETWEEN ? AND ?
         AND payment_status != 'voided'
+        $branchFilter
     GROUP BY {$groupFormat}
     ORDER BY MIN(created_at) ASC",
-            [$dateFrom, $dateTo]
+            $params
         );
 
         // Calculate totals

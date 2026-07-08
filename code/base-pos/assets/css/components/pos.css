@@ -221,6 +221,7 @@
 .order-actions {
   padding: 16px 20px;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 .order-actions .btn {

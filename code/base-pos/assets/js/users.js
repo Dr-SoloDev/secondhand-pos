@@ -48,7 +48,7 @@ async function initUserManagement() {
     loadActivityLog();
   } catch (error) {
     console.error('Failed to initialize user management:', error);
-    showNotification('Error loading user data', 'error');
+    showNotification('โหลดข้อมูลผู้ใช้ไม่สำเร็จ', 'error');
   }
 }
 
@@ -63,11 +63,11 @@ async function loadUsers() {
       renderUsers(users);
       populateUserActivityFilter();
     } else {
-      showNotification(response.message || 'Failed to load users', 'error');
+      showNotification(response.message || 'โหลดข้อมูลผู้ใช้ไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error loading users:', error);
-    showNotification('Error loading users', 'error');
+    showNotification('โหลดข้อมูลผู้ใช้ไม่สำเร็จ', 'error');
   }
 }
 
@@ -78,7 +78,7 @@ function renderUsers(usersToRender) {
 
   if (usersToRender.length === 0) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="7" class="text-center">No users found</td>';
+    row.innerHTML = '<td colspan="7" class="text-center">ไม่พบผู้ใช้</td>';
     tableBody.appendChild(row);
     return;
   }
@@ -87,7 +87,7 @@ function renderUsers(usersToRender) {
     const row = document.createElement('tr');
 
     // Format last login date
-    const lastLogin = user.last_login ? new Date(user.last_login).toLocaleString() : 'Never';
+    const lastLogin = user.last_login ? new Date(user.last_login.replace(' ', 'T')).toLocaleString() : '-';
 
     row.innerHTML = `
       <td>${user.username}</td>
@@ -192,7 +192,7 @@ function showAddUserModal() {
   // Reset form
   document.getElementById('userForm').reset();
   document.getElementById('userId').value = '';
-  document.getElementById('userModalTitle').textContent = 'Add User';
+  document.getElementById('userModalTitle').textContent = 'เพิ่มผู้ใช้';
 
   // Show password fields and make them required
   const passwordFields = document.querySelectorAll('.password-fields input');
@@ -239,16 +239,16 @@ async function editUser(userId) {
       });
 
       // Update modal title
-      document.getElementById('userModalTitle').textContent = 'Edit User';
+      document.getElementById('userModalTitle').textContent = 'แก้ไขผู้ใช้';
 
       // Show modal
       document.getElementById('userModal').classList.add('show');
     } else {
-      showNotification(response.message || 'Failed to load user details', 'error');
+      showNotification(response.message || 'โหลดรายละเอียดผู้ใช้ไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error loading user details:', error);
-    showNotification('Error loading user details', 'error');
+    showNotification('โหลดรายละเอียดผู้ใช้ไม่สำเร็จ', 'error');
   }
 }
 
@@ -310,11 +310,11 @@ async function saveUser() {
       hideUserModal();
       await loadUsers(); // Reload users
     } else {
-      showNotification(response.message || 'Failed to save user', 'error');
+      showNotification(response.message || 'บันทึกผู้ใช้ไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error saving user:', error);
-    showNotification('Error saving user', 'error');
+    showNotification('บันทึกผู้ใช้ไม่สำเร็จ', 'error');
   }
 }
 
@@ -325,7 +325,7 @@ async function deleteUser(userId) {
   if (userJson) {
     const currentUser = JSON.parse(userJson);
     if (currentUser.id == userId) {
-      showNotification('You cannot delete your own account', 'error');
+      showNotification('ไม่สามารถลบบัญชีของตนเองได้', 'error');
       return;
     }
   }
@@ -342,7 +342,7 @@ async function deleteUser(userId) {
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      showNotification('Error deleting user', 'error');
+      showNotification('ลบผู้ใช้ไม่สำเร็จ', 'error');
     }
   }
 }
@@ -392,7 +392,7 @@ async function changePassword() {
     }
   } catch (error) {
     console.error('Error changing password:', error);
-    showNotification('Error changing password', 'error');
+    showNotification('เปลี่ยนรหัสผ่านไม่สำเร็จ', 'error');
   }
 }
 
@@ -418,11 +418,11 @@ async function loadActivityLog() {
       totalPages = response.data.pagination.pages;
       renderPagination(response.data.pagination);
     } else {
-      showNotification(response.message || 'Failed to load activity log', 'error');
+      showNotification(response.message || 'โหลดบันทึกกิจกรรมไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error loading activity log:', error);
-    showNotification('Error loading activity log', 'error');
+    showNotification('โหลดบันทึกกิจกรรมไม่สำเร็จ', 'error');
   }
 }
 
@@ -433,7 +433,7 @@ function renderActivityLog(logs) {
 
   if (logs.length === 0) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="5" class="text-center">No activity logs found</td>';
+    row.innerHTML = '<td colspan="5" class="text-center">ไม่พบบันทึกกิจกรรม</td>';
     tableBody.appendChild(row);
     return;
   }
@@ -442,7 +442,7 @@ function renderActivityLog(logs) {
     const row = document.createElement('tr');
 
     // Format date
-    const date = new Date(log.created_at).toLocaleString();
+    const date = new Date(log.created_at.replace(' ', 'T')).toLocaleString();
 
     row.innerHTML = `
       <td>${log.username}</td>

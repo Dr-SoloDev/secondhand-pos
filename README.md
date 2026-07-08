@@ -2,7 +2,23 @@
 
 **Junk Shop POS System** — Customized from [goragodwiriya/pos-system](https://github.com/goragodwiriya/pos-system) for 4-branch scrap buying business in Surin, Thailand.
 
-> Owner: Dr.solodev | Last Updated: 2026-07-03 | Status: MVP Complete
+> Owner: Dr.solodev | Last Updated: 2026-07-07 | Status: **Production Ready** ✅
+
+---
+
+## Quick Start
+
+```bash
+cd code
+cp .env.example .env        # set JWT_SECRET, DB passwords
+docker compose up -d         # start web (8080) + db (3307) + caddy
+```
+
+| Service | URL | Login |
+|---------|-----|-------|
+| Admin UI | http://localhost:8080/admin/ | admin / admin |
+| API | http://localhost:8080/api/index.php/ | (JWT via login) |
+| Caddy (HTTPS) | https://your-domain.com | (production) |
 
 ---
 
@@ -24,143 +40,90 @@
 
 ```
 code/
-├── base-pos/              # Core POS (goragodwiriya/pos-system) — patched in-place
-│   ├── api/               # PHP Backend (Router, Controllers, Models, Core, Services)
-│   ├── admin/             # Admin UI pages (active delivery target)
-│   ├── pos/               # POS terminal
-│   └── assets/            # CSS, JS (all admin JS in assets/js/)
+├── base-pos/                  # Core POS framework — patched in-place
+│   ├── api/                   # Router, Controllers, Models, Core, Services
+│   ├── admin/                 # Admin UI pages (active delivery target)
+│   ├── pos/                   # POS terminal
+│   └── assets/                # CSS, JS (admin JS in assets/js/)
 │
-└── customizations/        # Custom code loaded by autoloader
-    ├── api/Models/        # Branch, Seller, PurchaseOrder, SaleLot, PurchaseItemCatalog, StockTransfer, BusinessExpense
-    ├── api/Controllers/   # Branches, Sellers, PurchaseOrders, SaleLots, PriceTiers, Catalog, StockTransfers, PhotoUpload, Financial
-    ├── database/          # 38 migrations + run-migrations.sh
+└── customizations/            # Custom overlay loaded by autoloader
+    ├── api/Models/            # 10 custom models
+    ├── api/Controllers/       # 11 custom controllers
+    └── database/
+        ├── migrations/        # 48 migrations (001-048)
+        └── run-migrations.sh
 ```
 
 ### Stack
-- **PHP 8.2** + Apache (Docker)
-- **MySQL 8.0** (MariaDB-compatible)
-- **Vanilla JS ES6** (no jQuery, no framework)
-- **Docker Compose** (web + db + phpmyadmin)
+- **PHP 8.2** + Apache (Docker — 59MB RAM)
+- **MySQL 8.0** (Docker — 409MB RAM)
+- **Vanilla JS ES6** (no framework, no jQuery)
+- **Docker Compose** (web + db + Caddy for HTTPS)
 
 ---
 
-## Features Implemented
+## Features
 
 ### Core Business
-- **Purchase Orders (รับซื้อ):** Multi-item PO with catalog autocomplete, seller search, weight deduction, price tiers, receipt printing
-- **Sale Lots (ขาย Lot):** Full CRUD with draft/confirm/cancel, FIFO cost calculation, weighted average costing, profit tracking, actual revenue recording
-- **Stock Transfers (โอนสต็อก):** Transfer stock between branches, pending/confirm/cancel with logistics tracking
-- **Sellers (ผู้ขาย):** ID card tracking, blacklist with reason/timestamp, duplicate detection, branch association, photo upload
-- **Inventory:** Category-based stock tracking with alert thresholds, price tiers
-- **Catalog:** Master purchase catalog with auto-fill, price board, tier pricing (JSON)
-- **Business Expenses:** Track expenses per branch/category with CRUD
+- **Purchase Orders (รับซื้อ):** Multi-item PO with catalog autocomplete, seller search, weight deduction, price tiers, precious metal receipt flag, receipt printing
+- **Sale Lots (ขาย Lot):** Full CRUD with draft/confirm/cancel, FIFO costing (atomic `consumed_qty` + `FOR UPDATE`), weighted average cost, profit tracking, actual revenue recording, transport cost
+- **Stock Transfers (โอนสต็อก):** Cross-branch stock transfer with pending→confirm/cancel workflow + logistics tracking (carrier, plate, driver)
+- **Sellers (ผู้ขาย):** ID card (13-digit) validation, duplicate detection, blacklist with reason/timestamp/who, vehicle plate tracking, photo upload, PDPA consent, search index
+- **Inventory:** Category-based stock tracking, alert thresholds, price tiers (3 tiers per category), unit management (kg/piece)
+- **Catalog:** Master purchase catalog with auto-fill, price board (all branches), JSON tier pricing
+- **Business Expenses:** Per-branch expense tracking with CRUD
+- **Employees:** Employee records + salary/SSO expense generation
 
 ### Cross-cutting
-- Multi-branch support with data isolation
-- Role-based access (admin/manager/cashier) with JWT branch_id scoping
-- Responsive UI (desktop + tablet + mobile breakpoints)
-- Reports: purchase report, sale lot report, financial summary, chart data, CSV export
-- Dashboard: stat cards, sale lot chart, recent sale lots table
-- Photo upload via QR code (HMAC token handoff)
-- Financial dashboard: revenue, expenses, purchase totals, kg
-- Login rate limiting (IP-based, persistent)
-- JWT revocation via token blocklist
+- **Multi-branch** with data isolation, per-branch cost method (FIFO / weighted average)
+- **Role-based access** — admin / manager / cashier with JWT branch_id scoping
+- **Responsive UI** — desktop + tablet + mobile (768px, 576px breakpoints)
+- **Dashboard:** Stat cards, sale lot chart, recent sale lots table
+- **Reports:** Purchase report, sale lot report, financial summary, CSV export, chart data
+- **Photo upload** via QR code + HMAC token handoff (no JWT needed)
+- **Security:** JWT (httpOnly cookie + Bearer fallback), login rate limiting (IP-based), token blocklist (revocation), SQL injection (PDO prepared statements everywhere), race safety (atomic conditional UPDATE + FOR UPDATE)
+- **Idempotency:** Duplicate POST prevention for POs and sale lots
 
 ---
 
-## Quick Start
+## Performance (Benchmarked 2026-07-07)
+
+| Metric | Result |
+|--------|--------|
+| GET endpoints avg | **< 15ms** |
+| GET endpoints p95 | **< 60ms** |
+| 5× concurrency | **10-21ms avg** |
+| Login (bcrypt + JWT) | **309ms avg** (expected) |
+| Docker RAM usage | 468MB total (< 3% of available) |
+
+---
+
+## Testing
 
 ```bash
-cd code
-docker compose up -d
+cd code/tests/api
+bash run.sh                       # 84 tests, all passing
+bash run.sh auth sellers          # run specific groups
+API_BASE=http://other:8080/api/index.php bash run.sh
 ```
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| Admin | http://localhost:8080/admin/ | admin / admin |
-| API | http://localhost:8080/api/index.php/ | (JWT auth) |
-| phpMyAdmin | http://localhost:8081/ | root / from .env |
-
-### Setup
-1. Copy `.env.example` → `.env` and set secrets
-2. `docker compose up -d` starts all 3 containers
-3. Database auto-initializes migrations on first start
-4. Login at `/admin/` with default credentials
-
-### Run Tests
-```bash
-cd tests/api
-bash run.sh          # 9 test functions, 54 assertions — auth, branches, sellers, POs, sale lots, FIFO flow, catalog, price tiers, inventory
-```
+**CI** (`.github/workflows/test.yml`): PHP lint → run migrations → start PHP server → run tests
 
 ---
 
-## Database
+## Documentation
 
-**38 migrations** in `customizations/database/migrations/`:
-
-| Area | Migrations | Key Tables |
-|------|-----------|------------|
-| Branches | 001, 021 | `branches` (cost_method: fifo/weighted) |
-| Sellers | 002, 011, 031 | `sellers` (id_card, phone, vehicle_plate, blacklist) |
-| Purchase Orders | 004, 008, 010, 013, 020, 036 | `purchase_orders`, `purchase_order_items`, `purchase_order_photos` |
-| Sale Lots | 009, 010, 017, 020, 029, 034, 035 | `sale_lots`, `sale_lot_items` |
-| Catalog | 012, 015, 016, 026 | `purchase_item_catalog` (tier_prices JSON) |
-| Price Tiers | 007 | `price_tiers` |
-| Stock Transfers | 024, 025 | `stock_transfers` |
-| Business Expenses | 030 | `business_expenses` |
-| Categories | 022, 027, 028, 032, 033 | `categories` (alert_threshold, default_unit) |
-| Seeds | 005, 006 | Default categories + demo data |
-| Security | 037, 038 | `login_attempts`, `token_blocklist` |
-
----
-
-## Project Status
-
-### ✅ Completed (All Phases + P0-P2 Hardening)
-- All 38 database migrations
-- 8 custom Models + 10 custom Controllers + 4 base Services
-- 9 test functions (54 assertions) — all passing
-- FIFO costing with atomic consumed_qty + TOCTOU FOR UPDATE locking
-- Weighted average cost (per-branch cost_method)
-- Stock Transfers (pending → confirm/cancel with logistics)
-- Photo upload (HMAC token + QR-based mobile upload)
-- Business Expenses + Financial Summary dashboard
-- Actual revenue tracking on sale lots
-- Price board endpoint for all branches
-- Stock alert thresholds per category
-- Blacklist reason/timestamp tracking
-- Precious metals receipt flag
-- Token blocklist for JWT revocation
-- Login attempt rate limiting (IP-based)
-- Reports: purchase-report, sale-lot-report, sale-lot-chart, financial export, + more
-- Dashboard charts + recent sale lots
-- Responsive CSS (768px, 576px breakpoints)
-- Security: JWT in .env, Docker secrets externalized, CORS from env
-- Console cleanup: 9 console.log() removed
-- Bug fixes: PO cancel, SL reference_no collision, PDO execute→query
-
-### ⏳ Pending
-- PHPUnit test framework integration
-- HTTPS setup
-- Auto-generate PO from low-stock alerts
-- Tax/nightly batch reports
-- Dedicated test files for StockTransfers, Financial, PhotoUpload
-
----
-
-## Documentation Index
-
-| File | Audience | Purpose |
+| File | Audience | Content |
 |------|----------|---------|
-| `AGENTS.md` | AI Agents | Full project context for Claude/Kimi |
+| `AGENTS.md` | AI agents | Full project context |
 | `DESIGN.md` | Designers/Devs | UI design system (Google Stitch) |
-| `code/README.md` | Developers | Technical setup + code structure |
-| `01-project-brief.md` | All | Original project scope |
-| `05-research-report.md` | Developers | Base codebase analysis |
-| `06-implementation-roadmap.md` | Developers | Step-by-step impl guide |
-| `07-executive-summary.md` | Stakeholders | Decision document |
+| `docs/INSTALLATION.md` | Ops | Docker, env, production deploy |
+| `docs/USER-GUIDE.md` | Users | Step-by-step workflow manual (Thai) |
+| `docs/TECHNICAL.md` | Developers | Architecture, API, DB, security |
+| `docs/DEPLOY-CHECKLIST.md` | Ops | Pre-launch verification |
 
 ---
 
-*Built for SoloCorp OS by Dr.solodev | Powered by Claude Code + Kimi CLI*
+## License
+
+Built for SoloCorp OS by Dr.solodev | Powered by Claude Code + Kimi CLI

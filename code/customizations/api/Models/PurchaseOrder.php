@@ -31,6 +31,7 @@ class PurchaseOrder extends Model
 
         $total = $this->db->fetchColumn(
             "SELECT COUNT(*) FROM {$this->table} po
+             LEFT JOIN sellers s ON po.seller_id = s.id
              WHERE {$whereSql}",
             $params
         );
@@ -66,6 +67,7 @@ class PurchaseOrder extends Model
             "SELECT po.*, s.full_name AS seller_name, s.id_card AS seller_id_card,
                     s.phone AS seller_phone, s.address AS seller_address,
                     b.name AS branch_name, b.code AS branch_code,
+                    b.phone AS branch_phone,
                     u.full_name AS user_name
              FROM {$this->table} po
              LEFT JOIN sellers s ON po.seller_id = s.id

@@ -50,10 +50,10 @@ jobs:
           DB_USER: posuser
           DB_PASS: pospass
         run: |
-          mysql -h 127.0.0.1 -P 3307 -u posuser -ppospass pos_system < base-pos/database/pos_system.sql
+          MYSQL_PWD=pospass mysql -h 127.0.0.1 -P 3307 -u posuser pos_system < base-pos/database/pos_system.sql
           for f in customizations/database/migrations/*.sql; do
             echo "Running migration: $f"
-            mysql -h 127.0.0.1 -P 3307 -u posuser -ppospass pos_system < "$f"
+            MYSQL_PWD=pospass mysql -h 127.0.0.1 -P 3307 -u posuser pos_system < "$f"
           done
 
       - name: Start PHP server
@@ -65,9 +65,30 @@ jobs:
           DB_PASS: pospass
           JWT_SECRET: ci-test-secret
         run: |
-          php -S 0.0.0.0:8080 -t base-pos &
-          sleep 2
+          php -S 0.0.0.0:8080 -t base-pos > php-server.log 2>&1 &
+
+          # Health check loop — wait for PHP server to respond
+          for i in $(seq 1 10); do
+            if curl -s -o /dev/null "http://localhost:8080/api/index.php/auth/verify" 2>/dev/null; then
+              echo "PHP server is ready (attempt $i)"
+              exit 0
+            fi
+            echo "Waiting for PHP server... (attempt $i/10)"
+            sleep 1
+          done
+          echo "ERROR: PHP server failed to start within 10 seconds"
+          exit 1
 
       - name: Run API tests
         run: |
-          bash tests/api/run.sh
+          bash tests/api/run.sh 2>&1 | tee test-output.log
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifacts
+          path: |
+            code/test-output.log
+            code/php-server.log
+          retention-days: 7

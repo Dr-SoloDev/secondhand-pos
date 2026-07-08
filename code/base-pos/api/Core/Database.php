@@ -152,6 +152,8 @@ class Database
      */
     public function insert($table, $data)
     {
+        $data = TextEncoding::normalize($data);
+
         foreach (array_keys($data) as $col) {
             if (!preg_match('/^[a-zA-Z0-9_]+$/', $col)) {
                 throw new InvalidArgumentException("Invalid column name: $col");
@@ -175,8 +177,13 @@ class Database
      */
     public function update($table, $data, $conditions, $conditionParams = [])
     {
+        $data = TextEncoding::normalize($data);
+
         $sets = [];
         foreach (array_keys($data) as $column) {
+            if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $column)) {
+                throw new \InvalidArgumentException("Invalid column name: $column");
+            }
             $sets[] = "{$column} = ?";
         }
 

@@ -2,19 +2,13 @@
 test_auth() {
   test_section "Authentication"
 
-  # Ensure token is initialized by using the helper
-  local token
-  token=$(get_token)
-
-  # 1. Login with valid credentials (via helper)
-  local res
-  res=$(curl -s "$API_BASE/auth/login" \
+  # 1. Login with valid credentials (login helper stores cookie in COOKIE_JAR)
+  local logres
+  logres=$(curl -s -c "$COOKIE_JAR" "$API_BASE/auth/login" \
     -X POST \
     -H 'Content-Type: application/json' \
     -d "{\"username\":\"$TEST_USER\",\"password\":\"$TEST_PASS\"}")
-  assert_contains "$res" '"status":"success"' "Login with valid credentials"
-  assert_contains "$res" '"token"' "Login returns token"
-  token=$(echo "$res" | sed 's/.*"token":"\([^"]*\)".*/\1/')
+  assert_contains "$logres" '"status":"success"' "Login with valid credentials"
 
   # 2. Login with invalid password
   local res_fail
@@ -32,15 +26,15 @@ test_auth() {
     -d '{"username":"","password":"admin"}')
   assert_contains "$res_empty" '"status":"error"' "Login with empty username fails"
 
-  # 4. Verify token (POST with token in JSON body)
+  # 4. Verify token via cookie (uses COOKIE_JAR from login)
   local res_verify
-  res_verify=$(curl -s "$API_BASE/auth/verify" \
+  res_verify=$(curl -s -b "$COOKIE_JAR" "$API_BASE/auth/verify" \
     -X POST \
     -H 'Content-Type: application/json' \
-    -d "{\"token\":\"$token\"}")
-  assert_contains "$res_verify" '"status":"success"' "Verify valid token"
+    -d '{}')
+  assert_contains "$res_verify" '"status":"success"' "Verify via cookie"
 
-  # 5. Verify with invalid token
+  # 5. Verify with invalid token (no cookie)
   local res_bad
   res_bad=$(curl -s "$API_BASE/auth/verify" \
     -X POST \
@@ -48,8 +42,8 @@ test_auth() {
     -d '{"token":"invalid-token"}')
   assert_contains "$res_bad" '"status":"error"' "Verify with invalid token fails"
 
-  # 6. Access without token returns error
+  # 6. Access without auth cookie returns error
   local res_noauth
   res_noauth=$(curl -s "$API_BASE/branches")
-  assert_contains "$res_noauth" '"status":"error"' "Access without token rejected"
+  assert_contains "$res_noauth" '"status":"error"' "Access without auth rejected"
 }

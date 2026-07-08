@@ -89,7 +89,7 @@ function setBranchMode(mode) {
     renderBranchSummary(allBranches, 'side');
     fetchDashboardData(null);
   } else if (mode.startsWith('single-')) {
-    const id = parseInt(mode.replace('single-', ''));
+    const id = parseInt(mode.replace('single-', ''), 10);
     currentBranchId = id;
     renderBranchSummary(allBranches.filter(b => b.id === id), 'all');
     // WF-04: โหลด stats เฉพาะสาขานี้
@@ -127,7 +127,7 @@ function renderBranchSummary(branches, mode) {
   grid.innerHTML = branches.map(b => {
     const todayAmt = parseFloat(b.today_purchase_amount || 0);
     const isTop = branches.length > 1 && todayAmt > 0 && todayAmt === maxToday;
-    const pendingTotal = parseInt(b.pending_po_count || 0) + parseInt(b.pending_salelot_count || 0);
+    const pendingTotal = parseInt(b.pending_po_count || 0, 10) + parseInt(b.pending_salelot_count || 0, 10);
     const pendingHtml = pendingTotal > 0
       ? `<span style="background:#fef3c7;color:#92400e;font-size:11px;padding:2px 8px;border-radius:99px">รอ ${pendingTotal}</span>` : '';
     const topHtml = isTop
@@ -144,7 +144,7 @@ function renderBranchSummary(branches, mode) {
           <div class="branch-stat-label">รับซื้อวันนี้</div>
         </div>
         <div class="branch-stat">
-          <div class="branch-stat-value">${parseInt(b.today_purchase_count || 0)}</div>
+          <div class="branch-stat-value">${parseInt(b.today_purchase_count || 0, 10)}</div>
           <div class="branch-stat-label">ใบวันนี้</div>
         </div>
         <div class="branch-stat">
@@ -167,6 +167,7 @@ function renderBranchSummary(branches, mode) {
 async function fetchPurchaseChartData(period) {
   const res = await apiRequest(`reports/purchase-chart?period=${period}`);
   if (res.status === 'success') renderPurchaseChart(res.data, period);
+  else document.getElementById('purchaseChart').innerHTML = '<div class="chart-placeholder" style="color:#ef4444">โหลดกราฟไม่สำเร็จ</div>';
 }
 
 function renderPurchaseChart(data, period) {
@@ -196,6 +197,7 @@ function renderPurchaseChart(data, period) {
 async function fetchSalelotChartData(period) {
   const res = await apiRequest(`reports/sale-lot-chart?period=${period}`);
   if (res.status === 'success') renderSalelotDashboardChart(res.data, period);
+  else document.getElementById('salelotDashboardChart').innerHTML = '<div class="chart-placeholder" style="color:#ef4444">โหลดกราฟไม่สำเร็จ</div>';
 }
 
 function renderSalelotDashboardChart(data, period) {
@@ -228,7 +230,7 @@ function renderRecentPurchases(purchases) {
   const tbody = document.querySelector('#recentPOTable tbody');
   if (!purchases.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center">ยังไม่มีรายการรับซื้อ</td></tr>'; return; }
   tbody.innerHTML = purchases.map(po => {
-    const date = new Date(po.created_at).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'});
+    const date = new Date(po.created_at.replace(' ', 'T')).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'});
     const badge = po.status === 'completed' ? 'badge-success' : po.status === 'draft' ? 'badge-warning' : 'badge-danger';
     const label = po.status === 'completed' ? 'สำเร็จ' : po.status === 'draft' ? 'ร่าง' : 'ยกเลิก';
     return `<tr>
@@ -246,7 +248,7 @@ function renderRecentSaleLots(lots) {
   const tbody = document.querySelector('#recentSaleLotsTable tbody');
   if (!lots.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center">ยังไม่มีรายการขาย Lot</td></tr>'; return; }
   tbody.innerHTML = lots.map(lot => {
-    const date = new Date(lot.sale_date).toLocaleDateString('th-TH');
+    const date = new Date(lot.sale_date.replace(' ', 'T')).toLocaleDateString('th-TH');
     const badge = lot.status === 'confirmed' ? 'badge-success' : lot.status === 'draft' ? 'badge-warning' : 'badge-danger';
     const label = lot.status === 'confirmed' ? 'ยืนยันแล้ว' : lot.status === 'draft' ? 'ร่าง' : 'ยกเลิก';
     return `<tr>

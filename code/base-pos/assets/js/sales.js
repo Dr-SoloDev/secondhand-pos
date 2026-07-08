@@ -89,11 +89,10 @@ async function loadSales() {
       currentPage = response.data.pagination.page;
       renderPagination(response.data.pagination);
     } else {
-      showNotification(response.message || 'Failed to load sales', 'error');
+      showNotification(response.message || 'โหลดรายการขายไม่สำเร็จ', 'error');
     }
   } catch (error) {
-    console.error('Error loading sales:', error);
-    showNotification('Error loading sales', 'error');
+    showNotification('โหลดรายการขายไม่สำเร็จ', 'error');
   }
 }
 
@@ -113,7 +112,7 @@ function renderSalesTable(sales) {
     const row = document.createElement('tr');
 
     // Format date and time
-    const dateTime = new Date(sale.created_at).toLocaleString();
+    const dateTime = new Date(sale.created_at.replace(' ', 'T')).toLocaleString();
 
     // Determine status badge class
     let statusBadgeClass = '';
@@ -231,7 +230,7 @@ async function viewSaleDetails(saleId) {
     }
   } catch (error) {
     console.error('Error viewing sale details:', error);
-    showNotification('Error loading sale details', 'error');
+    showNotification('โหลดรายละเอียดไม่สำเร็จ', 'error');
   }
 }
 
@@ -246,12 +245,12 @@ async function getSaleDetails(saleId, printReceipt = false) {
       }
       return response.data;
     } else {
-      showNotification(response.message || 'Failed to load sale details', 'error');
+      showNotification(response.message || 'โหลดรายละเอียดไม่สำเร็จ', 'error');
       return null;
     }
   } catch (error) {
     console.error('Error getting sale details:', error);
-    showNotification('Error loading sale details', 'error');
+    showNotification('โหลดรายละเอียดไม่สำเร็จ', 'error');
     return null;
   }
 }
@@ -260,7 +259,7 @@ async function getSaleDetails(saleId, printReceipt = false) {
 function renderSaleDetails(sale) {
   // Sale header information
   document.getElementById('saleReference').textContent = sale.reference_no;
-  document.getElementById('saleDate').textContent = new Date(sale.created_at).toLocaleString();
+  document.getElementById('saleDate').textContent = new Date(sale.created_at.replace(' ', 'T')).toLocaleString();
   document.getElementById('saleCustomer').textContent = sale.customer_name || 'Walk-in Customer';
   document.getElementById('saleCashier').textContent = sale.user_full_name || sale.user_name;
 
@@ -352,7 +351,7 @@ async function voidSale() {
     }
   } catch (error) {
     console.error('Error voiding sale:', error);
-    showNotification('Error voiding sale', 'error');
+    showNotification('ยกเลิกรายการไม่สำเร็จ', 'error');
   }
 }
 
@@ -361,7 +360,7 @@ async function voidSale() {
 function exportSales() {
   try {
     // แสดง notification กำลังทำงาน
-    showNotification('Creating sales export...', 'info');
+    showNotification('กำลังส่งออกรายการ...', 'info');
 
     // รับค่าจากฟิลเตอร์ต่างๆ
     const dateFrom = document.getElementById('dateFrom').value;
@@ -428,25 +427,25 @@ function exportSales() {
           link.setAttribute('download', filename);
           link.style.visibility = 'hidden';
 
-          // เพิ่ม link ลงใน document และคลิกเพื่อดาวน์โหลด
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+          URL.revokeObjectURL(url);
 
           // แสดง notification เมื่อสำเร็จ
           showNotification('ส่งออกรายการขายสำเร็จ', 'success');
         } else {
-          showNotification(response.message || 'Failed to retrieve sales data', 'error');
+          showNotification(response.message || 'ดึงข้อมูลรายการขายไม่สำเร็จ', 'error');
         }
       })
       .catch(error => {
         console.error('Error exporting sales:', error);
-        showNotification('Error exporting sales data', 'error');
+        showNotification('ส่งออกรายการไม่สำเร็จ', 'error');
       });
 
   } catch (error) {
     console.error('Error in export process:', error);
-    showNotification('Error processing export', 'error');
+    showNotification('ดำเนินการส่งออกไม่สำเร็จ', 'error');
   }
 }
 
@@ -461,7 +460,7 @@ function formatDateForFilename(date) {
 // Print receipt
 async function printReceipt() {
   if (!currentSaleId) {
-    showNotification('No sale selected', 'error');
+    showNotification('กรุณาเลือกรายการขาย', 'error');
     return;
   }
 
@@ -472,7 +471,7 @@ async function printReceipt() {
     }
   } catch (error) {
     console.error('Error printing receipt:', error);
-    showNotification('Error printing receipt', 'error');
+    showNotification('พิมพ์ใบเสร็จไม่สำเร็จ', 'error');
   }
 }
 
@@ -589,7 +588,7 @@ function printSaleReceipt(sale) {
 
       <div class="receipt-info">
         <p><strong>Receipt #:</strong> ${sale.reference_no}</p>
-        <p><strong>Date:</strong> ${new Date(sale.created_at).toLocaleString()}</p>
+        <p><strong>Date:</strong> ${new Date(sale.created_at.replace(' ', 'T')).toLocaleString()}</p>
         <p><strong>Cashier:</strong> ${sale.user_full_name || sale.user_name}</p>
         <p><strong>Customer:</strong> ${sale.customer_name || 'Walk-in Customer'}</p>
       </div>

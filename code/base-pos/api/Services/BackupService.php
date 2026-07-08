@@ -11,15 +11,19 @@ class BackupService
         $filename = "backup_{$timestamp}.sql";
         $filePath = BACKUP_DIR.'/'.$filename;
 
-        $host = escapeshellarg(DB_HOST);
-        $user = escapeshellarg(DB_USER);
-        $pass = escapeshellarg(DB_PASS);
+        $cnfFile = tempnam(sys_get_temp_dir(), 'mycnf_');
+        $cnfContent = "[client]\nhost=" . DB_HOST . "\nuser=" . DB_USER . "\npassword=" . DB_PASS . "\n";
+        file_put_contents($cnfFile, $cnfContent);
+        chmod($cnfFile, 0600);
+
         $dbName = escapeshellarg(DB_NAME);
         $fileArg = escapeshellarg($filePath);
+        $cnfArg = escapeshellarg($cnfFile);
 
-        $command = "mysqldump --host={$host} --user={$user} --password={$pass} {$dbName} > {$fileArg} 2>&1";
+        $command = "timeout 300 mysqldump --defaults-extra-file={$cnfArg} {$dbName} > {$fileArg} 2>&1";
 
         exec($command, $output, $returnVar);
+        unlink($cnfFile);
 
         if ($returnVar !== 0) {
             return [
@@ -207,7 +211,7 @@ class BackupService
         header('Content-Length: '.filesize($realPath));
 
         // Clear output buffer
-        ob_clean();
+        if (ob_get_level()) ob_clean();
         flush();
 
         // Read file and output to browser

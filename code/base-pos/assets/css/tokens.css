@@ -39,10 +39,10 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-round: 50px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.03);
-  --shadow-lg: 0 10px 25px rgba(0,0,0,0.05), 0 4px 10px rgba(0,0,0,0.03);
-  --shadow-xl: 0 20px 40px rgba(0,0,0,0.06);
+  --shadow-sm: 0 1px 3px rgba(217,119,6,0.04), 0 1px 2px rgba(0,0,0,0.02);
+  --shadow-md: 0 4px 6px rgba(217,119,6,0.04), 0 2px 4px rgba(0,0,0,0.03);
+  --shadow-lg: 0 10px 25px rgba(217,119,6,0.06), 0 4px 10px rgba(0,0,0,0.03);
+  --shadow-xl: 0 20px 40px rgba(120,53,15,0.15), 0 8px 16px rgba(0,0,0,0.06);
   --transition: 0.2s ease;
   --transition-slow: 0.35s ease;
   --font-main: 'IBM Plex Sans Thai', sans-serif;
@@ -55,6 +55,11 @@
   --z-modal: 1100;
   --z-notification: 1200;
   --z-loading-overlay: 9999;
+  --z-photo-sheet: 2000;
+  --z-photo-camera: 2100;
+  --z-photo-toast: 2200;
+  --z-photo-progress: 2300;
+  --z-photo-fab: 1000;
 }
 
 *, *::before, *::after {
@@ -131,6 +136,7 @@ a:hover {
   inset: 0;
   background: rgba(255,255,255,0.7);
   backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -139,7 +145,7 @@ a:hover {
 
 /* Text Colors */
 .text-muted {
-  color: #888;
+  color: var(--color-text-lighter);
 }
 
 /* === Typography Scale (taste-skill) === */

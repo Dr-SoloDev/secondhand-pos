@@ -46,7 +46,7 @@ async function initInventory() {
     }
   } catch (error) {
     console.error('Failed to initialize inventory:', error);
-    showNotification('Error loading inventory data', 'error');
+    showNotification('โหลดข้อมูลคลังสินค้าไม่สำเร็จ', 'error');
   }
 }
 
@@ -286,7 +286,7 @@ async function editCatalogItem(itemId) {
     document.getElementById('productModal').classList.add('show');
   } catch (error) {
     console.error('Error fetching catalog item:', error);
-    showNotification('Error loading item data', 'error');
+    showNotification('โหลดข้อมูลสินค้าไม่สำเร็จ', 'error');
   }
 }
 
@@ -351,7 +351,7 @@ async function saveCatalogItem() {
     }
   } catch (error) {
     console.error('Error saving catalog item:', error);
-    showNotification('Error saving catalog item', 'error');
+    showNotification('บันทึกรายการแคตตาล็อกไม่สำเร็จ', 'error');
   }
 }
 
@@ -371,7 +371,7 @@ async function deleteCatalogItem(itemId) {
     }
   } catch (error) {
     console.error('Error deleting catalog item:', error);
-    showNotification('Error deleting catalog item', 'error');
+    showNotification('ลบรายการแคตตาล็อกไม่สำเร็จ', 'error');
   }
 }
 
@@ -409,7 +409,7 @@ function renderCategoryList() {
 function editCategory(categoryId) {
   const category = categories.find(c => c.id === categoryId);
   if (category) {
-    document.getElementById('categoryId').value = category.id;
+    document.getElementById('editCategoryId').value = category.id;
     document.getElementById('categoryName').value = category.name;
     document.getElementById('categoryDescription').value = category.description || '';
   }
@@ -417,16 +417,16 @@ function editCategory(categoryId) {
 
 function resetCategoryForm() {
   document.getElementById('categoryForm').reset();
-  document.getElementById('categoryId').value = '';
+  document.getElementById('editCategoryId').value = '';
 }
 
 async function saveCategory() {
   try {
-    const categoryId = document.getElementById('categoryId').value;
+    const categoryId = document.getElementById('editCategoryId').value;
     const categoryName = document.getElementById('categoryName').value;
     const categoryDescription = document.getElementById('categoryDescription').value;
     if (!categoryName) {
-      showNotification('Category name is required', 'error');
+      showNotification('กรุณากรอกชื่อหมวดหมู่', 'error');
       return;
     }
     const payload = { name: categoryName, description: categoryDescription };
@@ -451,7 +451,7 @@ async function saveCategory() {
     }
   } catch (error) {
     console.error('Error saving category:', error);
-    showNotification('Error saving category', 'error');
+    showNotification('บันทึกหมวดหมู่ไม่สำเร็จ', 'error');
   }
 }
 
@@ -473,7 +473,7 @@ async function deleteCategory(categoryId) {
     }
   } catch (error) {
     console.error('Error deleting category:', error);
-    showNotification('Error deleting category', 'error');
+    showNotification('ลบหมวดหมู่ไม่สำเร็จ', 'error');
   }
 }
 

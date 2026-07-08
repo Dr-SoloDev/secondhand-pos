@@ -68,7 +68,7 @@
   position: fixed;
   inset: 0;
   background: var(--pp-overlay);
-  z-index: 2000;
+  z-index: var(--z-photo-sheet);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -196,7 +196,7 @@
    ================================================================== */
 .camera-overlay {
   position: fixed; inset: 0; background: #000;
-  z-index: 2100; display: flex; flex-direction: column;
+  z-index: var(--z-photo-camera); display: flex; flex-direction: column;
   opacity: 0; visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
 }
@@ -314,7 +314,7 @@
    ================================================================== */
 .upload-progress {
   position: fixed; top: 0; left: 0; right: 0; height: 3px;
-  z-index: 2300; display: none;
+  z-index: var(--z-photo-progress); display: none;
 }
 .upload-progress.show { display: block; }
 .upload-progress-bar {
@@ -325,10 +325,10 @@
 }
 
 .toast-upload {
-  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: max(28px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
   background: #1e293b; color: #fff;
   padding: 10px 22px; border-radius: 24px;
-  font-size: 14px; font-weight: 500; z-index: 2200;
+  font-size: 14px; font-weight: 500; z-index: var(--z-photo-toast);
   box-shadow: 0 4px 20px rgba(0,0,0,0.3);
   display: none; align-items: center; gap: 8px; white-space: nowrap;
   animation: toastUp 0.25s var(--pp-ease);
@@ -389,7 +389,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-photo-fab);
   transition: all 0.25s var(--pp-ease);
   -webkit-tap-highlight-color: transparent;
   padding: 0;
@@ -546,8 +546,8 @@
   .camera-retry-btn { padding: 8px 20px; font-size: 13px; }
   .camera-confirm-btn { padding: 8px 24px; font-size: 13px; }
   .po-photo-grid { grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
-  .btn-photo-picker { width: 28px; height: 28px; font-size: 14px; }
-  .btn-photo-picker-sm { width: 24px; height: 24px; font-size: 11px; }
+  .btn-photo-picker { width: 44px; height: 44px; font-size: 18px; }
+  .btn-photo-picker-sm { width: 36px; height: 36px; font-size: 14px; }
   .photo-fab { bottom: 16px; right: 16px; width: 48px; height: 48px; font-size: 22px; }
   .photo-fab-badge { min-width: 20px; height: 20px; font-size: 10px; }
   .photo-strip-item .photo-thumb { width: 44px; height: 44px; }

@@ -1,12 +1,409 @@
-/* Purchase Orders Grid */
-.po-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+/* ========================================
+   Purchase Orders UI — เครื่องมือรับซื้อของ
+   Hierarchy: form entry (hero) > cart > bottom actions > recent
+   ======================================== */
+
+/* ===== 1. PAGE LAYOUT ===== */
+.po-page {
+  max-width: 1360px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.seller-search-box {
+
+/* ===== 2. PAGE HEADER ===== */
+.po-page-header {
+  align-items: flex-start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(217, 119, 6, 0.1);
+}
+
+.po-page-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.po-page-header p {
+  font-size: 13px;
+  color: var(--color-text-lighter);
+  margin-top: 2px;
+}
+
+.po-header-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 3px 10px;
+  border: 1px solid #fed7aa;
+  border-radius: var(--radius-round);
+  background: #fff7ed;
+  color: var(--color-primary-darker);
+}
+
+.po-header-status span {
+  color: var(--color-text-lighter);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.po-header-status strong {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ===== 3. TOP ROW — Branch + Tier (subtle) ===== */
+.po-top-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: end;
+  padding: 12px 16px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.po-branch-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.po-branch-group label,
+.po-tier-group label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-lighter);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.po-branch-group select {
+  min-height: 38px;
+  border-radius: var(--radius-md);
+}
+
+.po-tier-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+#globalTierButtons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.po-tier-info {
+  min-height: 18px;
+  margin-top: 4px;
+  color: var(--color-text-lighter);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Tier Buttons */
+.tier-btn,
+.global-tier-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+  min-width: 90px;
+  min-height: 40px;
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.tier-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.tier-btn.active,
+.global-tier-btn.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2);
+  font-weight: 600;
+  transform: translateY(-1px);
+}
+
+/* ===== 4. ENTRY CARD — Hero Section ===== */
+.po-entry-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* Card Headers (shared by entry + cart) */
+.po-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-gray-50);
+}
+
+.po-card-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.25;
+}
+
+.po-card-header p {
+  margin-top: 1px;
+  color: var(--color-text-lighter);
+  font-size: 12px;
+}
+
+/* Field Rows */
+.po-field-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.po-entry-card .po-field-row {
+  margin: 0;
+  padding: 12px 16px 0;
+}
+
+.po-entry-card .po-field-row:last-child {
+  padding-bottom: 14px;
+}
+
+/* Fields — shared */
+.po-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.po-field label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-light);
+  letter-spacing: 0.2px;
+}
+
+.po-field input,
+.po-field select,
+.seller-search-box .form-control {
+  min-height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--color-input-bg);
+}
+
+/* Field Sizing */
+.po-field-name {
+  flex: 1 1 360px;
   position: relative;
 }
+
+.po-field-unit {
+  flex: 0 0 80px;
+}
+
+.po-field-weight {
+  flex: 1.5 1 200px;
+}
+
+.po-field-deduct {
+  flex: 0.8 1 130px;
+}
+
+.po-field-price-display {
+  flex: 0 1 140px;
+}
+
+.po-field-total {
+  flex: 0 1 140px;
+}
+
+.po-field-photo {
+  flex: 0 0 52px;
+}
+
+.po-field-addbtn {
+  flex: 0 0 100px;
+}
+
+/* Search */
+.po-search-wrap {
+  position: relative;
+}
+
+/* === 4a. WEIGHT INPUT — Hero element === */
+.po-field-weight input {
+  font-size: 26px;
+  font-weight: 700;
+  padding: 10px 14px;
+  height: 52px;
+  text-align: right;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--color-input-bg);
+}
+
+.po-field-weight input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+  outline: none;
+}
+
+.po-field-weight input::placeholder {
+  font-weight: 400;
+  font-size: 18px;
+  color: var(--color-text-lighter);
+}
+
+/* Unit Display */
+#itemUnit {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-light);
+  background: var(--color-gray-100);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  min-height: 38px;
+}
+
+/* Auto-price Display */
+.auto-price-display {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-gray-50);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.po-field-price-display .auto-price-display {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: var(--color-success);
+}
+
+.po-field-price-display label span {
+  color: var(--color-text-lighter);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.po-field-total .auto-price-display {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: var(--color-primary-darker);
+}
+
+/* === 4b. PREMIUM PHOTO BUTTON === */
+.po-photo-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-photo-picker {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-round);
+  background: var(--color-white);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  position: relative;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--color-text-lighter);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-photo-picker:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-photo-picker:active {
+  transform: scale(0.95);
+}
+
+.btn-photo-picker.has-photo {
+  border-color: var(--color-success);
+  color: var(--color-success);
+  background: #f0fdf4;
+}
+
+.photo-badge {
+  display: none;
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 18px;
+  height: 18px;
+  background: var(--color-success);
+  border-radius: 50%;
+  border: 2px solid var(--color-white);
+  font-size: 9px;
+  color: white;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.btn-photo-picker.has-photo + .photo-badge {
+  display: flex;
+}
+
+/* Add Button */
+.po-field-addbtn .btn {
+  width: 100%;
+  min-height: 42px;
+  font-weight: 700;
+}
+
+/* Seller Search (dropdown from item name) */
 .seller-results {
   position: absolute;
   top: 100%;
@@ -16,22 +413,25 @@
   border: 1px solid var(--color-border);
   border-top: 0;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  z-index: 10;
-  max-height: 300px;
+  z-index: var(--z-dropdown);
+  max-height: 260px;
   overflow-y: auto;
   display: none;
   box-shadow: var(--shadow-md);
 }
+
 .seller-item {
-  padding: 10px 14px;
+  padding: 8px 12px;
   cursor: pointer;
   border-bottom: 1px solid var(--color-border);
-  font-size: 14px;
+  font-size: 13px;
   transition: background var(--transition);
 }
+
 .seller-item:last-child {
   border-bottom: none;
 }
+
 .seller-item:hover {
   background: var(--color-primary-light);
 }
@@ -59,24 +459,13 @@
   color: var(--color-text);
 }
 
-/* Item Form */
-.item-form-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
-  gap: 8px;
-  align-items: end;
-}
-.total-preview {
-  font-size: 15px;
-  padding: 8px 12px;
-  background: #f8fafc;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  text-align: center;
-  font-weight: 500;
-  color: var(--color-text);
+.seller-item--blacklisted {
+  background: #fff5f5;
 }
 
+.seller-item--blacklisted:hover {
+  background: #fee2e2;
+}
 /* Tier Price Buttons */
 .tier-btn {
   display: inline-flex;
@@ -171,10 +560,18 @@
   transition: all 0.15s;
   color: var(--color-text-light);
 }
-.btn-photo-item:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+
+.seller-item__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.seller-item__id {
+  color: color-mix(in srgb, var(--color-text-light) 70%, transparent);
+  font-size: 11px;
+  margin-left: 8px;
 }
 .btn-photo-item.has-photo {
   border-color: var(--color-success);
@@ -198,11 +595,54 @@
 }
 .cart-total-amount { font-size: 20px; font-weight: 800; color: var(--color-success); }
 
+.seller-badge-blacklist {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+/* Cart Summary */
+.po-cart-card .cart-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-gray-50);
+  font-size: 13px;
+  color: var(--color-text);
+  border-radius: 0;
+}
+
+#cartTotalItems {
+  color: var(--color-text-light);
+}
+
+#cartPhotoCount {
+  display: none;
+  color: var(--color-info);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cart-total-amount {
+  color: var(--color-success);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+/* ===== 6. BOTTOM ROW ===== */
 .po-bottom-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1.5fr;
   gap: 10px;
 }
+
 .po-bottom-card {
   background: var(--color-white); border: 1px solid var(--color-border);
   border-radius: var(--radius-md); padding: 12px 14px;
@@ -216,16 +656,161 @@
 .po-recent { background: var(--color-white); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
 .po-recent-header { padding: 10px 16px; border-bottom: 1px solid var(--color-border); font-weight: 700; font-size: 13px; color: var(--color-text); }
 
+.po-small-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-light);
+  letter-spacing: 0.2px;
+}
+
+/* Seller */
+.seller-search-box {
+  position: relative;
+  margin-top: 4px;
+}
+
+.selected-seller {
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #ecfdf5 0%, #f0fdf4 100%);
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.selected-seller > div {
+  margin-bottom: 3px;
+  font-size: 13px;
+}
+
+/* Precious Metals Warning */
 .precious-warning {
   padding: 8px 10px;
   background: var(--color-danger-light);
   border: 1px solid #fca5a5;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
   line-height: 1.5;
 }
 
-/* Signature Pad */
+.precious-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+/* Payment Section */
+.po-compact-group {
+  margin: 0 0 10px;
+}
+
+.po-compact-group:last-child {
+  margin-bottom: 0;
+}
+
+/* === 6a. SAVE CARD === */
+.po-save-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.po-compliance-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.po-compliance-note span:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-success-light);
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* Total Panel */
+.po-total-panel {
+  padding: 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+  text-align: right;
+}
+
+.po-total-panel div {
+  color: var(--color-text-lighter);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.po-total-panel strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-success);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+/* Action Buttons */
+.po-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.po-actions .btn {
+  flex: 1;
+  height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: var(--radius-md);
+}
+
+.po-actions .btn-save {
+  flex: 2;
+}
+
+/* ===== 7. RECENT PO ===== */
+.po-recent {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.po-recent-header {
+  padding: 10px 16px;
+  background: var(--color-gray-50);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.po-recent .data-table th {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-light);
+  background: var(--color-gray-50);
+}
+
+.po-recent .data-table td {
+  font-size: 13px;
+}
+
+/* ===== 8. SIGNATURE PAD ===== */
 .sig-canvas-wrap {
   position: relative;
   display: inline-block;
@@ -235,6 +820,7 @@
   margin: 0 auto;
   touch-action: none;
 }
+
 .sig-canvas-wrap canvas {
   display: block;
   width: 100%;
@@ -242,6 +828,7 @@
   height: 140px;
   cursor: crosshair;
 }
+
 .sig-placeholder {
   position: absolute;
   inset: 0;
@@ -252,13 +839,14 @@
   color: var(--color-text-lighter);
   pointer-events: none;
 }
+
 .sig-pc-fallback {
   margin-top: 12px;
   padding: 10px;
   background: var(--color-success-light);
   border: 1px solid #bbf7d0;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
 }
 
 /* Precious actions row */
@@ -315,7 +903,26 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
+}
+
+/* ===== 10. PHOTO STRIP (hidden by default) ===== */
+.photo-strip-wrap {
+  display: none;
+}
+
+/* ===== 11. RESPONSIVE ===== */
+@media (max-width: 1100px) {
+  .po-top-row {
+    grid-template-columns: 1fr;
+  }
+
+  .po-bottom-row {
+    grid-template-columns: 1fr;
+  }
+
+  .po-bottom-card {
+    min-height: 0;
+  }
 }
 
 @media (max-width: 960px) {
@@ -323,40 +930,109 @@
 }
 
 @media (max-width: 768px) {
-  .po-top-row { flex-wrap: wrap; }
-  .po-branch-group { min-width: 100%; max-width: 100%; }
-  .po-add-row { flex-wrap: wrap; }
-  .po-add-row .field-group { min-width: calc(50% - 8px); }
-  .po-bottom-row { grid-template-columns: 1fr; }
-  /* Cart table — allow horizontal scroll, override card's overflow:hidden */
-  .po-cart-card { overflow: visible; }
-  .po-cart-card .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 0; }
-  /* Field rows — 2-column grid on tablet */
-  .po-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-wrap: wrap; }
-  .po-field-name { grid-column: 1 / -1; }
-  .po-field-photo,
-  .po-field-addbtn { align-self: flex-end; }
-}
+  .po-page-header {
+    align-items: stretch;
+  }
 
-@media (max-width: 576px) {
-  /* Add-row fields — full-width vertical stack */
-  .po-add-row .field-group { min-width: 100%; }
-  .po-field-row { grid-template-columns: 1fr; }
+  .po-header-status {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .po-top-row {
+    display: grid;
+    padding: 12px;
+  }
+
+  .po-entry-card .po-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 12px;
+  }
+
+  .po-entry-card .po-field-row + .po-field-row {
+    padding-top: 0;
+  }
+
   .po-field-name,
+  .po-field-price-display,
+  .po-field-total {
+    grid-column: 1 / -1;
+  }
+
   .po-field-unit,
   .po-field-weight,
   .po-field-deduct,
-  .po-field-price-display,
-  .po-field-total,
   .po-field-photo,
-  .po-field-addbtn { width: 100%; flex: unset; }
-  /* Photo + Add button — side by side at the bottom */
-  .po-field-photo { order: 5; flex: 0 0 52px; width: 52px; }
-  .po-field-addbtn { order: 6; flex: 1; width: auto; }
-  /* Tier buttons row — allow horizontal scroll so buttons stay usable */
-  #globalTierButtons { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
-  .tier-btn { flex: 0 0 auto; min-width: 80px; }
-  /* Bottom cards (seller / bill / save) spacing */
-  .po-bottom-card { padding: 12px; }
-  .po-actions .btn { height: 48px; font-size: 15px; }
+  .po-field-addbtn {
+    width: auto;
+  }
+
+  .po-cart-card .cart-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 576px) {
+  .po-page-header h1 {
+    font-size: 22px;
+  }
+
+  .po-card-header,
+  .po-entry-card .po-field-row,
+  .po-top-row,
+  .po-bottom-card {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .po-entry-card .po-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .po-field-weight {
+    flex: 1 1 100%;
+  }
+
+  .po-field-weight input {
+    font-size: 22px;
+    height: 48px;
+  }
+
+  .auto-price-display {
+    justify-content: flex-start;
+  }
+
+  .po-total-panel {
+    text-align: left;
+  }
+
+  .po-total-panel strong {
+    font-size: 28px;
+  }
+
+  .tier-btn {
+    min-width: 70px;
+    font-size: 11px;
+    padding: 6px 12px;
+  }
+
+  #globalTierButtons {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+  }
+
+  .po-bottom-card {
+    padding: 10px 12px;
+  }
+
+  .po-actions .btn {
+    height: 48px;
+    font-size: 15px;
+  }
+
+  .po-field label {
+    font-size: 12px;
+  }
 }

@@ -117,7 +117,7 @@ class UsersController extends Controller
         }
 
         // Prevent updating own role or status (admin cannot demote themselves)
-        if ($id == $this->user['user_id']) {
+        if ((int)$id === (int)$this->user['user_id']) {
             unset($data['role']);
             unset($data['status']);
         }

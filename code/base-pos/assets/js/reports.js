@@ -53,7 +53,7 @@ async function initReports() {
     generateSalesReport();
   } catch (error) {
     console.error('Failed to initialize reports:', error);
-    showNotification('Error loading report data', 'error');
+    showNotification('โหลดข้อมูลรายงานไม่สำเร็จ', 'error');
   }
 }
 
@@ -200,11 +200,11 @@ async function generateSalesReport() {
     const groupBy = document.getElementById('salesGroupBy').value;
 
     if (!dateFrom || !dateTo) {
-      showNotification('Please select date range', 'error');
+      showNotification('กรุณาเลือกช่วงวันที่', 'error');
       return;
     }
 
-    showNotification('Generating sales report...', 'info');
+    showNotification('กำลังสร้างรายงานขาย...', 'info');
     showTableLoading(document.querySelector('#salesReportTable tbody'), 8, 5);
 
     const response = await apiRequest(`reports/sales-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
@@ -213,11 +213,11 @@ async function generateSalesReport() {
       currentReportData = response.data;
       renderSalesReport(response.data);
     } else {
-      showNotification(response.message || 'Failed to generate sales report', 'error');
+      showNotification(response.message || 'สร้างรายงานขายไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error generating sales report:', error);
-    showNotification('Error generating sales report', 'error');
+    showNotification('สร้างรายงานขายไม่สำเร็จ', 'error');
   }
 }
 
@@ -255,7 +255,7 @@ function renderSalesReport(data) {
   // Render chart
   renderSalesChart(data);
 
-  showNotification('Sales report generated successfully', 'success');
+  showNotification('สร้างรายงานขายสำเร็จ', 'success');
 }
 
 // Render sales chart
@@ -327,11 +327,11 @@ async function generateProductsReport() {
     const categoryId = document.getElementById('productsCategory').value;
 
     if (!dateFrom || !dateTo) {
-      showNotification('Please select date range', 'error');
+      showNotification('กรุณาเลือกช่วงวันที่', 'error');
       return;
     }
 
-    showNotification('Generating product sales report...', 'info');
+    showNotification('กำลังสร้างรายงานสินค้า...', 'info');
     showTableLoading(document.querySelector('#productsReportTable tbody'), 8, 5);
 
     const params = new URLSearchParams({
@@ -350,11 +350,11 @@ async function generateProductsReport() {
       currentReportData = response.data;
       renderProductsReport(response.data);
     } else {
-      showNotification(response.message || 'Failed to generate product sales report', 'error');
+      showNotification(response.message || 'สร้างรายงานสินค้าไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error generating product sales report:', error);
-    showNotification('Error generating product sales report', 'error');
+    showNotification('สร้างรายงานสินค้าไม่สำเร็จ', 'error');
   }
 }
 
@@ -406,7 +406,7 @@ function renderProductsReport(data) {
   // Render chart
   renderProductsChart(data);
 
-  showNotification('Product sales report generated successfully', 'success');
+  showNotification('สร้างรายงานสินค้าสำเร็จ', 'success');
 }
 
 // Render products chart
@@ -481,7 +481,7 @@ async function generateInventoryReport() {
     const categoryId = document.getElementById('inventoryCategory').value;
     const stockStatus = document.getElementById('inventoryStatus').value;
 
-    showNotification('Generating inventory report...', 'info');
+    showNotification('กำลังสร้างรายงานสต็อก...', 'info');
     showTableLoading(document.querySelector('#inventoryReportTable tbody'), 10, 5);
 
     const params = new URLSearchParams();
@@ -500,11 +500,11 @@ async function generateInventoryReport() {
       currentReportData = response.data;
       renderInventoryReport(response.data);
     } else {
-      showNotification(response.message || 'Failed to generate inventory report', 'error');
+      showNotification(response.message || 'สร้างรายงานสต็อกไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error generating inventory report:', error);
-    showNotification('Error generating inventory report', 'error');
+    showNotification('สร้างรายงานสต็อกไม่สำเร็จ', 'error');
   }
 }
 
@@ -557,7 +557,7 @@ function renderInventoryReport(data) {
   // Render chart
   renderInventoryChart(data);
 
-  showNotification('Inventory report generated successfully', 'success');
+  showNotification('สร้างรายงานสต็อกสำเร็จ', 'success');
 }
 
 // Render inventory chart
@@ -643,11 +643,11 @@ async function generateCashierReport() {
     const userId = document.getElementById('cashierUser').value;
 
     if (!dateFrom || !dateTo) {
-      showNotification('Please select date range', 'error');
+      showNotification('กรุณาเลือกช่วงวันที่', 'error');
       return;
     }
 
-    showNotification('Generating cashier performance report...', 'info');
+    showNotification('กำลังสร้างรายงานพนักงาน...', 'info');
     showTableLoading(document.querySelector('#cashierReportTable tbody'), 6, 5);
 
     const params = new URLSearchParams({
@@ -665,11 +665,11 @@ async function generateCashierReport() {
       currentReportData = response.data;
       renderCashierReport(response.data);
     } else {
-      showNotification(response.message || 'Failed to generate cashier report', 'error');
+      showNotification(response.message || 'สร้างรายงานพนักงานไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error generating cashier report:', error);
-    showNotification('Error generating cashier report', 'error');
+    showNotification('สร้างรายงานพนักงานไม่สำเร็จ', 'error');
   }
 }
 
@@ -705,7 +705,7 @@ function renderCashierReport(data) {
   // Render chart
   renderCashierChart(data);
 
-  showNotification('Cashier performance report generated successfully', 'success');
+  showNotification('สร้างรายงานพนักงานสำเร็จ', 'success');
 }
 
 // Render cashier chart
@@ -796,11 +796,11 @@ async function generatePurchaseReport() {
     const groupBy = document.getElementById('purchaseGroupBy').value;
 
     if (!dateFrom || !dateTo) {
-      showNotification('Please select date range', 'error');
+      showNotification('กรุณาเลือกช่วงวันที่', 'error');
       return;
     }
 
-    showNotification('Generating purchase report...', 'info');
+    showNotification('กำลังสร้างรายงานรับซื้อ...', 'info');
     showTableLoading(document.querySelector('#purchaseReportTable tbody'), 6, 5);
 
     const response = await apiRequest(`reports/purchase-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
@@ -809,11 +809,11 @@ async function generatePurchaseReport() {
       currentReportData = response.data;
       renderPurchaseReport(response.data);
     } else {
-      showNotification(response.message || 'Failed to generate purchase report', 'error');
+      showNotification(response.message || 'สร้างรายงานรับซื้อไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error generating purchase report:', error);
-    showNotification('Error generating purchase report', 'error');
+    showNotification('สร้างรายงานรับซื้อไม่สำเร็จ', 'error');
   }
 }
 
@@ -845,7 +845,7 @@ function renderPurchaseReport(data) {
   }
 
   renderPurchaseReportChart(data);
-  showNotification('Purchase report generated successfully', 'success');
+  showNotification('สร้างรายงานรับซื้อสำเร็จ', 'success');
 }
 
 function renderPurchaseReportChart(data) {
@@ -897,11 +897,11 @@ async function generateSalelotReport() {
     const groupBy = document.getElementById('salelotGroupBy').value;
 
     if (!dateFrom || !dateTo) {
-      showNotification('Please select date range', 'error');
+      showNotification('กรุณาเลือกช่วงวันที่', 'error');
       return;
     }
 
-    showNotification('Generating sale lot report...', 'info');
+    showNotification('กำลังสร้างรายงานขาย Lot...', 'info');
     showTableLoading(document.querySelector('#salelotReportTable tbody'), 8, 5);
 
     const response = await apiRequest(`reports/sale-lot-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
@@ -910,11 +910,11 @@ async function generateSalelotReport() {
       currentReportData = response.data;
       renderSalelotReport(response.data);
     } else {
-      showNotification(response.message || 'Failed to generate sale lot report', 'error');
+      showNotification(response.message || 'สร้างรายงานขาย Lot ไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error generating sale lot report:', error);
-    showNotification('Error generating sale lot report', 'error');
+    showNotification('สร้างรายงานขาย Lot ไม่สำเร็จ', 'error');
   }
 }
 
@@ -948,7 +948,7 @@ function renderSalelotReport(data) {
   }
 
   renderSalelotReportChart(data);
-  showNotification('Sale lot report generated successfully', 'success');
+  showNotification('สร้างรายงานขาย Lot สำเร็จ', 'success');
 }
 
 function renderSalelotReportChart(data) {
@@ -1010,11 +1010,11 @@ async function generateTaxReport() {
     const taxPeriod = document.getElementById('taxPeriod').value;
 
     if (!dateFrom || !dateTo) {
-      showNotification('Please select date range', 'error');
+      showNotification('กรุณาเลือกช่วงวันที่', 'error');
       return;
     }
 
-    showNotification('Generating tax report...', 'info');
+    showNotification('กำลังสร้างรายงานภาษี...', 'info');
     showTableLoading(document.querySelector('#taxReportTable tbody'), 6, 5);
 
     const params = new URLSearchParams({
@@ -1029,11 +1029,11 @@ async function generateTaxReport() {
       currentReportData = response.data;
       renderTaxReport(response.data);
     } else {
-      showNotification(response.message || 'Failed to generate tax report', 'error');
+      showNotification(response.message || 'สร้างรายงานภาษีไม่สำเร็จ', 'error');
     }
   } catch (error) {
     console.error('Error generating tax report:', error);
-    showNotification('Error generating tax report', 'error');
+    showNotification('สร้างรายงานภาษีไม่สำเร็จ', 'error');
   }
 }
 
@@ -1068,13 +1068,13 @@ function renderTaxReport(data) {
     });
   }
 
-  showNotification('Tax report generated successfully', 'success');
+  showNotification('สร้างรายงานภาษีสำเร็จ', 'success');
 }
 
 // Export current report
 function exportCurrentReport() {
   if (!currentReportData) {
-    showNotification('Please generate a report first', 'error');
+    showNotification('กรุณาสร้างรายงานก่อน', 'error');
     return;
   }
 
@@ -1121,12 +1121,13 @@ function exportCurrentReport() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 // Print current report
 function printCurrentReport() {
   if (!currentReportData) {
-    showNotification('Please generate a report first', 'error');
+    showNotification('กรุณาสร้างรายงานก่อน', 'error');
     return;
   }
 

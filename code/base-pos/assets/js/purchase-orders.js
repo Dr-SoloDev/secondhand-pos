@@ -54,8 +54,6 @@ function restoreCartFromBackup() {
   // Restore seller
   if (saved.seller) {
     selectSeller(saved.seller);
-    // selectSeller ภายในเรียก doSelectSeller
-    doSelectSeller(saved.seller);
   }
 
   // Restore cart items
@@ -110,8 +108,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('itemQuantity').addEventListener('input', updateItemTotal);
   document.getElementById('itemWeightDeduct').addEventListener('input', updateItemTotal);
   document.getElementById('itemCategorySelect').addEventListener('change', saveCategoryToCatalog);
-  document.getElementById('itemName').addEventListener('input', debounce(function() {
-    const q = this.value.trim();
+  document.getElementById('itemName').addEventListener('input', debounce(function(e) {
+    const q = e.target.value.trim();
     if (currentCatalogItem && currentCatalogItem.name !== q) {
       clearCatalogSelection();
     }
@@ -378,9 +376,7 @@ function updateItemTotal() {
   const q = parseFloat(document.getElementById('itemQuantity').value || 0);
   const d = parseFloat(document.getElementById('itemWeightDeduct').value || 0);
   const net = Math.max(0, q - d);
-  const priceEl = document.getElementById('itemPriceDisplay');
-  const priceText = priceEl.textContent.replace(/[^0-9.]/g, '');
-  const p = parseFloat(priceText) || 0;
+  const p = parseFloat(document.getElementById('itemUnitPrice').value) || 0;
 
   const totalEl = document.getElementById('itemTotalPreview');
   if (q > 0 && p > 0) {
@@ -423,9 +419,9 @@ function addItemToCart() {
   const isIdCard = currentCatalogItem?.requiresIdCard || false;
   cart.push({
     _tempId: tempId,
-    catalog_id: parseInt(catalogId),
+    catalog_id: parseInt(catalogId, 10),
     item_name: name,
-    category_id: catId ? parseInt(catId) : null,
+    category_id: catId ? parseInt(catId, 10) : null,
     quantity: qty,
     weight_deduction: deduct,
     net_quantity: netQty,
@@ -533,7 +529,7 @@ function updatePreciousWarning() {
     if (!warn) {
       warn = document.createElement('div');
       warn.className = 'precious-warning';
-      warn.innerHTML = '<span style="color:#059669;font-weight:600">✅ พร้อมรับซื้อ — แค่ถ่ายบัตรประชาชน + เซ็นรับรองก็เสร็จ</span>';
+      warn.innerHTML = '<span style="color:#d97706;font-weight:600">⚠️ โลหะมีค่า — ต้องถ่ายบัตรประชาชน + เซ็นรับรองก่อนบันทึก</span>';
       sellerCard.insertBefore(warn, sellerCard.firstChild);
     }
     if (actions) actions.style.display = 'flex';
@@ -655,7 +651,7 @@ async function savePurchaseOrder() {
   const idempotencyKey = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 
   const payload = {
-    branch_id: parseInt(document.getElementById('branchSelect').value),
+    branch_id: parseInt(document.getElementById('branchSelect').value, 10),
     seller_id: selectedSeller.id,
     payment_method: document.getElementById('paymentMethod').value,
     notes: document.getElementById('poNotes').value.trim(),
@@ -771,7 +767,7 @@ async function loadRecentPOs() {
   }
   tbody.innerHTML = recentPOs.map(po => `
     <tr>
-      <td><a href="#" onclick="showReceipt(${po.id});return false">${escapeHtml(po.reference_no)}</a></td>
+      <td><a href="#" onclick="showReceipt(${po.id});event.preventDefault()">${escapeHtml(po.reference_no)}</a></td>
       <td>${escapeHtml(po.branch_name || '-')}</td>
       <td>${escapeHtml(po.seller_name || '-')}</td>
       <td>${po.total_items}</td>
@@ -886,6 +882,13 @@ window.showReceipt = async function(id) {
       ✂ พับครึ่งแนวยาวฉีกตรงเส้นปรุ — ร้านเก็บซ้าย | ลูกค้าเก็บขวา
     </div>`;
   document.getElementById('viewPOModal').classList.add('show');
+
+  // G2: Print button handler — open print-receipt.html in new tab
+  const btnPrint = document.getElementById('btnOpenPrint');
+  if (btnPrint) {
+    btnPrint.onclick = () => window.open(`print-receipt.html?id=${id}&auto=1`, '_blank');
+  }
+
   // WF-01: สร้าง QR code หลังเปิด modal
   generatePhotoQR(id);
 };
@@ -946,12 +949,19 @@ async function searchSellers() {
     items.forEach(s => {
       const row = document.createElement('div');
       row.className = 'seller-item';
-      const parts = [`<strong>${escapeHtml(s.full_name)}</strong>`];
-      if (s.id_card) parts.push(`<span style="color:#888;margin-left:8px">${maskIdCard(s.id_card)}</span>`);
-      if (s.phone) parts.push(`<span style="color:#888;margin-left:8px">${escapeHtml(s.phone)}</span>`);
-      if (s.is_blacklisted == 1) parts.push('<span style="color:#d32f2f;font-weight:bold;margin-left:8px">[Blacklist]</span>');
-      row.innerHTML = parts.join('');
-      row.addEventListener('click', () => selectSeller(s));
+      const isBlacklisted = s.is_blacklisted == 1;
+      if (isBlacklisted) row.classList.add('seller-item--blacklisted');
+      const badgeHtml = isBlacklisted
+        ? '<span class="seller-badge-blacklist">⚠️ บัญชีดำ</span>'
+        : '';
+      const idHtml = s.national_id
+        ? `<span class="seller-item__id">${maskIdCard(s.national_id)}</span>`
+        : '';
+      row.innerHTML =
+        `<span class="seller-item__name"><strong>${escapeHtml(s.name)}</strong>${badgeHtml}</span>${idHtml}`;
+      // normalize to legacy field names so rest of code works unchanged
+      const normalized = { ...s, full_name: s.name, id_card: s.national_id };
+      row.addEventListener('click', () => selectSeller(normalized));
       list.appendChild(row);
     });
   }
@@ -1006,6 +1016,12 @@ function doSelectSeller(s) {
   wrap.innerHTML = `<div><strong>${escapeHtml(s.full_name)}</strong></div>`;
   if (s.id_card) wrap.innerHTML += `<div>เลขบัตร: ${maskIdCard(s.id_card)}</div>`;
   if (s.phone)   wrap.innerHTML += `<div>โทร: ${escapeHtml(s.phone)}</div>`;
+  // Photo button for already-selected seller
+  if (s.id_card_photo) {
+    wrap.innerHTML += `<div style="margin-top:4px"><img src="${escapeHtml(s.id_card_photo)}" style="height:36px;border-radius:3px;cursor:pointer;border:1px solid #e2e8f0" onclick="openPhotoPicker('seller-id',0)" title="เปลี่ยนรูปบัตร"></div>`;
+  } else {
+    wrap.innerHTML += `<div style="margin-top:4px"><button type="button" class="btn btn-sm btn-secondary" onclick="openPhotoPicker('seller-id',0)">📷 เพิ่มรูปบัตร</button></div>`;
+  }
   // WF-03: แสดง badge ถ้าอยู่ใน blacklist (หลัง confirm popup แล้ว)
   if (s.is_blacklisted == 1) {
     wrap.innerHTML += `<div style="color:#c00;font-size:12px;font-weight:600;margin-top:6px;padding:4px 8px;background:#fff5f5;border-radius:4px;display:inline-block">⛔ ผู้ขายรายนี้อยู่ในบัญชีดำ</div>`;
@@ -1023,6 +1039,7 @@ function doSelectSeller(s) {
 
 function clearSeller() {
   selectedSeller = null;
+  pendingSellerIdPhoto = null;
   document.getElementById('selectedSellerBox').innerHTML = '<div class="text-muted" style="font-size:13px">ยังไม่ได้เลือกผู้ขาย</div>';
 }
 
@@ -1251,24 +1268,25 @@ function resetSellerPhotoUI() {
   title.textContent = 'เพิ่มรูปถ่ายบัตรประชาชน';
   sub.textContent = 'แตะเพื่อถ่ายรูป หรือเลือกรูป';
   thumb.style.display = 'none';
+  if (thumb.src.startsWith('blob:')) URL.revokeObjectURL(thumb.src);
   thumb.src = '';
 }
 
-// ── Update FAB Badge + Photo Strip ──────────────────────
+// ── Update Photo Count (inline in cart-summary) + Photo Strip ──────────────────────
 function updatePhotoUI() {
   const tempIds = Object.keys(pendingItemPhotos);
   const count = tempIds.length;
-  const badge = document.getElementById('fabBadge');
-  const fab = document.getElementById('fabCameraBtn');
 
-  // FAB badge
-  if (count > 0) {
-    badge.textContent = count > 99 ? '99+' : count;
-    badge.style.display = 'flex';
-    fab.classList.add('has-photos');
-  } else {
-    badge.style.display = 'none';
-    fab.classList.remove('has-photos');
+  // Inline cart-summary photo count
+  const cartPhotoCount = document.getElementById('cartPhotoCount');
+  const cartPhotoNum = document.getElementById('cartPhotoNum');
+  if (cartPhotoCount && cartPhotoNum) {
+    if (count > 0) {
+      cartPhotoNum.textContent = count;
+      cartPhotoCount.style.display = 'block';
+    } else {
+      cartPhotoCount.style.display = 'none';
+    }
   }
 
   // Photo strip
@@ -1279,11 +1297,13 @@ function updatePhotoUI() {
   if (count > 0) {
     wrap.classList.add('show');
     countEl.innerHTML = `<i class="icon-image"></i> ${count} รูป`;
+    // Revoke old blob URLs before re-render
+    strip.querySelectorAll('[data-blob-url]').forEach(el => URL.revokeObjectURL(el.dataset.blobUrl));
     strip.innerHTML = tempIds.map(tempId => {
       const file = pendingItemPhotos[tempId];
       const url = URL.createObjectURL(file);
       return `<div class="photo-strip-item">
-        <div class="photo-thumb" style="background-image:url(${url});background-size:cover;background-position:center" onclick="removePendingPhoto('${tempId}')"></div>
+        <div class="photo-thumb" data-blob-url="${url}" style="background-image:url(${url});background-size:cover;background-position:center" onclick="removePendingPhoto('${tempId}')"></div>
         <span class="photo-strip-remove" onclick="removePendingPhoto('${tempId}')">&times;</span>
       </div>`;
     }).join('');
@@ -1324,8 +1344,7 @@ async function uploadSellerIdPhoto(sellerId, file) {
   try {
     const res = await fetch(`/api/index.php/sellers/photo?id=${sellerId}`, {
       method: 'POST',
-      headers: {
-      },
+      credentials: 'include',
       body: formData,
     });
     const json = await res.json();
@@ -1347,8 +1366,7 @@ async function uploadItemPhoto(poId, file) {
   try {
     const res = await fetch(`/api/index.php/purchase-orders/photos?id=${poId}`, {
       method: 'POST',
-      headers: {
-      },
+      credentials: 'include',
       body: formData,
     });
     const json = await res.json();
@@ -1607,7 +1625,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('fabCameraBtn').addEventListener('click', () => {
     const itemCount = Object.keys(pendingItemPhotos).length;
     if (itemCount > 0 || cart.length > 0) {
-      openPhotoPicker('item', cart.length > 0 ? cart[0]._tempId : 'new');
+      openPhotoPicker('item', cart.length > 0 ? cart[cart.length - 1]._tempId : 'new');
     } else {
       openPhotoPicker('new-item', 'new');
     }

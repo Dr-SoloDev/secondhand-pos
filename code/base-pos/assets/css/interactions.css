@@ -65,8 +65,3 @@ textarea {
 .content-area {
   animation: contentFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-
-.sidebar {
-  animation: none !important;
-  opacity: 1 !important;
-}

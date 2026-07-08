@@ -12,7 +12,7 @@
   const TOKEN    = params.get('token');
   const EXPIRES  = params.get('expires');
   // ใช้ path-based routing เหมือน common.js: /api/index.php/{route}
-  const API_BASE = location.pathname.replace(/\/[^/]+\.html$/, '') + '/api/index.php';
+  const API_BASE = '/api/index.php';
 
   let selectedFile = null;
 

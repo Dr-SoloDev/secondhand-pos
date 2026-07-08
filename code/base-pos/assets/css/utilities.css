@@ -171,6 +171,13 @@
   padding-right: 24px;
 }
 
+@media (max-width: 576px) {
+  .container-xl, .container-lg, .container-md {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
 /* Depth & Layering */
 .overlap-top {
   margin-top: -32px;

@@ -45,6 +45,7 @@
 }
 .data-table .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .data-table th.text-right,
@@ -57,8 +58,11 @@
 .data-table th {
   padding: 10px 12px;
   border-right: 1px solid #f1f5f9;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.data-table td.text-right,
+.data-table th.text-right {
   white-space: nowrap;
 }
 
@@ -75,10 +79,6 @@
 /* Table row hover */
 .data-table tbody tr {
   transition: background 150ms ease;
-}
-
-.data-table tbody tr:hover {
-  background: var(--color-bg);
 }
 
 /* Skeleton loading */
@@ -103,10 +103,5 @@
 @media (max-width: 768px) {
   .data-table {
     min-width: max-content;
-  }
-
-  .data-table th,
-  .data-table td {
-    white-space: nowrap;
   }
 }
