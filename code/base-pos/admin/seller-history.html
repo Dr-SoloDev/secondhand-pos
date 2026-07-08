@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ประวัติผู้ขาย - รักษ์สะอาดรีไซเคิล</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+    .stat-card .label { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+    .stat-card .value { font-size: 22px; font-weight: 800; color: #1e293b; }
+    .stat-card .sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .seller-banner { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px; }
+    .seller-banner .name { font-size: 18px; font-weight: 800; color: #1e293b; }
+    .seller-banner .meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .blacklist-banner { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 8px 14px; color: #b91c1c; font-size: 13px; font-weight: 600; margin-bottom: 16px; }
+    .history-section-title { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 10px; }
+    .po-row { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+    .po-row-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; cursor: pointer; user-select: none; }
+    .po-row-header:hover { background: #f8fafc; }
+    .po-ref { font-weight: 700; font-size: 13px; color: #0f172a; }
+    .po-date { font-size: 12px; color: #64748b; }
+    .po-branch { font-size: 12px; color: #475569; }
+    .po-amount { font-size: 14px; font-weight: 800; color: #16a34a; }
+    .po-items-count { font-size: 11px; color: #94a3b8; }
+    .po-detail { display: none; border-top: 1px solid #e2e8f0; padding: 10px 14px; background: #f8fafc; font-size: 12px; }
+    .po-detail.open { display: block; }
+    .po-detail table { width: 100%; border-collapse: collapse; }
+    .po-detail th { text-align: left; padding: 4px 6px; color: #64748b; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
+    .po-detail td { padding: 4px 6px; border-bottom: 1px solid #f1f5f9; }
+    .badge-cancelled { background: #fee2e2; color: #b91c1c; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 700; }
+    .back-btn { display: inline-flex; align-items: center; gap: 6px; color: #475569; font-size: 13px; cursor: pointer; margin-bottom: 16px; text-decoration: none; }
+    .back-btn:hover { color: #0f172a; }
+    #loadingState { text-align: center; padding: 60px; color: #64748b; font-size: 15px; }
+    #errorState { text-align: center; padding: 60px; color: #ef4444; font-size: 15px; display: none; overflow-wrap: break-word; }
+    @media (max-width: 576px) {
+      .stat-cards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .stat-card { padding: 12px 8px; }
+      .stat-card .value { font-size: 18px; }
+      .stat-card .sub { font-size: 10px; }
+      .seller-banner { flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; }
+      .seller-banner .name { font-size: 16px; }
+      .back-btn { min-height: 44px; padding: 8px 0; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon">
+          <span>รักษ์สะอาด</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="sellers.html" class="active"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
+        <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+        <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+        <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+      </ul>
+    </aside>
+
+    <main class="content-area">
+      <div class="topbar">
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="currentUser"></span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-content">
+        <a href="sellers.html" class="back-btn"><i class="icon-back"></i> กลับหน้ารายชื่อ</a>
+
+        <div id="loadingState">กำลังโหลดข้อมูล...</div>
+        <div id="errorState"></div>
+
+        <div id="mainContent" style="display:none">
+          <div id="sellerBanner" class="seller-banner">
+            <div>
+              <div class="name" id="sellerName"></div>
+              <div class="meta" id="sellerMeta"></div>
+            </div>
+          </div>
+
+          <div id="blacklistBanner" class="blacklist-banner" style="display:none"></div>
+
+          <!-- G7-U1: Stat Cards -->
+          <div class="stat-cards">
+            <div class="stat-card">
+              <div class="label">ครั้งที่มาขาย</div>
+              <div class="value" id="statVisits">-</div>
+              <div class="sub">ใบรับซื้อ (completed)</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">รายการทั้งหมด</div>
+              <div class="value" id="statItems">-</div>
+              <div class="sub">รายการสินค้า</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">ยอดรวมตลอดเวลา</div>
+              <div class="value" id="statAmount">-</div>
+              <div class="sub">บาท</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">ครั้งล่าสุด</div>
+              <div class="value" id="statLastDate" style="font-size:14px">-</div>
+              <div class="sub" id="statFirstDate">ครั้งแรก: -</div>
+            </div>
+          </div>
+
+          <!-- G7-U2: History Table (accordion rows) -->
+          <div class="history-section-title">ประวัติการขาย <span id="poCountLabel" style="font-weight:400;color:#64748b;font-size:13px"></span></div>
+          <div id="historyList"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script>
+    function fmtDate(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      if (isNaN(d)) return s;
+      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()+543}`;
+    }
+    function fmtDateTime(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      if (isNaN(d)) return s;
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mi = String(d.getMinutes()).padStart(2,'0');
+      return `${dd}/${mm}/${d.getFullYear()+543} ${hh}:${mi}`;
+    }
+    function fmtNum(v, dec=0) {
+      return (parseFloat(v)||0).toLocaleString('th-TH', {minimumFractionDigits:dec, maximumFractionDigits:dec});
+    }
+    function esc(s) {
+      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function maskId(id) {
+      const s = String(id||'').replace(/\D/g,'');
+      if (!s.length) return '-';
+      if (s.length < 4) return s;
+      return s.slice(0,1) + '-XXXX-XXXXX-' + s.slice(-2) + '-X';
+    }
+
+    function renderPoRow(po) {
+      const isCancelled = po.status === 'cancelled';
+      const statusBadge = isCancelled ? '<span class="badge-cancelled">ยกเลิก</span>' : '';
+      const itemRows = (po.items||[]).map(it => {
+        const qty = parseFloat(it.quantity||0);
+        const ded = parseFloat(it.weight_deduction||0);
+        const net = Math.max(0, qty - ded);
+        return `<tr>
+          <td>${esc(it.item_name)}${it.category_name ? ` <span style="color:#94a3b8;font-size:11px">(${esc(it.category_name)})</span>` : ''}</td>
+          <td style="text-align:center">${net.toFixed(2)} ${esc(it.unit||'')}</td>
+          <td style="text-align:right">${fmtNum(it.unit_price,2)}</td>
+          <td style="text-align:right;font-weight:600">${fmtNum(it.total_price,2)}</td>
+        </tr>`;
+      }).join('');
+
+      const detailId = `detail_${po.id}`;
+      return `
+        <div class="po-row">
+          <div class="po-row-header" onclick="toggleDetail('${detailId}')">
+            <div>
+              <span class="po-ref">${esc(po.reference_no)}</span>
+              ${statusBadge}
+              <span class="po-date" style="margin-left:8px">${fmtDateTime(po.created_at)}</span>
+            </div>
+            <div style="text-align:right">
+              <div class="po-amount">฿ ${fmtNum(po.total_amount,2)}</div>
+              <div class="po-items-count">${esc(po.branch_name||'-')} · ${(po.items||[]).length} รายการ</div>
+            </div>
+          </div>
+          <div class="po-detail" id="${detailId}">
+            ${po.items && po.items.length ? `
+            <table>
+              <thead><tr>
+                <th>สินค้า</th>
+                <th style="text-align:center">สุทธิ</th>
+                <th style="text-align:right">ราคา/กก.</th>
+                <th style="text-align:right">รวม</th>
+              </tr></thead>
+              <tbody>${itemRows}</tbody>
+            </table>` : '<div style="color:#94a3b8;padding:4px 0">ไม่มีรายการ</div>'}
+            ${po.notes ? `<div style="margin-top:6px;font-size:11px;color:#64748b">หมายเหตุ: ${esc(po.notes)}</div>` : ''}
+            ${po.processed_by ? `<div style="margin-top:4px;font-size:11px;color:#94a3b8">แคชเชียร์: ${esc(po.processed_by)}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function toggleDetail(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('open');
+    }
+
+    async function loadHistory() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (!id) { showError('ไม่พบรหัสผู้ขายใน URL (ต้องระบุ ?id=N)'); return; }
+
+      try {
+        const res = await apiRequest(`sellers/data-center?id=${encodeURIComponent(id)}`);
+        if (!res || res.status !== 'success') { showError(res?.message || 'โหลดข้อมูลไม่สำเร็จ'); return; }
+        render(res.data);
+      } catch(e) {
+        showError('เชื่อมต่อ API ไม่ได้: ' + e.message);
+      }
+    }
+
+    function render(data) {
+      const { seller, transactions, summary } = data;
+
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      document.title = `${seller.full_name} — ประวัติผู้ขาย`;
+
+      // Banner
+      document.getElementById('sellerName').textContent = seller.full_name;
+      const metaParts = [
+        seller.id_card ? `บัตร ${maskId(seller.id_card)}` : null,
+        seller.phone || null,
+      ].filter(Boolean);
+      document.getElementById('sellerMeta').textContent = metaParts.join(' · ');
+
+      if (seller.is_blacklisted) {
+        const bb = document.getElementById('blacklistBanner');
+        bb.textContent = `⛔ Blacklist: ${seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล'}`;
+        bb.style.display = 'block';
+      }
+
+      // G7-U1 stat cards
+      document.getElementById('statVisits').textContent = fmtNum(summary.total_pos);
+      document.getElementById('statItems').textContent = fmtNum(summary.total_items_sold);
+      document.getElementById('statAmount').textContent = '฿ ' + fmtNum(summary.total_amount, 2);
+      document.getElementById('statLastDate').textContent = summary.last_transaction ? fmtDate(summary.last_transaction) : '-';
+      document.getElementById('statFirstDate').textContent = 'ครั้งแรก: ' + (summary.first_transaction ? fmtDate(summary.first_transaction) : '-');
+
+      // G7-U2 history list
+      document.getElementById('poCountLabel').textContent = `(${fmtNum(summary.total_pos)} รายการ)`;
+      const listEl = document.getElementById('historyList');
+      if (!transactions.length) {
+        listEl.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:40px">ยังไม่มีประวัติการขาย</div>';
+        return;
+      }
+      listEl.innerHTML = transactions.map(renderPoRow).join('');
+    }
+
+    function showError(msg) {
+      document.getElementById('loadingState').style.display = 'none';
+      const el = document.getElementById('errorState');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    loadHistory();
+  </script>
+</body>
+</html>

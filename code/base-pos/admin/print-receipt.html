@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>พิมพ์ใบรับซื้อ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: #f0f0f0;
+      font-size: 12px;
+    }
+
+    /* ======== Print Controls (hidden on print) ======== */
+    #printControls {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 100;
+      font-size: 13px;
+    }
+    #printControls button {
+      padding: 6px 18px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    #btnPrint { background: #22c55e; color: #fff; }
+    #btnClose { background: #64748b; color: #fff; }
+    #printControls .ref-no { color: #94a3b8; font-size: 12px; margin-left: 8px; }
+
+    /* ======== Page Wrapper ======== */
+    #pageWrapper {
+      padding: 70px 20px 20px;
+    }
+
+    /* ======== A4 Preview Sheet ======== */
+    .a4-sheet {
+      width: 210mm;
+      min-height: 148mm;
+      background: #fff;
+      margin: 0 auto;
+      padding: 8mm;
+      display: flex;
+      flex-direction: row;
+      gap: 0;
+      border: 1px solid #ccc;
+    }
+
+    /* ======== Bill Copy ======== */
+    .bill-copy {
+      width: 50%;
+      padding: 6px 12px;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 11px;
+    }
+    .bill-copy:first-child {
+      border-right: 2px dashed #999;
+      padding-right: 14px;
+    }
+    .bill-copy:last-child {
+      padding-left: 14px;
+    }
+
+    /* ======== Bill Header ======== */
+    .bill-header {
+      border: 2px solid #222;
+      border-radius: 3px;
+      padding: 4px 8px;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .bill-header .shop-name {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+    .bill-header .branch-name {
+      font-size: 11px;
+      color: #444;
+      margin-top: 1px;
+    }
+
+    /* ======== Bill Meta ======== */
+    .bill-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 5px;
+      color: #333;
+    }
+    .bill-meta .ref-no { font-weight: 700; font-size: 12px; }
+
+    .bill-seller {
+      background: #f7f7f7;
+      border-radius: 3px;
+      padding: 4px 7px;
+      font-size: 11px;
+      margin-bottom: 7px;
+      line-height: 1.7;
+    }
+    .bill-seller .id-card { color: #666; font-size: 10px; }
+
+    /* ======== Items Table ======== */
+    .bill-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+    .bill-table thead tr {
+      background: #222;
+      color: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .bill-table thead th {
+      padding: 3px 4px;
+      font-weight: 600;
+    }
+    .bill-table tbody td {
+      padding: 3px 4px;
+    }
+    .bill-table .ta-c { text-align: center; }
+    .bill-table .ta-r { text-align: right; }
+
+    /* ======== Total Bar ======== */
+    .bill-total {
+      background: #222;
+      color: #fff;
+      border-radius: 3px;
+      padding: 5px 7px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .bill-total .payment-method { font-size: 10px; opacity: .8; }
+    .bill-total .amount { font-size: 14px; font-weight: 800; }
+
+    /* ======== Footer ======== */
+    .bill-footer {
+      font-size: 10px;
+      text-align: center;
+      color: #666;
+      border-top: 1px dashed #ccc;
+      padding-top: 5px;
+      line-height: 1.8;
+    }
+
+    /* ======== Precious Metal Section ======== */
+    .precious-section {
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+    .precious-section .section-title {
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    .precious-section .declaration {
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    .sig-label { font-size: 10px; color: #444; margin-bottom: 2px; }
+    .sig-line {
+      border-bottom: 1.5px solid #333;
+      height: 28px;
+      margin-bottom: 4px;
+    }
+    .sig-date { font-size: 10px; color: #555; margin-bottom: 8px; }
+    .evidence-row {
+      font-size: 10px;
+      margin-bottom: 6px;
+    }
+    .warning-text {
+      font-size: 10px;
+      color: #c00;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+    .id-photo-box {
+      border: 1.5px dashed #999;
+      border-radius: 3px;
+      height: 72px;
+      margin-top: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 10px;
+      color: #aaa;
+    }
+
+    /* ======== Loading / Error States ======== */
+    #loadingState, #errorState {
+      text-align: center;
+      padding: 40px;
+      font-size: 15px;
+      color: #555;
+    }
+    #errorState { color: #c00; }
+
+    /* ======== @media print ======== */
+    @media print {
+      @page { size: A4 landscape; margin: 6mm; }
+
+      body { background: #fff; }
+      #printControls { display: none !important; }
+      #pageWrapper { padding: 0; }
+      #loadingState, #errorState { display: none !important; }
+
+      .a4-sheet {
+        border: none;
+        width: 100%;
+        padding: 0;
+      }
+      .bill-copy { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Print Controls Bar -->
+  <div id="printControls">
+    <button id="btnPrint" onclick="window.print()">พิมพ์</button>
+    <button id="btnClose" onclick="window.close()">ปิด</button>
+    <span id="refNoDisplay" class="ref-no"></span>
+  </div>
+
+  <div id="pageWrapper">
+    <div id="loadingState">กำลังโหลดข้อมูล...</div>
+    <div id="errorState" style="display:none"></div>
+
+    <div class="a4-sheet" id="billSheet" style="display:none">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <script src="../assets/js/config.js"></script>
+  <script>
+    function maskId(id) {
+      if (!id) return '';
+      const s = String(id).replace(/\D/g, '');
+      if (s.length < 4) return s;
+      return s.slice(0, 1) + '-XXXX-XXXXX-' + s.slice(-2) + '-X';
+    }
+
+    function fmtCurrency(v) {
+      const n = parseFloat(v) || 0;
+      return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fmtDateTime(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      if (isNaN(d)) return s;
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = d.getFullYear() + 543;
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${dd}/${mm}/${yy} ${hh}:${mi}`;
+    }
+
+    function esc(s) {
+      if (!s) return '';
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function buildBillCopy(po) {
+      const dt = fmtDateTime(po.created_at);
+      const branchLabel = [po.branch_name, po.branch_code ? `สาขา ${po.branch_code}` : ''].filter(Boolean).join(' · ');
+
+      const itemRows = (po.items || []).map((it, i) => {
+        const dq = parseFloat(it.weight_deduction || 0);
+        const q  = parseFloat(it.quantity || 0);
+        const net = Math.max(0, q - dq);
+        const bg  = i % 2 === 0 ? '#fff' : '#f9f9f9';
+        return `<tr style="background:${bg}">
+          <td>${esc(it.item_name)}</td>
+          <td class="ta-c" style="color:#666">${dq > 0 ? dq.toFixed(2) : '-'}</td>
+          <td class="ta-c">${net.toFixed(2)} ${esc(it.unit || '')}</td>
+          <td class="ta-r">${fmtCurrency(it.unit_price)}</td>
+          <td class="ta-r" style="font-weight:600">${fmtCurrency(it.total_price)}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;padding:8px">ไม่มีรายการสินค้า</td></tr>';
+
+      const paymentMap = { cash: 'เงินสด', bank: 'โอนธนาคาร', qr: 'QR Code', promptpay: 'พร้อมเพย์' };
+      const payment = paymentMap[po.payment_method] || po.payment_method || 'ไม่ระบุ';
+
+      const preciousHtml = po.is_precious_metal ? `
+        <div class="precious-section">
+          <div class="section-title">คำรับรองของผู้ขาย</div>
+          <div class="declaration">ข้าพเจ้าได้นำสินค้าที่ระบุในบิลนี้มาโดยสุจริต และยินยอมให้ทางร้านบันทึกข้อมูล</div>
+          <div class="sig-label">ลายมือชื่อ:</div>
+          <div class="sig-line"></div>
+          <div class="sig-date">วันที่/เวลา: ${esc(dt)}&nbsp;&nbsp;&nbsp;เลขบิล: ${esc(po.reference_no)}</div>
+          <div class="evidence-row">หลักฐานที่แนบ: &nbsp;&#9744; สำเนาบัตรประชาชน &nbsp;&#9744; สำเนาใบขับขี่ &nbsp;&#9744; เอกสารราชการ</div>
+          <div class="warning-text">ทางร้านไม่รับซื้อของที่มีการลักทรัพย์โดยเด็ดขาด<br>ทางร้านไม่รับผิดชอบต่อสินค้าที่เกิดจากการกระทำผิดกฎหมายทุกกรณี</div>
+          <div class="id-photo-box">
+            <span style="font-size:18px;opacity:.4">🪪</span>
+            <span>แนบสำเนาบัตรประชาชน / ภาพถ่ายที่นี่</span>
+          </div>
+        </div>` : '';
+
+      return `
+        <div class="bill-header">
+          <div class="shop-name">ใบรับซื้อของเก่า</div>
+          <div class="branch-name">${esc(branchLabel)}</div>
+        </div>
+        <div class="bill-meta">
+          <span>เลขที่ <span class="ref-no">${esc(po.reference_no)}</span></span>
+          <span style="color:#555">${esc(dt)}</span>
+        </div>
+        <div class="bill-seller">
+          <div>ผู้ขาย &nbsp;<strong>${esc(po.seller_name || '-')}</strong>
+            ${po.seller_id_card ? `<span class="id-card"> &nbsp;บัตร ${maskId(po.seller_id_card)}</span>` : ''}
+          </div>
+          <div style="color:#555;font-size:10px">แคชเชียร์ &nbsp;${esc(po.user_name || '-')}</div>
+        </div>
+        <table class="bill-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">สินค้า</th>
+              <th class="ta-c">หัก</th>
+              <th class="ta-c">สุทธิ</th>
+              <th class="ta-r">ราคา/กก.</th>
+              <th class="ta-r">รวม</th>
+            </tr>
+          </thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+        <div class="bill-total">
+          <span class="payment-method">${esc(payment)}</span>
+          <span class="amount">฿ ${fmtCurrency(po.total_amount)}</span>
+        </div>
+        <div class="bill-footer">
+          ${po.branch_phone ? `${esc(po.branch_phone)}<br>` : ''}
+          <span style="font-size:9px">บริการดี ราคาดี ตาชั่งดิจิตอลมาตรฐานกระทรวง</span>
+        </div>
+        ${preciousHtml}`;
+    }
+
+    async function loadAndRender() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (!id) {
+        showError('ไม่พบข้อมูลใบรับซื้อ กรุณาปิดและเปิดใหม่');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${window.apiPath}/purchase-orders/print?id=${encodeURIComponent(id)}`, {
+          credentials: 'include'
+        });
+        if (res.status === 401) { window.location.href = '../index.html'; return; }
+        const data = await res.json();
+        if (!res.ok || data.status !== 'success') {
+          showError(data.message || 'โหลดข้อมูลไม่สำเร็จ');
+          return;
+        }
+        render(data.data);
+      } catch (e) {
+        showError('ไม่สามารถโหลดข้อมูลใบรับซื้อได้ กรุณาปิดและเปิดใหม่');
+      }
+    }
+
+    function render(po) {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('refNoDisplay').textContent = `เลขที่: ${po.reference_no}`;
+      document.title = `ใบรับซื้อ ${po.reference_no}`;
+
+      const copyHtml = buildBillCopy(po);
+      const sheet = document.getElementById('billSheet');
+      sheet.innerHTML = `
+        <div class="bill-copy">${copyHtml}</div>
+        <div class="bill-copy">${copyHtml}</div>`;
+      sheet.style.display = 'flex';
+
+      // Auto-print when opened from PO detail
+      if (new URLSearchParams(window.location.search).get('auto') === '1') {
+        document.fonts.ready.then(() => window.print());
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loadingState').style.display = 'none';
+      const el = document.getElementById('errorState');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    loadAndRender();
+  </script>
+</body>
+</html>
