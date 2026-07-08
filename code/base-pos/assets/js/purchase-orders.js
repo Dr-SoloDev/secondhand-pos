@@ -1601,17 +1601,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return true;
   }
 
-  // Seller ID card photo
-  document.getElementById('sellerIdPhotoBtn').addEventListener('click', () => {
-    openPhotoPicker('seller-id', 0);
-  });
-  document.getElementById('sellerIdPhotoRemove').addEventListener('click', () => {
-    pendingSellerIdPhoto = null;
-    document.getElementById('sellerIdPhotoPreview').style.display = 'none';
-    const btn = document.getElementById('sellerIdPhotoBtn');
-    btn.textContent = '+';
-    btn.classList.remove('has-photo');
-  });
+  // Seller ID card photo — handled via sellerPhotoArea click below
 
   // FAB Camera Button
   document.getElementById('fabCameraBtn').addEventListener('click', () => {
