@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>สินค้าคงคลัง - รักษ์สะอาดรีไซเคิล</title>
+  <title>สต็อกสินค้า - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css">
 </head>
 
@@ -20,6 +20,7 @@
       <ul class="sidebar-menu">
         <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
         <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="catalog.html"><i class="icon-additem"></i><span>แคตตาล็อกสินค้า</span></a></li>
         <li><a href="sellers.html"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
         <li><a href="inventory.html" class="active"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
@@ -52,7 +53,32 @@
       </div>
 
       <div class="page-header">
-        <h1>จัดการสินค้าคงคลัง</h1>
+        <h1>สินค้าคงคลัง</h1>
+        <p>ตรวจสอบสต็อกสินค้าตามหมวดหมู่แต่ละสาขา</p>
+      </div>
+
+      <div class="stats-grid" id="stockSummaryGrid">
+        <div class="stat-card loading">
+          <div class="stat-icon"><i class="icon-product"></i></div>
+          <div class="stat-details">
+            <div class="stat-title">สต็อกทั้งหมด</div>
+            <div class="stat-value">...</div>
+          </div>
+        </div>
+        <div class="stat-card loading">
+          <div class="stat-icon"><i class="icon-additem"></i></div>
+          <div class="stat-details">
+            <div class="stat-title">หมวดหมู่</div>
+            <div class="stat-value">...</div>
+          </div>
+        </div>
+        <div class="stat-card loading">
+          <div class="stat-icon"><i class="icon-warning"></i></div>
+          <div class="stat-details">
+            <div class="stat-title">สต็อกใกล้หมด</div>
+            <div class="stat-value">...</div>
+          </div>
+        </div>
       </div>
 
       <div class="card" style="margin-bottom:16px">
@@ -67,188 +93,33 @@
           </div>
         </div>
         <div class="card-body">
-          <div id="thresholdForm" style="display:none;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px">
+          <div id="thresholdForm" class="alert-banner" style="display:none;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px">
             <strong>โหมดตั้งค่าแจ้งเตือน</strong> — กรอกตัวเลข (กก.) ที่ต้องการให้แจ้งเตือนเมื่อสต็อกต่ำกว่า ปล่อยว่างเพื่อปิดแจ้งเตือน
           </div>
           <div id="categoryStockGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px"></div>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">รายการแคตตาล็อก</h2>
-          <div class="card-tools">
-            <button class="btn btn-primary" id="addProductBtn" style="margin-right:8px">
-              <i class="icon-additem"></i> เพิ่มรายการ
-            </button>
-            <button class="btn btn-secondary" id="manageCategories" style="margin-right:8px">
-              <i class="icon-tags"></i> หมวดหมู่
-            </button>
-            <input type="text" id="productSearch" class="form-control" placeholder="ค้นหารหัสหรือชื่อสินค้า...">
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="filters">
-            <select id="categoryFilter" class="form-control">
-              <option value="">ทุกหมวดหมู่</option>
-            </select>
-            <select id="stockFilter" class="form-control">
-              <option value="all">ทั้งหมด</option>
-              <option value="active">ใช้งานอยู่</option>
-              <option value="inactive">ปิดใช้งาน</option>
-            </select>
-          </div>
-
-          <div class="table-container">
-            <table class="data-table" id="inventoryTable">
-              <thead>
-                <tr>
-                  <th>รหัส</th>
-                  <th>ชื่อสินค้า</th>
-                  <th>หมวดหมู่</th>
-                  <th class="text-right">บิล 1</th>
-                  <th class="text-right">บิล 2</th>
-                  <th class="text-right">บิล 3</th>
-                  <th>หน่วย</th>
-                  <th class="text-center">สถานะ</th>
-                  <th class="text-center">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-              </tbody>
-            </table>
+      <div class="row">
+        <div class="col">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">สต็อกใกล้หมด</h2>
+              <div class="card-tools">
+                <span class="badge badge-warning" id="alertCountBadge">0</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="stockAlertsContainer">
+                <div class="chart-placeholder">กำลังโหลด...</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- Catalog Item Modal -->
-  <div class="modal" id="productModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="productModalTitle">เพิ่มรายการแคตตาล็อก</h2>
-        <button class="close-modal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <form id="productForm">
-          <input type="hidden" id="productId">
-          <div class="form-row">
-            <div class="form-col">
-              <label for="sku" class="required">รหัสสินค้า</label>
-              <input type="text" id="sku" class="form-control" required placeholder="เช่น 01, 02, A001">
-            </div>
-            <div class="form-col">
-              <label for="name" class="required">ชื่อสินค้า</label>
-              <input type="text" id="name" class="form-control" required placeholder="เช่น เหล็กรวม">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-col">
-              <label for="categoryId">หมวดหมู่</label>
-              <select id="categoryId" class="form-control">
-                <option value="">เลือกหมวดหมู่</option>
-              </select>
-            </div>
-            <div class="form-col">
-              <label for="status">สถานะ</label>
-              <select id="status" class="form-control">
-                <option value="active">ใช้งานอยู่</option>
-                <option value="inactive">ปิดใช้งาน</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-col">
-              <label for="priceTier1" class="required">ราคาบิล 1 (ต่ำสุด)</label>
-              <input type="number" id="priceTier1" class="form-control" min="0" step="0.01" required>
-            </div>
-            <div class="form-col">
-              <label for="priceTier2" class="required">ราคาบิล 2 (กลาง)</label>
-              <input type="number" id="priceTier2" class="form-control" min="0" step="0.01" required>
-            </div>
-            <div class="form-col">
-              <label for="priceTier3" class="required">ราคาบิล 3 (สูงสุด)</label>
-              <input type="number" id="priceTier3" class="form-control" min="0" step="0.01" required>
-            </div>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelProduct">ยกเลิก</button>
-        <button class="btn btn-primary" id="saveProduct">บันทึก</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Category Modal -->
-  <div class="modal" id="categoryModal">
-    <div class="modal-content modal-sm">
-      <div class="modal-header">
-        <h2 id="categoryModalTitle">จัดการหมวดหมู่</h2>
-        <button class="close-modal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="category-list" id="categoryList">
-          <!-- Categories will be loaded here -->
-        </div>
-        <form id="categoryForm" class="mt-4">
-          <input type="hidden" id="editCategoryId">
-          <div class="form-group">
-            <label for="categoryName">ชื่อหมวดหมู่</label>
-            <input type="text" id="categoryName" class="form-control" required>
-          </div>
-          <div class="form-group">
-            <label for="categoryDescription">รายละเอียด</label>
-            <textarea id="categoryDescription" class="form-control"></textarea>
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-secondary" id="cancelCategory">ยกเลิก</button>
-            <button type="button" class="btn btn-primary" id="saveCategory">บันทึกหมวดหมู่</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- Stock Adjustment Modal -->
-  <div class="modal" id="stockModal">
-    <div class="modal-content modal-sm">
-      <div class="modal-header">
-        <h2>ปรับสต็อก</h2>
-        <button class="close-modal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <form id="stockForm">
-          <input type="hidden" id="stockProductId">
-          <div class="product-info">
-            <h3 id="stockProductName"></h3>
-            <p>สต็อกปัจจุบัน: <span id="currentStock">0</span></p>
-          </div>
-          <div class="form-group">
-            <label for="adjustmentType">ประเภทการปรับ</label>
-            <select id="adjustmentType" class="form-control">
-              <option value="add">เพิ่มสต็อก</option>
-              <option value="subtract">ลดสต็อก</option>
-              <option value="set">ตั้งสต็อก</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="adjustmentQuantity">จำนวน</label>
-            <input type="number" id="adjustmentQuantity" class="form-control" min="0.01" step="0.01" required>
-          </div>
-          <div class="form-group">
-            <label for="adjustmentNotes">หมายเหตุ</label>
-            <textarea id="adjustmentNotes" class="form-control"></textarea>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelAdjustment">ยกเลิก</button>
-        <button class="btn btn-primary" id="saveAdjustment">บันทึกการปรับ</button>
-      </div>
-    </div>
-  </div>
   <div id="notification-container"></div>
 
   <script src="../assets/js/config.js"></script>

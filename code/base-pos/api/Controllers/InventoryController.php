@@ -369,8 +369,29 @@ class InventoryController extends Controller
         try {
             $this->db->beginTransaction();
 
-            // Get product
+            // Get product — try products table first, then catalog
             $product = $productModel->getById($data['product_id']);
+            if (!$product) {
+                $catalogModel = new \PurchaseItemCatalog();
+                $catalogItem = $catalogModel->getById($data['product_id']);
+                if ($catalogItem) {
+                    $tierPrices = $catalogItem['tier_prices'] ?? [];
+                    $newProductId = $productModel->create([
+                        'sku' => 'CAT-' . $catalogItem['id'],
+                        'name' => $catalogItem['name'],
+                        'price' => $catalogItem['default_price'] ?? 0,
+                        'cost' => 0,
+                        'category_id' => $catalogItem['category_id'] ?? null,
+                        'price_tier1' => $tierPrices[0]['price'] ?? 0,
+                        'price_tier2' => $tierPrices[1]['price'] ?? 0,
+                        'price_tier3' => $tierPrices[2]['price'] ?? 0,
+                        'quantity' => 0,
+                        'status' => 'active',
+                    ]);
+                    $product = $productModel->getById($newProductId);
+                    $data['product_id'] = $newProductId;
+                }
+            }
             if (!$product) {
                 throw new Exception('Product not found');
             }
