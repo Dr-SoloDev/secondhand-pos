@@ -212,3 +212,60 @@
 **Commit:** `55fe9eb` — 23 files changed in this production audit session
 
 *End of Masterpiece Production Audit — SoloCorp OS*
+
+---
+
+## 📱 SESSION 12 ก.ค. 2569 — Competitive Analysis + Plan A+B
+
+### 1. 🔬 Competitive Analysis
+**ค้นคู่แข่ง POS ร้านรับซื้อของเก่าในไทย 5 ราย:**
+- **POSPOS** (~1,000+ ร้าน) — Cloud SaaS รายเดือน, เชื่อมตาชั่ง, CCTV, บัตร ปชช., BOM
+- **Scrapee** (~70 ร้าน) — 59,900 + 2,990/เดือน, ATM Machine 420K
+- **Green2Get Hero Store** (~300+ ร้าน) — ฟรีตลอดชีพ → 290-2,990/เดือน, Offline mode, QC
+- **ScaleBuy** (ใหม่) — ฟรี 14 วัน, Mobile-first, created by shop owner
+- **Recyclebiz** — ไม่มีข้อมูลชัดเจน
+
+**Differentiator ของเรา:**
+- ✅ Sale Lot + Profit/Loss ต่อ Lot — **ไม่มีใครมี**
+- ✅ Multi-branch + Stock Transfer — **ไม่มีใครมี**
+- ✅ Self-hosted (Docker) ฟรีตลอดชีพ — **ไม่มีใครมี**
+- ✅ FIFO / Weighted Avg Costing — **ไม่มีใครมี**
+- ✅ Security Enterprise-grade — CSP, requireAuth, Transaction, FOR UPDATE
+
+**Gap ที่ต้องปิด:**
+- 🔴 CRITICAL: Scale integration (เชื่อมตาชั่ง)
+- 🟡 HIGH: Mobile/Tablet support
+- 🟡 HIGH: Offline Mode
+
+### 2. 📱 Plan A+B Implementation
+
+| Plan | What | Files Changed |
+|:-----|:-----|:--------------|
+| **A** | Tablet-Responsive CSS | `layout.css` — touch targets (44px), column priority hiding, modal fullscreen, sidebar overlay on tablet |
+| **A** | Hamburger threshold expanded | `common.js` — 768→1024px |
+| **A** | Table priority columns | `index.html` + `purchase-orders.html` — priority-2/priority-3 classes |
+| **A** | Mobile link in topbar | `index.html` + `purchase-orders.html` — 📱 มือถือ button |
+| **B** | Mobile PO page (NEW) | `mobile/purchase.html` — 4-step wizard: Branch → Seller → Items → Review & Save |
+| **B** | Mobile uses existing API | Reuses `apiRequest()`, same JWT auth, catalog/seller/PO endpoints |
+
+### 3. 📄 Code Review Session
+| Component | Lines | Location |
+|:----------|:-----:|:---------|
+| Router (Switch Controller) | 281 | `base-pos/api/Router.php` |
+| SaleLotsController | 309 | `customizations/api/Controllers/SaleLotsController.php` |
+| SaleLot Model (FIFO) | 734 | `customizations/api/Models/SaleLot.php` |
+| FIFO Engine | ~50 | `calculateFifoCost()` — `ORDER BY po.created_at ASC` |
+| Stock Transfer FIFO | ~60 | `StockTransfer.php:114` |
+
+### 4. Owner Feedback — Architecture Score: **9/10**
+> *"คุณคิดแบบ business process ของร้านรับซื้อของเก่าจริงๆ ไม่ได้แค่ดัดแปลง POS ทั่วไป"*
+
+**สิ่งที่ต้องทำใน v2:**
+1. State transition business rules (explicit state machine)
+2. Deadlock lock order refactor
+3. FIFO mapping per sale item (track `purchase_order_item_id`)
+4. Reconcile script: `stock_kg` vs `SUM(poi.qty - consumed_qty)`
+
+**Commit:** `f3c1b8e` — 6 files changed, +1202/-48 lines
+
+*Session context 80% — saved*
