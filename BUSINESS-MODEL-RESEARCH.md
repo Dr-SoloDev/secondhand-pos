@@ -432,7 +432,8 @@ Revenue = 150 กก. × 430 = 64,500 บาท
 │                                                                 │
 │   📊 คุณภาพเทียบตลาด:                                          │
 │   ├── ดีกว่าคู่แข่งใน: Multi-branch, FIFO, Blacklist, Stock Tx   │
-│   ├── แย่กว่าคู่แข่งใน: Scale Integration, Photo Upload          │
+│   ├── แย่กว่าคู่แข่งใน: Scale Integration (ต้องรีบทำ)            │
+│   ├── ตามทันแล้ว: Mobile/Tablet Support (Plan A+B เสร็จ)        │
 │   └── ไม่มีค่าใช้จ่ายรายเดือน (จ่ายครั้งเดียว 40,000 บ.)         │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -441,7 +442,15 @@ Revenue = 150 กก. × 430 = 64,500 บาท
 ---
 
 > **เอกสารนี้จัดทำโดยคุณวุฒิ (Architecture) — SoloCorp OS 2.0**
-> **18 มิถุนายน 2569 | ปรับปรุงล่าสุด: 18 มิ.ย. 2569**
+> **18 มิถุนายน 2569 | ปรับปรุงล่าสุด: 12 ก.ค. 2569**
 >
 > *ที่มา: วิเคราะห์จาก source code โปรเจกต์, เอกสาร GOALS.md/DESIGN.md/AGENTS.md, 
 >  การค้นหาข้อมูลจากอินเทอร์เน็ต, และการวิเคราะห์ตลาด POS Software สำหรับร้านรับซื้อของเก่า*
+>
+> **📌 อัปเดตล่าสุด (12 ก.ค.):**
+> - ✅ **Mobile/Tablet Support เสร็จแล้ว** — Plan A (tablet-responsive) + Plan B (mobile PO wizard `/mobile/purchase.html`)
+> - ✅ **Production Audit เสร็จ** — 54 issues, 90% readiness
+> - ✅ **FIFO Code Review — Owner ให้ 9/10**
+> - ✅ **Competitive Analysis ละเอียดขึ้น** — ตารางเทียบ 5 คู่แข่ง
+> - ⏳ **Scale Integration (เชื่อมตาชั่ง)** — ยังเป็น CRITICAL GAP
+> - ⏳ **Offline Mode** — ยังเป็น HIGH GAP

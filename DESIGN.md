@@ -675,5 +675,40 @@ assets/js/
 
 ---
 
-*Built for SoloCorp OS by Dr.solodev | DESIGN.md v1.0 | 2026-06-07*
+## Appendix C: Responsive & Mobile Additions (2026-07-12)
+
+### Tablet-Responsive (layout.css — 768-1024px breakpoint)
+
+| Token / Rule | Value | Purpose |
+|:-------------|:------|:--------|
+| `min-height: 44px` | All interactive elements | Touch target (Apple HIG) |
+| `font-size: 16px` | Body text | iOS zoom prevention |
+| `priority-2` | Hidden on `<768px` | Column priority hiding |
+| `priority-3` | Hidden on `<576px` | Column priority hiding |
+| `.modal-fullscreen` | `<640px` | Fullscreen overlay modal |
+| `.sidebar-overlay` | 769-1024px | Hamburger toggle sidebar |
+| `hamburger threshold` | 768→1024px | common.js config change |
+
+### Mobile PO Wizard (`/mobile/purchase.html`)
+
+A **4-step standalone wizard** designed for mobile-first usage:
+
+| Step | Component | Design Pattern |
+|:-----|:----------|:---------------|
+| 1. Branch | `<select>` dropdown | Full-width, large touch target |
+| 2. Seller | Search + autocomplete + new seller form | Bottom sheet for new seller |
+| 3. Items | Catalog search + cart | Bottom sheet for tier prices |
+| 4. Review | Summary table + save button | Fixed bottom CTA |
+
+**Design principles applied:**
+- Single-column layout (no sidebar, no desktop nav)
+- Large touch targets (≥44px everywhere)
+- Step indicator at top (1-2-3-4)
+- Bottom sheet instead of modal (native feel)
+- Fixed bottom CTA button (ไม่พลาด)
+- Reuses existing CSS tokens (--color-primary, --color-text, etc.)
+
+---
+
+*Built for SoloCorp OS by Dr.solodev | DESIGN.md v1.1 | 2026-07-12*
 *Follows Google Stitch DESIGN.md format — interoperable with DESIGN.md-aware tools*

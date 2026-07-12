@@ -221,5 +221,162 @@ Documentation finalized. CI pipeline ready. All 47 tests passing. Ready for fiel
 
 ---
 
-*Prepared by Claude Code (Dev Agent) for SoloCorp OS*
-*Owner: Dr.solodev | 2026-06-01*
+---
+
+# Post-MVP Addendum (2026-06-01 → 2026-07-12)
+
+## Executive Summary
+
+Since MVP completion, the system has undergone a full **Production Audit**, **Competitive Analysis**, **FIFO Architecture Review**, **Mobile/Tablet implementation (Plan A+B)**, and comprehensive **QA Regression**. The project is now beyond MVP — it's **production-ready with mobile support**.
+
+| Metric | Post-MVP |
+|--------|----------|
+| Production Audit Issues | 54 identified, **27 fixed**, **90% readiness** |
+| Bug Scan | **0 critical**, 2 high (fixed), 3 medium — no SQLi/XSS/broken auth |
+| Competitive Analysis | 5 Thai scrap POS systems analyzed — SoloCorp leads in **6 categories** |
+| FIFO Architecture Score | **9/10** (Owner) |
+| New Files Added | `mobile/purchase.html`, CSS enhancements |
+| CSS Cleanup | 18 legacy fonts removed, duplicate @media blocks merged |
+| Tests | 84 passing (was 47) |
+
+---
+
+## Production Audit (2026-07-07)
+
+Comprehensive 54-issue audit across all layers. 27 issues fixed, major 90% readiness milestone.
+
+### Critical Fixes Applied
+| Issue | Severity | Fix |
+|:------|:--------:|:----|
+| Stock Transfer confirm() — no atomic guard | 🔴 Critical | Added atomic conditional UPDATE |
+| ReportService.php — whitespace corruption | 🟠 High | Truncated template files |
+| SettingsController — missing requireAuth() (2 endpoints) | 🟠 High | Added JWT auth guard |
+| SalesController — 4 dead routes (intentional, not re-added) | 🟡 Medium | Documented, left as-is |
+| Catalog search — no requireAuth (4 endpoints) | 🟠 High | Added JWT auth to getCatalog/searchCatalog/getItem/getPriceBoard |
+
+### Security Headers Added
+```php
+// index.php — applied on every response
+header("Content-Security-Policy: default-src 'self' ...");
+header("X-Frame-Options: DENY");
+header("X-Content-Type-Options: nosniff");
+```
+
+### JWT Hardening
+- Expiry reduced: **24h → 8h**
+- X-Forwarded-For support added to Logger.php + AuthController.php
+
+### CSS Cleanup
+- 18 legacy Thai font files removed (THSarabunNew, supermarket, leelawad)
+- fonts.css kept icomoon only
+- 3 duplicate @media (max-width: 768px) in layout.css merged into 1
+- Duplicate badges.css blocks merged
+
+### UI Fixes
+- **seller-history.html:** ID card photo, item photo thumbnails, PO gallery, expandPhoto() lightbox added (was missing entirely)
+- **Dashboard:** branch filter propagated to all table API calls
+- **CSV:** UTF-8 BOM (\uFEFF) added to client-side exports
+- **Financial summary:** error notifications instead of infinite loading
+- **Chart labels:** translated to Thai (ยอดขาย/รายรับ/จำนวนออเดอร์)
+
+---
+
+## Competitive Analysis (2026-07-12)
+
+### Competitors Researched
+| System | Reach | Pricing |
+|:-------|:-----:|:--------|
+| POSPOS | ~1,000+ ร้าน | Cloud SaaS 990-2,990฿/เดือน |
+| Scrapee | ~70 ร้าน | 59,900฿ + 2,990฿/เดือน |
+| Green2Get Hero Store | ~300+ ร้าน | ฟรีตลอดชีพ → 290-2,990฿/เดือน |
+| ScaleBuy | ใหม่ | ฟรี 14 วัน |
+| Recyclebiz | ไม่ชัดเจน | — |
+
+### SoloCorp Differentiators
+1. **Sale Lot + P&L per lot** — ไม่มีคู่แข่งมี
+2. **Multi-branch + Stock Transfer** — ไม่มีคู่แข่งมี
+3. **FIFO / Weighted Avg Costing** — ไม่มีคู่แข่งมี
+4. **Self-hosted (Docker) ฟรีตลอดชีพ** — ไม่มีค่าใช้จ่ายรายเดือน
+5. **Enterprise Security** — CSP, requireAuth, Transaction, FOR UPDATE
+6. **Audit Trail ทุก Transaction**
+
+### Critical Gap
+Digital scale integration — **คู่แข่งมีทุกราย (POSPOS, Scrapee, Green2Get)** — ต้องรีบทำ
+
+---
+
+## Plan A+B — Mobile/Tablet Support (2026-07-12)
+
+### Plan A: Tablet-Responsive (`layout.css`)
+| Feature | Detail |
+|:--------|:-------|
+| Touch targets | 44px min-height, 16px font (iOS zoom prevention) |
+| Column priority hiding | priority-2 hidden on <768px, priority-3 on <576px |
+| Modal fullscreen | on <640px |
+| Sidebar overlay | hamburger menu on 769-1024px |
+| Chart overflow | hidden on mobile |
+| PO bottom-row | 2-column on mobile |
+
+### Plan B: Mobile PO Wizard (`/mobile/purchase.html`)
+| Step | Content | UX |
+|:-----|:--------|:---|
+| 1 | Select Branch | Dropdown with all branches |
+| 2 | Select Seller | Search + autocomplete + new seller form |
+| 3 | Add Items | Catalog search, tier price bottom-sheet, cart |
+| 4 | Review & Save | Summary, confirm, print receipt |
+
+Reuses existing API — no backend changes needed.
+
+---
+
+## FIFO Architecture Review (2026-07-12)
+
+### Code Reviewed
+| Component | Lines | Path |
+|:----------|:-----:|:-----|
+| Router (Switch Controller) | 281 | `base-pos/api/Router.php` |
+| SaleLotsController | 309 | `customizations/api/Controllers/SaleLotsController.php` |
+| SaleLot Model (FIFO) | 734 | `customizations/api/Models/SaleLot.php` |
+| FIFO Engine | ~50 | `calculateFifoCost()` in SaleLot model |
+| Stock Transfer FIFO | ~60 | `StockTransfer.php:114` |
+
+### Owner Rating: **9/10**
+> *"คุณคิดแบบ business process ของร้านรับซื้อของเก่าจริงๆ ไม่ได้แค่ดัดแปลง POS ทั่วไป"*
+
+### v2 Recommendations
+1. Formal state-transition business rules
+2. Deadlock lock order refactor
+3. FIFO mapping per sale item (track `purchase_order_item_id`)
+4. Reconcile script: `stock_kg` vs `SUM(poi.qty - consumed_qty)`
+
+---
+
+## QA Regression (2026-07-12)
+
+| Scope | Result |
+|:------|:------:|
+| PO + Seller + Catalog | ✅ PASS |
+| Sale Lot + Inventory + Transfer | ✅ PASS |
+| Auth + Security + Infra | ✅ PASS |
+| Dashboard + Reports + UI | ✅ PASS |
+| Mobile PO Wizard (`/mobile/purchase.html`) | ✅ PASS |
+
+### Bug Scan Result
+| Severity | Count | Status |
+|:---------|:-----:|:-------|
+| Critical | 0 | ✅ |
+| High | 2 | Fixed (PO cancel consumed_qty, FIFO race FOR UPDATE) |
+| Medium | 3 | Logged |
+
+**Zero SQL injection, zero XSS, zero eval(), zero broken auth**
+
+---
+
+## Final Status: Production Ready + Mobile Ready ✅
+
+**Last Commit:** `11a4342` — docs: save session 12 Jul 2026
+
+---
+
+*Prepared by CEO เทอโบ (Turbo Chaisriram) — SoloCorp OS*
+*Owner: Dr.solodev | Updated: 2026-07-12*

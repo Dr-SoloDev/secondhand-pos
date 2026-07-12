@@ -1,6 +1,6 @@
 # 🤖 Agent Memory — Scrap POS
 **Last updated:** 12 กรกฎาคม 2569
-**Status:** GOALS G1-G10 เสร็จครบ — อยู่ระหว่างรอผลคุยเจ้าของ 9 มิ.ย.
+**Status:** GOALS G1-G10 เสร็จครบ + G11 (Mobile/Tablet) ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅
 
 ---
 
@@ -13,7 +13,7 @@
 
 ---
 
-## ✅ GOALS (G1-G10)
+## ✅ GOALS (G1-G11)
 
 | Goal | สถานะ | รายละเอียด |
 |---|---|---|
@@ -27,21 +27,28 @@
 | G8 | ✅ | Export CSV 4 แบบ |
 | G9 | ✅ | โอนสต็อกระหว่างสาขา + audit trail |
 | G10 | ✅ | Stock alert — threshold ต่อหมวด |
+| G11 | ✅ | Mobile/Tablet support — Plan A (tablet-responsive) + Plan B (mobile PO wizard) |
 
 ---
 
 ## ⏳ Todo
 
-### ด่วน — Pending จากคุยเจ้าของ 9 มิ.ย.
+### ด่วน — ก่อนนำเสนอลูกค้า
+- [ ] **นำเสนอลูกค้า (ผู้ว่าจ้าง)** — เปิด `http://localhost:8080/admin/index.html` (desktop) + `http://localhost:8080/mobile/purchase.html` (tablet)
 - [ ] G1: upload รูปภาพ (หลังเจ้าของเลือก storage: NAS ~10,000฿ / B2 ~12฿/เดือน / Hybrid)
 - [ ] Cloudflare Tunnel — remote access dashboard จากมือถือ
-- [ ] Commit 3 ไฟล์ค้าง: `purchase-orders.html`, `layout.css`, `purchase-orders.js`
 
 ### Tech Debt
 - [x] ~~JWT_SECRET ย้ายออกจาก apache-config.conf ก่อน production~~ → ย้ายเข้า .env แล้ว
-- [x] Rate limiting — เปลี่ยนเป็น DB-based (login_attempts table) แก้ IP-only bypass
-- [x] Token revocation — token_blocklist + jti + POST /auth/logout
-- [x] requireAuth() เพิ่มใน SalesController (4 methods) + UsersController (3 methods)
+- [x] ~~Rate limiting~~ — DB-based (login_attempts table) ✅
+- [x] ~~Token revocation~~ — token_blocklist + jti ✅
+- [x] ~~requireAuth()~~ — เพิ่มในทุก controllers ที่ขาด ✅
+- [x] ~~Production Audit (54 issues)~~ — 27 fixed, 90% readiness ✅
+- [x] ~~CSS cleanup~~ — legacy fonts removed, duplicate @media merged ✅
+- [x] ~~seller-history.html~~ — เพิ่มรูป ID card + item thumbnails + lightbox ✅
+- [x] ~~Dashboard branch filter~~ — filter ส่งต่อไปทุก table API ✅
+- [x] ~~CSV UTF-8 BOM~~ — เพิ่ม \uFEFF ใน client-side exports ✅
+- [x] ~~Financial summary~~ — error notifications แทน infinite loading ✅
 - [ ] **รัน migration ก่อน deploy:** `code/database/security-migrations.sql`
 - [ ] sidebar ใน stock-transfers.html + price-board.html เพิ่มลิงก์เมนูครบ
 - [ ] ลบ `code/base-pos/backups/.htaccess` (legacy)
@@ -85,13 +92,17 @@
 019-023  reports, dashboard, responsive, weighted avg cost
 024      global categories (merge 4สาขา → 1)
 025      default_unit per category
-026      (reserved)
+026      seller photo fields
 027      business expenses
 028      blacklist fields (sellers)
 029      precious receipt flag (categories)
 030      stock transfers table
 031      stock alert threshold (categories)
 032      catalog_id + item_name (sale_lot_items)
+033-042  security migrations: login_attempts, token_blocklist, rate_limiting
+043-044  seller history indexes, migration version fix
+045-047  seller search indexes, catalog search optimization
+048      (pending)
 ```
 
 ---
@@ -134,6 +145,50 @@ docker exec -it scrap-pos-db mysql -uroot -prootpass pos_system
 ---
 
 *Session logs ย้อนหลัง → `AGENT-HISTORY.md`*
+
+---
+
+## 🏆 FIFO Architecture Review — Owner Feedback (2026-07-12)
+
+### Components Reviewed
+| Component | Lines | Path |
+|:----------|:-----:|:-----|
+| Router (Switch Controller) | 281 | `base-pos/api/Router.php` |
+| SaleLotsController | 309 | `customizations/api/Controllers/SaleLotsController.php` |
+| SaleLot Model (FIFO Engine) | 734 | `customizations/api/Models/SaleLot.php` |
+
+### Owner Score: **9/10**
+> *"คุณคิดแบบ business process ของร้านรับซื้อของเก่าจริงๆ ไม่ได้แค่ดัดแปลง POS ทั่วไป"*
+
+### v2 Roadmap (Owner Approved)
+1. **State transition business rules** — formal state machine for PO/Sale Lot lifecycle
+2. **Deadlock lock order refactor** — consistent LOCK TABLE order across all transactions
+3. **FIFO mapping per sale item** — track which `purchase_order_item_id` each sale_lot_item consumed
+4. **Reconcile script** — `stock_kg` vs `SUM(poi.qty - consumed_qty)` audit
+
+---
+
+## 🔬 Competitive Analysis (2026-07-12)
+
+| Competitor | ร้าน | จุดเด่น | จุดอ่อนเราเทียบ |
+|:-----------|:---:|:--------|:----------------|
+| **POSPOS** | ~1,000+ | Scale, CCTV, ID card, BOM | Cloud SaaS รายเดือน |
+| **Scrapee** | ~70 | ATM Machine 420K, 59,900+2,990/เดือน | แพง, offline |
+| **Green2Get** | ~300+ | ฟรีตลอดชีพ → 290-2,990/เดือน | Offline mode, QC |
+| **ScaleBuy** | ใหม่ | Mobile-first, ฟรี 14 วัน | Mobile-first |
+| **Recyclebiz** | ไม่ชัดเจน | — | — |
+
+### Our Differentiators
+- ✅ **Sale Lot + Profit/Loss ต่อ Lot** — ไม่มีคู่แข่งมี
+- ✅ **Multi-branch + Stock Transfer** — ไม่มีคู่แข่งมี
+- ✅ **FIFO/Weighted Avg Costing** — ไม่มีคู่แข่งมี
+- ✅ **Self-hosted (Docker) ฟรีตลอดชีพ**
+- ✅ **Enterprise-grade Security** — CSP, requireAuth, Transaction, FOR UPDATE
+
+### Gaps to Close
+- 🟥 **CRITICAL:** Scale integration (digital weighing scale) — ทั้ง POSPOS, Scrapee, Green2Get มี
+- 🟧 **HIGH:** Mobile/Tablet support — **PLAN A+B IMPLEMENTED THEN** ✅
+- 🟧 **HIGH:** Offline Mode (Green2Get มี)
 
 ---
 

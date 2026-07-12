@@ -1,5 +1,5 @@
 # GOALS — Secondhand POS
-**ตกผลึกจาก session: 2026-06-08**
+**ตกผลึกจาก session: 2026-06-08 | อัปเดตล่าสุด: 2026-07-12**
 **ทำจนกว่าจะครบ — ทำงานได้จริง flow ราบรื่น**
 
 ---
@@ -81,6 +81,13 @@
 
 ---
 
+## G11 — Mobile / Tablet Support 🆕 (12 ก.ค. 2569)
+- Plan A: **Tablet-Responsive** — touch-friendly 44px min-height, 16px font (iOS zoom prevention), table column priority hiding (priority-2/priority-3), modal fullscreen on <640px, sidebar overlay + hamburger on 769-1024px
+- Plan B: **Mobile PO Wizard** — standalone 4-step wizard at `/mobile/purchase.html` (Branch → Seller → Items → Review & Save), catalog search with autocomplete, tier price bottom-sheet, cart management, reuses existing API
+- ✅ เสร็จแล้ว — ใช้ได้ทั้ง tablet (layout.css responsive) และมือถือ (mobile/purchase.html)
+
+---
+
 ## ❌ ตัดออก
 - Line Notify — ดูจาก dashboard มือถือได้เลย
 
@@ -88,24 +95,38 @@
 
 ## Pending — ต้องคุยกับเจ้าของก่อน implement
 - [ ] G1: เลือก storage รูปภาพ (NAS / Backblaze B2 / Hybrid)
-- [ ] G5: Cloudflare Tunnel สำหรับ remote access
+- [ ] Cloudflare Tunnel สำหรับ remote access (test ด้วย mobile/purchase.html)
 
 ---
 
 ## Priority Order
 ```
-Sprint 1 (ก่อน deploy):
-  G4 → ค้นหาผู้ขาย real-time
-  G3 → Blacklist alert + เหตุผล
-  G2 → ใบรับซื้อพิมพ์ได้ 2 แบบ
-  G7 → ประวัติผู้ขายต่อคน
+Sprint 1 (ก่อน deploy) — ✅ COMPLETE:
+  G4 → ค้นหาผู้ขาย real-time ✅
+  G3 → Blacklist alert + เหตุผล ✅
+  G2 → ใบรับซื้อพิมพ์ได้ 2 แบบ ✅
+  G7 → ประวัติผู้ขายต่อคน ✅
 
-Sprint 2 (หลัง deploy สัปดาห์แรก):
-  G5 → Dashboard 4 สาขา
-  G8 → Export CSV
+Sprint 2 (หลัง deploy สัปดาห์แรก) — ✅ COMPLETE:
+  G5 → Dashboard 4 สาขา ✅
+  G8 → Export CSV ✅
 
-Sprint 3 (เดือน 2):
-  G9 → โอนสต็อก
-  G10 → Stock alert
+Sprint 3 (เดือน 2) — ✅ COMPLETE:
+  G9 → โอนสต็อก ✅
+  G10 → Stock alert ✅
+
+Sprint 4 (Production Polish) — ✅ COMPLETE:
+  G11 → Mobile/Tablet Support (Plan A + Plan B) ✅
+  Production Audit (54 issues, 90% readiness) ✅
+  FIFO Code Review (Architecture 9/10) ✅
+  Competitive Analysis (5 คู่แข่ง) ✅
+
+Sprint 5 (v2 — รอหลังนำเสนอลูกค้า):
   G1 → รูปภาพ (หลังเจ้าของเลือก storage)
+  Scale Integration (digital weighing scale)
+  Offline Mode (PWA)
+  State transition business rules
+  Deadlock lock order refactor
+  FIFO mapping per sale item
+  Reconcile audit script
 ```
