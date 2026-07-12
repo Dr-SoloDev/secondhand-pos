@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>รับซื้อของ - มือถือ</title>
+  <style>
+    /* === Mobile-first Reset === */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans Thai', sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      line-height: 1.5;
+      padding-bottom: env(safe-area-inset-bottom, 16px);
+    }
+    input, select, textarea, button { font-family: inherit; font-size: 16px; }
+
+    /* === Header === */
+    .m-header {
+      position: sticky; top: 0; z-index: 100;
+      background: linear-gradient(180deg, #1e293b, #0f172a);
+      color: #fff;
+      padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      min-height: 56px;
+    }
+    .m-header h1 { font-size: 18px; font-weight: 600; }
+    .m-header .user-badge {
+      font-size: 13px; color: #94a3b8;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .m-header .user-badge i { font-size: 16px; }
+
+    /* === Container === */
+    .m-container { max-width: 600px; margin: 0 auto; padding: 12px; }
+
+    /* === Cards === */
+    .m-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .m-card-title {
+      font-size: 13px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 0.3px;
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* === Form elements === */
+    .m-field { margin-bottom: 12px; }
+    .m-field:last-child { margin-bottom: 0; }
+    .m-field label {
+      display: block;
+      font-size: 14px; font-weight: 600; color: #374151;
+      margin-bottom: 4px;
+    }
+    .m-field input, .m-field select, .m-field textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 10px;
+      background: #fff;
+      font-size: 16px;
+      color: #1d1d1f;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .m-field input:focus, .m-field select:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .m-field textarea { resize: vertical; min-height: 60px; }
+    select.m-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+
+    /* === Buttons === */
+    .m-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 48px;
+      transition: all 0.15s;
+    }
+    .m-btn:active { transform: scale(0.98); }
+    .m-btn-primary { background: #2563eb; color: #fff; }
+    .m-btn-primary:hover { background: #1d4ed8; }
+    .m-btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .m-btn-success { background: #059669; color: #fff; }
+    .m-btn-success:hover { background: #047857; }
+    .m-btn-danger { background: #dc2626; color: #fff; }
+    .m-btn-danger:hover { background: #b91c1c; }
+    .m-btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+    .m-btn-secondary:hover { background: #e5e7eb; }
+    .m-btn-sm { padding: 10px 14px; font-size: 14px; min-height: 40px; width: auto; }
+    .m-btn-group { display: flex; gap: 8px; }
+    .m-btn-group .m-btn { flex: 1; }
+
+    /* === Search === */
+    .m-search-wrap { position: relative; }
+    .m-search-results {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1.5px solid #d1d5db; border-top: none;
+      border-radius: 0 0 10px 10px;
+      max-height: 220px; overflow-y: auto;
+      z-index: 50; box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      display: none;
+    }
+    .m-search-results.show { display: block; }
+    .m-search-item {
+      padding: 12px 14px; border-bottom: 1px solid #f3f4f6;
+      cursor: pointer; font-size: 15px;
+    }
+    .m-search-item:last-child { border-bottom: none; }
+    .m-search-item:active { background: #eff6ff; }
+    .m-search-item .sub {
+      font-size: 12px; color: #6b7280; margin-top: 2px;
+    }
+
+    /* === Selected Seller === */
+    .m-seller-selected {
+      background: #ecfdf5; border: 1.5px solid #a7f3d0;
+      border-radius: 10px; padding: 12px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .m-seller-selected .name { font-weight: 600; font-size: 15px; }
+    .m-seller-selected .info { font-size: 13px; color: #6b7280; }
+
+    /* === Cart === */
+    .m-cart-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .m-cart-item:last-child { border-bottom: none; }
+    .m-cart-item .item-name { flex: 1; font-weight: 500; font-size: 15px; }
+    .m-cart-item .item-detail {
+      text-align: right; font-size: 14px; color: #6b7280;
+    }
+    .m-cart-item .item-total {
+      font-weight: 700; font-size: 16px; color: #059669;
+      min-width: 80px; text-align: right;
+    }
+    .m-cart-item .item-remove {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: none; background: #fee2e2; color: #dc2626;
+      font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .m-cart-item .item-remove:active { background: #fecaca; }
+
+    .m-cart-summary {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 12px; margin-top: 8px;
+      border-top: 2px solid #e5e7eb;
+    }
+    .m-cart-summary .label { font-size: 14px; color: #6b7280; }
+    .m-cart-summary .total {
+      font-size: 22px; font-weight: 800; color: #059669;
+    }
+    .m-cart-empty {
+      text-align: center; padding: 24px 0;
+      color: #9ca3af; font-size: 15px;
+    }
+
+    /* === Add Item Form (hidden by default) === */
+    .m-add-item-form { display: none; margin-top: 8px; }
+    .m-add-item-form.show { display: block; }
+
+    /* === Stepper === */
+    .m-step { display: none; }
+    .m-step.active { display: block; }
+    .m-step-indicator {
+      display: flex; gap: 6px; margin-bottom: 16px;
+      padding: 0 12px;
+    }
+    .m-step-dot {
+      flex: 1; height: 4px; border-radius: 2px;
+      background: #e5e7eb; transition: background 0.3s;
+    }
+    .m-step-dot.active { background: #2563eb; }
+    .m-step-dot.done { background: #059669; }
+
+    /* === Quantity input row === */
+    .m-qty-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .m-qty-row .m-qty-field { text-align: center; font-size: 24px; font-weight: 700; }
+
+    /* === Notification === */
+    .m-toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #1d1d1f; color: #fff; padding: 12px 20px;
+      border-radius: 10px; font-size: 14px; font-weight: 500;
+      z-index: 200; opacity: 0; transition: opacity 0.3s;
+      max-width: 90%; text-align: center;
+    }
+    .m-toast.show { opacity: 1; }
+    .m-toast.success { background: #059669; }
+    .m-toast.error { background: #dc2626; }
+
+    /* === Empty state === */
+    .m-empty {
+      text-align: center; padding: 32px 16px; color: #9ca3af;
+    }
+    .m-empty i { font-size: 36px; margin-bottom: 8px; display: block; }
+
+    /* === Loading === */
+    .m-spinner {
+      display: inline-block; width: 20px; height: 20px;
+      border: 2px solid #e5e7eb; border-top-color: #2563eb;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .m-btn .m-spinner { border-color: rgba(255,255,255,0.3); border-top-color: #fff; }
+
+    /* === Scrollable cart on small screens === */
+    .m-cart-items { max-height: 50vh; overflow-y: auto; }
+
+    /* === Footer === */
+    .m-footer {
+      text-align: center; padding: 16px; font-size: 12px; color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="m-header">
+    <h1>🛒 รับซื้อของ</h1>
+    <div class="user-badge">
+      <span id="mUserName">-</span>
+      <button onclick="logout()" style="background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer;padding:8px">ออกจากระบบ</button>
+    </div>
+  </header>
+
+  <!-- ===== STEP INDICATOR ===== -->
+  <div class="m-step-indicator" id="stepIndicator">
+    <div class="m-step-dot active" data-step="1"></div>
+    <div class="m-step-dot" data-step="2"></div>
+    <div class="m-step-dot" data-step="3"></div>
+    <div class="m-step-dot" data-step="4"></div>
+  </div>
+
+  <!-- ===== CONTAINER ===== -->
+  <div class="m-container">
+
+    <!-- ============================== -->
+    <!-- STEP 1: เลือกสาขา               -->
+    <!-- ============================== -->
+    <div class="m-step active" data-step="1">
+      <div class="m-card">
+        <div class="m-card-title">📍 สาขาที่รับซื้อ</div>
+        <div class="m-field">
+          <select id="mBranchSelect" class="m-select">
+            <option value="">— กำลังโหลดสาขา —</option>
+          </select>
+        </div>
+        <button class="m-btn m-btn-primary" onclick="goStep(2)" id="mStep1Btn" disabled>ต่อไป</button>
+      </div>
+      <div style="text-align:center;padding:12px">
+        <a href="../admin/index.html" style="color:#6b7280;font-size:14px">← กลับไปหน้าหลัก</a>
+      </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- STEP 2: เลือก/เพิ่มผู้ขาย       -->
+    <!-- ============================== -->
+    <div class="m-step" data-step="2">
+      <div class="m-card">
+        <div class="m-card-title">👤 ผู้ขาย</div>
+
+        <!-- Search seller -->
+        <div class="m-field">
+          <label>ค้นหาผู้ขาย</label>
+          <div class="m-search-wrap">
+            <input type="text" id="mSellerSearch" class="m-field-input" placeholder="ชื่อ หรือ เบอร์โทร...">
+            <div class="m-search-results" id="mSellerResults"></div>
+          </div>
+        </div>
+
+        <!-- Selected seller -->
+        <div id="mSellerSelected" style="display:none">
+          <div class="m-seller-selected">
+            <div>
+              <div class="name" id="mSellerName"></div>
+              <div class="info" id="mSellerInfo"></div>
+            </div>
+            <button class="m-btn m-btn-sm m-btn-secondary" onclick="clearSeller()" style="width:auto">เปลี่ยน</button>
+          </div>
+        </div>
+
+        <!-- Create new seller -->
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;font-size:14px;color:#2563eb;font-weight:600;padding:8px 0">+ เพิ่มผู้ขายใหม่</summary>
+          <div style="margin-top:8px">
+            <div class="m-field">
+              <label>ชื่อ-นามสกุล *</label>
+              <input type="text" id="mNewSellerName" placeholder="ชื่อ-นามสกุล">
+            </div>
+            <div class="m-field">
+              <label>เบอร์โทรศัพท์</label>
+              <input type="tel" id="mNewSellerPhone" placeholder="เบอร์โทร">
+            </div>
+            <div class="m-field">
+              <label>เลขบัตรประชาชน</label>
+              <input type="text" id="mNewSellerId" placeholder="13 หลัก" maxlength="13">
+            </div>
+            <button class="m-btn m-btn-primary" onclick="createSeller()">บันทึกผู้ขายใหม่</button>
+          </div>
+        </details>
+
+        <button class="m-btn m-btn-primary" onclick="goStep(3)" id="mStep2Btn" disabled style="margin-top:12px">
+          ต่อไป — เลือกสินค้า
+        </button>
+      </div>
+      <button class="m-btn m-btn-secondary" onclick="goStep(1)" style="margin-bottom:12px">← ย้อนกลับ</button>
+    </div>
+
+    <!-- ============================== -->
+    <!-- STEP 3: เพิ่มสินค้า             -->
+    <!-- ============================== -->
+    <div class="m-step" data-step="3">
+      <div class="m-card">
+        <div class="m-card-title">📦 เพิ่มสินค้า</div>
+
+        <!-- Search catalog -->
+        <div class="m-field">
+          <label>ค้นหาสินค้า</label>
+          <div class="m-search-wrap">
+            <input type="text" id="mItemSearch" class="m-field-input" placeholder="พิมพ์ชื่อ หรือ รหัส...">
+            <div class="m-search-results" id="mItemResults"></div>
+          </div>
+        </div>
+
+        <!-- Add item form -->
+        <div class="m-add-item-form" id="mAddItemForm">
+          <div class="m-field">
+            <label>สินค้าที่เลือก</label>
+            <div id="mSelectedItemName" style="font-weight:600;font-size:16px;padding:8px 0">—</div>
+          </div>
+          <div class="m-qty-row">
+            <div class="m-field">
+              <label>น้ำหนัก (กก.)</label>
+              <input type="number" id="mItemWeight" step="0.01" min="0" placeholder="0.00" class="m-qty-field">
+            </div>
+            <div class="m-field">
+              <label>หัก (กก.)</label>
+              <input type="number" id="mItemDeduct" step="0.01" min="0" value="0" class="m-qty-field">
+            </div>
+          </div>
+          <div class="m-field">
+            <label>ราคา/กก.</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span id="mItemUnitPrice" style="font-size:18px;font-weight:700;color:#059669">0.00</span>
+              <span style="color:#6b7280;font-size:14px">บาท/กก.</span>
+              <span id="mItemTierBadge" style="font-size:12px;color:#2563eb;background:#eff6ff;padding:2px 8px;border-radius:4px;display:none"></span>
+            </div>
+          </div>
+          <div class="m-field">
+            <label>รวม</label>
+            <div id="mItemTotalPreview" style="font-size:24px;font-weight:800;color:#059669">฿0.00</div>
+          </div>
+          <div class="m-btn-group">
+            <button class="m-btn m-btn-secondary" onclick="cancelAddItem()">ยกเลิก</button>
+            <button class="m-btn m-btn-success" onclick="addItemToCart()" id="mAddItemBtn">+ เพิ่มรายการ</button>
+          </div>
+        </div>
+
+        <!-- Change tier button -->
+        <button class="m-btn m-btn-sm m-btn-secondary" onclick="showTierPicker()" id="mTierBtn" style="width:auto;margin-top:8px">
+          🏷️ เลือกระดับราคา
+        </button>
+        <span id="mTierLabel" style="font-size:13px;color:#6b7280;margin-left:8px">(ราคาปกติ)</span>
+      </div>
+
+      <!-- Cart -->
+      <div class="m-card">
+        <div class="m-card-title">🧾 รายการในบิล</div>
+        <div id="mCartContent">
+          <div class="m-cart-empty">ยังไม่มีรายการ  — เพิ่มสินค้าข้างบน</div>
+        </div>
+        <div class="m-cart-summary" id="mCartSummary" style="display:none">
+          <span class="label">ยอดรวม</span>
+          <span class="total" id="mCartTotal">฿0.00</span>
+        </div>
+      </div>
+
+      <div class="m-btn-group">
+        <button class="m-btn m-btn-secondary" onclick="goStep(2)">← ผู้ขาย</button>
+        <button class="m-btn m-btn-primary" onclick="goStep(4)" id="mStep3Btn" disabled>
+          ทบทวน & บันทึก →
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================== -->
+    <!-- STEP 4: ทบทวน & บันทึก         -->
+    <!-- ============================== -->
+    <div class="m-step" data-step="4">
+      <div class="m-card">
+        <div class="m-card-title">📋 สรุปใบรับซื้อ</div>
+        <div id="mReviewContent">
+          <div class="m-empty">กำลังโหลด...</div>
+        </div>
+      </div>
+
+      <div class="m-card">
+        <div class="m-card-title">💳 รายละเอียดบิล</div>
+        <div class="m-field">
+          <label>วิธีจ่าย</label>
+          <select id="mPaymentMethod" class="m-select">
+            <option value="cash">เงินสด</option>
+            <option value="bank_transfer">โอนธนาคาร</option>
+          </select>
+        </div>
+        <div class="m-field">
+          <label>หมายเหตุ</label>
+          <textarea id="mNotes" placeholder="(ไม่บังคับ)" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="m-btn-group">
+        <button class="m-btn m-btn-secondary" onclick="goStep(3)">← แก้ไขรายการ</button>
+        <button class="m-btn m-btn-success" onclick="savePO()" id="mSaveBtn">
+          💾 บันทึกใบรับซื้อ
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div class="m-toast" id="mToast"></div>
+
+  <!-- ===== TIER PICKER BOTTOM SHEET ===== -->
+  <div style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,0.15);z-index:150;padding:16px;max-height:50vh;overflow-y:auto" id="mTierSheet">
+    <div style="text-align:center;font-weight:600;font-size:16px;margin-bottom:12px">เลือกระดับราคาสำหรับบิลนี้</div>
+    <div id="mTierOptions"></div>
+    <button class="m-btn m-btn-secondary" onclick="closeTierSheet()" style="margin-top:8px">ยกเลิก</button>
+  </div>
+  <div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:149" id="mTierOverlay" onclick="closeTierSheet()"></div>
+
+  <div class="m-footer">รักษ์สะอาดรีไซเคิล · SoloCorp OS</div>
+
+  <script src="../assets/js/config.js"></script>
+  <script>
+  // ============================================================
+  // Mobile Purchase Order — State & Logic
+  // ============================================================
+
+  // --- State ---
+  let mBranchId = null;
+  let mSeller = null;
+  let mCart = [];
+  let mCatalogItems = [];
+  let mTierLevel = null;
+  let mSelectedCatalogItem = null; // { id, name, unit_price, tier_prices }
+
+  // --- Init ---
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Auth check
+    const userJson = localStorage.getItem('posUser');
+    if (!userJson) {
+      window.location.href = '../index.html';
+      return;
+    }
+    try {
+      const user = JSON.parse(userJson);
+      document.getElementById('mUserName').textContent = user.full_name || user.username || '-';
+    } catch(e) {
+      window.location.href = '../index.html';
+      return;
+    }
+
+    // Load branches
+    const res = await apiRequest('branches/active');
+    if (res.status === 'success' && res.data) {
+      const sel = document.getElementById('mBranchSelect');
+      sel.innerHTML = '<option value="">เลือกสาขา</option>';
+      res.data.forEach(b => {
+        sel.appendChild(new Option(b.name, b.id));
+      });
+      sel.addEventListener('change', () => {
+        mBranchId = sel.value || null;
+        document.getElementById('mStep1Btn').disabled = !mBranchId;
+      });
+    }
+
+    // Load catalog (for item search)
+    const catRes = await apiRequest('purchase-catalog');
+    if (catRes.status === 'success' && catRes.data) {
+      mCatalogItems = catRes.data;
+    }
+
+    // Search seller
+    let sellerDebounce;
+    document.getElementById('mSellerSearch').addEventListener('input', function() {
+      clearTimeout(sellerDebounce);
+      const q = this.value.trim();
+      if (q.length < 2) { hideResults('mSellerResults'); return; }
+      sellerDebounce = setTimeout(() => searchSellers(q), 300);
+    });
+
+    // Search catalog item
+    let itemDebounce;
+    document.getElementById('mItemSearch').addEventListener('input', function() {
+      clearTimeout(itemDebounce);
+      const q = this.value.trim();
+      if (q.length < 1) { hideResults('mItemResults'); return; }
+      itemDebounce = setTimeout(() => searchItems(q), 200);
+    });
+
+    // Weight change preview
+    document.getElementById('mItemWeight').addEventListener('input', updateItemPreview);
+    document.getElementById('mItemDeduct').addEventListener('input', updateItemPreview);
+
+    // Hide results on blur
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.m-search-wrap')) {
+        hideResults('mSellerResults');
+        hideResults('mItemResults');
+      }
+    });
+  });
+
+  // --- API Wrapper ---
+  async function apiRequest(endpoint, method = 'GET', data = null) {
+    const headers = { 'Content-Type': 'application/json' };
+    const options = { method, headers };
+    if (data && ['POST','PUT','PATCH','DELETE'].includes(method)) {
+      options.body = JSON.stringify(data);
+    }
+    try {
+      const resp = await fetch(`${window.apiPath}/${endpoint}`, options);
+      const text = await resp.text();
+      let result = {};
+      if (text) {
+        try { result = JSON.parse(text); } catch(e) { throw new Error('ข้อมูลไม่ถูกต้อง'); }
+      }
+      if (!resp.ok) {
+        if (resp.status === 401) {
+          localStorage.removeItem('posUser');
+          window.location.href = '../index.html?expired=1';
+          return { status: 'error', message: 'Session expired' };
+        }
+        throw new Error(result.message || 'เกิดข้อผิดพลาด');
+      }
+      return result;
+    } catch(e) {
+      showToast(e.message || 'ไม่สามารถเชื่อมต่อระบบได้', 'error');
+      return { status: 'error', message: e.message };
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function formatCurrency(n) {
+    return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 2 }).format(n);
+  }
+
+  // --- Step Navigation ---
+  function goStep(n) {
+    // Validate current step before proceeding
+    if (n > 1 && n < 5) {
+      if (n === 2 && !mBranchId) { showToast('กรุณาเลือกสาขาก่อน', 'error'); return; }
+      if (n === 3 && !mSeller) { showToast('กรุณาเลือกผู้ขายก่อน', 'error'); return; }
+      if (n === 4 && mCart.length === 0) { showToast('กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ', 'error'); return; }
+    }
+
+    document.querySelectorAll('.m-step').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.m-step[data-step="${n}"]`).classList.add('active');
+
+    document.querySelectorAll('.m-step-dot').forEach(dot => {
+      const step = parseInt(dot.dataset.step);
+      dot.classList.toggle('active', step === n);
+      dot.classList.toggle('done', step < n);
+    });
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Update review on step 4
+    if (n === 4) renderReview();
+  }
+
+  // --- Seller Search ---
+  async function searchSellers(q) {
+    const res = await apiRequest(`sellers/search?keyword=${encodeURIComponent(q)}`);
+    const container = document.getElementById('mSellerResults');
+    if (res.status !== 'success' || !res.data || !res.data.length) {
+      container.innerHTML = '<div class="m-search-item" style="color:#9ca3af">ไม่พบผู้ขาย</div>';
+      container.classList.add('show');
+      return;
+    }
+    container.innerHTML = res.data.map(s => `
+      <div class="m-search-item" onclick="selectSeller(${s.id}, '${escapeHtml(s.full_name)}', '${escapeHtml(s.phone||'')}')">
+        <div>${escapeHtml(s.full_name)}</div>
+        <div class="sub">📞 ${escapeHtml(s.phone||'-')}${s.id_card ? ' · 🪪 '+s.id_card : ''}</div>
+      </div>
+    `).join('');
+    container.classList.add('show');
+  }
+
+  function selectSeller(id, name, phone) {
+    mSeller = { id, full_name: name, phone };
+    document.getElementById('mSellerSearch').value = name;
+    document.getElementById('mSellerSelected').style.display = 'block';
+    document.getElementById('mSellerName').textContent = name;
+    document.getElementById('mSellerInfo').textContent = `📞 ${phone || '-'}`;
+    hideResults('mSellerResults');
+    document.getElementById('mStep2Btn').disabled = false;
+    showToast('เลือกผู้ขาย: ' + name, 'success');
+  }
+
+  function clearSeller() {
+    mSeller = null;
+    document.getElementById('mSellerSearch').value = '';
+    document.getElementById('mSellerSelected').style.display = 'none';
+    document.getElementById('mStep2Btn').disabled = true;
+  }
+
+  // --- Create Seller ---
+  async function createSeller() {
+    const name = document.getElementById('mNewSellerName').value.trim();
+    const phone = document.getElementById('mNewSellerPhone').value.trim();
+    const idCard = document.getElementById('mNewSellerId').value.trim();
+    if (!name) { showToast('กรุณากรอกชื่อ-นามสกุล', 'error'); return; }
+    const res = await apiRequest('sellers', 'POST', { full_name: name, phone, id_card: idCard || undefined });
+    if (res.status === 'success') {
+      const s = res.data || res.seller || { id: res.id, full_name: name, phone };
+      selectSeller(s.id, s.full_name || name, s.phone || phone);
+      document.getElementById('mNewSellerName').value = '';
+      document.getElementById('mNewSellerPhone').value = '';
+      document.getElementById('mNewSellerId').value = '';
+      showToast('เพิ่มผู้ขายสำเร็จ', 'success');
+    } else {
+      showToast(res.message || 'ไม่สามารถเพิ่มผู้ขายได้', 'error');
+    }
+  }
+
+  // --- Item Search ---
+  function searchItems(q) {
+    const term = q.toLowerCase();
+    const results = mCatalogItems.filter(item =>
+      (item.name && item.name.toLowerCase().includes(term)) ||
+      (item.code && item.code.toLowerCase().includes(term))
+    ).slice(0, 15);
+
+    const container = document.getElementById('mItemResults');
+    if (!results.length) {
+      container.innerHTML = '<div class="m-search-item" style="color:#9ca3af">ไม่พบสินค้า</div>';
+      container.classList.add('show');
+      return;
+    }
+    container.innerHTML = results.map(item => {
+      const price = getItemPrice(item);
+      return `<div class="m-search-item" onclick="selectItem(${item.id}, '${escapeHtml(item.name)}', ${price}, '${escapeHtml(JSON.stringify(item.tier_prices||[]))}')">
+        <div>${escapeHtml(item.name)}${item.code ? ' <span style="color:#9ca3af;font-size:12px">('+escapeHtml(item.code)+')</span>' : ''}</div>
+        <div class="sub">💰 ${price.toFixed(2)} บาท/กก.${item.default_unit ? ' · '+escapeHtml(item.default_unit) : ''}</div>
+      </div>`;
+    }).join('');
+    container.classList.add('show');
+  }
+
+  function getItemPrice(item) {
+    if (mTierLevel && item.tier_prices && item.tier_prices.length > 0) {
+      const tier = item.tier_prices.find(t => t.level === mTierLevel);
+      if (tier) return parseFloat(tier.price) || 0;
+    }
+    return parseFloat(item.unit_price) || parseFloat(item.price) || 0;
+  }
+
+  function selectItem(id, name, price, tierJson) {
+    mSelectedCatalogItem = {
+      id,
+      name,
+      unit_price: price,
+      tier_prices: JSON.parse(tierJson)
+    };
+    document.getElementById('mItemSearch').value = name;
+    document.getElementById('mSelectedItemName').textContent = name;
+    document.getElementById('mItemUnitPrice').textContent = price.toFixed(2);
+    document.getElementById('mAddItemForm').classList.add('show');
+    document.getElementById('mItemWeight').focus();
+
+    // Show tier badge
+    const badge = document.getElementById('mItemTierBadge');
+    if (mTierLevel) {
+      badge.textContent = `🏷️ ระดับ ${mTierLevel}`;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    hideResults('mItemResults');
+    updateItemPreview();
+  }
+
+  function cancelAddItem() {
+    mSelectedCatalogItem = null;
+    document.getElementById('mItemSearch').value = '';
+    document.getElementById('mAddItemForm').classList.remove('show');
+    document.getElementById('mItemWeight').value = '';
+    document.getElementById('mItemDeduct').value = '0';
+  }
+
+  function updateItemPreview() {
+    const weight = parseFloat(document.getElementById('mItemWeight').value) || 0;
+    const deduct = parseFloat(document.getElementById('mItemDeduct').value) || 0;
+    const price = mSelectedCatalogItem ? mSelectedCatalogItem.unit_price : 0;
+    const net = Math.max(0, weight - deduct);
+    const total = net * price;
+    document.getElementById('mItemTotalPreview').textContent = formatCurrency(total);
+  }
+
+  function addItemToCart() {
+    if (!mSelectedCatalogItem) { showToast('กรุณาเลือกสินค้าก่อน', 'error'); return; }
+    const weight = parseFloat(document.getElementById('mItemWeight').value);
+    if (!weight || weight <= 0) { showToast('กรุณากรอกน้ำหนัก', 'error'); return; }
+    const deduct = parseFloat(document.getElementById('mItemDeduct').value) || 0;
+    const net = Math.max(0, weight - deduct);
+    const total = net * mSelectedCatalogItem.unit_price;
+
+    mCart.push({
+      catalog_id: mSelectedCatalogItem.id,
+      item_name: mSelectedCatalogItem.name,
+      quantity: weight,
+      weight_deduction: deduct,
+      unit_price: mSelectedCatalogItem.unit_price,
+      total: total
+    });
+
+    renderCart();
+    cancelAddItem();
+    document.getElementById('mStep3Btn').disabled = false;
+    showToast('เพิ่ม ' + mSelectedCatalogItem.name + ' เรียบร้อย', 'success');
+  }
+
+  function removeCartItem(index) {
+    mCart.splice(index, 1);
+    renderCart();
+    if (mCart.length === 0) {
+      document.getElementById('mStep3Btn').disabled = true;
+    }
+  }
+
+  function renderCart() {
+    const container = document.getElementById('mCartContent');
+    const summary = document.getElementById('mCartSummary');
+    const totalEl = document.getElementById('mCartTotal');
+
+    if (mCart.length === 0) {
+      container.innerHTML = '<div class="m-cart-empty">ยังไม่มีรายการ</div>';
+      summary.style.display = 'none';
+      return;
+    }
+
+    let total = 0;
+    container.innerHTML = '<div class="m-cart-items">' + mCart.map((item, i) => {
+      total += item.total || 0;
+      const net = Math.max(0, (item.quantity || 0) - (item.weight_deduction || 0));
+      return `<div class="m-cart-item">
+        <div class="item-name">${escapeHtml(item.item_name)}</div>
+        <div class="item-detail">
+          <div>${(item.quantity||0).toFixed(2)} กก.${item.weight_deduction ? ' (หัก '+item.weight_deduction+')' : ''}</div>
+          <div>@ ${(item.unit_price||0).toFixed(2)}</div>
+        </div>
+        <div class="item-total">${formatCurrency(item.total || 0)}</div>
+        <button class="item-remove" onclick="removeCartItem(${i})">✕</button>
+      </div>`;
+    }).join('') + '</div>';
+
+    summary.style.display = 'flex';
+    totalEl.textContent = formatCurrency(total);
+  }
+
+  // --- Tier ---
+  function showTierPicker() {
+    // Find all unique tier levels from catalog items
+    const tiers = new Map();
+    mCatalogItems.forEach(item => {
+      if (item.tier_prices) {
+        item.tier_prices.forEach(t => {
+          if (!tiers.has(t.level)) {
+            tiers.set(t.level, t.label || `ระดับ ${t.level}`);
+          }
+        });
+      }
+    });
+
+    const container = document.getElementById('mTierOptions');
+    if (tiers.size === 0) {
+      container.innerHTML = '<div style="color:#9ca3af;text-align:center">ไม่มีระดับราคา</div>';
+    } else {
+      container.innerHTML = Array.from(tiers.entries()).map(([level, label]) => `
+        <button class="m-btn ${mTierLevel === level ? 'm-btn-primary' : 'm-btn-secondary'}" onclick="setTier(${level})" style="margin-bottom:6px">
+          ${escapeHtml(label)}
+        </button>
+      `).join('');
+    }
+
+    // Add "None" option
+    container.innerHTML += `<button class="m-btn m-btn-secondary" onclick="setTier(null)" style="margin-top:4px">❌ ยกเลิกส่วนลดราคา</button>`;
+
+    document.getElementById('mTierSheet').style.display = 'block';
+    document.getElementById('mTierOverlay').style.display = 'block';
+  }
+
+  function setTier(level) {
+    mTierLevel = level;
+    document.getElementById('mTierLabel').textContent = level ? `🏷️ ระดับ ${level}` : '(ราคาปกติ)';
+    closeTierSheet();
+    // Update catalog prices if item selected
+    if (mSelectedCatalogItem) {
+      const newPrice = getItemPrice({
+        unit_price: mSelectedCatalogItem.unit_price,
+        tier_prices: mSelectedCatalogItem.tier_prices
+      });
+      mSelectedCatalogItem.unit_price = newPrice;
+      document.getElementById('mItemUnitPrice').textContent = newPrice.toFixed(2);
+      updateItemPreview();
+      const badge = document.getElementById('mItemTierBadge');
+      if (level) {
+        badge.textContent = `🏷️ ระดับ ${level}`;
+        badge.style.display = 'inline';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+    showToast('เปลี่ยนระดับราคาแล้ว', 'success');
+  }
+
+  function closeTierSheet() {
+    document.getElementById('mTierSheet').style.display = 'none';
+    document.getElementById('mTierOverlay').style.display = 'none';
+  }
+
+  // --- Review ---
+  function renderReview() {
+    const container = document.getElementById('mReviewContent');
+    let total = 0;
+    let itemsHtml = '';
+    mCart.forEach(item => {
+      total += item.total || 0;
+      const net = Math.max(0, (item.quantity || 0) - (item.weight_deduction || 0));
+      itemsHtml += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:14px">
+        <span>${escapeHtml(item.item_name)}</span>
+        <span style="font-weight:600">${formatCurrency(item.total||0)}</span>
+      </div>`;
+    });
+
+    container.innerHTML = `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px">
+          <span style="color:#6b7280">สาขา</span>
+          <span id="mReviewBranch">${document.getElementById('mBranchSelect').selectedOptions[0]?.text || '-'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:14px">
+          <span style="color:#6b7280">ผู้ขาย</span>
+          <span>${mSeller ? escapeHtml(mSeller.full_name) : '-'}</span>
+        </div>
+        ${mTierLevel ? `<div style="display:flex;justify-content:space-between;font-size:14px;margin-top:4px">
+          <span style="color:#6b7280">ระดับราคา</span>
+          <span>🏷️ ระดับ ${mTierLevel}</span>
+        </div>` : ''}
+      </div>
+      <div style="border-top:1px solid #e5e7eb;padding-top:8px;margin-bottom:4px;font-size:13px;color:#6b7280;font-weight:600">รายการสินค้า (${mCart.length} รายการ)</div>
+      ${itemsHtml}
+      <div style="display:flex;justify-content:space-between;padding:10px 0 0;margin-top:8px;border-top:2px solid #059669;font-size:18px;font-weight:800;color:#059669">
+        <span>ยอดรวมทั้งบิล</span>
+        <span>${formatCurrency(total)}</span>
+      </div>
+    `;
+  }
+
+  // --- Save PO ---
+  async function savePO() {
+    const btn = document.getElementById('mSaveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="m-spinner"></span> กำลังบันทึก...';
+
+    const items = mCart.map(item => ({
+      catalog_id: item.catalog_id,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      weight_deduction: item.weight_deduction || 0,
+      unit_price: item.unit_price,
+      total: item.total
+    }));
+
+    const tierData = mTierLevel ? { tier_level: mTierLevel } : {};
+    const paymentMethod = document.getElementById('mPaymentMethod').value;
+    const notes = document.getElementById('mNotes').value.trim();
+
+    const res = await apiRequest('purchase-orders', 'POST', {
+      branch_id: mBranchId,
+      seller_id: mSeller.id,
+      items,
+      payment_method: paymentMethod,
+      notes: notes || undefined,
+      ...tierData
+    });
+
+    if (res.status === 'success') {
+      showToast('✅ บันทึกใบรับซื้อสำเร็จ!', 'success');
+      // Reset form
+      mCart = [];
+      mSeller = null;
+      mSelectedCatalogItem = null;
+      mTierLevel = null;
+      document.getElementById('mSellerSearch').value = '';
+      document.getElementById('mSellerSelected').style.display = 'none';
+      document.getElementById('mNotes').value = '';
+      renderCart();
+      goStep(1);
+    } else {
+      showToast(res.message || 'บันทึกไม่สำเร็จ', 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '💾 บันทึกใบรับซื้อ';
+  }
+
+  // --- Toast ---
+  function showToast(msg, type = 'info') {
+    const el = document.getElementById('mToast');
+    el.textContent = msg;
+    el.className = 'm-toast ' + type + ' show';
+    clearTimeout(el._hide);
+    el._hide = setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  // --- Helpers ---
+  function hideResults(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('show');
+  }
+
+  function logout() {
+    fetch(`${window.apiPath}/auth/logout`, { method: 'POST' }).catch(() => {});
+    localStorage.removeItem('posUser');
+    window.location.href = '../index.html';
+  }
+  </script>
+</body>
+</html>

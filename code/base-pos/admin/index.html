@@ -50,6 +50,9 @@
             <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
           </div>
         </div>
+        <a href="../mobile/purchase.html" class="btn btn-sm btn-secondary" style="text-decoration:none;font-size:12px;margin-left:8px" target="_blank">
+          📱 มือถือ
+        </a>
       </div>
 
       <div class="page-header">
@@ -163,17 +166,17 @@
             </div>
             <div class="card-body">
               <div class="table-container">
-                <table class="data-table" id="recentPOTable">
-                  <thead>
-                    <tr>
-                      <th>เลขที่ใบรับซื้อ</th>
-                      <th>วันที่</th>
-                      <th>ผู้ขาย</th>
-                      <th>สาขา</th>
-                      <th class="text-right">จำนวนเงิน</th>
-                      <th>สถานะ</th>
-                    </tr>
-                  </thead>
+                  <table class="data-table" id="recentPOTable">
+                    <thead>
+                      <tr>
+                        <th>เลขที่ใบรับซื้อ</th>
+                        <th>วันที่</th>
+                        <th>ผู้ขาย</th>
+                        <th class="priority-3">สาขา</th>
+                        <th class="text-right">จำนวนเงิน</th>
+                        <th class="priority-2">สถานะ</th>
+                      </tr>
+                    </thead>
                   <tbody>
                     <!-- Purchase data will be populated here -->
                   </tbody>
@@ -215,18 +218,18 @@
             </div>
             <div class="card-body">
               <div class="table-container">
-                <table class="data-table" id="recentSaleLotsTable">
-                  <thead>
-                    <tr>
-                      <th>เลขที่</th>
-                      <th>วันที่</th>
-                      <th>ผู้ซื้อ</th>
-                      <th>สาขา</th>
-                      <th class="text-right">ยอดขาย</th>
-                      <th class="text-right">กำไร</th>
-                      <th>สถานะ</th>
-                    </tr>
-                  </thead>
+                  <table class="data-table" id="recentSaleLotsTable">
+                    <thead>
+                      <tr>
+                        <th>เลขที่</th>
+                        <th>วันที่</th>
+                        <th>ผู้ซื้อ</th>
+                        <th class="priority-3">สาขา</th>
+                        <th class="text-right">ยอดขาย</th>
+                        <th class="text-right priority-2">กำไร</th>
+                        <th class="priority-2">สถานะ</th>
+                      </tr>
+                    </thead>
                   <tbody>
                     <!-- Sale lot data will be populated here -->
                   </tbody>
@@ -264,17 +267,17 @@
             </div>
             <div class="card-body">
               <div class="table-container">
-                <table class="data-table" id="lowStockTable">
-                  <thead>
-                    <tr>
-                      <th>รหัสสินค้า</th>
-                      <th>สินค้า</th>
-                      <th>หมวดหมู่</th>
-                      <th>สต็อกปัจจุบัน</th>
-                      <th>เกณฑ์ขั้นต่ำ</th>
-                      <th>ดำเนินการ</th>
-                    </tr>
-                  </thead>
+                  <table class="data-table" id="lowStockTable">
+                    <thead>
+                      <tr>
+                        <th class="priority-3">รหัสสินค้า</th>
+                        <th>สินค้า</th>
+                        <th>หมวดหมู่</th>
+                        <th>สต็อกปัจจุบัน</th>
+                        <th>เกณฑ์ขั้นต่ำ</th>
+                        <th class="priority-3">ดำเนินการ</th>
+                      </tr>
+                    </thead>
                   <tbody>
                     <!-- Low stock data will be populated here -->
                   </tbody>

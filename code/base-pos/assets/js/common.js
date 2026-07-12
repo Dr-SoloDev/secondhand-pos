@@ -515,14 +515,14 @@ async function saveProfileChanges() {
     hamburger.addEventListener('click', toggleSidebar);
     overlay.addEventListener('click', toggleSidebar);
     
-    // Show hamburger on mobile
-    if (window.innerWidth <= 768) {
+    // Show hamburger on mobile & tablet
+    if (window.innerWidth <= 1024) {
       hamburger.style.display = 'flex';
     }
     
     // Handle window resize
     window.addEventListener('resize', () => {
-      if (window.innerWidth <= 768) {
+      if (window.innerWidth <= 1024) {
         hamburger.style.display = 'flex';
       } else {
         hamburger.style.display = 'none';
