@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ประวัติผู้ขาย - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css">
+  <link rel="stylesheet" href="../assets/css/components/photo-picker.css">
   <style>
     .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
     .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
@@ -97,6 +98,10 @@
 
         <div id="mainContent" style="display:none">
           <div id="sellerBanner" class="seller-banner">
+            <div id="sellerIdPhotoContainer" style="width:80px;height:56px;border:1.5px dashed #d1d5db;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;background:#f9fafb;cursor:pointer" onclick="expandPhoto(this.querySelector('img'))" title="คลิกดูรูปใหญ่">
+              <img id="sellerIdPhoto" style="display:none;max-width:100%;max-height:100%;object-fit:contain">
+              <span id="sellerNoIdPhoto" style="color:#ccc;font-size:10px">📸 ไม่มีรูป</span>
+            </div>
             <div>
               <div class="name" id="sellerName"></div>
               <div class="meta" id="sellerMeta"></div>
@@ -169,6 +174,17 @@
       return s.slice(0,1) + '-XXXX-XXXXX-' + s.slice(-2) + '-X';
     }
 
+    function expandPhoto(imgEl) {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:99999;cursor:pointer';
+      overlay.onclick = () => overlay.remove();
+      const img = document.createElement('img');
+      img.src = imgEl ? imgEl.src : '';
+      img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:8px;object-fit:contain';
+      overlay.appendChild(img);
+      document.body.appendChild(overlay);
+    }
+
     function renderPoRow(po) {
       const isCancelled = po.status === 'cancelled';
       const statusBadge = isCancelled ? '<span class="badge-cancelled">ยกเลิก</span>' : '';
@@ -176,8 +192,11 @@
         const qty = parseFloat(it.quantity||0);
         const ded = parseFloat(it.weight_deduction||0);
         const net = Math.max(0, qty - ded);
+        const itemPhotosHtml = (it.photos && it.photos.length)
+          ? `<div style="display:flex;gap:2px;margin-top:3px">${it.photos.map(p => `<img src="${esc(p.photo_path)}" style="width:36px;height:36px;object-fit:cover;border-radius:3px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="รูปสินค้า">`).join('')}</div>`
+          : (it.photo_path ? `<div style="margin-top:3px"><img src="${esc(it.photo_path)}" style="width:36px;height:36px;object-fit:cover;border-radius:3px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="รูปสินค้า"></div>` : '');
         return `<tr>
-          <td>${esc(it.item_name)}${it.category_name ? ` <span style="color:#94a3b8;font-size:11px">(${esc(it.category_name)})</span>` : ''}</td>
+          <td>${esc(it.item_name)}${it.category_name ? ` <span style="color:#94a3b8;font-size:11px">(${esc(it.category_name)})</span>` : ''}${itemPhotosHtml}</td>
           <td style="text-align:center">${net.toFixed(2)} ${esc(it.unit||'')}</td>
           <td style="text-align:right">${fmtNum(it.unit_price,2)}</td>
           <td style="text-align:right;font-weight:600">${fmtNum(it.total_price,2)}</td>
@@ -210,6 +229,10 @@
               <tbody>${itemRows}</tbody>
             </table>` : '<div style="color:#94a3b8;padding:4px 0">ไม่มีรายการ</div>'}
             ${po.notes ? `<div style="margin-top:6px;font-size:11px;color:#64748b">หมายเหตุ: ${esc(po.notes)}</div>` : ''}
+            ${(() => {
+              const poPhotos = (po.photos||[]).filter(p => !p.item_id);
+              return poPhotos.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid #e2e8f0"><span style="font-size:10px;color:#94a3b8;width:100%">📸 รูปรวมบิล</span>${poPhotos.map(p => `<img src="${esc(p.photo_path)}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="คลิกดูรูปใหญ่">`).join('')}</div>` : '';
+            })()}
             ${po.processed_by ? `<div style="margin-top:4px;font-size:11px;color:#94a3b8">แคชเชียร์: ${esc(po.processed_by)}</div>` : ''}
           </div>
         </div>`;
@@ -248,6 +271,18 @@
         seller.phone || null,
       ].filter(Boolean);
       document.getElementById('sellerMeta').textContent = metaParts.join(' · ');
+
+      // Seller ID card photo
+      const idPhotoImg = document.getElementById('sellerIdPhoto');
+      const noIdPhoto = document.getElementById('sellerNoIdPhoto');
+      if (seller.id_card_photo) {
+        idPhotoImg.src = seller.id_card_photo;
+        idPhotoImg.style.display = 'block';
+        noIdPhoto.style.display = 'none';
+      } else {
+        idPhotoImg.style.display = 'none';
+        noIdPhoto.style.display = 'block';
+      }
 
       if (seller.is_blacklisted) {
         const bb = document.getElementById('blacklistBanner');
