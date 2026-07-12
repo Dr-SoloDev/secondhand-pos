@@ -3,6 +3,8 @@ class SettingsController extends Controller
 {
     public function getStoreSettings()
     {
+        $this->requireAuth();
+
         $settingModel = new Setting();
         $settings = $settingModel->getSettingsByKeys([
             'store_name',
@@ -57,6 +59,8 @@ class SettingsController extends Controller
 
     public function getSystemSettings()
     {
+        $this->requireAuth();
+
         $settingModel = new Setting();
         $settings = $settingModel->getSettingsByKeys([
             'low_stock_threshold',
