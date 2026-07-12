@@ -519,7 +519,8 @@ class SaleLot extends Model
                AND poi.category_id = ?
                AND po.status = 'completed'
                AND (poi.quantity - poi.consumed_qty) > 0
-             ORDER BY po.created_at ASC",
+             ORDER BY po.created_at ASC
+             FOR UPDATE",
             [$branch_id, $category_id]
         );
 

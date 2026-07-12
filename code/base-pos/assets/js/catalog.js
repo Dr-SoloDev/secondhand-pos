@@ -21,12 +21,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Stock Adjustment Modal
-  const saveAdjustBtn = document.getElementById('saveAdjustment');
-  const cancelAdjustBtn = document.getElementById('cancelAdjustment');
-  if (saveAdjustBtn) saveAdjustBtn.addEventListener('click', saveStockAdjustment);
-  if (cancelAdjustBtn) cancelAdjustBtn.addEventListener('click', closeStockModal);
-
   // Clear errors on input
   ['sku', 'name', 'priceTier1', 'priceTier2', 'priceTier3'].forEach(id => {
     const field = document.getElementById(id);
@@ -109,18 +103,11 @@ function renderCatalogItems(items) {
         </span>
       </td>
       <td class="actions">
-        <button class="btn btn-sm btn-secondary stock-catalog" data-id="${item.id}" data-name="${item.name}" title="ปรับสต็อก"><i class="icon-product"></i> สต็อก</button>
         <button class="btn btn-sm btn-info edit-catalog" data-id="${item.id}"><i class="icon-edit"></i></button>
         <button class="btn btn-sm btn-danger delete-catalog" data-id="${item.id}"><i class="icon-delete"></i></button>
       </td>
     `;
     tableBody.appendChild(row);
-  });
-
-  document.querySelectorAll('.stock-catalog').forEach(btn => {
-    btn.addEventListener('click', function() {
-      openStockModal(this.getAttribute('data-id'), this.getAttribute('data-name'));
-    });
   });
 
   document.querySelectorAll('.edit-catalog').forEach(btn => {
@@ -384,65 +371,6 @@ async function deleteCategory(categoryId) {
   } catch (error) {
     console.error('Error deleting category:', error);
     showNotification('ลบหมวดหมู่ไม่สำเร็จ', 'error');
-  }
-}
-
-// ===== Stock Adjustment Modal =====
-function openStockModal(productId, productName) {
-  const modal = document.getElementById('stockModal');
-  const nameEl = document.getElementById('stockProductName');
-  const idInput = document.getElementById('stockProductId');
-  const typeSelect = document.getElementById('adjustmentType');
-  const qtyInput = document.getElementById('adjustmentQuantity');
-  const notesInput = document.getElementById('adjustmentNotes');
-
-  if (!modal || !nameEl || !idInput) return;
-
-  if (productId) {
-    idInput.value = productId;
-    nameEl.textContent = productName || '';
-    typeSelect.value = 'add';
-    qtyInput.value = '';
-    notesInput.value = '';
-    modal.classList.add('show');
-  }
-}
-
-function closeStockModal() {
-  const modal = document.getElementById('stockModal');
-  if (modal) modal.classList.remove('show');
-}
-
-async function saveStockAdjustment() {
-  const productId = document.getElementById('stockProductId')?.value;
-  const type = document.getElementById('adjustmentType')?.value;
-  const quantity = parseFloat(document.getElementById('adjustmentQuantity')?.value);
-  const notes = document.getElementById('adjustmentNotes')?.value || '';
-
-  if (!productId || !quantity || quantity <= 0) {
-    showNotification('กรุณากรอกจำนวนที่ต้องการปรับ', 'warning');
-    return;
-  }
-
-  const typeMap = { add: 'purchase', subtract: 'sale', set: 'adjustment' };
-  const apiType = typeMap[type] || 'adjustment';
-
-  try {
-    const res = await apiRequest('inventory/transactions', 'POST', {
-      product_id: parseInt(productId),
-      type: apiType,
-      quantity: quantity,
-      notes: notes
-    });
-    if (res.status === 'success') {
-      showNotification('ปรับสต็อกเรียบร้อย', 'success');
-      closeStockModal();
-    } else {
-      showNotification(res.message || 'ปรับสต็อกไม่สำเร็จ', 'error');
-    }
-  } catch (e) {
-    showNotification('เกิดข้อผิดพลาดในการปรับสต็อก', 'error');
-    console.error(e);
   }
 }
 

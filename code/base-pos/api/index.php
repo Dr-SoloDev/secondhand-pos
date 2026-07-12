@@ -3,8 +3,12 @@ define('APP_ACCESS', true);
 require_once 'config.php';
 require_once 'autoload.php';
 
-// Set content type header
+// Security headers
 header('Content-Type: application/json; charset=utf-8');
+header('X-Frame-Options: DENY');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: same-origin');
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'");
 
 // Validate request content length
 if (($_SERVER['CONTENT_LENGTH'] ?? 0) > 10 * 1024 * 1024) {

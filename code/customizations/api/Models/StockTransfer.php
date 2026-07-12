@@ -89,29 +89,28 @@ class StockTransfer extends Model
         $orderedWeight = (float)$st['weight_kg'];
         $weightNeeded  = $receivedWeight !== null ? (float)$receivedWeight : $orderedWeight;
 
-        // ── 1. เช็คสต็อกจริงจาก PO items ต้นทาง (ไม่ใช่ global stock_kg) ──
-        $availableRows = $this->db->fetchAll(
-            "SELECT poi.id, (poi.quantity - poi.consumed_qty) AS avail, poi.unit_price
-             FROM purchase_order_items poi
-             JOIN purchase_orders po ON poi.purchase_order_id = po.id
-             WHERE po.branch_id = ? AND poi.category_id = ?
-               AND po.status = 'completed'
-               AND (poi.quantity - poi.consumed_qty) > 0
-             ORDER BY po.created_at ASC
-             FOR UPDATE",
-            [$fromBranch, $categoryId]
-        );
-
-        $totalAvail = array_sum(array_column($availableRows, 'avail'));
-        if ($totalAvail < $weightNeeded) {
-            throw new Exception(
-                "สต็อกต้นทางไม่เพียงพอ (มี " . number_format($totalAvail, 2) .
-                " กก. ต้องการ " . number_format($weightNeeded, 2) . " กก.)"
-            );
-        }
-
         $this->db->beginTransaction();
         try {
+            // ── 1. เช็คสต็อกจริงจาก PO items ต้นทาง (ไม่ใช่ global stock_kg) ──
+            $availableRows = $this->db->fetchAll(
+                "SELECT poi.id, (poi.quantity - poi.consumed_qty) AS avail, poi.unit_price
+                 FROM purchase_order_items poi
+                 JOIN purchase_orders po ON poi.purchase_order_id = po.id
+                 WHERE po.branch_id = ? AND poi.category_id = ?
+                   AND po.status = 'completed'
+                   AND (poi.quantity - poi.consumed_qty) > 0
+                 ORDER BY po.created_at ASC
+                 FOR UPDATE",
+                [$fromBranch, $categoryId]
+            );
+
+            $totalAvail = array_sum(array_column($availableRows, 'avail'));
+            if ($totalAvail < $weightNeeded) {
+                throw new Exception(
+                    "สต็อกต้นทางไม่เพียงพอ (มี " . number_format($totalAvail, 2) .
+                    " กก. ต้องการ " . number_format($weightNeeded, 2) . " กก.)"
+                );
+            }
             // ── 2. หัก consumed_qty จาก PO items ต้นทาง (FIFO) ──
             //        พร้อมคำนวณ weighted avg cost ของที่โอน
             $remaining   = $weightNeeded;
@@ -123,7 +122,7 @@ class StockTransfer extends Model
                 $stmt = $this->db->prepare(
                     "UPDATE purchase_order_items
                      SET consumed_qty = consumed_qty + ?
-                     WHERE id = ? AND (quantity - consumed_qty) >= ?"
+                     WHERE id = ? AND consumed_qty + ? <= quantity"
                 );
                 $this->db->execute($stmt, [$take, $row['id'], $take]);
 

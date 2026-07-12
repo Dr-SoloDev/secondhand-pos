@@ -25,7 +25,7 @@ define('JWT_SECRET', getenv('JWT_SECRET') ?: (function() {
     echo json_encode(['status' => 'error', 'message' => 'Server configuration error']);
     exit;
 })());
-define('JWT_EXPIRY', 86400); // 24 hours
+define('JWT_EXPIRY', 28800); // 8 hours (reduced from 24h for security)
 define('API_URL', '/api');
 
 // Backup settings - outside web root for security

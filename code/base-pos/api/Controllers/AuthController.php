@@ -3,7 +3,7 @@ class AuthController extends Controller
 {
     private function checkRateLimit()
     {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $ip = ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown';
         $db = Database::getInstance();
         $row = $db->fetch("SELECT attempts, window_start FROM login_attempts WHERE ip = ?", [$ip]);
 
@@ -19,7 +19,7 @@ class AuthController extends Controller
 
     private function recordFailedAttempt()
     {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $ip = ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown';
         $db = Database::getInstance();
         $db->query(
             "INSERT INTO login_attempts (ip, attempts, window_start) VALUES (?, 1, NOW())
@@ -32,7 +32,7 @@ class AuthController extends Controller
 
     private function clearRateLimit()
     {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $ip = ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown';
         Database::getInstance()->query("DELETE FROM login_attempts WHERE ip = ?", [$ip]);
     }
 
@@ -56,14 +56,14 @@ class AuthController extends Controller
 
         if (!$user || !password_verify($password, $user['password'])) {
             $this->recordFailedAttempt();
-            error_log("Failed login attempt for username: {$username} from IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+            error_log("Failed login attempt for username: {$username} from IP: " . (($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown'));
             Response::error('Invalid username or password', 401);
             exit;
         }
 
         if ($user['status'] !== 'active') {
             $this->recordFailedAttempt();
-            error_log("Inactive account login attempt for username: {$username} from IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+            error_log("Inactive account login attempt for username: {$username} from IP: " . (($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown'));
             Response::error('Account is inactive', 403);
             exit;
         }

@@ -120,13 +120,13 @@ class PurchaseOrder extends Model
         try {
             // STOCK FIX: Restore stock when PO is cancelled
             $items = $this->db->fetchAll(
-                "SELECT category_id, (quantity - weight_deduction) as net_qty
+                "SELECT category_id, (quantity - weight_deduction - consumed_qty) as net_unconsumed
                  FROM purchase_order_items
                  WHERE purchase_order_id = ? AND category_id IS NOT NULL",
                 [$id]
             );
             foreach ($items as $item) {
-                $netQty = max(0, (float)$item['net_qty']);
+                $netQty = max(0, (float)$item['net_unconsumed']);
                 if ($netQty > 0) {
                     $this->db->query(
                         "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",

@@ -38,9 +38,9 @@ async function fetchDashboardData(branchId = null) {
   const [statsRes, branchRes, purchaseRes, salelotRes, stockRes] = await Promise.all([
     apiRequest(`reports/dashboard-stats${statParam}`),
     apiRequest('branches/summary'),
-    apiRequest('reports/recent-purchases'),
-    apiRequest('reports/recent-sale-lots'),
-    apiRequest('inventory/low-stock'),
+    apiRequest(`reports/recent-purchases${branchId ? '?branch_id=' + branchId : ''}`),
+    apiRequest(`reports/recent-sale-lots${branchId ? '?branch_id=' + branchId : ''}`),
+    apiRequest(`inventory/low-stock${branchId ? '?branch_id=' + branchId : ''}`),
   ]);
 
   // Remove loading skeletons

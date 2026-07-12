@@ -14,7 +14,7 @@ class Logger
             'user_id' => $userId,
             'action' => $action,
             'description' => $description,
-            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
+            'ip_address' => $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'Unknown',
             'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
         ];
 

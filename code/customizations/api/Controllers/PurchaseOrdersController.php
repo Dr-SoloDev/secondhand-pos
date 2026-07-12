@@ -76,6 +76,7 @@ class PurchaseOrdersController extends Controller
 
     public function createPurchaseOrder()
     {
+        $this->requireAuth(['admin', 'manager']);
         $data = $this->getRequestData();
 
         // Idempotency check — ป้องกัน PO ซ้ำ

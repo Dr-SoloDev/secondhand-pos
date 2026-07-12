@@ -52,8 +52,11 @@ async function loadSummary() {
   ]);
 
   if (summaryRes.status === 'success') renderCards(summaryRes.data);
+  else if (summaryRes.message) showNotification('โหลดข้อมูลสรุปไม่สำเร็จ', 'error');
   if (lotsRes.status === 'success')    renderLotTable(lotsRes.data?.items || []);
+  else if (lotsRes.message) showNotification('โหลดข้อมูลรายได้ Lot ไม่สำเร็จ', 'error');
   if (categoryRes.status === 'success') renderCategoryTable(categoryRes.data?.items || []);
+  else if (categoryRes.message) showNotification('โหลดข้อมูลประเภทสินค้าไม่สำเร็จ', 'error');
 }
 
 function renderCards(data) {
