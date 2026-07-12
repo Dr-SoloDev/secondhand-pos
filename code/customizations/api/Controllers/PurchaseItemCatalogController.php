@@ -6,6 +6,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function getCatalog()
     {
+        $this->requireAuth();
         $model = new PurchaseItemCatalog();
         $includeInactive = isset($_GET['include_inactive']) && $_GET['include_inactive'] === 'true';
         Response::success('ดึงรายการสินค้าสำเร็จ', $model->getAll($includeInactive));
@@ -16,6 +17,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function searchCatalog()
     {
+        $this->requireAuth();
         $q = trim($_GET['q'] ?? '');
         if ($q === '') {
             Response::success('ok', []);
@@ -30,6 +32,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function getItem()
     {
+        $this->requireAuth();
         $id = $_GET['id'] ?? null;
         if (!$id) {
             Response::error('กรุณาระบุ ID', 400);
@@ -135,6 +138,7 @@ class PurchaseItemCatalogController extends Controller
     // GET /api/purchase-catalog/price-board — ดึงราคาทุกรายการแยกตามหมวด สำหรับพิมพ์บอร์ด
     public function getPriceBoard()
     {
+        $this->requireAuth();
         $db = Database::getInstance();
         $rows = $db->fetchAll(
             "SELECT pic.id, pic.code, pic.name, pic.tier_prices, pic.default_unit,

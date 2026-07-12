@@ -11,11 +11,15 @@ async function init() {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
   }
 
-  const res = await apiRequest('branches', 'GET');
-  if (res.status === 'success') {
-    branches = res.data?.items || res.data || [];
-    const sel = document.getElementById('branchFilter');
-    branches.forEach(b => sel.appendChild(new Option(b.name, b.id)));
+  try {
+    const res = await apiRequest('branches', 'GET');
+    if (res.status === 'success') {
+      branches = res.data?.items || res.data || [];
+      const sel = document.getElementById('branchFilter');
+      branches.forEach(b => sel.appendChild(new Option(b.name, b.id)));
+    }
+  } catch (e) {
+    showNotification('โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'error');
   }
 
   const now = new Date();
@@ -45,18 +49,22 @@ async function loadSummary() {
   showTableLoading('lotRevenueBody', 7, 5);
   showTableLoading('categoryBody', 4, 5);
 
-  const [summaryRes, lotsRes, categoryRes] = await Promise.all([
-    apiRequest(`financial/summary?${params}`, 'GET'),
-    apiRequest(`financial/lot-revenues?${params}`, 'GET'),
-    apiRequest(`financial/purchase-by-category?${params}`, 'GET'),
-  ]);
+  try {
+    const [summaryRes, lotsRes, categoryRes] = await Promise.all([
+      apiRequest(`financial/summary?${params}`, 'GET'),
+      apiRequest(`financial/lot-revenues?${params}`, 'GET'),
+      apiRequest(`financial/purchase-by-category?${params}`, 'GET'),
+    ]);
 
-  if (summaryRes.status === 'success') renderCards(summaryRes.data);
-  else if (summaryRes.message) showNotification('โหลดข้อมูลสรุปไม่สำเร็จ', 'error');
-  if (lotsRes.status === 'success')    renderLotTable(lotsRes.data?.items || []);
-  else if (lotsRes.message) showNotification('โหลดข้อมูลรายได้ Lot ไม่สำเร็จ', 'error');
-  if (categoryRes.status === 'success') renderCategoryTable(categoryRes.data?.items || []);
-  else if (categoryRes.message) showNotification('โหลดข้อมูลประเภทสินค้าไม่สำเร็จ', 'error');
+    if (summaryRes.status === 'success') renderCards(summaryRes.data);
+    else if (summaryRes.message) showNotification('โหลดข้อมูลสรุปไม่สำเร็จ', 'error');
+    if (lotsRes.status === 'success')    renderLotTable(lotsRes.data?.items || []);
+    else if (lotsRes.message) showNotification('โหลดข้อมูลรายได้ Lot ไม่สำเร็จ', 'error');
+    if (categoryRes.status === 'success') renderCategoryTable(categoryRes.data?.items || []);
+    else if (categoryRes.message) showNotification('โหลดข้อมูลประเภทสินค้าไม่สำเร็จ', 'error');
+  } catch (e) {
+    showNotification('โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'error');
+  }
 }
 
 function renderCards(data) {

@@ -286,7 +286,7 @@ function renderSalesChart(data) {
     data: {
       labels: labels,
       datasets: [{
-        label: 'Sales',
+        label: 'ยอดขาย',
         data: salesData,
         backgroundColor: 'rgba(37, 117, 252, 0.7)',
         borderColor: '#2575fc',
@@ -438,7 +438,7 @@ function renderProductsChart(data) {
     data: {
       labels: labels,
       datasets: [{
-        label: 'Revenue',
+        label: 'รายรับ',
         data: salesData,
         backgroundColor: 'rgba(46, 204, 113, 0.7)',
         borderColor: '#2ecc71',
@@ -738,7 +738,7 @@ function renderCashierChart(data) {
       labels: labels,
       datasets: [
         {
-          label: 'Sales Amount',
+          label: 'ยอดขาย',
           data: salesData,
           backgroundColor: 'rgba(52, 152, 219, 0.7)',
           borderColor: '#3498db',
@@ -746,7 +746,7 @@ function renderCashierChart(data) {
           yAxisID: 'y'
         },
         {
-          label: 'Order Count',
+          label: 'จำนวนออเดอร์',
           data: ordersData,
           backgroundColor: 'rgba(46, 204, 113, 0.7)',
           borderColor: '#2ecc71',
@@ -764,7 +764,7 @@ function renderCashierChart(data) {
           position: 'left',
           title: {
             display: true,
-            text: 'Sales Amount'
+            text: 'ยอดขาย'
           },
           ticks: {
             callback: function(value) {
@@ -777,7 +777,7 @@ function renderCashierChart(data) {
           position: 'right',
           title: {
             display: true,
-            text: 'Order Count'
+            text: 'จำนวนออเดอร์'
           },
           grid: {
             drawOnChartArea: false
