@@ -1,0 +1,24 @@
+graph LR
+    subgraph Input[Data Input]
+        Seller[Seller Info<br/>ID Card + Name]
+        Item[Item Details<br/>Catalog + Weight]
+        Price[Tier Price<br/>บิล1/2/3]
+    end
+    subgraph Process[Business Process]
+        PO[Purchase Order<br/>รับซื้อ]
+        SL[Sale Lot<br/>ขาย Lot]
+        ST[Stock Transfer<br/>โอนสต็อก]
+        Exp[Expenses<br/>ค่าใช้จ่าย]
+    end
+    subgraph Output[Outputs]
+        Receipt[ใบรับซื้อ<br/>2 แบบ]
+        CSV[CSV Export<br/>4 รายงาน]
+        Dash[Dashboard<br/>4 สาขา]
+        PriceBoard[Price Board<br/>พิมพ์ได้]
+    end
+    Seller --> PO
+    Item --> PO
+    Price --> PO
+    PO --> Receipt & SL & ST
+    PO & SL & ST & Exp --> CSV
+    PO & SL & ST & Exp --> Dash

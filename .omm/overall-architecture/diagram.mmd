@@ -1,0 +1,36 @@
+graph TB
+    subgraph Frontend[Frontend - Vanilla JS ES6]
+        Admin[Admin UI<br/>admin/]
+        Mobile[Mobile PO Wizard<br/>mobile/purchase.html]
+        Print[Print Templates<br/>print-receipt.html]
+    end
+    subgraph API[API Layer - PHP 8.2]
+        Router[Router.php<br/>Switch Controller]
+        Auth[Auth Controller<br/>JWT + Rate Limit]
+    end
+    subgraph Custom[Customizations Overlay]
+        PO[Purchase Orders]
+        SL[Sale Lots<br/>FIFO Engine]
+        ST[Stock Transfers]
+        Cat[Item Catalog]
+        Seller[Sellers<br/>+ Blacklist]
+        Report[Reports<br/>+ CSV Export]
+        Dash[Dashboard]
+        Expense[Business Expenses]
+        Employee[Employees]
+    end
+    subgraph Core[Base POS Core]
+        CoreAPI[Core API]
+        CoreModels[Core Models]
+    end
+    subgraph DB[MySQL 8.0]
+        Tables[(48 Migrations<br/>21+ Tables)]
+    end
+    Admin --> Router
+    Mobile --> Router
+    Print --> Router
+    Router --> Auth
+    Router --> PO & SL & ST & Cat & Seller & Report & Dash & Expense & Employee
+    Router --> CoreAPI
+    PO & SL & ST & Cat & Seller --> Tables
+    CoreAPI --> CoreModels --> Tables

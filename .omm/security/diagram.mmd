@@ -1,0 +1,25 @@
+graph TB
+    subgraph Client[Client]
+        Browser[Browser]
+        MobileApp[Mobile]
+    end
+    subgraph Auth[Authentication Layer]
+        Login[/auth/login]
+        JWT[JWT Token<br/>8h expiry]
+        RateLimit[Rate Limiter<br/>DB-based/IP]
+        Blocklist[Token Blocklist<br/>for logout]
+    end
+    subgraph Security[Security Controls]
+        Headers[CSP + XFO + XCTO]
+        Input[Input Validation<br/>all endpoints]
+        SQL[SQL Injection<br/>PDO Prepared Statements]
+        Race[Race Condition<br/>FOR UPDATE]
+    end
+    subgraph Data[Data Protection]
+        Env[.env Secrets<br/>JWT + DB creds]
+        Perm[File Permissions<br/>0750 on backups]
+    end
+    Browser --> Login
+    MobileApp --> Login
+    Login --> JWT & RateLimit
+    JWT --> Headers & Input & SQL & Race & Env & Perm & Blocklist

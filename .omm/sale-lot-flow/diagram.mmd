@@ -1,0 +1,18 @@
+flowchart LR
+    subgraph Create[Create Draft]
+        New[สร้าง Sale Lot] --> SelectItems[เลือก PO Items<br/>FIFO order]
+        SelectItems --> AddExpenses[เพิ่มค่าใช้จ่าย<br/>ขนส่ง/อื่นๆ]
+        AddExpenses --> Draft[Draft - ยังไม่ตัด stock]
+    end
+    subgraph Confirm[Confirm Sale]
+        Draft --> Confirm[ยืนยันขาย]
+        Confirm --> DeductStock[ตัด stock_kg]
+        Confirm --> CalcProfit[คำนวณกำไร/ขาดทุน]
+        CalcProfit --> Status[Status: confirmed]
+    end
+    subgraph Cancel[Cancel]
+        Status --> CancelLot[ยกเลิก Lot]
+        CancelLot --> RestoreStock[คืน stock_kg]
+        CancelLot --> ReverseProfit[กลับกำไร]
+        ReverseProfit --> Cancelled[Status: cancelled]
+    end

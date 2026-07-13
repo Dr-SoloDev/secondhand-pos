@@ -1,0 +1,22 @@
+flowchart TD
+    Start([เริ่ม]) --> SelectBranch[เลือกสาขา]
+    SelectBranch --> SearchSeller{ค้นหาผู้ขาย}
+    SearchSeller -->|พบ| AutoFill[ดึงข้อมูลอัตโนมัติ]
+    SearchSeller -->|ไม่พบ| NewSeller[กรอกผู้ขายใหม่]
+    AutoFill --> CheckBlacklist{Blacklist?}
+    CheckBlacklist -->|ใช่| Alert[แสดง Alert สีแดง]
+    Alert --> Decide{เจ้าของตัดสินใจ}
+    Decide -->|ดำเนินการต่อ| AddItem
+    Decide -->|ยกเลิก| End([จบ])
+    CheckBlacklist -->|ไม่| AddItem[เพิ่มสินค้า]
+    NewSeller --> AddItem
+    AddItem --> SearchCatalog[ค้นหา Catalog]
+    SearchCatalog --> SelectTier[เลือก Tier ราคา]
+    SelectTier --> AddMore{มีสินค้าเพิ่ม?}
+    AddMore -->|ใช่| AddItem
+    AddMore -->|ไม่| Review[ตรวจสอบออเดอร์]
+    Review --> SavePO[บันทึก PO]
+    SavePO --> PrintReceipt[พิมพ์ใบรับซื้อ]
+    SavePO --> UpdateStock[อัปเดต stock_kg]
+    UpdateStock --> End
+    PrintReceipt --> End
