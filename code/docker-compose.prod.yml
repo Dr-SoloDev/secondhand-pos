@@ -1,7 +1,7 @@
 services:
   web:
     volumes:
-      - /var/data/secondhand-pos/uploads:/var/www/html/uploads:rw
+      - /mnt/data/secondhand-pos/uploads:/var/www/html/uploads:rw
 
 volumes:
   # ไม่ต้องใช้ named volume — ใช้ host path bind mount แทน
