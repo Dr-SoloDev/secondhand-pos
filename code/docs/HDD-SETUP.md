@@ -18,20 +18,36 @@ sudo fdisk -l
 
 สมมติว่าเห็น `/dev/sdb`
 
-### 3. สร้าง partition (ถ้าเป็น HDD ใหม่)
+### 3. 🔴 ลบข้อมูลเก่าทิ้ง
+
+> **⚠️ สำคัญ: ตรวจสอบให้แน่ใจว่า `/dev/sdb` คือ HDD 1TB ที่ต้องการลบจริงๆ**
+> ใช้ `lsblk` ดูขนาดให้แน่ใจ — ถ้าลบผิดดิสก์ ข้อมูลหายหมด!
+
+```bash
+# เช็คอีกครั้งก่อนลบ — ดูชื่อ+ขนาดให้ชัวร์
+sudo fdisk -l /dev/sdb
+
+# ลบ partition table + data ทั้งหมด
+sudo wipefs -a /dev/sdb
+
+# หรือถ้าต้องการ fast wipe (แค่ลบ partition table)
+sudo dd if=/dev/zero of=/dev/sdb bs=1M count=10 status=progress
+```
+
+### 4. สร้าง partition ใหม่
 
 ```bash
 sudo fdisk /dev/sdb
 # พิมพ์ n → p → 1 → enter → enter → w
 ```
 
-### 4. format filesystem
+### 5. format filesystem
 
 ```bash
 sudo mkfs.ext4 /dev/sdb1
 ```
 
-### 5. mount
+### 6. mount
 
 ```bash
 # หา UUID ของ drive
@@ -48,7 +64,7 @@ sudo mount /dev/sdb1 /mnt/data
 df -h /mnt/data
 ```
 
-### 6. เพิ่มใน /etc/fstab (auto-mount เวลา reboot)
+### 7. เพิ่มใน /etc/fstab (auto-mount เวลา reboot)
 
 ```bash
 # backup ก่อน
@@ -61,7 +77,7 @@ echo 'UUID=abc123-... /mnt/data ext4 defaults 0 2' | sudo tee -a /etc/fstab
 sudo mount -a
 ```
 
-### 7. สร้างโฟลเดอร์ uploads
+### 8. สร้างโฟลเดอร์ uploads
 
 ```bash
 sudo mkdir -p /mnt/data/secondhand-pos/uploads
@@ -70,7 +86,7 @@ sudo mkdir -p /mnt/data/secondhand-pos/uploads
 sudo chown -R 33:33 /mnt/data/secondhand-pos/uploads
 ```
 
-### 8. รัน Docker ด้วย path ใหม่
+### 9. รัน Docker ด้วย path ใหม่
 
 ```bash
 cd /path/to/code
