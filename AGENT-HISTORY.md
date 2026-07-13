@@ -336,3 +336,61 @@
 **Commit:** `f1421ba` (omm docs) + `fe1502c` (doc updates)
 
 *Session context 83% — saved*
+
+---
+
+## 🎯 SESSION 14 ก.ค. 2569 — Goal Audit + Storage Decision + HDD Setup
+
+### 1. 🔍 Full Goal Audit (G1-G11)
+ตรวจสอบโค้ดจริงทุก Goal — ยืนยันว่าทุกข้อทำงาน:
+- G1: โค้ดถ่ายรูปพร้อม (PhotoUploadController 255 lines, camera/FAB/QR/mobile standalone/ID card)
+- G2: ใบรับซื้อ 2 แบบ (requires_precious_receipt auto-detect + signature enforcement)
+- G3: Blacklist alert (popup สีแดง + blacklist_reason)
+- G4: ค้นหาผู้ขาย real-time (debounce 300ms)
+- G5: Dashboard 4 สาขา (stats 6 cards + charts + branch filter)
+- G6: บอร์ดราคาพิมพ์ได้ (price-board.html)
+- G7: ประวัติผู้ขาย (Data Center modal + seller-history พร้อมรูป)
+- G8: Export CSV 7 แบบ (ไม่ใช่ 4) + UTF-8 BOM
+- G9: โอนสต็อก FIFO + atomic transaction + transfer PO
+- G10: Stock alert threshold
+- G11: Mobile/Tablet (Plan A responsive + Plan B wizard)
+
+### 2. 📝 AGENT-MEMORY.md Updated
+- G1-G11 table: ตรวจสอบโค้ดจริง + ระบุไฟล์หลัก
+- Migrations: จาก 48 pending → 50 migrations ครบ (001-050)
+- Tech Debt: แยกหมวด fixed/pending ชัดเจน
+- UX Photo Task: อัปเดทว่าอิมพลีเมนต์เสร็จแล้ว รอ QA
+
+### 3. 💾 Storage Decision
+| ทางเลือก | Owner ตัดสินใจ |
+|:---------|:--------------|
+| NAS 10,000฿ | ❌ |
+| Backblaze B2 12บ./เดือน | ❌ |
+| Hybrid | ❌ |
+| **Host Directory (HDD เดียวกับ server)** | **✅ เลือก** |
+| **HDD 1TB แยก** | **✅ มีอยู่แล้ว + จะลบข้อมูลเก่า** |
+
+### 4. 🛠️ Files Created/Updated
+| File | What |
+|:-----|:-----|
+| `docker-compose.nas.yml` | NFS volume override (ไม่ได้ใช้แล้ว — keep for reference) |
+| `docker-compose.prod.yml` | Host directory bind mount → `/mnt/data/secondhand-pos/uploads` |
+| `docs/NAS-SETUP.md` | Updated — host directory primary, NFS as alternative |
+| `docs/HDD-SETUP.md` | New — 9-step guide: wipe → partition → format → mount → fstab → Docker |
+| `AGENT-MEMORY.md` | G1 ✅✅, migrations 001-050, tech debt clean |
+
+### 5. 📦 Commits
+| Commit | Message |
+|:-------|:--------|
+| `a5579bb` | docs: save session 13 Jul — omm eval, deploy, viewer tuning |
+| `d15e9f5` | feat: NAS storage solution for G1 — docker-compose override + Thai setup guide |
+| `03d2dd5` | feat: use host directory for photo storage (no NAS needed) — docker-compose.prod.yml |
+| `e996f05` | docs: HDD setup guide for 1TB storage + update prod compose path |
+| `5b568e6` | docs: add disk wipe step before format in HDD-SETUP guide |
+
+### 6. 🔮 Next
+- Owner จะลบข้อมูล HDD เก่า → mount → setup uploads
+- Tech Debt: run migration 048-050, sidebar links, ลบ .htaccess legacy
+- นำเสนอลูกค้า
+
+*Session context 86% — saved*
