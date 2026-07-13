@@ -269,3 +269,70 @@
 **Commit:** `f3c1b8e` — 6 files changed, +1202/-48 lines
 
 *Session context 80% — saved*
+
+---
+
+## 📱 SESSION 13 ก.ค. 2569 — oh-my-mermaid Evaluation + Deploy + Viewer Tuning
+
+### 1. 🔍 oh-my-mermaid Research
+| หัวข้อ | รายละเอียด |
+|:-------|:-----------|
+| Tool | CLI + Claude Code Skill — auto-generate architecture docs as Mermaid diagrams |
+| Stars | 1.7k, 148 forks |
+| License | MIT |
+| Dependency | `yaml` (1 dep) — low risk |
+| Version | v0.2.0 (17 commits) — early stage |
+
+### 2. ⚖️ Legal Review (@legal-tulya) — CONDITIONAL CLEAR
+| รายการ | ผล |
+|:-------|:----|
+| MIT License | ✅ Commercial use OK |
+| Cloud (`omm push`) | ❌ **ห้ามใช้** — รอ Privacy Policy จาก ohmymermaid.com |
+| Local mode | ✅ Zero data leak — ใช้ได้ทันที |
+| Supply chain risk | 🟢 Minimal (1 dep) |
+
+### 3. 🔧 Engineering POC (@changful) — SUCCESS
+| Test | Result |
+|:-----|:-------|
+| Install | ✅ `bun install -g oh-my-mermaid` |
+| CLI | ✅ `list`, `status`, `read`, `write`, `show`, `view` |
+| Viewer | ✅ HTTP 200 on port 5100 |
+| `.omm/` size | 20 files, 104K |
+| Perspectives | overall-architecture, data-flow, purchase-flow, sale-lot-flow, security |
+
+### 4. 🏗️ Architecture Trial (@architect-songsak) — SUCCESS
+| Test | Result |
+|:-----|:-------|
+| Hierarchy | ✅ 2 perspectives (org-chart + routing-flow) + 1 nested (architect-team) |
+| Viewer | ✅ HTTP 200 on port 5101 |
+| `.omm/` size | 17 files, 84K |
+| Assessment | SoloCorp fit **7/10**, Client fit **9/10** |
+| Recommendation | **TRIAL** — POC with Architect Dept first |
+
+### 5. 🚀 Deploy
+| ไฟล์ | รายละเอียด |
+|:-----|:-----------|
+| Commit | `f1421ba` — 20 files, +186 lines |
+| Push | ✅ pushed to origin/main |
+| `.omm/` | 5 perspectives, viewer ready |
+
+### 6. 🎨 Viewer Customization (graphic fix)
+| ก่อน | หลัง |
+|:-----|:-----|
+| Node สีดำทึบ `#0a0a0a` | Gradient ไล่สีอ่อน→เข้ม |
+| ขอบเทา `#666` | ขอบแอมเบอร์ `#D97706` (SoloCorp brand) |
+| ไม่มีเงา | Drop shadow |
+| Hover ขาวจ้า | Hover แอมเบอร์เรืองแสง |
+| Edge สีเทา | Edge สีแอมเบอร์ |
+| Light mode พื้นเทา | พื้น warm beige `#f5f5f0` |
+
+### 7. 🌐 Network Access
+| Service | URL | Status |
+|:--------|:----|:-------|
+| Cloudflare Tunnel | `https://restored-afternoon-throughout-veterans.trycloudflare.com` | ✅ |
+| Local proxy | `http://0.0.0.0:5100` | ✅ |
+| Internal omm | `127.0.0.1:5105` | ✅ |
+
+**Commit:** `f1421ba` (omm docs) + `fe1502c` (doc updates)
+
+*Session context 83% — saved*
