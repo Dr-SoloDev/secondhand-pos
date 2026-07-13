@@ -17,7 +17,7 @@
 
 | Goal | สถานะ | รายละเอียด | ตรวจสอบโค้ดจริง |
 |:-----|:-----:|:------------|:-----------------|
-| G1 | ✅✅ | ถ่ายรูปสินค้า — `PhotoUploadController` (255 lines, resize, HMAC auth), `photo-upload.html`+`js` (mobile standalone), camera/gallery/FAB/QR handoff ใน `purchase-orders.js`, ID card photo ใน `sellers.js` | **Owner เลือก NAS แล้ว** — `docker-compose.nas.yml` + `docs/NAS-SETUP.md` พร้อม |
+| G1 | ✅✅ | ถ่ายรูปสินค้า — `PhotoUploadController` (255 lines, resize, HMAC auth), `photo-upload.html`+`js` (mobile standalone), camera/gallery/FAB/QR handoff ใน `purchase-orders.js`, ID card photo ใน `sellers.js` | **Owner เลือก Host Directory** — `docker-compose.prod.yml` + `docs/NAS-SETUP.md` updated |
 | G2 | ✅ | ใบรับซื้อ 2 แบบ (ปกติ + โลหะมีค่า auto-detect, บังคับเซ็นรับรอง) | `PurchaseOrdersController:152,212`, `purchase-orders.js:627` |
 | G3 | ✅ | Blacklist alert popup สีแดง + blacklist_reason | `purchase-orders.js:972`, `sellers.js:44`, routes `sellers/blacklist`, `sellers/unblacklist` |
 | G4 | ✅ | ค้นหาผู้ขาย real-time debounce 300ms + blacklist badge | `purchase-orders.js:933`, `sellers.js:75` |
@@ -35,7 +35,7 @@
 
 ### ด่วน — ก่อนนำเสนอลูกค้า
 - [ ] **นำเสนอลูกค้า (ผู้ว่าจ้าง)** — เปิด `http://localhost:8080/admin/index.html` (desktop) + `http://localhost:8080/mobile/purchase.html` (tablet)
-- [x] G1: choose storage ✅ — **Owner เลือก NAS** — `docker-compose.nas.yml` + `docs/NAS-SETUP.md` พร้อม deploy
+- [x] G1: choose storage ✅ — **Owner เลือก Host Directory** — `docker-compose.prod.yml` ใช้ `/var/data/secondhand-pos/uploads`
 - [ ] เปิด Docker + Cloudflare Tunnel ก่อนนำเสนอ — remote access dashboard จากมือถือ
 
 ### ✅ Tech Debt — Fixed (verified)
