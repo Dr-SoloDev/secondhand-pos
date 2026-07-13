@@ -1,0 +1,11 @@
+services:
+  web:
+    volumes:
+      - nas_uploads:/var/www/html/uploads:rw
+
+volumes:
+  nas_uploads:
+    driver_opts:
+      type: nfs
+      o: addr=${NAS_IP},nolock,soft,rw,nfsvers=4
+      device: :/volume1/secondhand-pos/uploads

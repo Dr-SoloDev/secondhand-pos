@@ -1,6 +1,6 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 12 กรกฎาคม 2569
-**Status:** GOALS G1-G10 เสร็จครบ + G11 (Mobile/Tablet) ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅
+**Last updated:** 13 กรกฎาคม 2569
+**Status:** GOALS G1-G11 โค้ดพร้อม ตรวจสอบโค้ดจริงทุกข้อ ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅
 
 ---
 
@@ -15,19 +15,19 @@
 
 ## ✅ GOALS (G1-G11)
 
-| Goal | สถานะ | รายละเอียด |
-|---|---|---|
-| G1 | ⏳ | ถ่ายรูปสินค้า — รอเจ้าของเลือก storage |
-| G2 | ✅ | ใบรับซื้อพิมพ์ได้ 2 แบบ (ปกติ + โลหะมีค่า auto-detect) |
-| G3 | ✅ | Blacklist alert popup สีแดง + blacklist_reason |
-| G4 | ✅ | ค้นหาผู้ขาย real-time + blacklist badge |
-| G5 | ✅ | Dashboard 4 สาขา: รวม / เลือกสาขา / side-by-side |
-| G6 | ✅ | บอร์ดราคาพิมพ์ได้ (price-board.html) |
-| G7 | ✅ | ประวัติผู้ขายต่อคน (modal) |
-| G8 | ✅ | Export CSV 4 แบบ |
-| G9 | ✅ | โอนสต็อกระหว่างสาขา + audit trail |
-| G10 | ✅ | Stock alert — threshold ต่อหมวด |
-| G11 | ✅ | Mobile/Tablet support — Plan A (tablet-responsive) + Plan B (mobile PO wizard) |
+| Goal | สถานะ | รายละเอียด | ตรวจสอบโค้ดจริง |
+|:-----|:-----:|:------------|:-----------------|
+| G1 | ✅✅ | ถ่ายรูปสินค้า — `PhotoUploadController` (255 lines, resize, HMAC auth), `photo-upload.html`+`js` (mobile standalone), camera/gallery/FAB/QR handoff ใน `purchase-orders.js`, ID card photo ใน `sellers.js` | **Owner เลือก NAS แล้ว** — `docker-compose.nas.yml` + `docs/NAS-SETUP.md` พร้อม |
+| G2 | ✅ | ใบรับซื้อ 2 แบบ (ปกติ + โลหะมีค่า auto-detect, บังคับเซ็นรับรอง) | `PurchaseOrdersController:152,212`, `purchase-orders.js:627` |
+| G3 | ✅ | Blacklist alert popup สีแดง + blacklist_reason | `purchase-orders.js:972`, `sellers.js:44`, routes `sellers/blacklist`, `sellers/unblacklist` |
+| G4 | ✅ | ค้นหาผู้ขาย real-time debounce 300ms + blacklist badge | `purchase-orders.js:933`, `sellers.js:75` |
+| G5 | ✅ | Dashboard 4 สาขา: stats-grid 6 cards, charts, branch filter, recent PO table | `admin/index.html`, `dashboard.js` |
+| G6 | ✅ | บอร์ดราคาพิมพ์ได้ | `admin/price-board.html` |
+| G7 | ✅ | ประวัติผู้ขาย — Data Center modal + seller-history.html (ID card photo, item thumbnails, PO gallery, lightbox) | `sellers.js:157`, `seller-history.html` |
+| G8 | ✅ | Export CSV 7 แบบ (sales, products, inventory, cashier, tax, purchase, salelot) + UTF-8 BOM | `reports.js:1075-1278` |
+| G9 | ✅ | โอนสต็อกระหว่างสาขา — FIFO consumed_qty, weighted avg cost, transfer PO, atomic transaction FOR UPDATE, reference_no ST-YYYYMMDD-NNN | `StockTransfersController.php`, `StockTransfer.php` |
+| G10 | ✅ | Stock alert — threshold ต่อหมวด, low stock count ใน dashboard | `InventoryController.php:484`, `settings.js:125` |
+| G11 | ✅ | Mobile/Tablet — Plan A (responsive breakpoint 768-1024px, priority-2/3 columns, hamburger) + Plan B (mobile PO wizard 4 steps) | `layout.css`, `mobile/purchase.html` |
 
 ---
 
@@ -35,22 +35,24 @@
 
 ### ด่วน — ก่อนนำเสนอลูกค้า
 - [ ] **นำเสนอลูกค้า (ผู้ว่าจ้าง)** — เปิด `http://localhost:8080/admin/index.html` (desktop) + `http://localhost:8080/mobile/purchase.html` (tablet)
-- [ ] G1: upload รูปภาพ (หลังเจ้าของเลือก storage: NAS ~10,000฿ / B2 ~12฿/เดือน / Hybrid)
-- [ ] Cloudflare Tunnel — remote access dashboard จากมือถือ
+- [x] G1: choose storage ✅ — **Owner เลือก NAS** — `docker-compose.nas.yml` + `docs/NAS-SETUP.md` พร้อม deploy
+- [ ] เปิด Docker + Cloudflare Tunnel ก่อนนำเสนอ — remote access dashboard จากมือถือ
 
-### Tech Debt
+### ✅ Tech Debt — Fixed (verified)
 - [x] ~~JWT_SECRET ย้ายออกจาก apache-config.conf ก่อน production~~ → ย้ายเข้า .env แล้ว
-- [x] ~~Rate limiting~~ — DB-based (login_attempts table) ✅
-- [x] ~~Token revocation~~ — token_blocklist + jti ✅
-- [x] ~~requireAuth()~~ — เพิ่มในทุก controllers ที่ขาด ✅
-- [x] ~~Production Audit (54 issues)~~ — 27 fixed, 90% readiness ✅
-- [x] ~~CSS cleanup~~ — legacy fonts removed, duplicate @media merged ✅
-- [x] ~~seller-history.html~~ — เพิ่มรูป ID card + item thumbnails + lightbox ✅
-- [x] ~~Dashboard branch filter~~ — filter ส่งต่อไปทุก table API ✅
-- [x] ~~CSV UTF-8 BOM~~ — เพิ่ม \uFEFF ใน client-side exports ✅
-- [x] ~~Financial summary~~ — error notifications แทน infinite loading ✅
-- [ ] **รัน migration ก่อน deploy:** `code/database/security-migrations.sql`
-- [ ] sidebar ใน stock-transfers.html + price-board.html เพิ่มลิงก์เมนูครบ
+- [x] ~~Rate limiting~~ — DB-based (login_attempts table)
+- [x] ~~Token revocation~~ — token_blocklist + jti
+- [x] ~~requireAuth()~~ — เพิ่มในทุก controllers ที่ขาด
+- [x] ~~Production Audit (54 issues)~~ — 27 fixed, 90% readiness
+- [x] ~~CSS cleanup~~ — legacy fonts removed, duplicate @media merged
+- [x] ~~seller-history.html~~ — เพิ่มรูป ID card + item thumbnails + lightbox
+- [x] ~~Dashboard branch filter~~ — filter ส่งต่อไปทุก table API
+- [x] ~~CSV UTF-8 BOM~~ — เพิ่ม \uFEFF ใน client-side exports
+- [x] ~~Financial summary~~ — error notifications แทน infinite loading
+
+### ⏳ Tech Debt — Remaining
+- [ ] **รัน migration ก่อน deploy:** `code/customizations/database/migrations/` (#048-#050) + `code/database/security-migrations.sql`
+- [ ] sidebar stock-transfers.html + price-board.html — เพิ่มลิงก์เมนูครบ
 - [ ] ลบ `code/base-pos/backups/.htaccess` (legacy)
 - [ ] เมนู "สาขา" ถูกลบจาก sidebar — ตัดสินใจเอาคืนหรือลบ controller
 
@@ -67,12 +69,12 @@
 
 **อย่า** เพิ่ม route sales/* กลับเข้าไปใน Router.php โดยไม่ได้ตัดสินใจก่อน
 
-### UX Task — Photo Capture Feature 🚀
+### UX Task — Photo Capture Feature 🚀 (Implementation done)
 - [x] ✅ UX Requirements spec compiled → `docs/UX-REQUIREMENTS-PHOTO-CAPTURE.md`
 - [x] ✅ Architect Review (พี่ทรงศักดิ์) — อนุมัติ
-- [ ] 🎨 UX Team (08-design) — UI/UX Design
-- [ ] 🏗️ Engineering (ช่างฟูล) — Implementation
-- [ ] 🧪 QA — Testing
+- [x] ✅ UI/UX — Desktop (webcam + file picker + FAB + photo strip + QR) + Mobile standalone page
+- [x] ✅ Engineering — PhotoUploadController (255 lines) + photo-upload.html/js + ID card photo in sellers.js
+- [ ] 🧪 QA — Testing (เริ่มได้หลัง NAS setup + deploy) | **Owner เลือก NAS แล้ว — รอ setup จริง**
 
 ### Phase ถัดไป
 - [ ] Reports filter by branch
@@ -81,28 +83,58 @@
 
 ---
 
-## 📁 Schema — Migrations
+## 📁 Schema — Migrations (50 migrations, verifed on disk)
 
 ```
-001-013  core: branches, sellers, purchase_orders, sale_lots, price_tiers
+001      core: branches
+002      sellers
+003      item_conditions (mojibake fixed)
+004      purchase_orders + purchase_photos
+005      seed_categories
+006      three_tier_pricing + demo_data
+007      price_tiers
+008      tier to purchase_items
+009      sale_lots
+010      consumed_qty (FIFO foundation)
+011      seller_vehicle_plate
+012      purchase_item_catalog
+013      weight_deduction (replaces condition)
 014      missing indexes
 015-016  catalog tier prices (json)
-017      sale_lots expenses
+017      expenses to sale_lots
 018      rename tier labels → บิล1/2/3
-019-023  reports, dashboard, responsive, weighted avg cost
-024      global categories (merge 4สาขา → 1)
-025      default_unit per category
-026      seller photo fields
-027      business expenses
-028      blacklist fields (sellers)
-029      precious receipt flag (categories)
-030      stock transfers table
-031      stock alert threshold (categories)
-032      catalog_id + item_name (sale_lot_items)
-033-042  security migrations: login_attempts, token_blocklist, rate_limiting
-043-044  seller history indexes, migration version fix
-045-047  seller search indexes, catalog search optimization
-048      (pending)
+019      stock_kg to categories
+020      FIFO indexes + atomic consumed
+021      cost_method to branches
+022      branch_id to categories
+023      transfer_logistics (ARCHIVED → replaced by 025)
+024      stock_transfers
+025      transfer_logistics_fields
+026      populate_catalog_categories
+027      merge_duplicate_categories
+028      default_unit to categories
+029      actual_revenue to sale_lots
+030      business_expenses
+031      blacklist_fields
+032      precious_receipt_flag
+033      stock_alert_threshold
+034      catalog_id to sale_lot_items
+035      updated_by to sale_lots
+036      po_id to purchase_order_photos
+037      login_attempts
+038      token_blocklist
+039      transport_cost to sale_lots
+040      employees_table
+041      idempotency_keys
+042      requires_id_card to catalog
+043      blacklisted_by to sellers
+044      fix po_photos FK RESTRICT
+045      pdpa_consent to sellers
+046      enforce_precious_receipt on all risk categories
+047      seller_id_card_search_index
+048      sale_lots_created_at_index
+049      set_default_catalog_prices
+050      repair_mojibake_text
 ```
 
 ---
