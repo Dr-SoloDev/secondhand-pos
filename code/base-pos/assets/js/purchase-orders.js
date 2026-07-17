@@ -188,7 +188,8 @@ function buildTierButtons(tierPrices) {
   for (let i = 0; i < 3; i++) {
     const tp = tierPrices[i];
     const label = tp?.label?.trim() || `บิล${i + 1}`;
-    const priceStr = tp?.price > 0 ? `\n${parseFloat(tp.price).toFixed(2)} ฿` : '';
+    // เว้นบรรทัดที่ 2 ไว้เสมอ (แม้ไม่มีราคา) ปุ่มจะไม่เปลี่ยนความสูงตอนเลือก/ไม่เลือกสินค้า
+    const priceStr = tp?.price > 0 ? `\n${parseFloat(tp.price).toFixed(2)} ฿` : '\n ';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'global-tier-btn';
