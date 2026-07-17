@@ -28,8 +28,8 @@
 
 .po-page-header p {
   font-size: 13px;
-  color: var(--color-text-lighter);
-  margin-top: 2px;
+  color: var(--color-text-light);
+  margin-top: 4px;
 }
 
 .po-header-status {

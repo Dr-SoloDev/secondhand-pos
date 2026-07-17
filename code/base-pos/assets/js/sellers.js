@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSellers();
     setupIdCardFormatter();
     document.getElementById('isBlacklisted').addEventListener('change', function() {
-        document.getElementById('blacklistReasonGroup').style.display = this.checked ? '' : 'none';
+        document.getElementById('blacklistReasonGroup').classList.toggle('show', this.checked);
     });
 
     // Photo upload for seller ID card
@@ -103,7 +103,7 @@ function openAddSellerModal() {
     document.getElementById('modalTitle').textContent = 'เพิ่มผู้ขาย';
     document.getElementById('sellerForm').reset();
     document.getElementById('sellerId').value = '';
-    document.getElementById('blacklistReasonGroup').style.display = 'none';
+    document.getElementById('blacklistReasonGroup').classList.remove('show');
     const pdpaCheck = document.getElementById('pdpaConsent');
     pdpaCheck.checked = false;
     pdpaCheck.disabled = false;
@@ -134,7 +134,7 @@ function editSeller(id) {
     const bl = currentSeller.is_blacklisted == 1;
     document.getElementById('isBlacklisted').checked = bl;
     document.getElementById('blacklistReason').value = currentSeller.blacklist_reason || '';
-    document.getElementById('blacklistReasonGroup').style.display = bl ? '' : 'none';
+    document.getElementById('blacklistReasonGroup').classList.toggle('show', bl);
 
     const pdpaCheck = document.getElementById('pdpaConsent');
     pdpaCheck.checked = true;
@@ -167,14 +167,14 @@ async function viewSeller(id) {
     document.getElementById('viewSellerAddress').textContent = '-';
     document.getElementById('viewSellerNotes').textContent = '-';
     document.getElementById('viewSellerTransactionList').innerHTML =
-        '<div style="text-align:center;color:#888;padding:20px">กำลังโหลด...</div>';
+        '<div class="seller-view-loading">กำลังโหลด...</div>';
     document.getElementById('viewSellerModal').classList.add('show');
 
     const res = await apiRequest(`sellers/data-center?id=${id}`);
     if (res.status !== 'success') {
         document.getElementById('viewSellerName').textContent = 'เกิดข้อผิดพลาด';
         document.getElementById('viewSellerTransactionList').innerHTML =
-            '<div style="text-align:center;color:#ef4444;padding:20px">ไม่สามารถโหลดข้อมูลได้</div>';
+            '<div class="seller-view-error">ไม่สามารถโหลดข้อมูลได้</div>';
         showNotification(res.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล', 'error');
         return;
     }
@@ -209,10 +209,10 @@ async function viewSeller(id) {
         } else {
             pdpaEl.textContent = '✓ ยินยอม';
         }
-        pdpaEl.style.color = 'var(--color-success, #16a34a)';
+        pdpaEl.className = 'pdpa-consented';
     } else {
         pdpaEl.textContent = '-';
-        pdpaEl.style.color = '';
+        pdpaEl.className = '';
     }
 
     // ---- ID CARD PHOTO ----
@@ -236,10 +236,10 @@ async function viewSeller(id) {
     // ---- BLACKLIST INFO ----
     const blBar = document.getElementById('viewSellerBlacklist');
     if (seller.is_blacklisted) {
-        blBar.style.display = 'block';
+        blBar.classList.add('show');
         blBar.textContent = `⛔ บัญชีดำ: ${seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล'}`;
     } else {
-        blBar.style.display = 'none';
+        blBar.classList.remove('show');
     }
 
     // ---- TRANSACTION LIST ----
@@ -248,7 +248,7 @@ async function viewSeller(id) {
 
     const listEl = document.getElementById('viewSellerTransactionList');
     if (!safeTransactions.length) {
-        listEl.innerHTML = '<div style="text-align:center;color:#888;padding:30px 20px">ยังไม่มีประวัติการขาย</div>';
+        listEl.innerHTML = '<div class="seller-view-empty">ยังไม่มีประวัติการขาย</div>';
         return;
     }
 
@@ -264,13 +264,13 @@ function renderPoCard(po) {
     let itemsHtml = '';
     if (po.items && po.items.length) {
         itemsHtml = `
-            <table class="data-table" style="font-size:12px;margin-top:8px;width:100%">
+            <table class="po-items-table">
                 <thead>
-                    <tr style="background:#f1f5f9">
-                        <th style="padding:4px 8px;text-align:left">รายการ <span style="color:#888;font-weight:normal;font-size:11px">(📸 ถ้ามีรูป)</span></th>
-                        <th style="padding:4px 8px;text-align:center;width:80px">จำนวน</th>
-                        <th style="padding:4px 8px;text-align:right;width:90px">ราคา/หน่วย</th>
-                        <th style="padding:4px 8px;text-align:right;width:90px">รวม</th>
+                    <tr>
+                        <th>รายการ <span class="item-meta">(📸 ถ้ามีรูป)</span></th>
+                        <th class="col-qty">จำนวน</th>
+                        <th class="col-price">ราคา/หน่วย</th>
+                        <th class="col-total">รวม</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -278,30 +278,30 @@ function renderPoCard(po) {
                         const qty = parseFloat(item.quantity);
                         const ded = parseFloat(item.weight_deduction || 0);
                         const qtyDisplay = ded > 0
-                            ? `${qty.toFixed(3)} <span style="color:#888;font-size:11px">(หัก ${ded.toFixed(3)})</span>`
+                            ? `${qty.toFixed(3)} <span class="qty-deduction">(หัก ${ded.toFixed(3)})</span>`
                             : qty.toFixed(3);
 
                         // Per-item photo thumbnails
                         const itemPhotosHtml = (item.photos && item.photos.length)
-                            ? `<div style="display:flex;gap:3px;margin-top:4px">
+                            ? `<div class="item-photo-thumbs">
                                 ${item.photos.map(p =>
-                                    `<img src="${escapeHtml(p.photo_path)}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="รูปสินค้าชิ้นนี้">`
+                                    `<img src="${escapeHtml(p.photo_path)}" class="item-photo-thumb" onclick="expandPhoto(this)" title="รูปสินค้าชิ้นนี้">`
                                 ).join('')}
                                </div>`
                             : (item.photo_path
-                                ? `<div style="margin-top:4px"><img src="${escapeHtml(item.photo_path)}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="รูปสินค้าชิ้นนี้"></div>`
+                                ? `<div class="item-photo-thumbs"><img src="${escapeHtml(item.photo_path)}" class="item-photo-thumb" onclick="expandPhoto(this)" title="รูปสินค้าชิ้นนี้"></div>`
                                 : '');
 
                         return `<tr>
-                            <td style="padding:4px 8px">
-                                <strong>${escapeHtml(item.item_name)}</strong>
-                                ${item.category_name ? `<span style="color:#888;font-size:11px"> · ${escapeHtml(item.category_name)}</span>` : ''}
-                                ${item.notes ? `<div style="color:#888;font-size:11px">${escapeHtml(item.notes)}</div>` : ''}
+                            <td class="item-name">
+                                ${escapeHtml(item.item_name)}
+                                ${item.category_name ? `<span class="item-meta"> · ${escapeHtml(item.category_name)}</span>` : ''}
+                                ${item.notes ? `<div class="item-notes">${escapeHtml(item.notes)}</div>` : ''}
                                 ${itemPhotosHtml}
                             </td>
-                            <td style="padding:4px 8px;text-align:center">${qtyDisplay} ${escapeHtml(item.unit)}</td>
-                            <td style="padding:4px 8px;text-align:right">${formatNumber(item.unit_price)}</td>
-                            <td style="padding:4px 8px;text-align:right"><strong>${formatNumber(item.total_price)}</strong></td>
+                            <td class="text-center">${qtyDisplay} ${escapeHtml(item.unit)}</td>
+                            <td class="text-right">${formatNumber(item.unit_price)}</td>
+                            <td class="text-right"><strong>${formatNumber(item.total_price)}</strong></td>
                         </tr>`;
                     }).join('')}
                 </tbody>
@@ -313,34 +313,31 @@ function renderPoCard(po) {
     let photosHtml = '';
     if (poLevelPhotos.length) {
         photosHtml = `
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0">
-                <span style="font-size:11px;color:#888;width:100%;margin-bottom:4px">📸 รูปรวมของบิลนี้</span>
+            <div class="po-photo-gallery">
+                <span class="po-photo-gallery-label">📸 รูปรวมของบิลนี้</span>
                 ${poLevelPhotos.map(p =>
-                    `<img src="${escapeHtml(p.photo_path)}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onclick="expandPhoto(this)" title="คลิกดูรูปใหญ่">`
+                    `<img src="${escapeHtml(p.photo_path)}" onclick="expandPhoto(this)" title="คลิกดูรูปใหญ่">`
                 ).join('')}
             </div>`;
     }
 
     const notesHtml = po.notes
-        ? `<div style="font-size:12px;color:#888;margin-top:6px">📝 ${escapeHtml(po.notes)}</div>`
+        ? `<div class="po-card-notes">📝 ${escapeHtml(po.notes)}</div>`
         : '';
 
     return `
-        <div class="po-card" style="border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;overflow:hidden">
-            <div class="po-card-header" onclick="togglePoCard(this)"
-                 style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:#f8fafc;user-select:none;transition:background .15s"
-                 onmouseenter="this.style.background='#f1f5f9'"
-                 onmouseleave="this.style.background='#f8fafc'">
-                <span style="font-family:monospace;font-size:12px;font-weight:600;flex-shrink:0;color:#334155">${escapeHtml(po.reference_no)}</span>
-                <span style="font-size:12px;color:#64748b;flex-shrink:0">${formatDate(po.created_at)}</span>
-                <span style="font-size:12px;color:#94a3b8;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        <div class="po-card">
+            <div class="po-card-header" onclick="togglePoCard(this)">
+                <span class="po-card-ref">${escapeHtml(po.reference_no)}</span>
+                <span class="po-card-date">${formatDate(po.created_at)}</span>
+                <span class="po-card-branch">
                     ${escapeHtml(po.branch_name)}${po.processed_by ? ' · ' + escapeHtml(po.processed_by) : ''}
                 </span>
-                <span style="font-weight:700;font-size:13px;flex-shrink:0;color:#1e293b">${formatNumber(po.total_amount)}</span>
+                <span class="po-card-amount">${formatNumber(po.total_amount)}</span>
                 ${statusBadge}
-                <span class="toggle-icon" style="font-size:10px;color:#94a3b8;transition:transform .2s;flex-shrink:0">▶</span>
+                <span class="po-card-toggle">▶</span>
             </div>
-            <div class="po-card-body" style="display:none;padding:10px 12px 12px;border-top:1px solid #e2e8f0;background:#fff">
+            <div class="po-card-body">
                 ${itemsHtml}
                 ${photosHtml}
                 ${notesHtml}
@@ -350,10 +347,10 @@ function renderPoCard(po) {
 
 function togglePoCard(headerEl) {
     const body = headerEl.nextElementSibling;
-    const icon = headerEl.querySelector('.toggle-icon');
-    const isOpen = body.style.display !== 'none' && body.style.display !== '';
-    body.style.display = isOpen ? 'none' : 'block';
-    icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+    const icon = headerEl.querySelector('.po-card-toggle');
+    const isOpen = body.classList.contains('open');
+    body.classList.toggle('open');
+    icon.classList.toggle('open');
 }
 
 function expandPhoto(imgEl) {
@@ -469,23 +466,21 @@ function confirmBlacklist(id) {
 
     // ใช้ Modal แทน prompt()
     const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
+    overlay.className = 'blacklist-modal-overlay';
     overlay.innerHTML = `
-        <div class="modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
-            <div class="modal-content" style="max-width:420px;width:90%;">
-                <div class="modal-header">
-                    <h3>⚠️ ยืนยันบัญชีดำ</h3>
-                    <button class="close-modal" onclick="this.closest('.modal-overlay').remove()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p style="margin-bottom:12px;">ผู้ขาย: <strong>${escapeHtml(seller.full_name)}</strong></p>
-                    <label for="blacklistReasonConfirm">เหตุผลที่ขึ้นบัญชีดำ <span style="color:#ef4444;">*</span></label>
-                    <textarea id="blacklistReasonConfirm" class="form-control" rows="3" placeholder="ระบุเหตุผล..." style="width:100%;margin-top:4px;"></textarea>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">ยกเลิก</button>
-                    <button class="btn btn-danger" id="confirmBlacklistBtn">ยืนยันบัญชีดำ</button>
-                </div>
+        <div class="modal-content blacklist-modal-inner">
+            <div class="modal-header">
+                <h3>⚠️ ยืนยันบัญชีดำ</h3>
+                <button class="close-modal" onclick="this.closest('.blacklist-modal-overlay').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="blacklist-modal-body">ผู้ขาย: <strong>${escapeHtml(seller.full_name)}</strong></p>
+                <label class="blacklist-modal-label" for="blacklistReasonConfirm">เหตุผลที่ขึ้นบัญชีดำ <span class="blacklist-modal-required">*</span></label>
+                <textarea id="blacklistReasonConfirm" class="form-control" rows="3" placeholder="ระบุเหตุผล..." style="margin-top:4px;"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="this.closest('.blacklist-modal-overlay').remove()">ยกเลิก</button>
+                <button class="btn btn-danger" id="confirmBlacklistBtn">ยืนยันบัญชีดำ</button>
             </div>
         </div>
     `;
@@ -529,21 +524,19 @@ async function unblacklistSeller(id) {
 
 function showUnblacklistModal(sellerId, sellerName) {
     const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
+    overlay.className = 'blacklist-modal-overlay';
     overlay.innerHTML = `
-        <div class="modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
-            <div class="modal-content" style="max-width:420px;width:90%;">
-                <div class="modal-header">
-                    <h3>✓ ยืนยันยกเลิกบัญชีดำ</h3>
-                    <button class="close-modal" onclick="this.closest('.modal-overlay').remove()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p>ยืนยันการยกเลิกบัญชีดำผู้ขาย: <strong>${escapeHtml(sellerName)}</strong>?</p>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">ยกเลิก</button>
-                    <button class="btn btn-success" id="confirmUnblacklistBtn">ยืนยัน</button>
-                </div>
+        <div class="modal-content blacklist-modal-inner">
+            <div class="modal-header">
+                <h3>✓ ยืนยันยกเลิกบัญชีดำ</h3>
+                <button class="close-modal" onclick="this.closest('.blacklist-modal-overlay').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>ยืนยันการยกเลิกบัญชีดำผู้ขาย: <strong>${escapeHtml(sellerName)}</strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="this.closest('.blacklist-modal-overlay').remove()">ยกเลิก</button>
+                <button class="btn btn-success" id="confirmUnblacklistBtn">ยืนยัน</button>
             </div>
         </div>
     `;
