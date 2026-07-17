@@ -188,9 +188,9 @@ docker compose restart web  # ไม่ mount volume ใหม่
 | WF-02 | Receipts (Type A + B) | ✅ DONE | WORKFLOW-02-receipts.md |
 | WF-03 | Seller Search + Blacklist | ✅ DONE | WORKFLOW-03-seller-search-blacklist.md |
 | WF-04 | 4-Branch Dashboard | ✅ DONE | WORKFLOW-04-dashboard.md |
-| WF-05 | _(next)_ | 🔲 TODO | — |
+| WF-05 | Purchase Flow UX — keyboard-first cashier redesign | ✅ DONE | WORKFLOW-05-purchase-flow-ux.md |
 
-**Deadline: 2026-06-30**
+**Deadline: 2026-06-30** | **WF-05 Done: 2026-07-13**
 
 ---
 

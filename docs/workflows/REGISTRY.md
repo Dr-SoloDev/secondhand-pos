@@ -43,6 +43,7 @@
 | WF-02 | พิมพ์ใบรับซื้อ 2 แบบ | WORKFLOW-02-receipt-printing.md | Missing | กดปุ่ม "พิมพ์บิล" หลังบันทึก PO | Frontend | G2 |
 | WF-03 | ค้นหา seller + Blacklist Alert | WORKFLOW-03-seller-lookup.md | Missing (API พร้อม) | พิมพ์ในช่องค้นหา seller | Frontend | G3+G4 |
 | WF-04 | Dashboard 4 สาขา | WORKFLOW-04-branch-dashboard.md | Missing (API พร้อม) | เปิดหน้า Dashboard | Frontend | G5 |
+| **WF-05** | **Purchase Flow UX — keyboard-first cashier redesign** | **WORKFLOW-05-purchase-flow-ux.md** (ใน `code/docs/workflows/`) | **✅ DONE** | Client demo feedback | Frontend | UX |
 
 Status: `Approved` | `Review` | `Draft` | `Missing` | `Deprecated`
 **Missing** = ยังไม่มี spec (ธงแดง) — "API พร้อม" = endpoint มีแล้วแต่ยังไม่ได้ต่อ UI/ยังไม่ได้ spec
@@ -106,3 +107,8 @@ WF-00 (Responsive) → WF-01 (ถ่ายรูป) → WF-02 (พิมพ์�
 - พบ workflow ใหม่หรือเขียน spec เสร็จ → อัปเดตตารางทันที
 - Status `Missing` = ธงแดง ต้องยกขึ้นมาคุยรอบถัดไป
 - ห้ามลบแถว — ใช้ `Deprecated` แทน เพื่อเก็บประวัติ
+
+---
+
+> ⚠️ **หมายเหตุ:** มี `REGISTRY.md` 2 ที่ — `docs/workflows/REGISTRY.md` (อันนี้) กับ `code/docs/workflows/REGISTRY.md` (อันใหม่กว่า, มี WF-05)  
+> **ควรย้ายไปใช้ `code/docs/workflows/REGISTRY.md` เป็นหลัก** — อันนี้เป็น legacy ที่ยังไม่ได้ merge

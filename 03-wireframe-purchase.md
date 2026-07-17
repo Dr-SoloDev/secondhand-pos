@@ -1,6 +1,14 @@
 # Wireframe — หน้ารับซื้อของเก่า (Purchase from Seller)
 
-## Layout Overview
+> ⚠️ **SUPERSEDED โดย WF-05 (2026-07-13)**
+> Layout ปัจจุบันเปลี่ยนไป — ดู spec ใหม่ที่ `code/docs/workflows/WORKFLOW-05-purchase-flow-ux.md`
+>
+> ความต่างหลัก:
+> - Top row: `[ค้นหาผู้ขาย] → [บิล1/2/3] → [สาขา] → [+ผู้ขายใหม่]` (ไม่ใช่ branch-top)
+> - เลย์เอาต์เป็น single-column (ไม่ใช่ 2-column ซ้าย-ขวา)
+> - บิล1 auto-select, auto-select product, select-all-on-focus
+
+## Layout Overview (Legacy — เก็บไว้เป็น reference)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
