@@ -29,8 +29,9 @@ phpMyAdmin is **commented out in docker-compose.yml** (disabled in production).
 ## Architecture
 
 **Two-layer overlay system** (`code/`):
+- `customizations/` — **primary edit target** for new features
 - `base-pos/` — core POS framework ([goragodwiriya/pos-system](https://github.com/goragodwiriya/pos-system)), patched in-place
-- `customizations/` — custom code loaded by autoloader at `base-pos/api/autoload.php`
+- Autoloader scans both (base first, then custom), so a custom class with the same name shadows the base
 - ALL routes registered in **single file**: `base-pos/api/Router.php` (core + custom)
 - Custom controllers/models extend base `Controller`/`Model` classes
 
@@ -63,22 +64,32 @@ showNotification('บันทึกสำเร็จ', 'success');            
 
 ### Migration Rules
 - **DO NOT** modify `base-pos/database/pos_system.sql`
-- All changes → `customizations/database/migrations/NNN_description.sql` (48 files, 001-048)
+- All changes → `customizations/database/migrations/NNN_description.sql` (50 files, 001-050)
 - Run via `run-migrations.sh` from `customizations/database/`; guard with `IF NOT EXISTS`
-- Duplicate `006_*` files — skip one within a version number
+- Duplicate `006_*` files (006 + 006p) — skip one within a version number
 
 ---
 
 ## Testing
 
 ```bash
+# PHP syntax check (what CI runs first)
+find code/base-pos/api -name '*.php' -exec php -l {} \;
+find code/customizations/api -name '*.php' -exec php -l {} \;
+
+# API integration tests (bash, needs running server)
 cd code/tests/api
 bash run.sh                       # 84 tests, 12 test functions
 bash run.sh auth sellers          # run specific groups (test_{group})
 API_BASE=http://other:8080/api/index.php bash run.sh   # custom URL
+
+# PHPUnit (Unit + Integration, run from code/)
+cd code
+phpunit                            # all suites
+phpunit tests/Unit/FifoCalculationTest.php   # single file
 ```
 
-**CI** (`.github/workflows/test.yml`): PHP lint → run migrations → start PHP server → run tests
+**CI** (`.github/workflows/test.yml`): PHP lint → load base schema → run all migrations → start `php -S` → run `tests/api/run.sh`
 
 ---
 
@@ -90,9 +101,17 @@ FIFO costing on sale lot **create/confirm**:
 3. Atomic conditional UPDATE on `purchase_order_items.consumed_qty`
 4. On **cancel**: restore consumed_qty using LIFO order inside transaction
 
+### Cost Methods
+- Per-branch configurable: **FIFO** (default) or **weighted average**
+- Affects how `PurchaseOrder`/`SaleLot` models compute cost basis — check branch's `cost_method` before assuming FIFO-only
+
 ### Branch Scope Enforcement
 - All controllers enforce branch_id from JWT for non-admin users
 - `SaleLotsController::store()` — branch scope check added (gap closed WF-01)
+
+### Idempotency
+- POST endpoints for POs and sale lots prevent duplicates via `idempotency_keys` table
+- Client generates and sends a unique key per request; server rejects repeat keys
 
 ---
 
@@ -100,17 +119,6 @@ FIFO costing on sale lot **create/confirm**:
 
 `code/deploy.sh` flow: backup DB → `git pull` → rebuild containers → run migrations → health check → (rollback on failure)
 Healthcheck configured in Docker Compose for web container.
-
----
-
-## Performance
-
-| Metric | Result |
-|--------|--------|
-| GET endpoints avg | < 15ms |
-| GET endpoints p95 | < 60ms |
-| 5× concurrency | 10-21ms |
-| Login (bcrypt) | 309ms avg |
 
 ---
 
