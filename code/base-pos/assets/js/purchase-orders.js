@@ -4,7 +4,7 @@ let categories = [];
 let cart = [];
 let selectedSeller = null;
 let recentPOs = [];
-let globalTier = { level: null };
+let globalTier = { level: 1 };
 let currentCatalogItem = null; // { id, name, unit, price, tierPrices: [] }
 
 // ===== Signature State =====
@@ -107,6 +107,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('itemQuantity').addEventListener('input', updateItemTotal);
   document.getElementById('itemWeightDeduct').addEventListener('input', updateItemTotal);
+
+  // IMP: focus → select all — แคชเชียร์พิมพ์ตัวเลขแทนที่ได้เลย ไม่ต้องกดลบ
+  ['itemQuantity', 'itemWeightDeduct'].forEach(id =>
+    document.getElementById(id).addEventListener('focus', function() { this.select(); })
+  );
   document.getElementById('itemCategorySelect').addEventListener('change', saveCategoryToCatalog);
   document.getElementById('itemName').addEventListener('input', debounce(function(e) {
     const q = e.target.value.trim();
@@ -276,6 +281,15 @@ async function searchCatalogImmediate(q) {
   if (exact) {
     closeCatalogDropdown();
     selectCatalogItem(exact);
+    focusNextField();
+    return;
+  }
+
+  // ผลลัพธ์เดียว → auto-select (แคชเชียร์จำรหัสได้ พิมพ์บางส่วนก็เจอ)
+  if (items.length === 1) {
+    closeCatalogDropdown();
+    selectCatalogItem(items[0]);
+    focusNextField();
     return;
   }
 
@@ -355,6 +369,13 @@ function selectCatalogItem(item) {
   document.getElementById('itemQuantity').value = '1';
   document.getElementById('itemWeightDeduct').value = '0';
   updateItemTotal();
+}
+
+// ===== Keyboard Flow Helper =====
+function focusNextField() {
+  // ขยับ focus ไปช่องน้ำหนัก ให้แคชเชียร์คีย์ Tab ต่อเนื่องได้
+  const qty = document.getElementById('itemQuantity');
+  if (qty) setTimeout(() => qty.focus(), 50);
 }
 
 // ===== Price Display (read-only, auto-fill from tier) =====

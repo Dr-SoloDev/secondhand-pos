@@ -409,6 +409,9 @@
 
 ### 6.10 Tier Button (Price Tier)
 
+> **WF-05 (2026-07-13):** บิล1 เป็นค่าเริ่มต้น — `globalTier.level = 1` auto-select
+> Layout: tier group อยู่ระหว่าง `searchSellerInput` กับ `branchSelect`, flex: 1.2
+
 ```html
 <button class="tier-btn active">
   <span>บิล1</span>
@@ -420,6 +423,7 @@
 - Min-width: 100px, padding 10px 18px
 - Active: amber lighter bg + focus ring 3px
 - Hover: amber-50 bg, amber border
+- **Default state:** `active` = บิล1 (ตั้งแต่โหลดหน้า)
 
 ### 6.11 Cart Summary
 

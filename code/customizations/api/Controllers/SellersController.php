@@ -481,7 +481,7 @@ class SellersController extends Controller
         }
 
         // สร้าง path
-        $uploadBase = '/var/www/html/uploads/sellers';
+        $uploadBase = UPLOAD_DIR . '/sellers';
         $year = date('Y');
         $month = date('m');
         $dir = "{$uploadBase}/{$year}/{$month}";
@@ -491,7 +491,7 @@ class SellersController extends Controller
         }
 
         // ตรวจสอบพื้นที่ว่าง
-        if (disk_free_space($uploadBase) < 50 * 1024 * 1024) {
+        if (disk_free_space(UPLOAD_DIR) < 50 * 1024 * 1024) {
             Response::error('พื้นที่จัดเก็บเต็ม กรุณาติดต่อผู้ดูแลระบบ', 507);
         }
 

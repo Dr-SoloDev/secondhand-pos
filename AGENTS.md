@@ -131,6 +131,34 @@ UI follows **Google Stitch format** documented in `DESIGN.md` (root):
 
 ---
 
+## Purchase Flow UX (WF-05) — Client Requirements
+
+> **Workflow doc:** `code/docs/workflows/WORKFLOW-05-purchase-flow-ux.md`
+> **Last update:** 13 กรกฎาคม 2569 — Implemented + Approved ✅
+
+**Layout order (Tab 순서):** `[ค้นหาผู้ขาย] → [บิล1/2/3] → [สาขา] → [+ผู้ขายใหม่]`
+
+### Key Behaviours
+| Behaviour | Description |
+|:----------|:------------|
+| **Default tier** | บิล1 auto-selected `globalTier.level = 1` |
+| **Auto-select product** | If search returns 1 result → auto-select + focus next |
+| **Select-all on focus** | `itemQuantity` / `itemWeightDeduct` → `this.select()` |
+| **Focus ring** | `:focus` = box-shadow (mouse), `:focus-visible` = outline (keyboard Tab) |
+| **Bottom row** | `0.8fr 1fr 1.2fr` (seller card / payment / save) |
+
+### ⚠️ Cashier-Flow-First Principle
+Design layout follows cashier's workflow order, not system logic. **Keyboard-first** — all fields must be reachable via Tab without mouse.
+
+### Deploy Checklist
+1. Copy `assets/js/purchase-orders.js` → server
+2. Copy `admin/purchase-orders.html` → server
+3. Copy `assets/css/components/purchase-orders.css` → server
+4. Copy `assets/css/components/forms.css` → server
+5. `docker compose restart web`
+
+---
+
 ## Reference Files
 
 | Task | Read First |

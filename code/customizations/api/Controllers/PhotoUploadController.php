@@ -13,7 +13,7 @@ class PhotoUploadController extends Controller
     private const MAX_SIZE_BYTES  = 10 * 1024 * 1024; // 10 MB
     private const MAX_DIMENSION   = 1920;              // px (longest side)
     private const ALLOWED_MIMES   = ['image/jpeg', 'image/png', 'image/webp'];
-    private const UPLOAD_BASE     = '/var/www/html/uploads/purchase-orders';
+    private const UPLOAD_BASE     = UPLOAD_DIR . '/purchase-orders';
     private const URL_BASE        = '/uploads/purchase-orders';
 
     // -------------------------------------------------------
@@ -143,11 +143,18 @@ class PhotoUploadController extends Controller
     // PRIVATE HELPERS
     // -------------------------------------------------------
 
-    /** ลอง authenticate ด้วย JWT Bearer token (ไม่ exit — แค่ return bool) */
+    /** ลอง authenticate ด้วย JWT Bearer token หรือ httpOnly cookie */
     private function tryJwtAuth(): bool
     {
-        // $this->user ถูก set โดย Router::checkAuth() ถ้า Bearer token valid
-        return $this->user !== null;
+        if ($this->user !== null) return true;
+        $token = $_COOKIE['posToken'] ?? '';
+        if (empty($token)) return false;
+        $decoded = TokenService::validate($token);
+        if ($decoded) {
+            $this->user = $decoded;
+            return true;
+        }
+        return false;
     }
 
     /** ลอง authenticate ด้วย HMAC token ใน query string */

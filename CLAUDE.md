@@ -130,3 +130,23 @@ Design system is documented in `DESIGN.md` (Google Stitch format): amber primary
 | Installation | `code/docs/INSTALLATION.md` |
 | Technical/architecture detail | `code/docs/TECHNICAL.md` |
 | User manual (Thai) | `code/docs/USER-GUIDE.md` |
+
+## Latest work: WF-05 Purchase Flow UX (2026-07-13)
+
+Client demo feedback → **Cashier-Flow-First** redesign:
+
+| Change | File |
+|:-------|:-----|
+| **Layout** — ผู้ขาย → บิล → สาขา → +ผู้ขายใหม่ | `admin/purchase-orders.html` |
+| **บิล1 default** — `globalTier.level = 1` | `assets/js/purchase-orders.js` |
+| **Auto-select product** — 1 result → auto | `assets/js/purchase-orders.js` |
+| **Select-all on focus** — no need to clear weight | `assets/js/purchase-orders.js` |
+| **Focus ring** — `:focus` vs `:focus-visible` | `assets/css/components/forms.css` |
+| **Bottom row** — 0.8fr / 1fr / 1.2fr | `assets/css/components/purchase-orders.css` |
+
+Detailed spec: `code/docs/workflows/WORKFLOW-05-purchase-flow-ux.md`
+
+## Cautions
+
+- **DO NOT** restore dead retail POS (SalesController, sales.html) — decided 14 Jun 2026
+- **DO NOT** add Penpot integration — on hold indefinitely
