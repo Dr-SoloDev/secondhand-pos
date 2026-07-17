@@ -100,7 +100,8 @@
 #globalTierButtons {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: stretch;
   margin: 0;
 }
 
@@ -900,7 +901,8 @@
 #globalTierButtons {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: stretch;
 }
 
 /* ===== 10. PHOTO STRIP (hidden by default) ===== */

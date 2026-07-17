@@ -216,7 +216,7 @@ function setTierActive(btn, level) {
   });
   btn.style.background = btn.dataset.color;
   btn.style.color = '#fff';
-  btn.style.boxShadow = `0 2px 8px ${btn.dataset.color}66`;
+  btn.style.boxShadow = `0 1px 4px ${btn.dataset.color}55`;
   btn.classList.add('active');
   globalTier.level = level;
   const tierLabel = btn.innerText.split('\n')[0];
