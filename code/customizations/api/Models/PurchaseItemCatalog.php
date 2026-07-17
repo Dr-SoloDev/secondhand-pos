@@ -142,6 +142,9 @@ class PurchaseItemCatalog extends Model
                 'price' => isset($t['price']) && is_numeric($t['price']) ? max(0, (float)$t['price']) : 0,
             ];
         }
+        usort($clean, function ($a, $b) {
+            return $a['price'] <=> $b['price'];
+        });
         return $clean;
     }
 

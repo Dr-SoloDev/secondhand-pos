@@ -35,7 +35,7 @@ function renderPriceTiersTable(items) {
     }
 
     tbody.innerHTML = items.map(item => {
-        const tiers = item.tier_prices || [];
+        const tiers = (item.tier_prices || []).slice().sort((a, b) => (a.price || 0) - (b.price || 0));
         const tiersHtml = tiers.map((t, i) => `
             <div class="tier-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
                 <input type="text" class="form-control tier-label-input"
