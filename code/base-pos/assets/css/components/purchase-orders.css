@@ -56,12 +56,11 @@
   white-space: nowrap;
 }
 
-/* ===== 3. TOP ROW — Branch + Tier (subtle) ===== */
+/* ===== 3. TOP ROW — Seller + Tier + Branch ===== */
 .po-top-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  gap: 16px;
+  display: flex;
   align-items: end;
+  gap: 12px;
   padding: 12px 16px;
   background: var(--color-white);
   border: 1px solid var(--color-border);
@@ -275,7 +274,11 @@
 .po-field-weight input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
-  outline: none;
+}
+.po-field-weight input:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .po-field-weight input::placeholder {
@@ -506,20 +509,15 @@
 /* ===== PO Page Layout (ย้ายจาก inline style) ===== */
 .po-page { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
 
-.po-top-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  background: var(--color-white);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 12px 16px;
-}
-.po-branch-group { display: flex; flex-direction: column; gap: 4px; min-width: 220px; max-width: 280px; }
-.po-branch-group label { font-size: 12px; font-weight: 600; color: var(--color-text-light); }
+.po-seller-search-group { display: flex; flex-direction: column; gap: 4px; flex: 2; min-width: 200px; }
+.po-seller-search-group label { font-size: 12px; font-weight: 600; color: var(--color-text-light); white-space: nowrap; }
+.po-seller-add-group { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+.po-seller-add-group label { font-size: 12px; font-weight: 600; color: var(--color-text-light); }
+.po-branch-group { display: flex; flex-direction: column; gap: 4px; flex: 0 0 160px; }
+.po-branch-group label { font-size: 12px; font-weight: 600; color: var(--color-text-light); white-space: nowrap; }
 .po-branch-group select { height: 40px; line-height: 1.5; padding: 6px 10px; }
-.po-tier-group { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.po-tier-group label { font-size: 12px; font-weight: 600; color: var(--color-text-light); }
+.po-tier-group { display: flex; flex-direction: column; gap: 4px; flex: 1.2; min-width: 240px; }
+.po-tier-group label { font-size: 12px; font-weight: 600; color: var(--color-text-light); white-space: nowrap; }
 
 .po-add-row {
   display: flex;
@@ -639,7 +637,7 @@
 /* ===== 6. BOTTOM ROW ===== */
 .po-bottom-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr;
+  grid-template-columns: 0.8fr 1fr 1.2fr;
   gap: 10px;
 }
 
@@ -913,8 +911,9 @@
 /* ===== 11. RESPONSIVE ===== */
 @media (max-width: 1100px) {
   .po-top-row {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
   }
+  .po-seller-search-group { flex: 1 1 100%; }
 
   .po-bottom-row {
     grid-template-columns: 1fr;
@@ -940,7 +939,7 @@
   }
 
   .po-top-row {
-    display: grid;
+    flex-wrap: wrap;
     padding: 12px;
   }
 

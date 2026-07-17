@@ -66,16 +66,29 @@
 
       <div class="po-page">
 
-        <!-- ===== Row 1: สาขา + บิล ===== -->
+        <!-- ===== Row 1: ค้นหาผู้ขาย | บิล | สาขา | +ผู้ขายใหม่ ===== -->
         <div class="po-top-row">
-          <div class="po-branch-group">
-            <label for="branchSelect">สาขาที่รับซื้อ</label>
-            <select id="branchSelect" class="form-control"></select>
+          <div class="po-seller-search-group">
+            <label>ค้นหาผู้ขาย (ชื่อ / เลขบัตร)</label>
+            <div class="seller-search-box" style="margin-top:0">
+              <input type="text" id="searchSellerInput" class="form-control" placeholder="พิมพ์เพื่อค้นหา...">
+              <div id="sellerSearchResults" class="seller-results"></div>
+            </div>
           </div>
           <div class="po-tier-group">
             <label>ระดับราคา (บิล)</label>
             <div id="globalTierButtons"></div>
-            <div id="globalTierInfo" class="po-tier-info">ยังไม่ได้เลือก — จะใช้ราคาปกติ</div>
+            <div id="globalTierInfo" class="po-tier-info">บิล1 — ค่าเริ่มต้น (กดเปลี่ยนเป็น บิล2/บิล3)</div>
+          </div>
+          <div class="po-branch-group">
+            <label for="branchSelect">สาขา</label>
+            <select id="branchSelect" class="form-control"></select>
+          </div>
+          <div class="po-seller-add-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-secondary" id="createNewSellerBtn" type="button" style="white-space:nowrap;height:38px">
+              <i class="icon-additem"></i> + ผู้ขายใหม่
+            </button>
           </div>
         </div>
 
@@ -168,16 +181,9 @@
         <!-- ===== Row ล่าง: ผู้ขาย + วิธีจ่าย/หมายเหตุ + ปุ่ม ===== -->
         <div class="po-bottom-row">
 
-          <!-- ผู้ขาย -->
+          <!-- ผู้ขาย (selected info + actions เท่านั้น — search อยู่ด้านบน) -->
           <div class="po-bottom-card" id="poSellerCard">
             <h3><i class="icon-user"></i> ผู้ขาย</h3>
-            <div style="flex:1">
-              <label class="po-small-label">ค้นหา (ชื่อ / เลขบัตร)</label>
-              <div class="seller-search-box">
-                <input type="text" id="searchSellerInput" class="form-control" placeholder="พิมพ์เพื่อค้นหา...">
-                <div id="sellerSearchResults" class="seller-results"></div>
-              </div>
-            </div>
             <div id="selectedSellerBox">
               <div class="text-muted" style="font-size:13px">ยังไม่ได้เลือกผู้ขาย</div>
             </div>
@@ -187,9 +193,6 @@
               </button>
               <span id="sigStatus" style="font-size:11px;color:#888;margin-left:4px">ยังไม่เซ็น</span>
             </div>
-            <button class="btn btn-sm btn-secondary" id="createNewSellerBtn" style="align-self:flex-start">
-              <i class="icon-additem"></i> + ผู้ขายใหม่
-            </button>
           </div>
 
           <!-- วิธีจ่าย + หมายเหตุ -->

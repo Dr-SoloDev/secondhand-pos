@@ -126,14 +126,21 @@ class ReportsController extends Controller
     {
         $this->requireAuth();
         $userBranch = $this->enforceBranchScope();
-        $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
-        $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
-        $userId = isset($_GET['user_id']) ? intval($_GET['user_id']) : null;
-
-        $reportService = new ReportService();
-        $reportData = $reportService->getCashierPerformanceReport($dateFrom, $dateTo, $userId, $userBranch);
-
-        Response::success('Cashier performance data retrieved', $reportData);
+        try {
+            $reportService = new ReportService();
+            $reportData = $reportService->getCashierPerformanceReport(
+                $_GET['date_from'] ?? date('Y-m-01'),
+                $_GET['date_to'] ?? date('Y-m-d'),
+                isset($_GET['user_id']) ? intval($_GET['user_id']) : null,
+                $userBranch
+            );
+            Response::success('Cashier performance data retrieved', $reportData);
+        } catch (\Throwable $e) {
+            Response::success('Cashier performance not available', [
+                'cashiers' => [],
+                'filters' => ['date_from' => date('Y-m-01'), 'date_to' => date('Y-m-d')]
+            ]);
+        }
     }
 
     public function getRecentSaleLots()

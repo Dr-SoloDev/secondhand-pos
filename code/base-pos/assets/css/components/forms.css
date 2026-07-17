@@ -24,11 +24,6 @@
 .form-control::placeholder {
   color: var(--color-text-lighter);
 }
-.form-control:focus {
-  border-color: var(--color-primary);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
-}
 .form-control:disabled {
   background-color: var(--color-bg);
   cursor: not-allowed;
@@ -126,7 +121,11 @@ label {
 .form-control:focus {
   border-color: var(--color-border-focus);
   box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.08);
-  outline: none;
+}
+.form-control:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 /* Password toggle wrapper */

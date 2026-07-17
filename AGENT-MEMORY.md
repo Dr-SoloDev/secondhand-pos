@@ -83,6 +83,35 @@
 
 ---
 
+## 🚀 WF-05: Purchase Flow UX — Client Feedback (2026-07-13)
+
+### Overview
+ลูกค้าต้องการ flow รับซื้อที่ **เร็วขึ้น — keyboard-first, minimal clicks** หลังดู Demo
+
+| Requirement | การแก้ไข | Status |
+|:------------|:---------|:------:|
+| **Layout** — ผู้ขายอยู่บนสุด, ตามด้วยบิล, สาขา, +ผู้ขายใหม่ | ย้าย DOM order ใน `purchase-orders.html` | ✅ |
+| **บิล1 default** — ไม่ต้องกดเลือกทุกครั้ง | `globalTier.level = null` → `1` | ✅ |
+| **Auto-select** — พิมพ์รหัสแล้วผลลัพธ์เดียว → เลือกให้อัตโนมัติ | `searchCatalogImmediate()` + exact match check | ✅ |
+| **Select-all on focus** — focus ช่องน้ำหนัก → เลือกข้อความทั้งหมดไม่ต้องลบ | `this.select()` ใน `focus` event | ✅ |
+| **Focus ring** — mouse กับ keyboard แยกกัน | `:focus` (box-shadow) / `:focus-visible` (outline) | ✅ |
+| **สัดส่วน bottom row** — 0.8fr / 1fr / 1.2fr | ปรับ flex ratios | ✅ |
+
+### ⚠️ Key Design Decision
+- **Penpot integration ถูกเลื่อน (on hold)** — ครีเอทตัดสินใจไม่เอา layer 0-5 template ไปใช้ต่อในรอบนี้
+- **ต้อง deploy 3 ไฟล์:** `purchase-orders.js`, `purchase-orders.html`, `purchase-orders.css` + 1 ไฟล์ shared `forms.css`
+
+### คณะทำงาน
+- **Design Director:** `@design-kreet` (ครีเอท) — ตรวจสอบ + approve ✅
+- **UI Designer:** `@ui-designer` (ยูไอดี) — ทำ audit pixel
+- **Engineering:** `@changful` (ช่างฟูล) — review overlay feasibility
+- **Client:** ผู้ว่าจ้างร้านรับซื้อของเก่า 4 สาขา จ.สุรินทร์
+
+### Reference
+ดู spec เต็มได้ที่: `code/docs/workflows/WORKFLOW-05-purchase-flow-ux.md`
+
+---
+
 ## 📁 Schema — Migrations (50 migrations, verifed on disk)
 
 ```

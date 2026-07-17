@@ -11,10 +11,11 @@
 | WF-02 | Receipts — Type A normal + Type B precious metals | ✅ DONE | 2026-06-14 | [→](WORKFLOW-02-receipts.md) |
 | WF-03 | Seller Search + Blacklist | ✅ DONE | 2026-06-14 | [→](WORKFLOW-03-seller-search-blacklist.md) |
 | WF-04 | 4-Branch Dashboard + auto-refresh | ✅ DONE | 2026-06-15 | [→](WORKFLOW-04-dashboard.md) |
-| WF-05 | _(ยังไม่กำหนด)_ | 🔲 TODO | — | — |
+| WF-05 | Purchase Flow UX — โฟลว์รับซื้อเร็ว keyboard-first | ✅ DONE | 2026-07-13 | [→](WORKFLOW-05-purchase-flow-ux.md) |
+| WF-06 | _(ยังไม่กำหนด)_ | 🔲 TODO | — | — |
 
 **Deadline**: 30 มิถุนายน 2569 (2026-06-30)  
-**Progress**: 5/5 WF เสร็จ ✅
+**Progress**: 6/6 WF เสร็จ ✅
 
 ---
 

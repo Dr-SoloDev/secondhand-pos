@@ -445,6 +445,9 @@
   <!-- ===== TOAST ===== -->
   <div class="m-toast" id="mToast"></div>
 
+  <!-- ===== Hidden file input for photo capture ===== -->
+  <input type="file" id="mPhotoInput" accept="image/*" capture="environment" style="display:none">
+
   <!-- ===== TIER PICKER BOTTOM SHEET ===== -->
   <div style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,0.15);z-index:150;padding:16px;max-height:50vh;overflow-y:auto" id="mTierSheet">
     <div style="text-align:center;font-weight:600;font-size:16px;margin-bottom:12px">เลือกระดับราคาสำหรับบิลนี้</div>
@@ -468,6 +471,7 @@
   let mCatalogItems = [];
   let mTierLevel = null;
   let mSelectedCatalogItem = null; // { id, name, unit_price, tier_prices }
+  let mPendingPhotos = {}; // { tempId: File }
 
   // --- Init ---
   document.addEventListener('DOMContentLoaded', async () => {
@@ -600,7 +604,7 @@
 
   // --- Seller Search ---
   async function searchSellers(q) {
-    const res = await apiRequest(`sellers/search?keyword=${encodeURIComponent(q)}`);
+    const res = await apiRequest(`sellers/search?q=${encodeURIComponent(q)}`);
     const container = document.getElementById('mSellerResults');
     if (res.status !== 'success' || !res.data || !res.data.length) {
       container.innerHTML = '<div class="m-search-item" style="color:#9ca3af">ไม่พบผู้ขาย</div>';
@@ -679,10 +683,10 @@
 
   function getItemPrice(item) {
     if (mTierLevel && item.tier_prices && item.tier_prices.length > 0) {
-      const tier = item.tier_prices.find(t => t.level === mTierLevel);
-      if (tier) return parseFloat(tier.price) || 0;
+      const tier = item.tier_prices[mTierLevel - 1];
+      if (tier && parseFloat(tier.price) > 0) return parseFloat(tier.price);
     }
-    return parseFloat(item.unit_price) || parseFloat(item.price) || 0;
+    return parseFloat(item.default_price) || 0;
   }
 
   function selectItem(id, name, price, tierJson) {
@@ -736,7 +740,9 @@
     const net = Math.max(0, weight - deduct);
     const total = net * mSelectedCatalogItem.unit_price;
 
+    const tempId = 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
     mCart.push({
+      _tempId: tempId,
       catalog_id: mSelectedCatalogItem.id,
       item_name: mSelectedCatalogItem.name,
       quantity: weight,
@@ -752,6 +758,10 @@
   }
 
   function removeCartItem(index) {
+    const item = mCart[index];
+    if (item && item._tempId && mPendingPhotos[item._tempId]) {
+      delete mPendingPhotos[item._tempId];
+    }
     mCart.splice(index, 1);
     renderCart();
     if (mCart.length === 0) {
@@ -773,7 +783,7 @@
     let total = 0;
     container.innerHTML = '<div class="m-cart-items">' + mCart.map((item, i) => {
       total += item.total || 0;
-      const net = Math.max(0, (item.quantity || 0) - (item.weight_deduction || 0));
+      const hasPhoto = !!mPendingPhotos[item._tempId];
       return `<div class="m-cart-item">
         <div class="item-name">${escapeHtml(item.item_name)}</div>
         <div class="item-detail">
@@ -781,6 +791,7 @@
           <div>@ ${(item.unit_price||0).toFixed(2)}</div>
         </div>
         <div class="item-total">${formatCurrency(item.total || 0)}</div>
+        <button class="item-remove" style="width:32px;height:32px;font-size:14px" onclick="capturePhoto(${i})" title="ถ่ายรูป">${hasPhoto ? '📷' : '📸'}</button>
         <button class="item-remove" onclick="removeCartItem(${i})">✕</button>
       </div>`;
     }).join('') + '</div>';
@@ -791,13 +802,13 @@
 
   // --- Tier ---
   function showTierPicker() {
-    // Find all unique tier levels from catalog items
     const tiers = new Map();
     mCatalogItems.forEach(item => {
       if (item.tier_prices) {
-        item.tier_prices.forEach(t => {
-          if (!tiers.has(t.level)) {
-            tiers.set(t.level, t.label || `ระดับ ${t.level}`);
+        item.tier_prices.forEach((t, idx) => {
+          const level = idx + 1;
+          if (!tiers.has(level)) {
+            tiers.set(level, t.label || `ระดับ ${level}`);
           }
         });
       }
@@ -825,12 +836,13 @@
     mTierLevel = level;
     document.getElementById('mTierLabel').textContent = level ? `🏷️ ระดับ ${level}` : '(ราคาปกติ)';
     closeTierSheet();
-    // Update catalog prices if item selected
     if (mSelectedCatalogItem) {
-      const newPrice = getItemPrice({
-        unit_price: mSelectedCatalogItem.unit_price,
-        tier_prices: mSelectedCatalogItem.tier_prices
-      });
+      const tierPrices = mSelectedCatalogItem.tier_prices;
+      let newPrice = mSelectedCatalogItem.unit_price;
+      if (level && tierPrices && tierPrices.length > 0) {
+        const tier = tierPrices[level - 1];
+        if (tier && parseFloat(tier.price) > 0) newPrice = parseFloat(tier.price);
+      }
       mSelectedCatalogItem.unit_price = newPrice;
       document.getElementById('mItemUnitPrice').textContent = newPrice.toFixed(2);
       updateItemPreview();
@@ -917,12 +929,30 @@
     });
 
     if (res.status === 'success') {
+      const poId = res.data?.id;
+      // Upload pending photos
+      const photoEntries = Object.entries(mPendingPhotos);
+      if (poId && photoEntries.length > 0) {
+        for (const [, file] of photoEntries) {
+          const fd = new FormData();
+          fd.append('photo', file);
+          try {
+            await fetch(`${window.apiPath}/purchase-orders/photos?id=${poId}`, {
+              method: 'POST',
+              body: fd
+            });
+          } catch(e) {
+            console.warn('Photo upload failed:', e);
+          }
+        }
+      }
       showToast('✅ บันทึกใบรับซื้อสำเร็จ!', 'success');
       // Reset form
       mCart = [];
       mSeller = null;
       mSelectedCatalogItem = null;
       mTierLevel = null;
+      mPendingPhotos = {};
       document.getElementById('mSellerSearch').value = '';
       document.getElementById('mSellerSelected').style.display = 'none';
       document.getElementById('mNotes').value = '';
@@ -934,6 +964,27 @@
 
     btn.disabled = false;
     btn.innerHTML = '💾 บันทึกใบรับซื้อ';
+  }
+
+  // --- Photo Capture ---
+  let mPhotoTargetIndex = null;
+
+  document.getElementById('mPhotoInput').addEventListener('change', function(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file || mPhotoTargetIndex === null) return;
+    const item = mCart[mPhotoTargetIndex];
+    if (item) {
+      mPendingPhotos[item._tempId] = file;
+      renderCart();
+      showToast('เพิ่มรูปแล้ว', 'success');
+    }
+    mPhotoTargetIndex = null;
+    this.value = '';
+  });
+
+  function capturePhoto(index) {
+    mPhotoTargetIndex = index;
+    document.getElementById('mPhotoInput').click();
   }
 
   // --- Toast ---
