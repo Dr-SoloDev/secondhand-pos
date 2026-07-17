@@ -187,7 +187,7 @@ function buildTierButtons(tierPrices) {
   container.innerHTML = '';
   for (let i = 0; i < 3; i++) {
     const tp = tierPrices[i];
-    const label = tp?.label?.trim() || `บิล${i + 1}`;
+    const label = `บิล${i + 1}`;
     // เว้นบรรทัดที่ 2 ไว้เสมอ (แม้ไม่มีราคา) ปุ่มจะไม่เปลี่ยนความสูงตอนเลือก/ไม่เลือกสินค้า
     const priceStr = tp?.price > 0 ? `\n${parseFloat(tp.price).toFixed(2)} ฿` : '\n ';
     const btn = document.createElement('button');
@@ -318,7 +318,7 @@ async function searchCatalogImmediate(q) {
 // item มาจาก API response โดยตรง (object ที่มี tier_prices เป็น array แน่ๆ)
 function selectCatalogItem(item) {
   const tierPrices = Array.isArray(item.tier_prices)
-    ? [...item.tier_prices].sort((a, b) => (b.price || 0) - (a.price || 0))
+    ? [...item.tier_prices].sort((a, b) => (a.price || 0) - (b.price || 0))
     : [];
 
   // เก็บ state
