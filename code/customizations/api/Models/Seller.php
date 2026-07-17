@@ -9,7 +9,7 @@ class Seller extends Model
     public function getAll($includeBlacklisted = false)
     {
         $query = "SELECT
-                    id, id_card, full_name, phone, address, vehicle_plate,
+                    id, id_card, full_name, phone, address, vehicle_plate, vehicle_type,
                     id_card_photo, is_blacklisted, blacklist_reason, blacklisted_at,
                     notes,
                     total_transactions, total_amount,
@@ -62,7 +62,7 @@ class Seller extends Model
                          id_card              AS national_id,
                          phone,
                          id_card_photo,
-                         vehicle_plate,
+                          vehicle_plate, vehicle_type,
                          is_blacklisted,
                          blacklist_reason,
                          blacklisted_at,
@@ -131,6 +131,7 @@ class Seller extends Model
             'phone' => !empty($data['phone']) ? $data['phone'] : null,
             'address' => !empty($data['address']) ? $data['address'] : null,
             'vehicle_plate' => !empty($data['vehicle_plate']) ? $data['vehicle_plate'] : null,
+            'vehicle_type' => !empty($data['vehicle_type']) ? $data['vehicle_type'] : null,
             'notes' => !empty($data['notes']) ? $data['notes'] : null,
             'is_blacklisted' => $data['is_blacklisted'] ?? 0,
         ]);
@@ -173,6 +174,7 @@ class Seller extends Model
         if (isset($data['phone'])) $updateData['phone'] = $data['phone'];
         if (isset($data['address'])) $updateData['address'] = $data['address'];
         if (isset($data['vehicle_plate'])) $updateData['vehicle_plate'] = $data['vehicle_plate'];
+        if (isset($data['vehicle_type'])) $updateData['vehicle_type'] = $data['vehicle_type'];
         if (isset($data['notes'])) $updateData['notes'] = $data['notes'];
         // is_blacklisted/blacklist_reason ต้องใช้ผ่าน endpoint blacklist/unblacklist เท่านั้น
 

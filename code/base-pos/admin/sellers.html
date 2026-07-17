@@ -125,6 +125,7 @@
             <div><span style="color:#888">บัตรประชาชน:</span> <span id="viewSellerIdCard">-</span></div>
             <div><span style="color:#888">โทรศัพท์:</span> <span id="viewSellerPhone">-</span></div>
             <div><span style="color:#888">ทะเบียนรถ:</span> <span id="viewSellerVehicle">-</span></div>
+            <div><span style="color:#888">ประเภทยานพาหนะ:</span> <span id="viewSellerVehicleType">-</span></div>
             <div><span style="color:#888">PDPA:</span> <span id="viewSellerPdpa">-</span></div>
             <div style="grid-column:1/-1"><span style="color:#888">ที่อยู่:</span> <span id="viewSellerAddress">-</span></div>
             <div style="grid-column:1/-1"><span style="color:#888">หมายเหตุ:</span> <span id="viewSellerNotes">-</span></div>
@@ -193,6 +194,32 @@
           <div class="form-group">
             <label for="vehiclePlate">ทะเบียนรถ</label>
             <input type="text" id="vehiclePlate" class="form-control" placeholder="เช่น กข 1234 กรุงเทพฯ">
+          </div>
+          <div class="form-group">
+            <label>ประเภทยานพาหนะ</label>
+            <div class="vehicle-type-group">
+              <label class="vehicle-type-radio">
+                <input type="radio" name="vehicleType" value="จักรยานยนต์"> <span>จักรยานยนต์</span>
+              </label>
+              <label class="vehicle-type-radio">
+                <input type="radio" name="vehicleType" value="รถเก๋ง"> <span>รถเก๋ง</span>
+              </label>
+              <label class="vehicle-type-radio">
+                <input type="radio" name="vehicleType" value="รถกระบะ"> <span>รถกระบะ</span>
+              </label>
+              <label class="vehicle-type-radio">
+                <input type="radio" name="vehicleType" value="รถตู้"> <span>รถตู้</span>
+              </label>
+              <label class="vehicle-type-radio">
+                <input type="radio" name="vehicleType" value="รถบรรทุก"> <span>รถบรรทุก</span>
+              </label>
+              <label class="vehicle-type-radio">
+                <input type="radio" name="vehicleType" value="สามล้อ"> <span>สามล้อ</span>
+              </label>
+              <label class="vehicle-type-radio">
+                <input type="radio" name="vehicleType" value="อื่นๆ"> <span>อื่นๆ</span>
+              </label>
+            </div>
           </div>
            <div class="form-group" id="pdpaConsentGroup" style="background:var(--color-bg-subtle,#f8fafc);border:1px solid var(--color-border,#e2e8f0);border-radius:6px;padding:10px 12px">
              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:0">

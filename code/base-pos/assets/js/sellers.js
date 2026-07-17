@@ -129,6 +129,8 @@ function editSeller(id) {
     document.getElementById('address').value = currentSeller.address || '';
     document.getElementById('notes').value = currentSeller.notes || '';
     document.getElementById('vehiclePlate').value = currentSeller.vehicle_plate || '';
+    const vt = currentSeller.vehicle_type || '';
+    document.querySelectorAll('input[name="vehicleType"]').forEach(r => r.checked = r.value === vt);
     const bl = currentSeller.is_blacklisted == 1;
     document.getElementById('isBlacklisted').checked = bl;
     document.getElementById('blacklistReason').value = currentSeller.blacklist_reason || '';
@@ -194,6 +196,7 @@ async function viewSeller(id) {
     document.getElementById('viewSellerIdCard').textContent = formatIdCard(seller.id_card) || '-';
     document.getElementById('viewSellerPhone').textContent = seller.phone || '-';
     document.getElementById('viewSellerVehicle').textContent = seller.vehicle_plate || '-';
+    document.getElementById('viewSellerVehicleType').textContent = seller.vehicle_type || '-';
     document.getElementById('viewSellerAddress').textContent = seller.address || '-';
     document.getElementById('viewSellerNotes').textContent = seller.notes || '-';
 
@@ -254,7 +257,7 @@ async function viewSeller(id) {
 
 function renderPoCard(po) {
     const statusBadge = po.status !== 'completed'
-        ? `<span class="badge badge-warning" style="font-size:10px;padding:1px 6px">${po.status}</span>`
+        ? `<span class="badge badge-warning" style="font-size:10px;padding:1px 6px">${escapeHtml(po.status)}</span>`
         : '';
 
     // Items table
@@ -411,6 +414,7 @@ async function saveSeller() {
     }
 
     const vehiclePlate = document.getElementById('vehiclePlate').value.trim();
+    const vehicleType = document.querySelector('input[name="vehicleType"]:checked')?.value || '';
     const data = {
         full_name: fullName,
         phone: phone || null,
@@ -418,6 +422,7 @@ async function saveSeller() {
         address: address || null,
         notes: notes || null,
         vehicle_plate: vehiclePlate || null,
+        vehicle_type: vehicleType || null,
         is_blacklisted: isBlacklisted,
         blacklist_reason: isBlacklisted ? (document.getElementById('blacklistReason').value.trim() || null) : null,
         pdpa_consent: pdpaConsent,

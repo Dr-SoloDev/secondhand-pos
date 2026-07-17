@@ -73,8 +73,8 @@
     }
     .m-field input:focus, .m-field select:focus {
       outline: none;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+      border-color: #D97706;
+      box-shadow: 0 0 0 3px rgba(217,119,6,0.12);
     }
     .m-field textarea { resize: vertical; min-height: 60px; }
     select.m-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
@@ -96,9 +96,10 @@
       transition: all 0.15s;
     }
     .m-btn:active { transform: scale(0.98); }
-    .m-btn-primary { background: #2563eb; color: #fff; }
-    .m-btn-primary:hover { background: #1d4ed8; }
-    .m-btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .m-btn:focus-visible { outline: 2px solid #D97706; outline-offset: 2px; }
+    .m-btn-primary { background: #D97706; color: #fff; }
+    .m-btn-primary:hover { background: #B45309; }
+    .m-btn-primary:disabled { background: #FCD34D; cursor: not-allowed; }
     .m-btn-success { background: #059669; color: #fff; }
     .m-btn-success:hover { background: #047857; }
     .m-btn-danger { background: #dc2626; color: #fff; }
@@ -125,7 +126,7 @@
       cursor: pointer; font-size: 15px;
     }
     .m-search-item:last-child { border-bottom: none; }
-    .m-search-item:active { background: #eff6ff; }
+    .m-search-item:active { background: #FFFBEB; }
     .m-search-item .sub {
       font-size: 12px; color: #6b7280; margin-top: 2px;
     }
@@ -190,7 +191,7 @@
       flex: 1; height: 4px; border-radius: 2px;
       background: #e5e7eb; transition: background 0.3s;
     }
-    .m-step-dot.active { background: #2563eb; }
+    .m-step-dot.active { background: #D97706; }
     .m-step-dot.done { background: #059669; }
 
     /* === Quantity input row === */
@@ -220,7 +221,7 @@
     /* === Loading === */
     .m-spinner {
       display: inline-block; width: 20px; height: 20px;
-      border: 2px solid #e5e7eb; border-top-color: #2563eb;
+      border: 2px solid #e5e7eb; border-top-color: #D97706;
       border-radius: 50%; animation: spin 0.6s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -270,7 +271,7 @@
         </div>
         <button class="m-btn m-btn-primary" onclick="goStep(2)" id="mStep1Btn" disabled>ต่อไป</button>
       </div>
-      <div style="text-align:center;padding:12px">
+      <div class="text-center p-3">
         <a href="../admin/index.html" style="color:#6b7280;font-size:14px">← กลับไปหน้าหลัก</a>
       </div>
     </div>
@@ -303,9 +304,9 @@
         </div>
 
         <!-- Create new seller -->
-        <details style="margin-top:10px">
-          <summary style="cursor:pointer;font-size:14px;color:#2563eb;font-weight:600;padding:8px 0">+ เพิ่มผู้ขายใหม่</summary>
-          <div style="margin-top:8px">
+        <details class="mt-3">
+          <summary style="cursor:pointer;font-size:14px;color:#D97706;font-weight:600;padding:8px 0">+ เพิ่มผู้ขายใหม่</summary>
+          <div class="mt-2">
             <div class="m-field">
               <label>ชื่อ-นามสกุล *</label>
               <input type="text" id="mNewSellerName" placeholder="ชื่อ-นามสกุล">
@@ -322,11 +323,11 @@
           </div>
         </details>
 
-        <button class="m-btn m-btn-primary" onclick="goStep(3)" id="mStep2Btn" disabled style="margin-top:12px">
+        <button class="m-btn m-btn-primary mt-3" onclick="goStep(3)" id="mStep2Btn" disabled>
           ต่อไป — เลือกสินค้า
         </button>
       </div>
-      <button class="m-btn m-btn-secondary" onclick="goStep(1)" style="margin-bottom:12px">← ย้อนกลับ</button>
+      <button class="m-btn m-btn-secondary mb-3" onclick="goStep(1)">← ย้อนกลับ</button>
     </div>
 
     <!-- ============================== -->
@@ -363,10 +364,10 @@
           </div>
           <div class="m-field">
             <label>ราคา/กก.</label>
-            <div style="display:flex;gap:8px;align-items:center">
+            <div class="flex gap-2 items-center">
               <span id="mItemUnitPrice" style="font-size:18px;font-weight:700;color:#059669">0.00</span>
               <span style="color:#6b7280;font-size:14px">บาท/กก.</span>
-              <span id="mItemTierBadge" style="font-size:12px;color:#2563eb;background:#eff6ff;padding:2px 8px;border-radius:4px;display:none"></span>
+              <span id="mItemTierBadge" style="font-size:12px;color:#D97706;background:#FFFBEB;padding:2px 8px;border-radius:4px;display:none"></span>
             </div>
           </div>
           <div class="m-field">
@@ -380,10 +381,10 @@
         </div>
 
         <!-- Change tier button -->
-        <button class="m-btn m-btn-sm m-btn-secondary" onclick="showTierPicker()" id="mTierBtn" style="width:auto;margin-top:8px">
+        <button class="m-btn m-btn-sm m-btn-secondary w-auto mt-2" onclick="showTierPicker()" id="mTierBtn">
           🏷️ เลือกระดับราคา
         </button>
-        <span id="mTierLabel" style="font-size:13px;color:#6b7280;margin-left:8px">(ราคาปกติ)</span>
+        <span id="mTierLabel" style="font-size:13px;color:#6b7280" class="ml-2">(ราคาปกติ)</span>
       </div>
 
       <!-- Cart -->
@@ -446,7 +447,7 @@
   <div class="m-toast" id="mToast"></div>
 
   <!-- ===== Hidden file input for photo capture ===== -->
-  <input type="file" id="mPhotoInput" accept="image/*" capture="environment" style="display:none">
+  <input type="file" id="mPhotoInput" accept="image/*" capture="environment" class="hidden">
 
   <!-- ===== TIER PICKER BOTTOM SHEET ===== -->
   <div style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,0.15);z-index:150;padding:16px;max-height:50vh;overflow-y:auto" id="mTierSheet">

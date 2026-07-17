@@ -1074,7 +1074,8 @@ function openNewSellerModal() {
   document.getElementById('newIdCard').value = '';
   document.getElementById('newPhone').value = '';
   document.getElementById('newAddress').value = '';
-  document.getElementById('newVehiclePlate').value = '';
+   document.getElementById('newVehiclePlate').value = '';
+   document.querySelectorAll('input[name="newVehicleType"]').forEach(r => r.checked = false);
 
   // Reset ID card photo
   pendingSellerIdPhoto = null;
@@ -1088,6 +1089,7 @@ async function saveNewSeller() {
     phone: document.getElementById('newPhone').value.trim(),
     address: document.getElementById('newAddress').value.trim(),
     vehicle_plate: document.getElementById('newVehiclePlate').value.trim(),
+    vehicle_type: document.querySelector('input[name="newVehicleType"]:checked')?.value || null,
   };
   if (!payload.full_name) { showNotification('กรุณากรอกชื่อ-นามสกุล', 'error'); return; }
   if (payload.id_card && payload.id_card.length !== 13) {

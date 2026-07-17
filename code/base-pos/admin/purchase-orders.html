@@ -48,7 +48,7 @@
             <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
           </div>
         </div>
-        <a href="../mobile/purchase.html" class="btn btn-sm btn-secondary" style="text-decoration:none;font-size:12px;margin-left:8px" target="_blank">
+        <a href="../mobile/purchase.html" class="btn btn-sm btn-secondary ml-2" style="text-decoration:none;font-size:12px" target="_blank">
           📱 มือถือ
         </a>
       </div>
@@ -66,11 +66,11 @@
 
       <div class="po-page">
 
-        <!-- ===== Row 1: ค้นหาผู้ขาย | บิล | สาขา | +ผู้ขายใหม่ ===== -->
+        <!-- ===== Row 1: ค้นหาผู้ขาย | บิล | +ผู้ขายใหม่ | สาขา ===== -->
         <div class="po-top-row">
           <div class="po-seller-search-group">
             <label>ค้นหาผู้ขาย (ชื่อ / เลขบัตร)</label>
-            <div class="seller-search-box" style="margin-top:0">
+            <div class="seller-search-box mt-0">
               <input type="text" id="searchSellerInput" class="form-control" placeholder="พิมพ์เพื่อค้นหา...">
               <div id="sellerSearchResults" class="seller-results"></div>
             </div>
@@ -78,17 +78,17 @@
           <div class="po-tier-group">
             <label>ระดับราคา (บิล)</label>
             <div id="globalTierButtons"></div>
-            <div id="globalTierInfo" class="po-tier-info">บิล1 — ค่าเริ่มต้น (กดเปลี่ยนเป็น บิล2/บิล3)</div>
+            <div id="globalTierInfo" class="po-tier-info hidden">บิล1 — ค่าเริ่มต้น (กดเปลี่ยนเป็น บิล2/บิล3)</div>
+          </div>
+          <div class="po-seller-add-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-secondary" id="createNewSellerBtn" type="button">
+              <i class="icon-additem"></i> + ผู้ขายใหม่
+            </button>
           </div>
           <div class="po-branch-group">
             <label for="branchSelect">สาขา</label>
             <select id="branchSelect" class="form-control"></select>
-          </div>
-          <div class="po-seller-add-group">
-            <label>&nbsp;</label>
-            <button class="btn btn-secondary" id="createNewSellerBtn" type="button" style="white-space:nowrap;height:38px">
-              <i class="icon-additem"></i> + ผู้ขายใหม่
-            </button>
           </div>
         </div>
 
@@ -109,7 +109,7 @@
                 <input type="hidden" id="itemUnitPrice" value="0">
                 <div id="itemCatalogResults" class="seller-results"></div>
               </div>
-              <select id="itemCategorySelect" style="display:none"></select>
+              <select id="itemCategorySelect" class="hidden"></select>
             </div>
             <div class="po-field po-field-unit">
               <label>หน่วย</label>
@@ -138,7 +138,7 @@
               <label>&nbsp;</label>
               <div class="po-photo-wrap">
                 <button id="itemPhotoBtn" class="btn-photo-picker" title="ถ่ายรูปสินค้า" type="button" tabindex="-1">📷</button>
-                <span id="itemPhotoIndicator" class="photo-badge" style="display:none"></span>
+                <span id="itemPhotoIndicator" class="photo-badge hidden"></span>
               </div>
             </div>
             <div class="po-field po-field-addbtn">
@@ -164,8 +164,8 @@
                   <th class="text-right">สุทธิ</th>
                   <th class="text-right">ราคา/หน่วย</th>
                   <th class="text-right">รวม</th>
-                  <th style="width:36px;text-align:center">รูป</th>
-                  <th style="width:40px;text-align:center"></th>
+                  <th class="text-center" style="width:36px">รูป</th>
+                  <th class="text-center" style="width:40px"></th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -187,7 +187,7 @@
             <div id="selectedSellerBox">
               <div class="text-muted" style="font-size:13px">ยังไม่ได้เลือกผู้ขาย</div>
             </div>
-            <div class="precious-actions" id="preciousActions" style="display:none">
+            <div class="precious-actions hidden" id="preciousActions">
               <button class="btn btn-sm btn-secondary" id="sigBtn" style="font-size:12px;border-color:#ef4444;color:#ef4444">
                 ✍️ เซ็นรับรอง
               </button>
@@ -292,9 +292,9 @@
               <span class="title" id="sellerPhotoTitle"><i class="icon-image"></i> เพิ่มรูปถ่ายบัตรประชาชน</span>
               <span class="sub" id="sellerPhotoSub">แตะเพื่อถ่ายรูป หรือเลือกรูป</span>
             </div>
-            <img class="seller-photo-thumb" id="sellerPhotoThumb" style="display:none" alt="รูปบัตร">
+            <img class="seller-photo-thumb hidden" id="sellerPhotoThumb" alt="รูปบัตร">
           </div>
-          <div id="sellerIdPhotoPreview" style="display:none"></div>
+          <div id="sellerIdPhotoPreview" class="hidden"></div>
         </div>
         <div class="form-group">
           <label for="newPhone">เบอร์โทรศัพท์</label>
@@ -307,6 +307,32 @@
         <div class="form-group">
           <label for="newVehiclePlate">ทะเบียนรถ</label>
           <input type="text" id="newVehiclePlate" class="form-control" maxlength="20" placeholder="เช่น กข-1234 สุรินทร์">
+        </div>
+        <div class="form-group">
+          <label>ประเภทยานพาหนะ</label>
+          <div class="vehicle-type-group">
+            <label class="vehicle-type-radio">
+              <input type="radio" name="newVehicleType" value="จักรยานยนต์"> <span>จักรยานยนต์</span>
+            </label>
+            <label class="vehicle-type-radio">
+              <input type="radio" name="newVehicleType" value="รถเก๋ง"> <span>รถเก๋ง</span>
+            </label>
+            <label class="vehicle-type-radio">
+              <input type="radio" name="newVehicleType" value="รถกระบะ"> <span>รถกระบะ</span>
+            </label>
+            <label class="vehicle-type-radio">
+              <input type="radio" name="newVehicleType" value="รถตู้"> <span>รถตู้</span>
+            </label>
+            <label class="vehicle-type-radio">
+              <input type="radio" name="newVehicleType" value="รถบรรทุก"> <span>รถบรรทุก</span>
+            </label>
+            <label class="vehicle-type-radio">
+              <input type="radio" name="newVehicleType" value="สามล้อ"> <span>สามล้อ</span>
+            </label>
+            <label class="vehicle-type-radio">
+              <input type="radio" name="newVehicleType" value="อื่นๆ"> <span>อื่นๆ</span>
+            </label>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -325,9 +351,9 @@
       </div>
       <div class="modal-body" id="viewPOContent"></div>
       <!-- WF-01: QR code section (hidden เวลาพิมพ์) -->
-      <div id="poQrSection" style="display:none;text-align:center;padding:12px 0;border-top:1px dashed #ccc;margin:0 16px 8px">
+      <div id="poQrSection" class="hidden text-center" style="padding:12px 0;border-top:1px dashed #ccc;margin:0 16px 8px">
         <div style="font-size:13px;color:#555;margin-bottom:8px">สแกนเพื่อถ่ายรูปสินค้าผ่านมือถือ</div>
-        <div id="poQrCanvas" style="display:inline-block"></div>
+        <div id="poQrCanvas" class="inline-block"></div>
         <div id="poQrHint" style="font-size:11px;color:#888;margin-top:6px">ลิงก์ใช้ได้ 24 ชั่วโมง</div>
       </div>
       <div class="modal-footer">
@@ -368,9 +394,9 @@
   </div>
 
   <!-- FAB: hidden — photo count moved inline to cart-summary -->
-  <button class="photo-fab" id="fabCameraBtn" style="display:none" title="ถ่ายรูปสินค้า">
+  <button class="photo-fab hidden" id="fabCameraBtn" title="ถ่ายรูปสินค้า">
     <i class="icon-image"></i>
-    <span class="photo-fab-badge" id="fabBadge" style="display:none">0</span>
+    <span class="photo-fab-badge hidden" id="fabBadge">0</span>
   </button>
 
   <input type="file" id="photoFileInput" class="photo-file-input" accept="image/*" capture="environment">

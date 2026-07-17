@@ -344,6 +344,7 @@ class SellersController extends Controller
                 'phone'              => $seller['phone'] ?? '',
                 'address'            => $seller['address'] ?? '',
                 'vehicle_plate'      => $seller['vehicle_plate'] ?? '',
+                'vehicle_type'       => $seller['vehicle_type'] ?? '',
                 'id_card_photo'      => $seller['id_card_photo'] ?? '',
                 'pdpa_consented_at'  => $seller['pdpa_consented_at'] ?? null,
                 'is_blacklisted'     => $seller['is_blacklisted'] ?? 0,

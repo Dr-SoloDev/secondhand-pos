@@ -155,3 +155,49 @@ label {
   color: var(--color-primary);
   background: var(--color-bg);
 }
+
+/* Vehicle Type Radio Group */
+.vehicle-type-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.vehicle-type-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-round);
+  background: var(--color-white);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all var(--transition);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.vehicle-type-radio:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+.vehicle-type-radio:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
+  font-weight: 600;
+}
+.vehicle-type-radio input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  margin: 0;
+  flex-shrink: 0;
+  transition: all var(--transition);
+  position: relative;
+}
+.vehicle-type-radio input:checked {
+  border-color: var(--color-primary);
+  border-width: 5px;
+}
