@@ -30,13 +30,16 @@ bash run.sh auth sellers                      # run specific groups (test_auth, 
 API_BASE=http://other:8080/api/index.php bash run.sh   # against a different server
 
 # Tests — PHPUnit (Unit + Integration, run from code/)
+# ⚠️ Currently non-functional — no composer.json/vendor/ in repo or container.
+# All test files (FifoCalculationTest, NetProfitCalculationTest, PreciousReceiptEnforcementTest)
+# are stub-only (markTestIncomplete). Set up composer before using these.
 composer install    # if vendor/ missing
 phpunit              # uses phpunit.xml (bootstrap: base-pos/api/autoload.php)
 phpunit tests/Unit/FifoCalculationTest.php   # single file
 
-# PHP syntax check (what CI runs before tests)
-find base-pos/api -name '*.php' -exec php -l {} \;
-find customizations/api -name '*.php' -exec php -l {} \;
+# PHP syntax check — must run inside container (host has no php binary)
+docker exec scrap-pos-web bash -c "find /var/www/html/base-pos/api -name '*.php' -exec php -l {} \;"
+docker exec scrap-pos-web bash -c "find /var/www/html/customizations/api -name '*.php' -exec php -l {} \;"
 
 # Deploy (production, from code/)
 bash deploy.sh       # backup DB -> git pull -> rebuild containers -> migrate -> healthcheck -> rollback on failure
@@ -99,6 +102,7 @@ Naming: routes `kebab-case/action`, DB tables `snake_case` plural, JS identifier
 - **Never modify** `base-pos/database/pos_system.sql` (base schema).
 - All schema changes go in `customizations/database/migrations/NNN_description.sql`, guarded with `IF NOT EXISTS` (migrations may be re-run).
 - Applied in numeric order by `run-migrations.sh`. There are duplicate-numbered files from history — when adding a new migration, check the highest existing number rather than assuming no gaps/collisions.
+- **Docker entrypoint SQL** (`code/docker/entrypoint/`): mirrored copies of migrations applied automatically when the MySQL container first starts. Keep these in sync with `customizations/database/migrations/` when adding new migrations.
 
 ### Business logic: race safety on Sale Lots
 
@@ -120,6 +124,14 @@ Vanilla JS ES6, no build step, no framework. Admin pages under `base-pos/admin/*
 
 Design system is documented in `DESIGN.md` (Google Stitch format): amber primary `#D97706`, slate sidebar `#1e293b`, IBM Plex Sans Thai font.
 
+### Thai text encoding
+
+`Response::generateJson()` (`base-pos/api/Core/Response.php`) passes all response data through `TextEncoding::normalize()` (`customizations/api/Helpers/TextEncoding.php`) which repairs UTF-8-interpreted-as-Latin1 mojibake before JSON encoding. All DB writes use `JSON_UNESCAPED_UNICODE` — never use `json_encode()` without it on Thai strings, or MySQL will strip backslashes from `\uXXXX` escapes if written via raw SQL rather than a bound parameter.
+
+### Tier pricing (purchase orders)
+
+`purchase_item_catalog.tier_prices` is a JSON column: array of `{label, price}`. Business convention: **บิล1 = lowest price, บิล3 = highest** (ascending). DB may store them in any order — the frontend (`selectCatalogItem` in `purchase-orders.js`) always sorts descending→ascending before use. Button labels are always rendered as position-based `บิล${i+1}` (not the stored `label` field) to avoid label/position drift.
+
 ## Reference docs
 
 | Task | Read first |
@@ -131,20 +143,17 @@ Design system is documented in `DESIGN.md` (Google Stitch format): amber primary
 | Technical/architecture detail | `code/docs/TECHNICAL.md` |
 | User manual (Thai) | `code/docs/USER-GUIDE.md` |
 
-## Latest work: WF-05 Purchase Flow UX (2026-07-13)
+## Latest work: Tier button fixes (2026-07-17)
 
-Client demo feedback → **Cashier-Flow-First** redesign:
+| Fix | File |
+|:----|:-----|
+| Corrupted `tier_prices` label in M01 row (DB data fix) | SQL direct fix |
+| Tier buttons sort ascending (บิล1=low, บิล3=high) | `assets/js/purchase-orders.js` |
+| Button labels always position-based `บิล${i+1}` | `assets/js/purchase-orders.js` |
+| Tier buttons `flex-wrap: nowrap` + `align-items: stretch` | `assets/css/components/purchase-orders.css` |
+| 2-line height reserved on buttons (no size jump on item select) | `assets/js/purchase-orders.js` |
 
-| Change | File |
-|:-------|:-----|
-| **Layout** — ผู้ขาย → บิล → สาขา → +ผู้ขายใหม่ | `admin/purchase-orders.html` |
-| **บิล1 default** — `globalTier.level = 1` | `assets/js/purchase-orders.js` |
-| **Auto-select product** — 1 result → auto | `assets/js/purchase-orders.js` |
-| **Select-all on focus** — no need to clear weight | `assets/js/purchase-orders.js` |
-| **Focus ring** — `:focus` vs `:focus-visible` | `assets/css/components/forms.css` |
-| **Bottom row** — 0.8fr / 1fr / 1.2fr | `assets/css/components/purchase-orders.css` |
-
-Detailed spec: `code/docs/workflows/WORKFLOW-05-purchase-flow-ux.md`
+Previous: WF-05 Purchase Flow UX (2026-07-13) — Cashier-Flow-First redesign, see `code/docs/workflows/WORKFLOW-05-purchase-flow-ux.md`
 
 ## Cautions
 
