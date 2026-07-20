@@ -106,7 +106,7 @@ class PurchaseOrder extends Model
     public function cancel($id)
     {
         $po = $this->db->fetch(
-            "SELECT id, status, seller_id, total_amount FROM {$this->table} WHERE id = ?",
+            "SELECT id, branch_id, status, seller_id, total_amount FROM {$this->table} WHERE id = ?",
             [$id]
         );
         if (!$po) {
@@ -120,7 +120,7 @@ class PurchaseOrder extends Model
         try {
             // STOCK FIX: Restore stock when PO is cancelled
             $items = $this->db->fetchAll(
-                "SELECT category_id, (quantity - weight_deduction - consumed_qty) as net_unconsumed
+                "SELECT category_id, item_name, (quantity - weight_deduction - consumed_qty) as net_unconsumed
                  FROM purchase_order_items
                  WHERE purchase_order_id = ? AND category_id IS NOT NULL",
                 [$id]
@@ -128,6 +128,11 @@ class PurchaseOrder extends Model
             foreach ($items as $item) {
                 $netQty = max(0, (float)$item['net_unconsumed']);
                 if ($netQty > 0) {
+                    // ── Branch Stock: deduct per-branch per-item (ADD-001) ──
+                    $branchStock = new BranchStock();
+                    $branchStock->deduct($po['branch_id'], $item['category_id'], $item['item_name'], $netQty);
+
+                    // ── Dual-write: categories.stock_kg (backward compat) ──
                     $this->db->query(
                         "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",
                         [$netQty, $item['category_id']]
@@ -184,6 +189,8 @@ class PurchaseOrder extends Model
                 'payment_status' => $data['payment_status'] ?? 'paid',
                 'status' => $data['status'] ?? 'completed',
                 'notes' => $data['notes'] ?? null,
+                'vehicle_type' => $data['vehicle_type'] ?? null,
+                'vehicle_plate' => $data['vehicle_plate'] ?? null,
             ]);
 
             foreach ($items as $item) {
@@ -210,8 +217,12 @@ class PurchaseOrder extends Model
                     'notes' => $item['notes'] ?? null,
                 ]);
 
-                // STOCK FIX: Update category stock when PO item is created
+                // ── Branch Stock: UPSERT per-branch per-item (ADD-001) ──
                 if ($categoryId) {
+                    $branchStock = new BranchStock();
+                    $branchStock->upsert($data['branch_id'], $categoryId, $item['item_name'], $netQty, $unitPrice);
+
+                    // ── Dual-write: categories.stock_kg (backward compat) ──
                     $this->db->query(
                         "UPDATE categories SET stock_kg = stock_kg + ? WHERE id = ?",
                         [$netQty, $categoryId]

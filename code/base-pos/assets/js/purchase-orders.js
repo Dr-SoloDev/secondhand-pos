@@ -679,6 +679,8 @@ async function savePurchaseOrder() {
     seller_id: selectedSeller.id,
     payment_method: document.getElementById('paymentMethod').value,
     notes: document.getElementById('poNotes').value.trim(),
+    vehicle_type: document.getElementById('billVehicleType')?.value || null,
+    vehicle_plate: document.getElementById('billVehiclePlate').value.trim() || null,
     items: cart.map(it => ({
       catalog_id: it.catalog_id,
       item_name: it.item_name,
@@ -752,6 +754,9 @@ function clearAll() {
 
   document.getElementById('selectedSellerBox').innerHTML = '<div class="text-muted" style="font-size:13px">ยังไม่ได้เลือกผู้ขาย</div>';
   document.getElementById('poNotes').value = '';
+  const billVT = document.getElementById('billVehicleType');
+  if (billVT) billVT.value = '';
+  document.getElementById('billVehiclePlate').value = '';
   document.getElementById('itemName').value = '';
   document.getElementById('itemCatalogId').value = '';
   document.getElementById('itemCategoryId').value = '';
@@ -1059,6 +1064,15 @@ function doSelectSeller(s) {
   box.appendChild(wrap);
   document.getElementById('searchSellerInput').value = '';
   document.getElementById('sellerSearchResults').style.display = 'none';
+
+  // Pre-fill vehicle fields from seller profile (overridable per-bill)
+  if (s.vehicle_type) {
+    const sel = document.getElementById('billVehicleType');
+    if (sel) sel.value = s.vehicle_type;
+  }
+  if (s.vehicle_plate) {
+    document.getElementById('billVehiclePlate').value = s.vehicle_plate;
+  }
 }
 
 function clearSeller() {

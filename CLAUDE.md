@@ -51,23 +51,7 @@ CI (`.github/workflows/test.yml`) does: PHP lint -> load `base-pos/database/pos_
 
 ### Two-layer overlay
 
-```
-code/
-├── base-pos/            # Core POS framework, patched in-place (upstream: goragodwiriya/pos-system)
-│   ├── api/             # Router.php, Controllers/, Models/, Core/, Services/, autoload.php, config.php
-│   ├── admin/            # Admin UI pages (primary delivery target)
-│   ├── mobile/           # Standalone mobile pages (e.g. purchase.html — 4-step PO wizard)
-│   ├── pos/              # POS terminal
-│   └── assets/           # CSS + vanilla JS (no framework, no jQuery)
-└── customizations/       # Custom overlay, loaded via autoloader
-    ├── api/Models/        # Custom models (Branch, PurchaseOrder, SaleLot, Seller, StockTransfer, ...)
-    ├── api/Controllers/    # Custom controllers (SaleLotsController, StockTransfersController, ...)
-    └── database/
-        ├── migrations/     # Numbered SQL migrations (currently 001-050)
-        └── run-migrations.sh
-```
-
-`base-pos/api/autoload.php` registers both `base-pos/api/{Core,Controllers,Models,Services}` and `customizations/api/{Controllers,Models,Services,Helpers}` as class search paths — a custom class with the same name as a base one is found first if placed earlier in that list, but in practice customizations extend/replace by unique naming, not shadowing.
+Two directories: `base-pos/` (core framework, patched in-place) and `customizations/` (overlay loaded via autoloader). Custom classes extend/replace by unique naming; `base-pos/api/autoload.php` registers both `base-pos/api/{Core,Controllers,Models,Services}` and `customizations/api/{Controllers,Models,Services,Helpers}` as class search paths — a custom class with the same name as a base one is found first if placed earlier in that list, but in practice customizations extend/replace by unique naming, not shadowing.
 
 **All routes are registered in one place**: `base-pos/api/Router.php`, both core and custom. To find or add an endpoint, start there:
 
@@ -142,18 +126,6 @@ Design system is documented in `DESIGN.md` (Google Stitch format): amber primary
 | Installation | `code/docs/INSTALLATION.md` |
 | Technical/architecture detail | `code/docs/TECHNICAL.md` |
 | User manual (Thai) | `code/docs/USER-GUIDE.md` |
-
-## Latest work: Tier button fixes (2026-07-17)
-
-| Fix | File |
-|:----|:-----|
-| Corrupted `tier_prices` label in M01 row (DB data fix) | SQL direct fix |
-| Tier buttons sort ascending (บิล1=low, บิล3=high) | `assets/js/purchase-orders.js` |
-| Button labels always position-based `บิล${i+1}` | `assets/js/purchase-orders.js` |
-| Tier buttons `flex-wrap: nowrap` + `align-items: stretch` | `assets/css/components/purchase-orders.css` |
-| 2-line height reserved on buttons (no size jump on item select) | `assets/js/purchase-orders.js` |
-
-Previous: WF-05 Purchase Flow UX (2026-07-13) — Cashier-Flow-First redesign, see `code/docs/workflows/WORKFLOW-05-purchase-flow-ux.md`
 
 ## Cautions
 

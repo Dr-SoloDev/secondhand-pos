@@ -108,6 +108,8 @@ class PurchaseOrdersController extends Controller
             'payment_status' => $data['payment_status'] ?? 'paid',
             'status' => $data['status'] ?? 'completed',
             'notes' => isset($data['notes']) ? trim((string)$data['notes']) : null,
+            'vehicle_type' => !empty($data['vehicle_type']) ? trim((string)$data['vehicle_type']) : null,
+            'vehicle_plate' => !empty($data['vehicle_plate']) ? trim((string)$data['vehicle_plate']) : null,
         ];
 
         $cleanItems = [];

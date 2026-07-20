@@ -191,7 +191,7 @@
             </div>
           </div>
 
-          <!-- วิธีจ่าย + หมายเหตุ -->
+          <!-- วิธีจ่าย + หมายเหตุ + ยานพาหนะ -->
           <div class="po-bottom-card">
             <h3><i class="icon-price"></i> รายละเอียดบิล</h3>
             <div style="flex:1">
@@ -203,8 +203,25 @@
                 </select>
               </div>
               <div class="form-group po-compact-group">
+                <label class="po-small-label">ประเภทยานพาหนะ</label>
+                <select id="billVehicleType" class="form-control mt-1">
+                  <option value="">— ไม่ระบุ —</option>
+                  <option value="จักรยานยนต์">จักรยานยนต์</option>
+                  <option value="รถเก๋ง">รถเก๋ง</option>
+                  <option value="รถกระบะ">รถกระบะ</option>
+                  <option value="รถตู้">รถตู้</option>
+                  <option value="รถบรรทุก">รถบรรทุก</option>
+                  <option value="สามล้อ">สามล้อ</option>
+                  <option value="อื่นๆ">อื่นๆ</option>
+                </select>
+              </div>
+              <div class="form-group po-compact-group">
+                <label class="po-small-label">ทะเบียนรถ (บิลนี้)</label>
+                <input type="text" id="billVehiclePlate" class="form-control mt-1" maxlength="20" placeholder="เช่น กข-1234 สุรินทร์">
+              </div>
+              <div class="form-group po-compact-group">
                 <label class="po-small-label">หมายเหตุ</label>
-                <textarea id="poNotes" class="form-control mt-1" rows="3" placeholder="(ไม่บังคับ)"></textarea>
+                <textarea id="poNotes" class="form-control mt-1" rows="2" placeholder="(ไม่บังคับ)"></textarea>
               </div>
             </div>
           </div>
