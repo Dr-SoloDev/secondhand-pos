@@ -35,6 +35,12 @@
   color: #475569;
 }
 
+/* Accent Badge — Teal (NEW) */
+.badge-accent {
+  background-color: var(--color-accent-light);
+  color: var(--color-accent-darker);
+}
+
 /* Tags */
 .tag {
   display: inline-flex;

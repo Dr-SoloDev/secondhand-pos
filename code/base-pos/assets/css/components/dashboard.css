@@ -40,17 +40,17 @@
 }
 .stat-title {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: var(--font-weight-label, 600);
   text-transform: uppercase;
   letter-spacing: 0;
-  color: var(--color-text-light);
+  color: var(--color-text);
   margin-bottom: 4px;
 }
 .stat-value {
   font-size: 28px;
   font-weight: 700;
   letter-spacing: 0;
-  color: var(--color-text);
+  color: var(--color-text-heading);
 }
 .chart-container {
   height: 300px;
@@ -64,6 +64,12 @@
   height: 100%;
   color: var(--color-text-lighter);
   font-size: 14px;
+}
+
+/* Stat-card alternating icon colors (NEW) */
+.stats-grid .stat-card:nth-child(even) .stat-icon {
+  background: linear-gradient(135deg, var(--color-accent-lighter), var(--color-accent-light));
+  color: var(--color-accent);
 }
 
 /* Empty States */
