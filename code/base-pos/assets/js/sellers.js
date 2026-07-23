@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadSellers() {
     const includeBlacklisted = document.getElementById('showBlacklisted').checked;
     const query = includeBlacklisted ? '?include_blacklisted=true' : '';
-    showTableLoading('sellersTableBody', 9, 5);
+    showTableLoading('sellersTableBody', 10, 5);
     const result = await apiRequest(`sellers${query}`);
 
     if (result.status === 'success') {
@@ -455,6 +455,9 @@ async function saveSeller() {
     const vehiclePlate = document.getElementById('vehiclePlate').value.trim();
     const vehicleType = document.querySelector('input[name="vehicleType"]:checked')?.value || '';
     const tierLevelEl = document.getElementById('tierLevel');
+    const tierGroup = document.getElementById('tierLevelGroup');
+    // Only send tier_level if the dropdown is visible (admin/manager users);
+    // otherwise omit so the controller doesn't block non-admin users.
     const data = {
         full_name: fullName,
         phone: phone || null,
@@ -463,7 +466,8 @@ async function saveSeller() {
         notes: notes || null,
         vehicle_plate: vehiclePlate || null,
         vehicle_type: vehicleType || null,
-        tier_level: tierLevelEl ? parseInt(tierLevelEl.value, 10) : 1,
+        tier_level: (tierLevelEl && tierGroup && tierGroup.style.display !== 'none')
+            ? parseInt(tierLevelEl.value, 10) : undefined,
         is_blacklisted: isBlacklisted,
         blacklist_reason: isBlacklisted ? (document.getElementById('blacklistReason').value.trim() || null) : null,
         pdpa_consent: pdpaConsent,
