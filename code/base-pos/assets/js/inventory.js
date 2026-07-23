@@ -5,7 +5,10 @@ let branches = [];
 document.addEventListener('DOMContentLoaded', function() {
   initStock();
 
-  document.getElementById('branchFilterStock').addEventListener('change', renderCategoryStock);
+  document.getElementById('branchFilterStock').addEventListener('change', function() {
+    refreshCategoryStock();
+  });
+  document.getElementById('categoryStockGrid').addEventListener('click', handleCategoryCardClick);
 
   // Close modals
   document.querySelectorAll('.close-modal').forEach(button => {
@@ -14,6 +17,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+async function refreshCategoryStock() {
+  // Re-fetch categories per selected branch (เพราะ categories.stock_kg เป็น global)
+  const branchId = document.getElementById('branchFilterStock').value;
+  try {
+    let url = 'inventory/categories';
+    if (branchId !== 'all') url += `?branch_id=${branchId}`;
+
+    const catRes = await apiRequest(url);
+    if (catRes.status === 'success') {
+      categories = catRes.data;
+      renderCategoryStock();
+    }
+  } catch (error) {
+    console.error('Failed to load categories:', error);
+    showNotification('โหลดข้อมูลสต็อกตามสาขาไม่สำเร็จ', 'error');
+  }
+}
 
 async function initStock() {
   try {
@@ -56,7 +77,7 @@ let thresholdMode = false;
 
 function toggleThresholdMode() {
   thresholdMode = !thresholdMode;
-  document.getElementById('thresholdForm').style.display = thresholdMode ? '' : 'none';
+  document.getElementById('thresholdForm').classList.toggle('show', thresholdMode);
   renderCategoryStock();
 }
 
@@ -64,25 +85,11 @@ function renderCategoryStock() {
   const container = document.getElementById('categoryStockGrid');
   if (!container) return;
 
-  const branchFilter = document.getElementById('branchFilterStock').value;
-  let filtered = categories.filter(c => c.status === 'active');
-
-  if (branchFilter === 'all') {
-    const grouped = {};
-    filtered.forEach(c => {
-      if (!grouped[c.name]) grouped[c.name] = 0;
-      grouped[c.name] += parseFloat(c.stock_kg || 0);
-    });
-    filtered = Object.keys(grouped).map(name => ({
-      name: name,
-      stock_kg: grouped[name]
-    }));
-  } else {
-    filtered = filtered.filter(c => c.branch_id == branchFilter);
-  }
+  // Backend already returns per-branch data via ?branch_id=X
+  const filtered = categories.filter(c => c.status === 'active');
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:12px">ไม่มีหมวดหมู่</div>';
+    container.innerHTML = '<div class="inv-empty">ไม่มีหมวดหมู่</div>';
     return;
   }
 
@@ -92,31 +99,35 @@ function renderCategoryStock() {
     const threshold = parseFloat(c.alert_threshold || 0);
     const isAlert = threshold > 0 && kg <= threshold;
     const pct = Math.min(100, (kg / maxStock) * 100);
-    let barColor = 'var(--color-success)';
-    if (kg <= 0) barColor = 'var(--color-danger)';
-    else if (isAlert) barColor = 'var(--color-warning)';
-    else if (pct < 20) barColor = 'var(--color-warning)';
+    const catId = c.id || '';
 
-    const thresholdInput = thresholdMode && c.id ? `
-      <div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+    const thresholdInput = thresholdMode && catId ? `
+      <div class="inv-threshold-row">
         <input type="number" min="0" step="0.001" placeholder="ตั้ง alert (กก.)"
           value="${c.alert_threshold != null ? c.alert_threshold : ''}"
-          style="width:100%;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px"
-          onchange="saveThreshold(${c.id}, this.value)">
+          class="inv-threshold-input"
+          onchange="saveThreshold(${catId}, this.value)">
       </div>` : '';
 
     const alertBadge = isAlert && !thresholdMode
-      ? `<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:99px;margin-left:4px">⚠ ใกล้หมด</span>` : '';
+      ? `<span class="inv-alert-badge">⚠ ใกล้หมด</span>` : '';
+
+    const kgClass = kg <= 0 ? 'danger' : isAlert ? 'warning' : pct < 20 ? 'warning' : 'success';
+    const barClass = kgClass;
 
     return `
-      <div style="background:#fff;border:1px solid ${isAlert ? '#fcd34d' : '#e2e8f0'};border-radius:10px;padding:14px">
-        <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:6px">${escapeHtml(c.name)}${alertBadge}</div>
-        <div style="font-size:22px;font-weight:700;color:${barColor}">${kg.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
-        <div style="font-size:11px;color:#94a3b8">กก.</div>
-        <div style="margin-top:8px;height:4px;background:#f1f5f9;border-radius:4px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width 0.3s"></div>
+      <div class="inv-cat-card${isAlert ? ' alert' : ''}${catId ? ' inv-clickable' : ''}"${catId ? ` data-category-id="${catId}"` : ''}>
+        <div class="inv-cat-card-header">
+          <div class="inv-cat-name">${escapeHtml(c.name)}${alertBadge}</div>
+          ${catId ? '<span class="inv-expand-icon">▼</span>' : ''}
+        </div>
+        <div class="inv-cat-kg ${kgClass}">${kg.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+        <div class="inv-cat-unit">กก.</div>
+        <div class="inv-progress-bar">
+          <div class="inv-progress-fill ${barClass}" style="width:${pct}%"></div>
         </div>
         ${thresholdInput}
+        ${catId ? '<div class="inv-item-table-wrap"></div>' : ''}
       </div>`;
   }).join('');
 }
@@ -130,6 +141,101 @@ async function saveThreshold(categoryId, value) {
   } else {
     showNotification('บันทึก threshold ไม่สำเร็จ', 'error');
   }
+}
+
+/**
+ * Click handler: expand/collapse category card → show item-level stock
+ */
+async function handleCategoryCardClick(e) {
+  const card = e.target.closest('.inv-cat-card.inv-clickable');
+  if (!card) return;
+
+  const catId = card.dataset.categoryId;
+  if (!catId) return;
+
+  const wrap = card.querySelector('.inv-item-table-wrap');
+  if (!wrap) return;
+
+  if (card.classList.contains('inv-expanded')) {
+    // Collapse
+    card.classList.remove('inv-expanded');
+    return;
+  }
+
+  // Expand + fetch
+  card.classList.add('inv-expanded');
+
+  if (!wrap.dataset.loaded) {
+    wrap.innerHTML = '<div class="inv-item-loading">กำลังโหลด...</div>';
+    try {
+      await loadCategoryItems(card, catId, wrap);
+      wrap.dataset.loaded = '1';
+    } catch (err) {
+      wrap.innerHTML = '<div class="inv-item-error">โหลดข้อมูลไม่สำเร็จ</div>';
+      console.error('Load items failed:', err);
+    }
+  }
+}
+
+/**
+ * Fetch item-level stock from API and render table
+ */
+async function loadCategoryItems(card, catId, wrap) {
+  const branchId = document.getElementById('branchFilterStock').value;
+  const params = new URLSearchParams({ category_id: catId });
+  if (branchId !== 'all') params.set('branch_id', branchId);
+
+  const res = await apiRequest(`inventory/category-items?${params}`);
+  if (res.status !== 'success') {
+    wrap.innerHTML = '<div class="inv-item-error">โหลดข้อมูลไม่สำเร็จ</div>';
+    return;
+  }
+
+  const data = res.data;
+  if (!data.items || data.items.length === 0) {
+    wrap.innerHTML = '<div class="inv-item-empty">ไม่มีรายการในหมวดนี้</div>';
+    return;
+  }
+
+  wrap.innerHTML = renderItemTable(data.items);
+}
+
+/**
+ * Render item-level stock table HTML
+ */
+function renderItemTable(items) {
+  const maxKg = Math.max(...items.map(i => i.stock_kg), 1);
+
+  return `<table class="inv-item-table">
+    <thead>
+      <tr>
+        <th class="inv-item-col-num">#</th>
+        <th class="inv-item-col-name">รายการ</th>
+        <th class="inv-item-col-kg">สต็อก (กก.)</th>
+        <th class="inv-item-col-bar"></th>
+        <th class="inv-item-col-price">ราคาล่าสุด/กก.</th>
+        <th class="inv-item-col-count">ครั้ง</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${items.map((item, i) => {
+        const pct = Math.min(100, (item.stock_kg / maxKg) * 100);
+        const barClass = item.stock_kg <= 0 ? 'danger' : pct < 20 ? 'warning' : 'success';
+        return `<tr>
+          <td class="inv-item-col-num">${i + 1}</td>
+          <td class="inv-item-col-name">${escapeHtml(item.item_name)}</td>
+          <td class="inv-item-col-kg">${item.stock_kg.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+          <td class="inv-item-col-bar">
+            <div class="inv-item-stock-bar">
+              <div class="inv-item-stock-fill ${barClass}" style="width:${pct}%"></div>
+            </div>
+          </td>
+          <td class="inv-item-col-price">${item.latest_unit_price > 0 ? item.latest_unit_price.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-'}</td>
+          <td class="inv-item-col-count">${item.purchase_count}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
 }
 
 function renderStockSummary() {

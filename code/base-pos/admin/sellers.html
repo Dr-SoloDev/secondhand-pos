@@ -51,16 +51,14 @@
         </div>
       </div>
 
-      <div class="page-header">
+      <div class="sellers-page-header">
         <h1>จัดการผู้ขาย</h1>
-        <div>
-          <button class="btn btn-primary" onclick="openAddSellerModal()">
-            <i class="icon-additem"></i> เพิ่มผู้ขาย
-          </button>
-        </div>
+        <button class="btn btn-primary" onclick="openAddSellerModal()">
+          <i class="icon-additem"></i> เพิ่มผู้ขาย
+        </button>
       </div>
 
-      <div class="card">
+      <div class="card sellers-card">
         <div class="card-header">
           <h2 class="card-title">รายชื่อผู้ขาย</h2>
           <div class="card-tools">
@@ -68,25 +66,25 @@
           </div>
         </div>
         <div class="card-body">
-          <div class="filters">
+          <div class="sellers-filter-bar">
             <label class="sellers-filter-checkbox">
               <input type="checkbox" id="showBlacklisted" onchange="loadSellers()">
               แสดงบัญชีดำ
             </label>
           </div>
           <div class="table-container">
-            <table class="data-table" id="sellersTable">
+            <table class="sellers-table" id="sellersTable">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>ชื่อ-นามสกุล</th>
-                  <th>เบอร์โทร</th>
-                  <th>บัตรประชาชน</th>
-                  <th>ครั้งที่ขาย</th>
-                  <th>ยอดรวม (฿)</th>
-                  <th>ขายล่าสุด</th>
-                  <th>สถานะ</th>
-                  <th>จัดการ</th>
+                  <th class="col-id">ID</th>
+                  <th class="col-name">ชื่อ-นามสกุล</th>
+                  <th class="col-phone">เบอร์โทร</th>
+                  <th class="col-idcard">บัตรประชาชน</th>
+                  <th class="col-count">ครั้งที่ขาย</th>
+                  <th class="col-amount">ยอดรวม (฿)</th>
+                  <th class="col-last">ขายล่าสุด</th>
+                  <th class="col-status">สถานะ</th>
+                  <th class="col-actions">จัดการ</th>
                 </tr>
               </thead>
               <tbody id="sellersTableBody">
@@ -159,7 +157,7 @@
   </div>
 
   <!-- Modal: Add/Edit Seller -->
-  <div class="modal" id="sellerModal">
+  <div class="modal seller-form-modal" id="sellerModal">
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="modalTitle">เพิ่มผู้ขาย</h2>

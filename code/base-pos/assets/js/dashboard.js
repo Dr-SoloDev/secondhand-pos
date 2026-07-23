@@ -1,7 +1,8 @@
 let allBranches = [];
 let currentBranchMode = 'all';
 let currentBranchId   = null;   // WF-04: สาขาที่เลือกอยู่
-let refreshTimer      = null;   // WF-04: auto-refresh timer
+let refreshTimer      = null;   // auto-refresh timer
+let lastRefreshTime   = null;   // เวลาอัปเดตล่าสุด
 
 document.addEventListener('DOMContentLoaded', function() {
   fetchDashboardData();
@@ -12,10 +13,11 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchSalelotChartData(this.value);
   });
 
-  // WF-04: auto-refresh ทุก 2 นาที
+  // Auto-refresh ทุก 10 วินาที (real-time)
   refreshTimer = setInterval(() => {
+    console.log('[Dashboard] Auto-refresh triggered at', new Date().toLocaleTimeString('th-TH'));
     fetchDashboardData(currentBranchId);
-  }, 2 * 60 * 1000);
+  }, 10 * 1000);
 
   window.addEventListener('beforeunload', function() {
     if (refreshTimer) {
@@ -61,9 +63,30 @@ async function fetchDashboardData(branchId = null) {
   if (stockRes.status === 'success') renderLowStockItems(stockRes.data);
   else if (stockRes.message) showNotification('โหลดสต็อกไม่สำเร็จ', 'error');
 
+  // อัปเดตเวลาที่ดึงข้อมูลล่าสุด
+  lastRefreshTime = new Date();
+  updateRefreshIndicator();
+
   const period = document.getElementById('purchasePeriod')?.value || 'week';
   fetchPurchaseChartData(period);
   fetchSalelotChartData(document.getElementById('salelotPeriod')?.value || 'week');
+}
+
+function updateRefreshIndicator() {
+  const el = document.getElementById('refreshTimestamp');
+  if (!el) return;
+  if (lastRefreshTime) {
+    const timeStr = lastRefreshTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    el.textContent = 'อัปเดตล่าสุด: ' + timeStr;
+    el.style.color = '#10b981'; // เขียว = อัปเดตเมื่อกี้
+
+    // เปลี่ยนสีเป็นเทาหลังผ่าน 2 วินาที
+    setTimeout(() => {
+      el.style.color = '#888';
+    }, 2000);
+
+    console.log('[Dashboard] Refresh indicator updated:', timeStr);
+  }
 }
 
 function buildBranchSingleButtons(branches) {

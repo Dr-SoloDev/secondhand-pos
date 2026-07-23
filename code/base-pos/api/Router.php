@@ -81,6 +81,7 @@ class Router
         $this->routes[] = ['route' => 'inventory/categories', 'controller' => 'InventoryController', 'method' => 'createCategory', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'inventory/set-threshold', 'controller' => 'InventoryController', 'method' => 'setThreshold', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'inventory/stock-alerts', 'controller' => 'InventoryController', 'method' => 'getStockAlerts', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'inventory/category-items', 'controller' => 'InventoryController', 'method' => 'getCategoryItems', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'getCategory', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'updateCategory', 'verb' => 'PUT'];
         $this->routes[] = ['route' => 'inventory/category', 'controller' => 'InventoryController', 'method' => 'deleteCategory', 'verb' => 'DELETE'];

@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>สต็อกสินค้า - รักษ์สะอาดรีไซเคิล</title>
-  <link rel="stylesheet" href="../assets/css/main.css">
+  <link rel="stylesheet" href="../assets/css/main.css?v=20260718">
 </head>
 
 <body>
@@ -52,7 +52,7 @@
         </div>
       </div>
 
-      <div class="page-header">
+      <div class="inv-page-header">
         <h1>สินค้าคงคลัง</h1>
         <p>ตรวจสอบสต็อกสินค้าตามหมวดหมู่แต่ละสาขา</p>
       </div>
@@ -81,22 +81,22 @@
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:16px">
+      <div class="card inv-card">
         <div class="card-header">
           <h2 class="card-title">สต็อกตามหมวด (กก.)</h2>
-          <div class="card-tools">
-            <select id="branchFilterStock" class="form-control" style="width:200px;margin-right:8px">
+          <div class="inv-card-tools">
+            <select id="branchFilterStock" class="form-control inv-branch-select">
               <option value="all">รวมทุกสาขา</option>
             </select>
             <button class="btn btn-sm btn-secondary" id="refreshCategoryStock" onclick="renderCategoryStock()">รีเฟรช</button>
-            <button class="btn btn-sm btn-secondary" style="margin-left:4px" onclick="toggleThresholdMode()">⚙ ตั้ง Alert</button>
+            <button class="btn btn-sm btn-secondary inv-threshold-btn" onclick="toggleThresholdMode()">⚙ ตั้ง Alert</button>
           </div>
         </div>
         <div class="card-body">
-          <div id="thresholdForm" class="alert-banner" style="display:none;border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px">
+          <div id="thresholdForm" class="inv-threshold-form">
             <strong>โหมดตั้งค่าแจ้งเตือน</strong> — กรอกตัวเลข (กก.) ที่ต้องการให้แจ้งเตือนเมื่อสต็อกต่ำกว่า ปล่อยว่างเพื่อปิดแจ้งเตือน
           </div>
-          <div id="categoryStockGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px"></div>
+          <div id="categoryStockGrid" class="inv-category-grid"></div>
         </div>
       </div>
 
@@ -110,7 +110,7 @@
               </div>
             </div>
             <div class="card-body">
-              <div id="stockAlertsContainer">
+              <div id="stockAlertsContainer" class="inv-alerts-table">
                 <div class="chart-placeholder">กำลังโหลด...</div>
               </div>
             </div>
@@ -124,7 +124,7 @@
 
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
-  <script src="../assets/js/inventory.js?v=20260607"></script>
+  <script src="../assets/js/inventory.js?v=20260718"></script>
   <script src="../assets/js/animations.js"></script>
 <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 </body>

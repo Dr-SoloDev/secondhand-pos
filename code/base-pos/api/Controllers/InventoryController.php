@@ -5,8 +5,41 @@ class InventoryController extends Controller
     public function getCategories()
     {
         $this->requireAuth();
+        $branchId = isset($_GET['branch_id']) ? intval($_GET['branch_id']) : 0;
+
         $categoryModel = new Category();
         $categories = $categoryModel->findAll('name ASC');
+
+        if ($branchId) {
+            // Per-branch mode: compute actual stock from PO items
+            // เพราะ categories.stock_kg เป็น global ไม่แยกสาขา
+            $branchStocks = $this->db->fetchAll(
+                "SELECT poi.category_id,
+                        ROUND(SUM(poi.quantity - poi.weight_deduction - poi.consumed_qty), 3) AS stock_kg
+                 FROM purchase_order_items poi
+                 INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
+                 WHERE po.branch_id = ?
+                   AND po.status = 'completed'
+                   AND (poi.quantity - poi.consumed_qty) > 0
+                 GROUP BY poi.category_id",
+                [$branchId]
+            );
+
+            // Build lookup: category_id => stock_kg
+            $stockMap = [];
+            foreach ($branchStocks as $row) {
+                $catId = (int)$row['category_id'];
+                if ($catId > 0) {
+                    $stockMap[$catId] = (float)$row['stock_kg'];
+                }
+            }
+
+            // Override stock_kg for each category
+            foreach ($categories as &$cat) {
+                $cat['stock_kg'] = $stockMap[(int)$cat['id']] ?? 0;
+            }
+            unset($cat);
+        }
 
         Response::success('Categories retrieved', $categories);
     }
@@ -475,15 +508,157 @@ class InventoryController extends Controller
         Response::success('บันทึกแล้ว');
     }
 
+    /**
+     * SECURITY: Non-admin บังคับ scope ที่ branch ของตัวเองเสมอ
+     */
+    private function enforceBranchScope()
+    {
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch) {
+                Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+            }
+            return $userBranch;
+        }
+        return null; // admin: no restriction
+    }
+
     public function getStockAlerts()
     {
         $this->requireAuth();
+        $userBranch = $this->enforceBranchScope();
+        $branchId = isset($_GET['branch_id']) && is_numeric($_GET['branch_id'])
+            ? intval($_GET['branch_id']) : null;
+        if ($userBranch !== null) {
+            $branchId = $userBranch;
+        }
+
+        // Query branch_stock for items below threshold
+        // Joined with categories to get the alert_threshold
+        $where = [];
+        $params = [];
+
+        if ($branchId) {
+            $where[] = "bs.branch_id = ?";
+            $params[] = $branchId;
+        }
+
+        // Alert: stock_kg <= 0 (out of stock) OR stock_kg <= alert_threshold
+        // When categories.alert_threshold is NULL, treat as threshold = 0
+        $where[] = "(c.alert_threshold IS NOT NULL AND bs.stock_kg <= c.alert_threshold)
+                    OR (c.alert_threshold IS NULL AND bs.stock_kg <= 0)";
+
+        $whereClause = " WHERE " . implode(' AND ', $where);
+
         $rows = $this->db->fetchAll(
-            "SELECT id, name, stock_kg, alert_threshold, default_unit
-             FROM categories
-             WHERE status='active' AND alert_threshold IS NOT NULL AND stock_kg <= alert_threshold
-             ORDER BY stock_kg ASC"
+            "SELECT
+                bs.id,
+                bs.branch_id,
+                b.name AS branch_name,
+                bs.category_id,
+                c.name AS category_name,
+                bs.item_name,
+                bs.stock_kg,
+                bs.unit_price,
+                (bs.stock_kg * bs.unit_price) AS inventory_value,
+                c.alert_threshold
+            FROM branch_stock bs
+            LEFT JOIN categories c ON bs.category_id = c.id
+            LEFT JOIN branches b ON bs.branch_id = b.id
+            $whereClause
+            ORDER BY bs.stock_kg ASC, c.name ASC, bs.item_name ASC",
+            $params
         );
-        Response::success('สำเร็จ', ['items' => $rows ?: []]);
+
+        $totalAlerts = count($rows);
+        $zeroStockCount = 0;
+        $belowThresholdCount = 0;
+        foreach ($rows as &$row) {
+            if ($row['stock_kg'] <= 0) {
+                $zeroStockCount++;
+            } else {
+                $belowThresholdCount++;
+            }
+        }
+        unset($row);
+
+        Response::success('สำเร็จ', [
+            'items' => $rows ?: [],
+            'summary' => [
+                'total_alerts' => $totalAlerts,
+                'zero_stock' => $zeroStockCount,
+                'below_threshold' => $belowThresholdCount,
+            ]
+        ]);
+    }
+
+    /**
+     * GET /inventory/category-items?category_id=X&branch_id=Y
+     * คืนค่ารายการสินค้า (item_name) ในหมวดหมู่พร้อมสต็อกคงเหลือ (กก.)
+     * ดึงจาก branch_stock (SSoT) แทนการคำนวณจาก PO items โดยตรง
+     */
+    public function getCategoryItems()
+    {
+        $this->requireAuth();
+        $categoryId = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
+        $branchId   = isset($_GET['branch_id'])   ? intval($_GET['branch_id'])   : 0;
+
+        if (!$categoryId) {
+            Response::error('ต้องระบุ category_id', 400);
+            return;
+        }
+
+        // ตรวจสอบหมวดหมู่
+        $categoryModel = new Category();
+        $category = $categoryModel->findById($categoryId);
+        if (!$category) {
+            Response::error('ไม่พบหมวดหมู่', 404);
+            return;
+        }
+
+        // Query item-level stock จาก branch_stock (SSoT)
+        $sql = "SELECT
+                    bs.item_name,
+                    bs.stock_kg,
+                    bs.unit_price AS latest_unit_price
+                FROM branch_stock bs
+                WHERE bs.category_id = ?";
+        $params = [$categoryId];
+
+        if ($branchId) {
+            $sql .= " AND bs.branch_id = ?";
+            $params[] = $branchId;
+        }
+
+        $sql .= " ORDER BY bs.stock_kg DESC, bs.item_name ASC";
+
+        $items = $this->db->fetchAll($sql, $params) ?: [];
+
+        $totalStockKg = 0;
+        $formattedItems = [];
+        foreach ($items as $item) {
+            $kg = (float)$item['stock_kg'];
+            $totalStockKg += $kg;
+            $formattedItems[] = [
+                'item_name'         => $item['item_name'],
+                'stock_kg'          => $kg,
+                'latest_unit_price' => (float)($item['latest_unit_price'] ?? 0),
+            ];
+        }
+        $totalItems = count($formattedItems);
+
+        // Per-branch: แสดง stock_kg จริงที่ query ได้ (ไม่ใช่ global categories.stock_kg)
+        $catStockKg = $branchId ? $totalStockKg : (float)$category['stock_kg'];
+
+        Response::success('สำเร็จ', [
+            'category' => [
+                'id'       => (int)$category['id'],
+                'name'     => $category['name'],
+                'stock_kg' => $catStockKg,
+            ],
+            'items'          => $formattedItems,
+            'total_items'    => $totalItems,
+            'total_stock_kg' => $totalStockKg,
+        ]);
     }
 }

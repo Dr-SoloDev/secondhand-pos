@@ -93,7 +93,8 @@ class StockTransfer extends Model
         try {
             // ── 1. เช็คสต็อกจริงจาก PO items ต้นทาง (ไม่ใช่ global stock_kg) ──
             $availableRows = $this->db->fetchAll(
-                "SELECT poi.id, (poi.quantity - poi.consumed_qty) AS avail, poi.unit_price
+                "SELECT poi.id, poi.item_name,
+                        (poi.quantity - poi.consumed_qty) AS avail, poi.unit_price
                  FROM purchase_order_items poi
                  JOIN purchase_orders po ON poi.purchase_order_id = po.id
                  WHERE po.branch_id = ? AND poi.category_id = ?
@@ -111,13 +112,14 @@ class StockTransfer extends Model
                     " กก. ต้องการ " . number_format($weightNeeded, 2) . " กก.)"
                 );
             }
-            // ── 2. หัก consumed_qty จาก PO items ต้นทาง (FIFO) ──
-            //        พร้อมคำนวณ weighted avg cost ของที่โอน
+            // ── 2. หัก consumed_qty จาก PO items ต้นทาง (FIFO) + เก็บ item_name ──
             $remaining   = $weightNeeded;
             $totalCost   = 0.0;
+            $itemBatches = []; // item_name => ['qty' => float, 'cost' => float]
             foreach ($availableRows as $row) {
                 if ($remaining <= 0) break;
                 $take = min((float)$row['avail'], $remaining);
+                $itemName = $row['item_name'] ?? '';
 
                 $stmt = $this->db->prepare(
                     "UPDATE purchase_order_items
@@ -126,16 +128,23 @@ class StockTransfer extends Model
                 );
                 $this->db->execute($stmt, [$take, $row['id'], $take]);
 
-                $totalCost += $take * (float)$row['unit_price'];
+                $rowCost = $take * (float)$row['unit_price'];
+                $totalCost += $rowCost;
                 $remaining -= $take;
-            }
 
-            $avgUnitPrice = $weightNeeded > 0 ? round($totalCost / $weightNeeded, 4) : 0;
+                // Group by item_name
+                if ($itemName) {
+                    if (!isset($itemBatches[$itemName])) {
+                        $itemBatches[$itemName] = ['qty' => 0, 'cost' => 0];
+                    }
+                    $itemBatches[$itemName]['qty'] += $take;
+                    $itemBatches[$itemName]['cost'] += $rowCost;
+                }
+            }
 
             $transferSellerId = $this->getTransferSellerId($toBranch);
 
-            // ── 3. สร้าง "transfer PO" ในสาขาปลายทาง ──
-            //        ให้ FIFO ของปลายทางเดินต่อได้ตามปกติ
+            // ── 3. สร้าง "transfer PO" ในสาขาปลายทาง + branch_stock ──
             $today    = date('Ymd');
             $lastSeq  = $this->db->fetchColumn(
                 "SELECT MAX(CAST(SUBSTRING_INDEX(reference_no, '-', -1) AS UNSIGNED))
@@ -148,35 +157,48 @@ class StockTransfer extends Model
             $poId = $this->db->fetchColumn(
                 "SELECT id FROM purchase_orders WHERE reference_no = ?", [$refNo]
             );
+            $totalItems = count($itemBatches);
             if (!$poId) {
                 $stmt = $this->db->prepare(
                     "INSERT INTO purchase_orders
                        (reference_no, branch_id, seller_id, user_id,
                         total_items, total_amount, payment_method, payment_status, status, notes)
-                     VALUES (?, ?, ?, ?, 1, ?, 'cash', 'paid', 'completed', ?)"
+                     VALUES (?, ?, ?, ?, ?, ?, 'cash', 'paid', 'completed', ?)"
                 );
                 $this->db->execute($stmt, [
                     $refNo, $toBranch, $transferSellerId, $userId,
-                    round($totalCost, 2),
+                    $totalItems ?: 1, round($totalCost, 2),
                     "โอนสต็อกจากสาขา {$fromBranch} (ST: {$st['reference_no']})",
                 ]);
                 $poId = (int)$this->db->lastInsertId();
             }
 
-            $stmt = $this->db->prepare(
-                "INSERT INTO purchase_order_items
-                   (purchase_order_id, item_name, category_id,
-                    quantity, unit_price, total_price, consumed_qty, unit)
-                 VALUES (?, ?, ?, ?, ?, ?, 0, 'กก.')"
-            );
-            $this->db->execute($stmt, [
-                $poId,
-                "โอนสต็อก (ST: {$st['reference_no']})",
-                $categoryId,
-                $weightNeeded,
-                $avgUnitPrice,
-                round($totalCost, 2),
-            ]);
+            // Create PO items per item_name + update branch_stock
+            foreach ($itemBatches as $origItemName => $batch) {
+                $batchQty = $batch['qty'];
+                $batchCost = $batch['cost'];
+                $batchUnitPrice = $batchQty > 0 ? round($batchCost / $batchQty, 4) : 0;
+
+                $stmt = $this->db->prepare(
+                    "INSERT INTO purchase_order_items
+                       (purchase_order_id, item_name, category_id,
+                        quantity, unit_price, total_price, consumed_qty, unit)
+                     VALUES (?, ?, ?, ?, ?, ?, 0, 'กก.')"
+                );
+                $this->db->execute($stmt, [
+                    $poId,
+                    $origItemName,  // ← PRESERVE original item_name!
+                    $categoryId,
+                    $batchQty,
+                    $batchUnitPrice,
+                    round($batchCost, 2),
+                ]);
+
+                // ── Branch Stock: deduct origin, upsert destination (ADD-001) ──
+                $branchStock = new BranchStock();
+                $branchStock->deduct($fromBranch, $categoryId, $origItemName, $batchQty);
+                $branchStock->upsert($toBranch, $categoryId, $origItemName, $batchQty, $batchUnitPrice);
+            }
 
             // ── 4. อัปเดตสถานะ + บันทึกน้ำหนักรับจริง ──
             $stmt = $this->db->prepare(
@@ -187,7 +209,6 @@ class StockTransfer extends Model
             );
             $this->db->execute($stmt, [$userId, $weightNeeded, $receiveNote, $id]);
 
-            // ── 5. stock_kg global ไม่เปลี่ยน (ของยังอยู่ในระบบ แค่ย้ายสาขา) ──
 
             $this->db->commit();
         } catch (Exception $e) {

@@ -57,13 +57,27 @@ class ReportService
             $branchId ? [$branchId] : []
         );
 
-        // Low stock count
+        // Low stock count (retail products)
         $lowStockCount = $this->db->fetchColumn(
             "SELECT COUNT(*)
               FROM products
               WHERE quantity <= low_stock_threshold
               AND status = 'active'" . $bWhere,
             $branchId ? [$branchId] : []
+        );
+
+        // ── Branch Stock (scrap inventory) stats ──
+        $bWhereBS = $branchId ? " WHERE branch_id = ?" : "";
+        $bsParams = $branchId ? [$branchId] : [];
+
+        $branchStockSummary = $this->db->fetch(
+            "SELECT
+                COUNT(*) as total_items,
+                COALESCE(SUM(stock_kg), 0) as total_kg,
+                COALESCE(SUM(stock_kg * unit_price), 0) as total_value,
+                SUM(CASE WHEN stock_kg <= 0 THEN 1 ELSE 0 END) as zero_stock_count
+            FROM branch_stock" . $bWhereBS,
+            $bsParams
         );
 
         // Sale lot stats
@@ -100,17 +114,23 @@ class ReportService
             'low_stock_count' => intval($lowStockCount),
             'today_salelot_amount' => floatval($todaySaleLotAmount),
             'month_salelot_profit' => floatval($monthSaleLotProfit),
-            'pending_salelots' => intval($pendingSaleLots)
+            'pending_salelots' => intval($pendingSaleLots),
+            // Branch Stock (scrap inventory) metrics
+            'branch_stock_total_items' => intval($branchStockSummary['total_items']),
+            'branch_stock_total_kg' => floatval($branchStockSummary['total_kg']),
+            'branch_stock_total_value' => floatval($branchStockSummary['total_value']),
+            'branch_stock_zero_count' => intval($branchStockSummary['zero_stock_count'])
         ];
     }
 
     public function getRecentPurchases($limit = 10, $branchId = null)
     {
         $branchFilter = $branchId ? 'AND po.branch_id = ?' : '';
-        $params = [$limit];
+        $params = [];
         if ($branchId) {
-            $params[] = $branchId;
+            $params[] = $branchId;  // branch_id first (WHERE clause)
         }
+        $params[] = $limit;  // limit last (LIMIT clause)
 
         return $this->db->fetchAll(
             "SELECT
@@ -350,10 +370,11 @@ class ReportService
     public function getRecentSales($limit = 10, $branchId = null)
     {
         $branchFilter = $branchId ? 'AND s.branch_id = ?' : '';
-        $params = [$limit];
+        $params = [];
         if ($branchId) {
-            $params[] = $branchId;
+            $params[] = $branchId;  // branch_id first (WHERE clause)
         }
+        $params[] = $limit;  // limit last (LIMIT clause)
 
         return $this->db->fetchAll(
             "SELECT
@@ -510,51 +531,51 @@ class ReportService
      */
     public function getInventoryReport($categoryId = null, $stockStatus = null, $branchId = null)
     {
-        $conditions = ["p.status = 'active'"];
-        $params = [];
+        // ── Part 1: Retail Products (from `products` table) ──
+        $prodConditions = ["p.status = 'active'"];
+        $prodParams = [];
 
         if ($categoryId) {
-            $conditions[] = "p.category_id = ?";
-            $params[] = $categoryId;
+            $prodConditions[] = "p.category_id = ?";
+            $prodParams[] = $categoryId;
         }
 
         if ($stockStatus) {
             switch ($stockStatus) {
                 case 'low':
-                    $conditions[] = "p.quantity <= p.low_stock_threshold AND p.quantity > 0";
+                    $prodConditions[] = "p.quantity <= p.low_stock_threshold AND p.quantity > 0";
                     break;
                 case 'out':
-                    $conditions[] = "p.quantity <= 0";
+                    $prodConditions[] = "p.quantity <= 0";
                     break;
             }
         }
 
         if ($branchId) {
-            $conditions[] = "p.branch_id = ?";
-            $params[] = $branchId;
+            $prodConditions[] = "p.branch_id = ?";
+            $prodParams[] = $branchId;
         }
 
-        $whereClause = " WHERE ".implode(' AND ', $conditions);
+        $prodWhere = " WHERE " . implode(' AND ', $prodConditions);
 
         $inventory = $this->db->fetchAll(
             "SELECT
-        p.id,
-        p.sku,
-        p.name,
-        p.quantity,
-        p.low_stock_threshold,
-        c.name as category_name,
-        p.price,
-        p.cost,
-        (p.quantity * p.cost) as inventory_value
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    $whereClause
-    ORDER BY p.name ASC",
-            $params
+                p.id,
+                p.sku,
+                p.name,
+                p.quantity,
+                p.low_stock_threshold,
+                c.name as category_name,
+                p.price,
+                p.cost,
+                (p.quantity * p.cost) as inventory_value
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            $prodWhere
+            ORDER BY p.name ASC",
+            $prodParams
         );
 
-        // Calculate totals
         $totalItems = count($inventory);
         $totalQuantity = 0;
         $totalValue = 0;
@@ -564,11 +585,71 @@ class ReportService
         foreach ($inventory as $item) {
             $totalQuantity += $item['quantity'];
             $totalValue += $item['inventory_value'];
-
             if ($item['quantity'] <= 0) {
                 $outOfStockCount++;
             } elseif ($item['quantity'] <= $item['low_stock_threshold']) {
                 $lowStockCount++;
+            }
+        }
+
+        // ── Part 2: Scrap / Branch Stock (from `branch_stock` table) ──
+        $bsConditions = [];
+        $bsParams = [];
+
+        if ($categoryId) {
+            $bsConditions[] = "bs.category_id = ?";
+            $bsParams[] = $categoryId;
+        }
+
+        if ($stockStatus) {
+            switch ($stockStatus) {
+                case 'low':
+                    // branch_stock has no threshold column; treat "low" as stock_kg <= 0
+                    $bsConditions[] = "bs.stock_kg <= 0";
+                    break;
+                case 'out':
+                    $bsConditions[] = "bs.stock_kg <= 0";
+                    break;
+            }
+        }
+
+        if ($branchId) {
+            $bsConditions[] = "bs.branch_id = ?";
+            $bsParams[] = $branchId;
+        }
+
+        $bsWhere = count($bsConditions) ? " WHERE " . implode(' AND ', $bsConditions) : "";
+
+        $branchStock = $this->db->fetchAll(
+            "SELECT
+                bs.id,
+                bs.branch_id,
+                b.name as branch_name,
+                bs.category_id,
+                c.name as category_name,
+                bs.item_name,
+                bs.stock_kg,
+                bs.unit_price,
+                (bs.stock_kg * bs.unit_price) as inventory_value,
+                bs.last_updated
+            FROM branch_stock bs
+            LEFT JOIN categories c ON bs.category_id = c.id
+            LEFT JOIN branches b ON bs.branch_id = b.id
+            $bsWhere
+            ORDER BY c.name ASC, bs.item_name ASC",
+            $bsParams
+        );
+
+        $bsTotalItems = count($branchStock);
+        $bsTotalKg = 0;
+        $bsTotalValue = 0;
+        $bsZeroStockCount = 0;
+
+        foreach ($branchStock as $item) {
+            $bsTotalKg += $item['stock_kg'];
+            $bsTotalValue += $item['inventory_value'];
+            if ($item['stock_kg'] <= 0) {
+                $bsZeroStockCount++;
             }
         }
 
@@ -580,6 +661,14 @@ class ReportService
                 'total_value' => $totalValue,
                 'low_stock_count' => $lowStockCount,
                 'out_of_stock_count' => $outOfStockCount
+            ],
+            // New: Branch Stock (scrap inventory) section
+            'branch_stock_inventory' => $branchStock,
+            'branch_stock_totals' => [
+                'total_items' => $bsTotalItems,
+                'total_kg' => $bsTotalKg,
+                'total_value' => $bsTotalValue,
+                'zero_stock_count' => $bsZeroStockCount
             ]
         ];
     }
@@ -660,10 +749,11 @@ class ReportService
     public function getRecentSaleLots($limit = 10, $branchId = null)
     {
         $branchFilter = $branchId ? 'AND sl.branch_id = ?' : '';
-        $params = [$limit];
+        $params = [];
         if ($branchId) {
-            $params[] = $branchId;
+            $params[] = $branchId;  // branch_id first (WHERE clause)
         }
+        $params[] = $limit;  // limit last (LIMIT clause)
 
         return $this->db->fetchAll(
             "SELECT

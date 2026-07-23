@@ -423,20 +423,40 @@ function addItemToCart() {
   const price = parseFloat(document.getElementById('itemUnitPrice').value || 0);
   const unit = document.getElementById('itemUnit').value || 'กก.';
 
-  if (!name) { showNotification('กรุณากรอกชื่อสินค้า', 'error'); return; }
-  if (!catalogId) { showNotification('กรุณาเลือกสินค้าจากรายการที่ระบบกำหนด', 'error'); return; }
-  if (qty <= 0) { showNotification('น้ำหนักต้องมากกว่า 0', 'error'); return; }
-  if (deduct < 0) { showNotification('น้ำหนักหักต้องไม่ติดลบ', 'error'); return; }
-  if (deduct >= qty) { showNotification('น้ำหนักหักต้องน้อยกว่าน้ำหนักรวม', 'error'); return; }
-  if (price <= 0) { showNotification('ราคาต้องมากกว่า 0 — กรุณาเลือกระดับบิลก่อน', 'error'); return; }
+  // WF-06: Helper เพื่อ focus กลับไปที่ช่องรหัสสินค้า (ใช้ทั้งกรณี success และ error)
+  const focusItemName = () => {
+    setTimeout(() => {
+      const el = document.getElementById('itemName');
+      if (el) {
+        el.focus();
+        el.select(); // เลือกข้อความเดิมเพื่อให้พิมพ์ทับได้เลย
+        console.log('[WF-06] Focus returned to itemName, active:', document.activeElement.id);
+      } else {
+        console.error('[WF-06] itemName element not found!');
+      }
+    }, 150);
+  };
+
+  if (!name) { showNotification('กรุณากรอกชื่อสินค้า', 'error'); focusItemName(); return; }
+  if (!catalogId) { showNotification('กรุณาเลือกสินค้าจากรายการที่ระบบกำหนด', 'error'); focusItemName(); return; }
+  if (qty <= 0) { showNotification('น้ำหนักต้องมากกว่า 0', 'error'); focusItemName(); return; }
+  if (deduct < 0) { showNotification('น้ำหนักหักต้องไม่ติดลบ', 'error'); focusItemName(); return; }
+  if (deduct >= qty) { showNotification('น้ำหนักหักต้องน้อยกว่าน้ำหนักรวม', 'error'); focusItemName(); return; }
+  if (price <= 0) { showNotification('ราคาต้องมากกว่า 0 — กรุณาเลือกระดับบิลก่อน', 'error'); focusItemName(); return; }
 
   const netQty = Math.max(0, qty - deduct);
   const tempId = 'item_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
+  console.log('[AddItem] Generated tempId:', tempId);
+
   // associate pending photo ถ้ามี
   if (pendingNewItemPhoto) {
     pendingItemPhotos[tempId] = pendingNewItemPhoto;
+    console.log('[AddItem] ✓ Transferred pendingNewItemPhoto to pendingItemPhotos[' + tempId + ']');
+    console.log('[AddItem] pendingItemPhotos keys now:', Object.keys(pendingItemPhotos));
     pendingNewItemPhoto = null;
+  } else {
+    console.log('[AddItem] No pendingNewItemPhoto to transfer');
   }
 
   const isPrecious = currentCatalogItem?.requiresPreciousReceipt || false;
@@ -474,11 +494,24 @@ function addItemToCart() {
 
   renderCart();
   saveCartState(window.getCurrentCartState());
+
+  // WF-06: Focus กลับไปที่ช่องรหัสสินค้าทันทีหลังเพิ่มรายการสำเร็จ
+  focusItemName();
 }
 
 window.removeFromCart = function(idx) {
+  const itemToRemove = cart[idx];
+  console.log('[RemoveItem] Removing item at index', idx, '- tempId:', itemToRemove._tempId);
+
   // Remove associated photo
-  delete pendingItemPhotos[cart[idx]._tempId];
+  if (pendingItemPhotos[itemToRemove._tempId]) {
+    console.log('[RemoveItem] ✓ Deleted photo for', itemToRemove._tempId);
+    delete pendingItemPhotos[itemToRemove._tempId];
+  } else {
+    console.log('[RemoveItem] No photo found for', itemToRemove._tempId);
+  }
+  console.log('[RemoveItem] pendingItemPhotos keys now:', Object.keys(pendingItemPhotos));
+
   cart.splice(idx, 1);
   renderCart();
   updatePhotoUI();
@@ -488,12 +521,18 @@ window.removeFromCart = function(idx) {
 };
 
 function renderCart() {
+  console.log('[RenderCart] Rendering cart - items:', cart.length);
+  console.log('[RenderCart] Current cart _tempIds:', cart.map(it => it._tempId));
+  console.log('[RenderCart] Current pendingItemPhotos keys:', Object.keys(pendingItemPhotos));
+
   const tbody = document.querySelector('#cartTable tbody');
   if (cart.length === 0) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:24px 12px">ยังไม่มีรายการ</td></tr>';
   } else {
     tbody.innerHTML = cart.map((it, i) => {
       const net = it.net_quantity ?? Math.max(0, (it.quantity || 0) - (it.weight_deduction || 0));
+      const hasPhoto = pendingItemPhotos[it._tempId];
+      console.log('[RenderCart] Item', i, '- tempId:', it._tempId, '- hasPhoto:', !!hasPhoto);
       return `<tr>
         <td style="color:#999">${i + 1}</td>
         <td style="font-weight:500">${escapeHtml(it.item_name)}</td>
@@ -503,9 +542,9 @@ function renderCart() {
         <td class="text-right">${formatCurrency(it.unit_price)}</td>
         <td class="text-right"><strong>${formatCurrency(it.total_price)}</strong></td>
         <td style="text-align:center">
-          <button class="btn-photo-picker btn-photo-picker-sm ${pendingItemPhotos[it._tempId] ? 'has-photo' : ''}"
+          <button class="btn-photo-picker btn-photo-picker-sm ${hasPhoto ? 'has-photo' : ''}"
                   onclick="openPhotoPicker('item', '${it._tempId}')" title="ถ่ายรูปสินค้า" type="button">
-            ${pendingItemPhotos[it._tempId] ? '✓' : '+'}
+            ${hasPhoto ? '✓' : '+'}
           </button>
         </td>
         <td style="text-align:center"><button class="btn btn-sm btn-danger" onclick="removeFromCart(${i})" style="padding:2px 8px;font-size:12px">ลบ</button></td>
@@ -572,6 +611,30 @@ function showPreFlightChecklist() {
     const signatureOk = !hasPrecious || !!pendingSignatureDataUrl;
     const hasPhotos = Object.keys(pendingItemPhotos).length > 0;
 
+    console.log('[Pre-flight] cart:', cart.map(it => ({ _tempId: it._tempId, name: it.item_name })));
+    console.log('[Pre-flight] pendingItemPhotos keys:', Object.keys(pendingItemPhotos));
+    console.log('[Pre-flight] pendingItemPhotos:', pendingItemPhotos);
+    console.log('[Pre-flight] hasPhotos:', hasPhotos, 'count:', Object.keys(pendingItemPhotos).length);
+
+    // Validation: เช็คว่า keys ใน pendingItemPhotos ตรงกับ _tempId ใน cart หรือเปล่า
+    const cartTempIds = cart.map(it => it._tempId);
+    const photoKeys = Object.keys(pendingItemPhotos);
+    const orphanedPhotos = photoKeys.filter(k => !cartTempIds.includes(k));
+    const itemsWithPhotos = cart.filter(it => pendingItemPhotos[it._tempId]);
+
+    if (orphanedPhotos.length > 0) {
+      console.warn('[Pre-flight] ⚠️ Orphaned photos (key ไม่ตรงกับ cart):', orphanedPhotos);
+    }
+    console.log('[Pre-flight] Items with photos:', itemsWithPhotos.map(it => it.item_name));
+
+    // DEBUG ALERT — แสดงข้อมูลทั้งหมด
+    if (photoKeys.length > 0 && !hasPhotos) {
+      alert('🐛 DEBUG: มีรูปใน pendingItemPhotos แต่ hasPhotos = false!\n\n' +
+        'Cart _tempIds:\n' + cartTempIds.join('\n') + '\n\n' +
+        'Photo keys:\n' + photoKeys.join('\n') + '\n\n' +
+        'Match? ' + (cartTempIds.some(id => photoKeys.includes(id)) ? 'YES' : 'NO'));
+    }
+
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center';
@@ -600,7 +663,7 @@ function showPreFlightChecklist() {
           </div>
           <div class="checklist-item" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f0fdf4;border-radius:8px">
             <span style="font-size:18px">${hasPhotos ? '✅' : '⏭️'}</span>
-            <span style="font-size:14px">รูปถ่ายสินค้า: ${hasPhotos ? '<strong>' + Object.keys(pendingItemPhotos).length + ' รูป</strong>' : '<span style="color:#888">ไม่ได้ถ่าย</span>'}</span>
+            <span style="font-size:14px">รูปถ่ายสินค้า: ${hasPhotos ? '<strong>' + itemsWithPhotos.length + ' รายการมีรูป (' + Object.keys(pendingItemPhotos).length + ' ไฟล์)</strong>' : '<span style="color:#888">ไม่ได้ถ่าย</span>'}</span>
           </div>
         </div>
 
@@ -708,24 +771,33 @@ async function savePurchaseOrder() {
     const poId = res.data.id;
     showNotification(`บันทึกสำเร็จ! เลขที่: ${res.data.reference_no} ยอดรวม ${formatCurrency(res.data.total_amount)}`, 'success');
 
+    console.log('[SavePO] ✓ PO saved successfully, ID:', poId);
+    console.log('[SavePO] Uploading photos - pendingItemPhotos keys:', Object.keys(pendingItemPhotos));
+
     // อัปโหลดลายเซ็น
     if (pendingSignatureBlob) {
+      console.log('[SavePO] Uploading signature...');
       await uploadItemPhoto(poId, pendingSignatureBlob);
     }
 
     // อัปโหลดรูปสินค้าที่ถ่ายค้างไว้
     const itemPhotoCount = Object.keys(pendingItemPhotos).length;
     if (itemPhotoCount > 0) {
+      console.log('[SavePO] Uploading', itemPhotoCount, 'photos...');
       showUploadToast(`กำลังอัปโหลด ${itemPhotoCount} รูป...`);
       showUploadProgress();
       let uploaded = 0;
       for (const [tempId, file] of Object.entries(pendingItemPhotos)) {
+        console.log('[SavePO] Uploading photo for tempId:', tempId, 'file:', file.name);
         await uploadItemPhoto(poId, file);
         uploaded++;
         showUploadProgress((uploaded / itemPhotoCount) * 100);
       }
       hideUploadProgress();
       showUploadToast(`✅ อัปโหลด ${itemPhotoCount} รูปเรียบร้อย`, 2000);
+      console.log('[SavePO] ✓ All photos uploaded');
+    } else {
+      console.log('[SavePO] No photos to upload');
     }
 
     showReceipt(poId);
@@ -738,6 +810,10 @@ async function savePurchaseOrder() {
 
 // ===== Clear All =====
 function clearAll() {
+  console.log('[ClearAll] Clearing all data...');
+  console.log('[ClearAll] Before clear - cart:', cart.length, 'items');
+  console.log('[ClearAll] Before clear - pendingItemPhotos:', Object.keys(pendingItemPhotos).length, 'photos');
+
   cart = [];
   selectedSeller = null;
   globalTier = { level: null };
@@ -896,7 +972,8 @@ window.showReceipt = async function(id) {
         #viewPOModal .modal-header,
         #viewPOModal .modal-footer,
         #billPrintHint,
-        #poQrSection { display: none !important; }
+        #poQrSection,
+        #poPhotoGallery { display: none !important; }
         /* ลบ border กรอบ modal */
         #billPrintWrap { border: none !important; }
         /* ถ้า Type B ยาวเกิน → ขึ้นหน้าใหม่โดยอัตโนมัติ */
@@ -909,6 +986,10 @@ window.showReceipt = async function(id) {
     </div>
     <div id="billPrintHint" style="text-align:center;font-size:12px;color:#888;margin-top:8px">
       ✂ พับครึ่งแนวยาวฉีกตรงเส้นปรุ — ร้านเก็บซ้าย | ลูกค้าเก็บขวา
+    </div>
+    <div id="poPhotoGallery" style="display:none;margin-top:16px;padding:12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0">
+      <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">รูปภาพสินค้า</div>
+      <div id="poPhotoGrid" style="display:flex;flex-wrap:wrap;gap:8px"></div>
     </div>`;
   document.getElementById('viewPOModal').classList.add('show');
 
@@ -920,7 +1001,29 @@ window.showReceipt = async function(id) {
 
   // WF-01: สร้าง QR code หลังเปิด modal
   generatePhotoQR(id);
+  loadPoPhotos(id);
 };
+
+// ===== WF-01: โหลดรูปภาพ PO =====
+async function loadPoPhotos(poId) {
+  const gallery = document.getElementById('poPhotoGallery');
+  const grid    = document.getElementById('poPhotoGrid');
+  if (!gallery || !grid) return;
+  try {
+    const res = await fetch(`/api/index.php/purchase-orders/photos?id=${poId}`, {
+      credentials: 'include',
+    });
+    const json = await res.json();
+    const photos = json?.data?.photos || [];
+    if (photos.length === 0) return;
+    grid.innerHTML = photos.map(p =>
+      `<img src="${escapeHtml(p.photo_path)}" alt="รูปสินค้า"
+        style="width:90px;height:90px;object-fit:cover;border-radius:4px;border:1px solid #e2e8f0;cursor:pointer"
+        onclick="window.open(this.src,'_blank')">`
+    ).join('');
+    gallery.style.display = 'block';
+  } catch (_) {}
+}
 
 // ===== WF-01: QR Code สำหรับถ่ายรูป =====
 async function generatePhotoQR(poId) {
@@ -1153,14 +1256,17 @@ function updateBranchBanner() {}
 
 // ── Open bottom sheet ──────────────────────────────────────
 window.openPhotoPicker = function(type, id) {
+  console.log('[PhotoPicker] Opening photo picker - type:', type, 'id:', id);
   activePhotoTarget = { type, id };
+  console.log('[PhotoPicker] activePhotoTarget set:', activePhotoTarget);
   document.getElementById('photoSheetOverlay').classList.add('show');
 };
 
 // ── Close bottom sheet ─────────────────────────────────────
 function closePhotoSheet() {
+  console.log('[PhotoPicker] Closing photo sheet');
   document.getElementById('photoSheetOverlay').classList.remove('show');
-  activePhotoTarget = null;
+  // NOTE: ไม่ล้าง activePhotoTarget ที่นี่ เพราะ openCamera() ต้องใช้
 }
 
 // ── Open camera (webcam / mobile camera) ───────────────────
@@ -1247,20 +1353,30 @@ function confirmPhoto() {
   canvas.toBlob(async (blob) => {
     const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
 
+    console.log('[Photo] confirmPhoto - activePhotoTarget:', activePhotoTarget);
+    console.log('[Photo] confirmPhoto - file created:', file.name, file.size, 'bytes');
+
     if (activePhotoTarget) {
       if (activePhotoTarget.type === 'item') {
         pendingItemPhotos[activePhotoTarget.id] = file;
+        console.log('[Photo] ✓ Saved to pendingItemPhotos[' + activePhotoTarget.id + ']');
+        console.log('[Photo] pendingItemPhotos keys now:', Object.keys(pendingItemPhotos));
       } else if (activePhotoTarget.type === 'new-item') {
         pendingNewItemPhoto = file;
+        console.log('[Photo] ✓ Saved to pendingNewItemPhoto (will transfer to pendingItemPhotos on add)');
         showItemPhotoIndicator(file);
       } else if (activePhotoTarget.type === 'seller-id') {
         pendingSellerIdPhoto = file;
+        console.log('[Photo] ✓ Saved to pendingSellerIdPhoto');
         showSellerIdPhotoPreview(file);
       }
+    } else {
+      console.error('[Photo] ❌ activePhotoTarget is null! Photo will be lost.');
     }
 
     // Close camera
     closeCamera();
+    console.log('[Photo] After closeCamera, activePhotoTarget:', activePhotoTarget);
     renderCart(); // refresh to show ✓
     updatePhotoUI(); // refresh FAB badge + photo strip
 
@@ -1270,9 +1386,13 @@ function confirmPhoto() {
 
 // ── Close camera overlay ───────────────────────────────────
 function closeCamera() {
+  console.log('[Camera] Closing camera - activePhotoTarget before:', activePhotoTarget);
   stopCamera();
   document.getElementById('cameraOverlay').classList.remove('show');
   document.getElementById('cameraPreviewOverlay').classList.remove('show');
+  // ล้าง activePhotoTarget หลังจาก confirmPhoto() บันทึกไปแล้ว
+  activePhotoTarget = null;
+  console.log('[Camera] Cleared activePhotoTarget after close');
 }
 
 // ── Retry photo (go back to live view) ─────────────────────
@@ -1371,7 +1491,10 @@ function resetItemPhotoBtn() {
 
 // ── Remove pending photo ────────────────────────────────
 window.removePendingPhoto = function(tempId) {
+  console.log('[RemovePhoto] Removing photo for tempId:', tempId);
+  console.log('[RemovePhoto] Before delete - pendingItemPhotos keys:', Object.keys(pendingItemPhotos));
   delete pendingItemPhotos[tempId];
+  console.log('[RemovePhoto] After delete - pendingItemPhotos keys:', Object.keys(pendingItemPhotos));
   updatePhotoUI();
   renderCart();
 };

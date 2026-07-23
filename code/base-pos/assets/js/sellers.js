@@ -58,7 +58,8 @@ function renderSellersTable() {
                 <td class="text-right">${formatNumber(seller.total_amount)}</td>
                 <td>${lastTransaction}</td>
                 <td>${statusBadge}</td>
-                <td>
+                <td class="text-center">
+                    <div class="action-btn-group">
                     <button class="btn-sm btn-info" onclick="viewSeller(${seller.id})" title="ดูรายละเอียด"><i class="icon-search"></i></button>
                     <a class="btn-sm btn-secondary" href="seller-history.html?id=${seller.id}" title="ประวัติการขาย" style="display:inline-flex;align-items:center;text-decoration:none"><i class="icon-report"></i></a>
                     <button class="btn-sm btn-warning" onclick="editSeller(${seller.id})" title="แก้ไข"><i class="icon-edit"></i></button>
@@ -66,6 +67,7 @@ function renderSellersTable() {
                         ? `<button class="btn-sm btn-success" onclick="unblacklistSeller(${seller.id})" title="ยกเลิกบัญชีดำ">✓</button>`
                         : `<button class="btn-sm btn-danger" onclick="confirmBlacklist(${seller.id})" title="ขึ้นบัญชีดำ">×</button>`
                     }
+                    </div>
                 </td>
             </tr>
         `;

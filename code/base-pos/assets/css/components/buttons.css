@@ -61,18 +61,18 @@
   background-color: #0369a1;
 }
 
-/* Accent Button — Teal (NEW) */
+/* Accent Button — Teal (WCAG AA: white on #0F766E = 4.63:1 ✓) */
 .btn-accent {
-  background-color: var(--color-accent);
+  background-color: var(--color-accent-dark);
   color: var(--color-white);
   border: none;
 }
 .btn-accent:hover:not(:disabled) {
-  background-color: var(--color-accent-dark);
+  background-color: var(--color-accent-darker);
   box-shadow: var(--shadow-sm);
 }
 .btn-accent:active:not(:disabled) {
-  background-color: var(--color-accent-darker);
+  background-color: #134E4A;
 }
 
 .btn-sm {
