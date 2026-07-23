@@ -80,6 +80,16 @@ class SellersController extends Controller
             $data['id_card'] = $idCard;
         }
 
+        // tier_level — เฉพาะ admin/manager กำหนดได้ตอนเพิ่ม
+        if (isset($data['tier_level'])) {
+            $this->requireAuth(['admin', 'manager']);
+            $tierLevel = (int)$data['tier_level'];
+            if ($tierLevel < 1 || $tierLevel > 3) {
+                Response::error('ระดับราคาพิเศษไม่ถูกต้อง (1-3)', 400);
+            }
+            $data['tier_level'] = $tierLevel;
+        }
+
         // Stamp PDPA consent timestamp on first consent
         if (!empty($data['pdpa_consent'])) {
             $data['pdpa_consented_at'] = date('Y-m-d H:i:s');
@@ -133,18 +143,42 @@ class SellersController extends Controller
         }
 
         $sellerModel = new Seller();
+        $current = $sellerModel->getById($id);
+        if (!$current) {
+            Response::error('ไม่พบผู้ขายนี้', 404);
+        }
 
         // Only stamp pdpa_consented_at once — if consent given and not yet recorded
         if (!empty($data['pdpa_consent'])) {
-            $current = $sellerModel->getById($id);
             if ($current && $current['pdpa_consented_at'] === null) {
                 $data['pdpa_consented_at'] = date('Y-m-d H:i:s');
             }
         }
         unset($data['pdpa_consent']);
 
+        // tier_level — เฉพาะ admin/manager ที่เปลี่ยนได้
+        if (isset($data['tier_level']) && (int)$data['tier_level'] !== (int)($current['tier_level'] ?? 1)) {
+            $this->requireAuth(['admin', 'manager']);
+            $newTier = (int)$data['tier_level'];
+            if ($newTier < 1 || $newTier > 3) {
+                Response::error('ระดับราคาพิเศษไม่ถูกต้อง (1-3)', 400);
+            }
+            $tierLabels = [1 => 'บิล 1 (ทั่วไป)', 2 => 'บิล 2', 3 => 'บิล 3'];
+            $oldLabel = $tierLabels[(int)($current['tier_level'] ?? 1)];
+            $newLabel = $tierLabels[$newTier];
+        }
+
         try {
             $sellerModel->update($id, $data);
+
+            // Audit log — tier change
+            if (isset($data['tier_level']) && (int)$data['tier_level'] !== (int)($current['tier_level'] ?? 1)) {
+                Logger::logActivity(
+                    $this->user['user_id'],
+                    'update_seller_tier',
+                    "เปลี่ยนระดับราคาผู้ขาย ID: {$id}: {$oldLabel} → {$newLabel} โดย {$this->user['full_name']}"
+                );
+            }
 
             Logger::logActivity(
                 $this->user['user_id'],
@@ -286,6 +320,10 @@ class SellersController extends Controller
             }
         }
 
+        // 4.5. tier_level fallback
+        $tierLevel = isset($seller['tier_level']) ? (int)$seller['tier_level'] : 1;
+        if ($tierLevel < 1 || $tierLevel > 3) $tierLevel = 1;
+
         // 5. ประกอบ POs
         $transactions = [];
         $totalPos = 0;
@@ -350,6 +388,7 @@ class SellersController extends Controller
                 'is_blacklisted'     => $seller['is_blacklisted'] ?? 0,
                 'blacklist_reason'   => $seller['blacklist_reason'] ?? '',
                 'notes'              => $seller['notes'] ?? '',
+                'tier_level'         => $tierLevel,
                 'total_transactions' => $seller['total_transactions'] ?? 0,
                 'total_amount'       => $seller['total_amount'] ?? 0,
                 'last_transaction_at'=> $seller['last_transaction_at'] ?? null,

@@ -35,7 +35,7 @@ function renderSellersTable() {
         const msg = keyword.length >= 2
             ? `ไม่พบผู้ขายที่ค้นหา "${escapeHtml(keyword)}"`
             : 'ยังไม่มีข้อมูลผู้ขาย';
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center">${msg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center">${msg}</td></tr>`;
         return;
     }
 
@@ -43,6 +43,11 @@ function renderSellersTable() {
         const statusBadge = seller.is_blacklisted
             ? `<span class="badge badge-danger" title="${escapeHtml(seller.blacklist_reason || 'ไม่ได้ระบุเหตุผล')}">⚠️ บัญชีดำ</span>`
             : '<span class="badge badge-success">ปกติ</span>';
+
+        const tierLevel = seller.tier_level || 1;
+        const tierBadge = tierLevel > 1
+            ? `<span class="badge badge-tier-${tierLevel}">บิล ${tierLevel}</span>`
+            : '<span class="badge badge-tier-1">บิล 1</span>';
 
         const lastTransaction = seller.last_transaction_at
             ? formatDate(seller.last_transaction_at)
@@ -57,6 +62,7 @@ function renderSellersTable() {
                 <td class="text-center">${seller.total_transactions ?? '-'}</td>
                 <td class="text-right">${formatNumber(seller.total_amount)}</td>
                 <td>${lastTransaction}</td>
+                <td class="text-center">${tierBadge}</td>
                 <td>${statusBadge}</td>
                 <td class="text-center">
                     <div class="action-btn-group">
@@ -112,6 +118,18 @@ function openAddSellerModal() {
     document.getElementById('pdpaConsentText').textContent =
         'ยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น';
     resetSellerPhoto();
+    // tier_level — แสดงเฉพาะ admin/manager
+    const tierGroup = document.getElementById('tierLevelGroup');
+    if (tierGroup) {
+        try {
+            const user = JSON.parse(localStorage.getItem('posUser'));
+            const isAdminOrManager = user && (user.role === 'admin' || user.role === 'manager');
+            tierGroup.style.display = isAdminOrManager ? '' : 'none';
+        } catch(e) {
+            tierGroup.style.display = 'none';
+        }
+        document.getElementById('tierLevel').value = '1';
+    }
     document.getElementById('sellerModal').classList.add('show');
 }
 
@@ -133,6 +151,20 @@ function editSeller(id) {
     document.getElementById('vehiclePlate').value = currentSeller.vehicle_plate || '';
     const vt = currentSeller.vehicle_type || '';
     document.querySelectorAll('input[name="vehicleType"]').forEach(r => r.checked = r.value === vt);
+
+    // tier_level dropdown — admin/manager only
+    const tierSelect = document.getElementById('tierLevel');
+    const tierGroup = document.getElementById('tierLevelGroup');
+    if (tierSelect && tierGroup) {
+        tierSelect.value = currentSeller.tier_level || 1;
+        try {
+            const user = JSON.parse(localStorage.getItem('posUser'));
+            const isAdminOrManager = user && (user.role === 'admin' || user.role === 'manager');
+            tierGroup.style.display = isAdminOrManager ? '' : 'none';
+        } catch(e) {
+            tierGroup.style.display = 'none';
+        }
+    }
     const bl = currentSeller.is_blacklisted == 1;
     document.getElementById('isBlacklisted').checked = bl;
     document.getElementById('blacklistReason').value = currentSeller.blacklist_reason || '';
@@ -201,6 +233,14 @@ async function viewSeller(id) {
     document.getElementById('viewSellerVehicleType').textContent = seller.vehicle_type || '-';
     document.getElementById('viewSellerAddress').textContent = seller.address || '-';
     document.getElementById('viewSellerNotes').textContent = seller.notes || '-';
+
+    // tier_level display
+    const tierLabels = { 1: 'บิล 1 (ทั่วไป)', 2: 'บิล 2', 3: 'บิล 3' };
+    const tierEl = document.getElementById('viewSellerTier');
+    if (tierEl) {
+        const tl = seller.tier_level || 1;
+        tierEl.textContent = tierLabels[tl] || 'บิล 1 (ทั่วไป)';
+    }
 
     // PDPA
     const pdpaEl = document.getElementById('viewSellerPdpa');
@@ -414,6 +454,7 @@ async function saveSeller() {
 
     const vehiclePlate = document.getElementById('vehiclePlate').value.trim();
     const vehicleType = document.querySelector('input[name="vehicleType"]:checked')?.value || '';
+    const tierLevelEl = document.getElementById('tierLevel');
     const data = {
         full_name: fullName,
         phone: phone || null,
@@ -422,6 +463,7 @@ async function saveSeller() {
         notes: notes || null,
         vehicle_plate: vehiclePlate || null,
         vehicle_type: vehicleType || null,
+        tier_level: tierLevelEl ? parseInt(tierLevelEl.value, 10) : 1,
         is_blacklisted: isBlacklisted,
         blacklist_reason: isBlacklisted ? (document.getElementById('blacklistReason').value.trim() || null) : null,
         pdpa_consent: pdpaConsent,

@@ -11,7 +11,7 @@ class Seller extends Model
         $query = "SELECT
                     id, id_card, full_name, phone, address, vehicle_plate, vehicle_type,
                     id_card_photo, is_blacklisted, blacklist_reason, blacklisted_at,
-                    notes,
+                    notes, tier_level,
                     total_transactions, total_amount,
                     last_transaction_at, created_at, updated_at
                   FROM {$this->table}";
@@ -66,6 +66,7 @@ class Seller extends Model
                          is_blacklisted,
                          blacklist_reason,
                          blacklisted_at,
+                         tier_level,
                          total_transactions,
                          total_amount,
                          last_transaction_at
@@ -133,6 +134,7 @@ class Seller extends Model
             'vehicle_plate' => !empty($data['vehicle_plate']) ? $data['vehicle_plate'] : null,
             'vehicle_type' => !empty($data['vehicle_type']) ? $data['vehicle_type'] : null,
             'notes' => !empty($data['notes']) ? $data['notes'] : null,
+            'tier_level' => !empty($data['tier_level']) ? (int)$data['tier_level'] : 1,
             'is_blacklisted' => $data['is_blacklisted'] ?? 0,
         ]);
     }
@@ -176,6 +178,7 @@ class Seller extends Model
         if (isset($data['vehicle_plate'])) $updateData['vehicle_plate'] = $data['vehicle_plate'];
         if (isset($data['vehicle_type'])) $updateData['vehicle_type'] = $data['vehicle_type'];
         if (isset($data['notes'])) $updateData['notes'] = $data['notes'];
+        if (isset($data['tier_level'])) $updateData['tier_level'] = (int)$data['tier_level'];
         // is_blacklisted/blacklist_reason ต้องใช้ผ่าน endpoint blacklist/unblacklist เท่านั้น
 
         if (!empty($updateData)) {

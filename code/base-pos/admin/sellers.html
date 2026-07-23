@@ -83,13 +83,14 @@
                   <th class="col-count">ครั้งที่ขาย</th>
                   <th class="col-amount">ยอดรวม (฿)</th>
                   <th class="col-last">ขายล่าสุด</th>
+                  <th class="col-tier">ระดับราคา</th>
                   <th class="col-status">สถานะ</th>
                   <th class="col-actions">จัดการ</th>
                 </tr>
               </thead>
               <tbody id="sellersTableBody">
                 <tr>
-                  <td colspan="9" class="text-center">กำลังโหลด...</td>
+                  <td colspan="10" class="text-center">กำลังโหลด...</td>
                 </tr>
               </tbody>
             </table>
@@ -124,6 +125,7 @@
             <div><span class="detail-label">โทรศัพท์:</span> <span id="viewSellerPhone">-</span></div>
             <div><span class="detail-label">ทะเบียนรถ:</span> <span id="viewSellerVehicle">-</span></div>
             <div><span class="detail-label">ประเภทยานพาหนะ:</span> <span id="viewSellerVehicleType">-</span></div>
+            <div><span class="detail-label">ระดับราคาพิเศษ:</span> <span id="viewSellerTier">บิล 1 (ทั่วไป)</span></div>
             <div><span class="detail-label">PDPA:</span> <span id="viewSellerPdpa">-</span></div>
             <div class="detail-full"><span class="detail-label">ที่อยู่:</span> <span id="viewSellerAddress">-</span></div>
             <div class="detail-full"><span class="detail-label">หมายเหตุ:</span> <span id="viewSellerNotes">-</span></div>
@@ -188,6 +190,15 @@
           <div class="form-group">
             <label for="notes">หมายเหตุ</label>
             <textarea id="notes" class="form-control" rows="2" placeholder="เช่น ลักษณะพิเศษ, ประวัติ"></textarea>
+          </div>
+          <div class="form-group" id="tierLevelGroup">
+            <label for="tierLevel">ระดับราคาพิเศษ</label>
+            <select id="tierLevel" class="form-control">
+              <option value="1">บิล 1 (ทั่วไป)</option>
+              <option value="2">บิล 2</option>
+              <option value="3">บิล 3</option>
+            </select>
+            <small class="form-hint">ระบบจะใช้ราคานี้เป็นค่าเริ่มต้นตอนรับซื้อ (เฉพาะ admin/manager)</small>
           </div>
           <div class="form-group">
             <label for="vehiclePlate">ทะเบียนรถ</label>

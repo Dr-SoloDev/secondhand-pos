@@ -114,10 +114,11 @@
 .sellers-table .col-name { min-width: 140px; }
 .sellers-table .col-phone { width: 120px; }
 .sellers-table .col-idcard { width: 140px; font-variant-numeric: tabular-nums; }
-.sellers-table .col-count { width: 80px; text-align: center; }
-.sellers-table .col-amount { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
-.sellers-table .col-last { width: 130px; }
-.sellers-table .col-status { width: 80px; }
+.sellers-table .col-count { width: 65px; text-align: center; }
+.sellers-table .col-amount { width: 95px; text-align: right; font-variant-numeric: tabular-nums; }
+.sellers-table .col-last { width: 120px; }
+.sellers-table .col-tier { width: 70px; text-align: center; }
+.sellers-table .col-status { width: 72px; }
 .sellers-table .col-actions { width: 140px; text-align: center; }
 
 .sellers-table .action-btn-group {
@@ -135,6 +136,38 @@
   border-radius: var(--radius-sm);
   font-size: 13px;
   line-height: 1;
+}
+
+/* Tier badges */
+.badge-tier-1 {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 10px;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+}
+.badge-tier-2 {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+.badge-tier-3 {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  background: #f0fdfa;
+  color: #115e59;
+  border: 1px solid #5eead4;
 }
 
 /* ===== 5. VIEW MODAL — Data Center ===== */

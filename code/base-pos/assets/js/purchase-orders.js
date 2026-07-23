@@ -816,7 +816,7 @@ function clearAll() {
 
   cart = [];
   selectedSeller = null;
-  globalTier = { level: null };
+  globalTier = { level: 1 };
   currentCatalogItem = null;
 
   // Reset photo state
@@ -842,7 +842,7 @@ function clearAll() {
   document.getElementById('itemWeightDeduct').value = '0';
   document.getElementById('itemTotalPreview').textContent = 'เลือกสินค้าจากแคตาล็อก';
   document.getElementById('itemTotalPreview').style.color = '#999';
-  document.getElementById('globalTierInfo').textContent = 'ยังไม่ได้เลือก — จะใช้ราคาปกติ';
+  document.getElementById('globalTierInfo').textContent = 'บิล 1 (ทั่วไป) — ราคาจะถูกใช้กับทุกรายการในใบนี้อัตโนมัติ';
   buildTierButtons([]);
   renderCart();
   updatePreciousWarning();
@@ -1148,6 +1148,26 @@ function doSelectSeller(s) {
   wrap.innerHTML = `<div><strong>${escapeHtml(s.full_name)}</strong></div>`;
   if (s.id_card) wrap.innerHTML += `<div>เลขบัตร: ${maskIdCard(s.id_card)}</div>`;
   if (s.phone)   wrap.innerHTML += `<div>โทร: ${escapeHtml(s.phone)}</div>`;
+  // Auto-select tier based on seller's tier_level
+  if (s.tier_level && s.tier_level >= 1 && s.tier_level <= 3) {
+    globalTier.level = s.tier_level;
+    const btns = document.querySelectorAll('.global-tier-btn');
+    if (btns[s.tier_level - 1]) {
+      setTierActive(btns[s.tier_level - 1], s.tier_level);
+    }
+    // Show auto-select info badge
+    const tierInfoEl = document.getElementById('globalTierInfo');
+    const tierLabels = { 1: 'บิล 1 (ทั่วไป)', 2: 'บิล 2', 3: 'บิล 3' };
+    if (s.tier_level > 1) {
+      const colors = { 2: '#16a34a', 3: '#0f766e' };
+      tierInfoEl.innerHTML =
+        `<span style="color:${colors[s.tier_level] || '#555'};font-weight:600">${tierLabels[s.tier_level]}</span>` +
+        ` — ตามสิทธิ์ผู้ขาย (สามารถเปลี่ยนได้)`;
+    } else {
+      tierInfoEl.innerHTML =
+        `<span style="color:#555;font-weight:600">${tierLabels[1]}</span> — ราคาจะถูกใช้กับทุกรายการในใบนี้อัตโนมัติ`;
+    }
+  }
   // Photo button for already-selected seller
   if (s.id_card_photo) {
     wrap.innerHTML += `<div style="margin-top:4px"><img src="${escapeHtml(s.id_card_photo)}" style="height:36px;border-radius:3px;cursor:pointer;border:1px solid #e2e8f0" onclick="openPhotoPicker('seller-id',0)" title="เปลี่ยนรูปบัตร"></div>`;
