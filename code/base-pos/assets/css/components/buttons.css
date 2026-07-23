@@ -60,6 +60,21 @@
 .btn-info:hover:not(:disabled) {
   background-color: #0369a1;
 }
+
+/* Accent Button — Teal (NEW) */
+.btn-accent {
+  background-color: var(--color-accent);
+  color: var(--color-white);
+  border: none;
+}
+.btn-accent:hover:not(:disabled) {
+  background-color: var(--color-accent-dark);
+  box-shadow: var(--shadow-sm);
+}
+.btn-accent:active:not(:disabled) {
+  background-color: var(--color-accent-darker);
+}
+
 .btn-sm {
   padding: 6px 12px;
   font-size: 13px;

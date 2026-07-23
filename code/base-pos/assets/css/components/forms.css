@@ -5,7 +5,7 @@
 .form-group label {
   display: block;
   margin-bottom: 6px;
-  font-weight: 500;
+  font-weight: var(--font-weight-label, 600);
   font-size: 14px;
   color: var(--color-text);
 }
@@ -54,8 +54,15 @@ select.form-control {
 
 /* Labels & Small Text */
 label {
-  font-weight: 500;
+  font-weight: var(--font-weight-label, 600);
   font-size: 14px;
+}
+
+/* Form label class */
+.form-label {
+  font-weight: var(--font-weight-label, 600);
+  font-size: 14px;
+  color: var(--color-text);
 }
 
 /* Password Fields */

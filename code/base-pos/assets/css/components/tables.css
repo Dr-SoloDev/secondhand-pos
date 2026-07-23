@@ -31,6 +31,9 @@
   color: var(--color-text);
   overflow-wrap: break-word;
 }
+.data-table tbody td {
+  font-weight: var(--font-weight-table, 500);
+}
 .data-table tbody tr:last-child td {
   border-bottom: none;
 }

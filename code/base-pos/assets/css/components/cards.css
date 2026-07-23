@@ -1,54 +1,109 @@
-/* Card */
+/* === Card Components === */
+
+/* --- Base Card — with border + shadow --- */
 .card {
   background-color: var(--color-white);
+  border: 1px solid var(--color-border-card);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   margin-bottom: 20px;
-  transition: box-shadow var(--transition);
+  transition: box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color var(--transition);
 }
+
 .card:hover {
   box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-lighter);
+  transform: translateY(-1px);
 }
+
 .card-header {
   padding: 16px 20px;
   border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
+
 .card-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: var(--color-text);
-  margin: 0;
+  letter-spacing: 0;
+  color: var(--color-text-heading);
 }
+
 .card-body {
   padding: 20px;
   overflow-wrap: break-word;
 }
 
-/* Card titles */
-.card-title {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0;
+.card-footer {                /* NEW */
+  padding: 12px 20px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--color-gray-50);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
-/* Card variants - remove border OR shadow, not both */
-.card-flat {
-  box-shadow: none;
-  border: 1px solid var(--color-border);
-}
+/* === Card Variants === */
 
+/* Elevated — no border, stronger shadow (modals/popups) */
 .card-elevated {
   border: none;
   box-shadow: var(--shadow-md);
 }
+.card-elevated:hover {
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-2px);
+  border-color: transparent;
+}
 
+/* Flat — border only, no shadow (settings/info) */
+.card-flat {
+  box-shadow: none;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-gray-50);
+}
+.card-flat:hover {
+  box-shadow: none;
+  transform: none;
+  border-color: var(--color-border);
+}
+
+/* Minimal — transparent, bottom border only (list items) */
 .card-minimal {
   background: transparent;
   box-shadow: none;
   border: none;
   border-bottom: 1px solid var(--color-border);
   border-radius: 0;
+  padding: 16px 0;
+  margin-bottom: 0;
+}
+.card-minimal:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* Accent — left teal color bar (NEW) */
+.card-accent {
+  position: relative;
+  border-left: 4px solid var(--color-accent);
+}
+.card-accent:hover {
+  border-left-color: var(--color-accent-dark);
+}
+
+/* Bordered — stronger border for table containers (NEW) */
+.card-bordered {
+  border: 1px solid var(--color-border-card);
+}
+.card-bordered:hover {
+  border-color: var(--color-primary-lighter);
 }
