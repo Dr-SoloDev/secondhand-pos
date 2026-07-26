@@ -6,22 +6,22 @@ class InventoryController extends Controller
     {
         $this->requireAuth();
         $branchId = isset($_GET['branch_id']) ? intval($_GET['branch_id']) : 0;
+        $userBranch = $this->enforceBranchScope();
+        if ($userBranch !== null) {
+            $branchId = $userBranch;
+        }
 
         $categoryModel = new Category();
         $categories = $categoryModel->findAll('name ASC');
 
         if ($branchId) {
-            // Per-branch mode: compute actual stock from PO items
-            // เพราะ categories.stock_kg เป็น global ไม่แยกสาขา
+            // Per-branch mode: aggregate stock from branch_stock (SSoT)
             $branchStocks = $this->db->fetchAll(
-                "SELECT poi.category_id,
-                        ROUND(SUM(poi.quantity - poi.weight_deduction - poi.consumed_qty), 3) AS stock_kg
-                 FROM purchase_order_items poi
-                 INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
-                 WHERE po.branch_id = ?
-                   AND po.status = 'completed'
-                   AND (poi.quantity - poi.consumed_qty) > 0
-                 GROUP BY poi.category_id",
+                "SELECT category_id,
+                        ROUND(SUM(stock_kg), 3) AS stock_kg
+                 FROM branch_stock
+                 WHERE branch_id = ?
+                 GROUP BY category_id",
                 [$branchId]
             );
 
@@ -602,6 +602,10 @@ class InventoryController extends Controller
         $this->requireAuth();
         $categoryId = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
         $branchId   = isset($_GET['branch_id'])   ? intval($_GET['branch_id'])   : 0;
+        $userBranch = $this->enforceBranchScope();
+        if ($userBranch !== null) {
+            $branchId = $userBranch;
+        }
 
         if (!$categoryId) {
             Response::error('ต้องระบุ category_id', 400);

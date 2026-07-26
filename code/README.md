@@ -35,8 +35,8 @@ code/
     │   ├── Controllers/            # 11 controllers
     │   ├── Models/                 # 10 models
     │   └── Services/               # ReportService (14 methods)
-    └── database/
-        └── migrations/             # 48 files (001-048)
+        └── database/
+            └── migrations/             # Active migrations (001-053 + patch variants)
 ```
 
 ---
@@ -68,14 +68,14 @@ code/
 
 ## Migrations
 
-48 files in `customizations/database/migrations/` — run via `bash customizations/database/run-migrations.sh root rootpass`. **DO NOT** modify `base-pos/database/pos_system.sql`.
+Active migrations in `customizations/database/migrations/` — run via `bash customizations/database/run-migrations.sh root rootpass`. **DO NOT** modify `base-pos/database/pos_system.sql`.
 
 ---
 
 ## Testing
 
 ```bash
-cd tests/api && bash run.sh   # 84 tests, all passing
+cd tests/api && bash run.sh
 ```
 
 **CI** (`.github/workflows/test.yml`): PHP lint → migrations → PHP server → tests
@@ -88,7 +88,8 @@ cd tests/api && bash run.sh   # 84 tests, all passing
 - **Route registration:** All routes in `base-pos/api/Router.php`
 - **Cost methods:** FIFO (default) or Weighted Average per branch
 - **Race safety:** `SELECT ... FOR UPDATE` + atomic conditional UPDATE on `consumed_qty`
-- **Branch scope:** Non-admin enforced to own branch in every controller
+- **Branch scope:** Non-admin enforced to own branch in inventory, sale lots, transfers, and reports
+- **Stock source of truth:** `branch_stock` is the per-branch scrap inventory SSoT; `categories.stock_kg` is compatibility/backfill only
 - **Idempotency:** Duplicate POST prevention via `idempotency_keys`
 
 ---
@@ -100,7 +101,7 @@ const res = await apiRequest('sale-lots', 'POST', payload);
 // Response: { status: 'success'|'error', data: {...}, message: '...' }
 ```
 
-Full API reference → `docs/TECHNICAL.md`
+Technical reference → `docs/TECHNICAL.md`
 
 ---
 

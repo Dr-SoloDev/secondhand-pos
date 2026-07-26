@@ -1,30 +1,30 @@
 # WF-02: Printable Receipts
-**Status**: SPEC — พร้อม implement  
+**Status**: DONE — implemented + verified  
 **Date**: 2026-06-14
 
 ---
 
-## What EXISTS (ไม่ต้องสร้าง)
+## What EXISTS (ตามโค้ดปัจจุบัน)
 
-| Component | File:Line |
-|-----------|-----------|
-| `showReceipt()` function | purchase-orders.js:450-545 |
-| Type A: ใบรับซื้อปกติ (2 copy, fold) | purchase-orders.js:520-538 |
-| Type B: โลหะมีค่า + signature box | purchase-orders.js:499-518 |
-| `requires_precious_receipt` flag | categories table, migration 032 |
-| API returns all receipt fields | PurchaseOrder::getById() |
-| Print CSS `@media print` | purchase-orders.js:526-533 |
-| `window.print()` button | purchase-orders.html:338 |
+| Component | Current code |
+|-----------|--------------|
+| `showReceipt()` flow | `base-pos/assets/js/purchase-orders.js` |
+| Type A: ใบรับซื้อปกติ (2 copy, fold) | `base-pos/assets/js/purchase-orders.js` |
+| Type B: โลหะมีค่า + signature box | `base-pos/assets/js/purchase-orders.js` |
+| `requires_precious_receipt` flag | categories table + migration 032/046 |
+| API returns all receipt fields | `customizations/api/Models/PurchaseOrder.php` |
+| Print CSS `@media print` | `base-pos/assets/js/purchase-orders.js` |
+| `window.print()` button | `base-pos/admin/purchase-orders.html` |
 
-## What MISSING (ต้องทำ)
+## Verification Notes
 
-| Gap | ผลกระทบ |
-|-----|---------|
-| `#poQrSection` ไม่ถูก hide ใน print | QR code จะพิมพ์ออกมาด้วย |
-| ไม่มี page-break ถ้า Type B ยาวเกิน A4 | receipt ถูก clip |
-| ไม่มี `.pu-toast`, `.pu-state` print-safe | อาจ render ขยะ |
-| Signature line แคบ (text underline) | เขียนลายเซ็นลำบาก |
-| `@page` landscape ต้อง confirm size | บาง printer อ่านผิด |
+| Check | Result |
+|------|--------|
+| `#poQrSection` hidden in print | already implemented |
+| page-break handling for long Type B receipt | already implemented |
+| print-safe receipt wrapper styles | already implemented |
+| signature area for precious metals | already implemented |
+| `@page` landscape sizing | already set in code |
 
 ---
 

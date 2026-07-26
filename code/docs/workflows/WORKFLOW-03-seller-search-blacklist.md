@@ -1,31 +1,27 @@
 # WF-03: Real-time Seller Search + Blacklist Alert
-**Status**: SPEC — พร้อม implement  
+**Status**: DONE — implemented + verified  
 **Date**: 2026-06-14
 
 ---
 
-## What EXISTS (ดีมากแล้ว — ไม่แตะ)
+## What EXISTS (ตามโค้ดปัจจุบัน)
 
-| Component | File:Line | Quality |
-|-----------|-----------|---------|
-| Debounced real-time search | purchase-orders.js:17 | ✅ 300ms |
-| `[Blacklist]` badge ใน results | purchase-orders.js:612 | ✅ |
-| `showBlacklistAlert()` popup | purchase-orders.js:629-659 | ✅ สวยและครบ |
-| Cancel / ดำเนินการต่อ buttons | purchase-orders.js:651-658 | ✅ |
-| Reason + วันที่ ใน popup | purchase-orders.js:647-648 | ✅ |
-| Search API returns blacklist fields | sellers/search endpoint | ✅ |
+| Component | Current code | Quality |
+|-----------|--------------|---------|
+| Debounced real-time search | `base-pos/assets/js/purchase-orders.js` | ✅ |
+| `[Blacklist]` badge ใน results | `base-pos/assets/js/purchase-orders.js` | ✅ |
+| `showBlacklistAlert()` popup | `base-pos/assets/js/purchase-orders.js` | ✅ |
+| Cancel / ดำเนินการต่อ buttons | `base-pos/assets/js/purchase-orders.js` | ✅ |
+| Reason + วันที่ ใน popup | `base-pos/assets/js/purchase-orders.js` | ✅ |
+| Selected seller badge | `base-pos/assets/js/purchase-orders.js` | ✅ |
+| Soft reminder ตอน save | `base-pos/assets/js/purchase-orders.js` | ✅ |
+| Search API returns blacklist fields | sellers search endpoint | ✅ |
 
-## What MISSING (2 gaps ที่ต้องปิด)
+## Verification Notes
 
-### Gap 1: ไม่มี blacklist indicator ใน selected seller box
-เมื่อ confirm แล้ว → `doSelectSeller()` แสดงชื่อ/โทรศัพท์ปกติ  
-**ไม่มี visual ว่า "seller นี้อยู่ใน blacklist"**  
-พนักงานคนอื่นที่มาดูหน้าจอจะไม่รู้
-
-### Gap 2: ไม่มี check ตอน save
-`savePurchaseOrder()` line 365: ตรวจแค่ `!selectedSeller`  
-**ไม่ตรวจ `selectedSeller.is_blacklisted`**  
-ถ้า staff confirm popup แล้วรอนาน (phone call etc.) → save โดยไม่มี 2nd reminder
+- เลือก seller blacklist แล้ว UI แสดง warning ทั้งในผลค้นหาและ selected seller box
+- กดบันทึก PO หลังเลือก seller blacklist จะมี soft reminder ก่อนส่งข้อมูล
+- ฟีเจอร์นี้ไม่ block การบันทึก แต่ทำให้ cashier เห็นสถานะชัดเจน
 
 ---
 

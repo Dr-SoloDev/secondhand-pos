@@ -193,6 +193,17 @@ class SaleLotsController extends Controller
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
+        $lot   = $model->getById($id);
+        if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+
+        // SECURITY: non-admin ยืนยันได้เฉพาะ Sale Lot ของสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์ยืนยัน Sale Lot นี้', 403);
+            }
+        }
+
         try {
             $model->updateStatus($id, 'confirmed');
             Logger::logActivity(
@@ -214,6 +225,17 @@ class SaleLotsController extends Controller
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
+        $lot   = $model->getById($id);
+        if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+
+        // SECURITY: non-admin ยกเลิกได้เฉพาะ Sale Lot ของสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์ยกเลิก Sale Lot นี้', 403);
+            }
+        }
+
         try {
             $model->updateStatus($id, 'cancelled');
             Logger::logActivity(

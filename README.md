@@ -2,7 +2,7 @@
 
 **Junk Shop POS System** — Customized from [goragodwiriya/pos-system](https://github.com/goragodwiriya/pos-system) for 4-branch scrap buying business in Surin, Thailand.
 
-> Owner: Dr.solodev | Last Updated: 2026-07-12 | Status: **Production Ready** ✅ | **Mobile/Tablet Support** ✅ | **Architecture Score: 9/10**
+> Owner: Dr.solodev | Last Updated: 2026-07-26 | Status: **Production Ready** ✅ | **Mobile/Tablet Support** ✅ | **Architecture Score: 9/10**
 
 ---
 
@@ -53,7 +53,7 @@ code/
         ├── api/Models/            # 10 custom models
         ├── api/Controllers/       # 11 custom controllers
         └── database/
-            ├── migrations/        # 48 migrations (001-048)
+            ├── migrations/        # Active migrations (001-053 + patch variants)
             └── run-migrations.sh
 ```
 
@@ -69,10 +69,10 @@ code/
 
 ### Core Business
 - **Purchase Orders (รับซื้อ):** Multi-item PO with catalog autocomplete, seller search, weight deduction, price tiers, precious metal receipt flag, receipt printing
-- **Sale Lots (ขาย Lot):** Full CRUD with draft/confirm/cancel, FIFO costing (atomic `consumed_qty` + `FOR UPDATE`), weighted average cost, profit tracking, actual revenue recording, transport cost
+- **Sale Lots (ขาย Lot):** Auto-confirmed sale lots, confirmed-lot edit via restore/reapply stock, cancel → restore stock, FIFO or weighted-average costing, profit tracking, actual revenue recording, transport cost
 - **Stock Transfers (โอนสต็อก):** Cross-branch stock transfer with pending→confirm/cancel workflow + logistics tracking (carrier, plate, driver)
 - **Sellers (ผู้ขาย):** ID card (13-digit) validation, duplicate detection, blacklist with reason/timestamp/who, vehicle plate tracking, photo upload, PDPA consent, search index
-- **Inventory:** Category-based stock tracking, alert thresholds, price tiers (3 tiers per category), unit management (kg/piece)
+- **Inventory:** `branch_stock` per-branch per-item stock tracking, alert thresholds, `categories.stock_kg` compatibility backfill, price tiers (3 tiers per category), unit management (kg/piece)
 - **Catalog:** Master purchase catalog with auto-fill, price board (all branches), JSON tier pricing
 - **Business Expenses:** Per-branch expense tracking with CRUD
 - **Employees:** Employee records + salary/SSO expense generation
@@ -86,7 +86,7 @@ code/
 - **Role-based access** — admin / manager / cashier with JWT branch_id scoping
 - **Responsive UI** — desktop + tablet + mobile (768px, 576px breakpoints)
 - **Dashboard:** Stat cards, sale lot chart, recent sale lots table
-- **Reports:** Purchase report, sale lot report, financial summary, CSV export, chart data
+- **Reports:** Purchase report, sale lot report, financial summary from `actual_revenue`, CSV export, chart data
 - **Photo upload** via QR code + HMAC token handoff (no JWT needed)
 - **Security:** JWT (httpOnly cookie + Bearer fallback), login rate limiting (IP-based), token blocklist (revocation), SQL injection (PDO prepared statements everywhere), race safety (atomic conditional UPDATE + FOR UPDATE), security headers (CSP, X-Frame-Options, X-Content-Type-Options)
 - **Idempotency:** Duplicate POST prevention for POs and sale lots
@@ -124,8 +124,8 @@ code/
 
 ```bash
 cd code/tests/api
-bash run.sh                       # 84 tests, all passing
-bash run.sh auth sellers          # run specific groups
+bash run.sh                       # full API suite
+bash run.sh sale_lots_fifo inventory  # focused smoke checks
 API_BASE=http://other:8080/api/index.php bash run.sh
 ```
 
@@ -139,11 +139,11 @@ API_BASE=http://other:8080/api/index.php bash run.sh
 |------|----------|---------|
 | `AGENTS.md` | AI agents | Full project context |
 | `DESIGN.md` | Designers/Devs | UI design system (Google Stitch) |
-| `docs/INSTALLATION.md` | Ops | Docker, env, production deploy |
-| `docs/USER-GUIDE.md` | Users | Step-by-step workflow manual (Thai) |
-| `mobile/purchase.html` | Mobile users | Standalone mobile PO wizard (4-step) |
-| `docs/TECHNICAL.md` | Developers | Architecture, API, DB, security |
-| `docs/DEPLOY-CHECKLIST.md` | Ops | Pre-launch verification |
+| `code/README.md` | Developers | Codebase summary, structure, setup |
+| `code/docs/TECHNICAL.md` | Developers | Architecture, API, DB, stock model, security |
+| `code/docs/workflows/REGISTRY.md` | Team | Workflow status registry |
+| `code/docs/workflows/WORKFLOW-05-purchase-flow-ux.md` | Cashiers/Designers | Purchase flow UX |
+| `code/base-pos/README.md` | Developers | Upstream framework reference |
 
 ---
 

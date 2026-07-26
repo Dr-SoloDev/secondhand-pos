@@ -38,12 +38,21 @@ test_sale_lots_fifo() {
   assert_neq "" "$po_id" "FIFO: PO has ID"
   [ -z "$po_id" ] && po_id=1
 
+  get_fifo_stock() {
+    api_get "inventory/category-items?category_id=$cat_id&branch_id=$branch_id" | python3 -c "import sys,json; d=json.load(sys.stdin); items=d.get('data',{}).get('items',[]); print(next((str(it.get('stock_kg')) for it in items if it.get('item_name') == 'FIFO Test Item'), ''))" 2>/dev/null
+  }
+
+  local initial_stock
+  initial_stock=$(get_fifo_stock)
+  assert_neq "" "$initial_stock" "FIFO: Initial stock exists in branch_stock"
+
   # 2. Create sale lot — now creates as confirmed immediately (no separate confirm step)
   res=$(api_post "sale-lots" "{
     \"branch_id\":$branch_id,
     \"buyer_name\":\"FIFO Test Buyer\",
     \"sale_date\":\"$(date +%Y-%m-%d)\",
     \"items\":[{
+      \"item_name\":\"FIFO Test Item\",
       \"category_id\":$cat_id,
       \"quantity_kg\":30,
       \"unit_price\":25.00
@@ -55,6 +64,10 @@ test_sale_lots_fifo() {
   assert_neq "" "$lot_id" "FIFO: Sale lot has ID"
   [ -z "$lot_id" ] && lot_id=1
 
+  local after_create_stock
+  after_create_stock=$(get_fifo_stock)
+  assert_neq "$initial_stock" "$after_create_stock" "FIFO: Stock is reduced after sale lot"
+
   # 3. Verify lot is already confirmed after creation
   res=$(api_get "sale-lots/sale-lot?id=$lot_id")
   assert_contains "$res" '"status":"success"' "FIFO: Get lot details"
@@ -65,6 +78,10 @@ test_sale_lots_fifo() {
   # 4. Cancel confirmed lot
   res=$(api_post_id "sale-lots/cancel" "$lot_id" "{}")
   assert_contains "$res" '"status":"success"' "FIFO: Cancel sale lot"
+
+  local after_cancel_stock
+  after_cancel_stock=$(get_fifo_stock)
+  assert_eq "$initial_stock" "$after_cancel_stock" "FIFO: Stock restored after cancel"
 
   # 5. Verify lot is cancelled
   res=$(api_get "sale-lots/sale-lot?id=$lot_id")
@@ -100,6 +117,7 @@ test_sale_lots_fifo() {
     \"buyer_name\":\"Overstock Buyer\",
     \"sale_date\":\"$(date +%Y-%m-%d)\",
     \"items\":[{
+      \"item_name\":\"Low Stock Test\",
       \"category_id\":$cat_id,
       \"quantity_kg\":999999,
       \"unit_price\":25.00

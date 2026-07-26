@@ -88,7 +88,7 @@
             <select id="branchFilterStock" class="form-control inv-branch-select">
               <option value="all">รวมทุกสาขา</option>
             </select>
-            <button class="btn btn-sm btn-secondary" id="refreshCategoryStock" onclick="renderCategoryStock()">รีเฟรช</button>
+            <button class="btn btn-sm btn-secondary" id="refreshCategoryStock" onclick="refreshCategoryStock()">รีเฟรช</button>
             <button class="btn btn-sm btn-secondary inv-threshold-btn" onclick="toggleThresholdMode()">⚙ ตั้ง Alert</button>
           </div>
         </div>
@@ -96,7 +96,25 @@
           <div id="thresholdForm" class="inv-threshold-form">
             <strong>โหมดตั้งค่าแจ้งเตือน</strong> — กรอกตัวเลข (กก.) ที่ต้องการให้แจ้งเตือนเมื่อสต็อกต่ำกว่า ปล่อยว่างเพื่อปิดแจ้งเตือน
           </div>
-          <div id="categoryStockGrid" class="inv-category-grid"></div>
+          <div class="inv-stock-workspace">
+            <section class="inv-category-pane" aria-label="หมวดหมู่สินค้า">
+              <div class="inv-pane-header">
+                <div>
+                  <h3 class="inv-pane-title">หมวดหมู่</h3>
+                  <div class="inv-pane-meta" id="categoryPaneMeta">0 หมวด</div>
+                </div>
+              </div>
+              <div id="categoryStockGrid" class="inv-category-grid"></div>
+            </section>
+
+            <section id="categoryItemPanel" class="inv-detail-pane" aria-live="polite">
+              <div class="inv-detail-empty">
+                <div class="inv-detail-empty-icon"><i class="icon-product"></i></div>
+                <h3>ยังไม่ได้เลือกหมวดหมู่</h3>
+                <p>รายการสต็อกจะแสดงตรงนี้</p>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
 

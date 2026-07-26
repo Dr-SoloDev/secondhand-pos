@@ -17,11 +17,16 @@ test_sale_lots() {
   cat_id=$(api_get "inventory/categories" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
   [ -z "$cat_id" ] && cat_id=1
 
+  local item_name
+  item_name=$(api_get "inventory/category-items?category_id=$cat_id&branch_id=$branch_id" | php -r '$d=json_decode(stream_get_contents(STDIN), true); echo $d["data"]["items"][0]["item_name"] ?? "";')
+  [ -z "$item_name" ] && item_name="Test Item"
+
   res=$(api_post "sale-lots" "{
     \"branch_id\":$branch_id,
     \"buyer_name\":\"Test Buyer\",
     \"sale_date\":\"$(date +%Y-%m-%d)\",
     \"items\":[{
+      \"item_name\":\"$item_name\",
       \"category_id\":$cat_id,
       \"quantity_kg\":0.001,
       \"unit_price\":30.00
