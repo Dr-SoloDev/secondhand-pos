@@ -673,9 +673,85 @@ window.addEventListener('click', function(event) {
     if (event.target === viewModal) closeViewSellerModal();
 });
 
-document.getElementById('searchInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') searchSellers();
+// ── Seller Autocomplete Search ──
+let _searchDebounceTimer = null;
+const SEARCH_DELAY = 300; // ms
+
+document.getElementById('searchInput').addEventListener('input', function(e) {
+    clearTimeout(_searchDebounceTimer);
+    const q = e.target.value.trim();
+    if (q.length < 2) {
+        closeSellerSearchDropdown();
+        return;
+    }
+    _searchDebounceTimer = setTimeout(() => searchSellerAutocomplete(q), SEARCH_DELAY);
 });
+
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        closeSellerSearchDropdown();
+        searchSellers();
+    }
+});
+
+// Close dropdown on outside click
+document.addEventListener('click', function(e) {
+    const container = document.querySelector('.card-tools[style*="position:relative"]');
+    if (container && !container.contains(e.target)) {
+        closeSellerSearchDropdown();
+    }
+});
+
+async function searchSellerAutocomplete(q) {
+    const resultsBox = document.getElementById('sellerSearchResults');
+    if (!resultsBox) return;
+
+    const includeBlacklisted = document.getElementById('showBlacklisted').checked;
+    const res = await apiRequest(`sellers/search?q=${encodeURIComponent(q)}${includeBlacklisted ? '&include_blacklisted=true' : ''}`);
+    if (res.status !== 'success') { closeSellerSearchDropdown(); return; }
+
+    const items = res.data || [];
+    if (items.length === 0) {
+        resultsBox.innerHTML = '<div class="seller-item" style="color:#999;cursor:default">ไม่พบผู้ขายที่ค้นหา</div>';
+        resultsBox.style.display = 'block';
+        return;
+    }
+
+    // Single result — auto-select (open Data Center)
+    if (items.length === 1) {
+        closeSellerSearchDropdown();
+        viewSeller(items[0].id);
+        return;
+    }
+
+    // Multiple results — show dropdown
+    resultsBox.innerHTML = '';
+    items.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'seller-item' + (s.is_blacklisted ? ' seller-item--blacklisted' : '');
+        const tierLabel = 'บิล ' + (s.tier_level || 1);
+        const phoneFmt = s.phone ? ' · ' + escapeHtml(s.phone) : '';
+        const idCardFmt = s.national_id ? ' · ' + formatIdCard(s.national_id) : '';
+        const blacklistIcon = s.is_blacklisted ? ' ⛔' : '';
+        div.innerHTML = `
+            <div class="seller-item__name">
+                <strong>${escapeHtml(s.name)}</strong>${blacklistIcon}
+                <span class="badge badge-tier-${s.tier_level || 1}" style="font-size:10px;padding:1px 6px">${tierLabel}</span>
+            </div>
+            <div class="seller-item__id">${phoneFmt}${idCardFmt}</div>`;
+        div.addEventListener('click', () => {
+            closeSellerSearchDropdown();
+            viewSeller(s.id);
+        });
+        resultsBox.appendChild(div);
+    });
+    resultsBox.style.display = 'block';
+}
+
+function closeSellerSearchDropdown() {
+    const box = document.getElementById('sellerSearchResults');
+    if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+}
 
 // ===== Photo Upload =====
 let sellerPhotoFileInput = null;

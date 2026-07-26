@@ -6,6 +6,7 @@
   <title>ผู้ขาย - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css">
   <link rel="stylesheet" href="../assets/css/components/photo-picker.css">
+  <link rel="stylesheet" href="../assets/css/components/purchase-orders.css">
 </head>
 <body>
   <div class="app-container">
@@ -61,8 +62,9 @@
       <div class="card sellers-card">
         <div class="card-header">
           <h2 class="card-title">รายชื่อผู้ขาย</h2>
-          <div class="card-tools">
-            <input type="text" id="searchInput" class="form-control" placeholder="ค้นหา: ชื่อ, เบอร์โทร, บัตรประชาชน...">
+          <div class="card-tools" style="position:relative">
+            <input type="text" id="searchInput" class="form-control" placeholder="ค้นหา: ชื่อ, เบอร์โทร, บัตรประชาชน..." autocomplete="off">
+            <div id="sellerSearchResults" class="seller-results"></div>
           </div>
         </div>
         <div class="card-body">
