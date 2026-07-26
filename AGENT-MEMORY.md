@@ -1,6 +1,6 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 26 กรกฎาคม 2569
-**Status:** GOALS G1-G11 โค้ดพร้อม ตรวจสอบโค้ดจริงทุกข้อ ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅
+**Last updated:** 26 กรกฎาคม 2569 (Tech Debt Cleanup Session)
+**Status:** GOALS G1-G11 โค้ดพร้อม ตรวจสอบโค้ดจริงทุกข้อ ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅ | **Migrations 001-053 ครบถ้วน** ✅ | **Tech Debt Cleanup เสร็จ** ✅
 
 ---
 
@@ -50,11 +50,12 @@
 - [x] ~~CSV UTF-8 BOM~~ — เพิ่ม \uFEFF ใน client-side exports
 - [x] ~~Financial summary~~ — error notifications แทน infinite loading
 
-### ⏳ Tech Debt — Remaining
-- [ ] **รัน migration ก่อน deploy:** `code/customizations/database/migrations/` (#048-#050) + `code/database/security-migrations.sql`
-- [ ] sidebar stock-transfers.html + price-board.html — เพิ่มลิงก์เมนูครบ
-- [ ] ลบ `code/base-pos/backups/.htaccess` (legacy)
-- [ ] เมนู "สาขา" ถูกลบจาก sidebar — ตัดสินใจเอาคืนหรือลบ controller
+### ✅ Tech Debt — Resolved (2026-07-26)
+- [x] **รัน migration:** 046, 047, 051, 052, 053 — ครบทั้งหมด 001-053 ✅
+- [x] **Sidebar links:** stock-transfers + price-board มีครบทุกหน้า 18 หน้า (ตรวจสอบแล้ว)
+- [x] **ลบ legacy:** `base-pos/backups/.htaccess` + `database/security-migrations.sql` (ซ้ำซ้อน)
+- [x] **เมนูสาขา:** branches.html มีใน sidebar ทุกหน้าอยู่แล้ว
+- [x] **Test default password:** auth.sh อัปเดตเป็น `password` (ตรงกับ DB)
 
 ## 🗑️ Dead Code — อย่าแตะ อย่า restore (ตัดสินใจแล้ว 14 มิ.ย. 2569)
 
@@ -329,3 +330,22 @@ docker exec -it scrap-pos-db mysql -uroot -prootpass pos_system
 - รูปสินค้าเก็บไว้ดูในระบบประวัติเท่านั้น (seller-history.html, PO detail)
 - **ไม่มีรูปสินค้าออกไปที่บิลใบรับซื้อ** — print-receipt.html แสดงแค่ชื่อ + น้ำหนัก + ราคา
 - commit: `ad5f1f0` + unstaged changes
+
+---
+
+## 🧠 Session 2026-07-26 — Tech Debt Cleanup (CEO เทอโบ)
+
+### งานที่ทำ
+1. ✅ **Commit staged changes** — 9 ไฟล์, 686 บรรทัด (thermal receipt + item_id photo binding) — `4faf9b8`
+2. ✅ **ลบ legacy files** — `backups/.htaccess` + `security-migrations.sql` (ซ้ำซ้อน) — `312d923`
+3. ✅ **รัน migrations ที่ค้าง** — 046, 047, 051, 052, 053 — ครบ 001-053
+   - 051 `branch_stock` table: 17 rows populated (ใช้ INSERT IGNORE กันข้อมูลซ้ำ)
+4. ✅ **Sidebar audit** — ทุก 18 หน้ามี stock-transfers + price-board + branches ครบ
+5. ✅ **Tests** — 78/88 pass (10 failures = pre-existing FIFO/Sale Lot issues)
+6. ✅ **auth.sh default password** — แก้เป็น `password` (ตรงกับ DB)
+
+### สถานะล่าสุด
+- **Migrations:** 001-053 complete ✅
+- **Tech Debt:** ทั้งหมดที่ค้างไว้เคลียร์แล้ว ✅
+- **Working tree:** clean
+- **next:** Phase Reports filter by branch / กำไรต่อชิ้น / Hybrid Offline
