@@ -149,4 +149,4 @@ API_BASE=http://other:8080/api/index.php bash run.sh
 
 ## License
 
-Built for SoloCorp OS by Dr.solodev | Powered by Claude Code + Kimi CLI
+Built for SoloCorp OS by Dr.solodev
