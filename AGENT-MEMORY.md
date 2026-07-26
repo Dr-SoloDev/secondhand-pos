@@ -1,5 +1,5 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 13 กรกฎาคม 2569
+**Last updated:** 26 กรกฎาคม 2569
 **Status:** GOALS G1-G11 โค้ดพร้อม ตรวจสอบโค้ดจริงทุกข้อ ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅
 
 ---
@@ -300,4 +300,32 @@ docker exec -it scrap-pos-db mysql -uroot -prootpass pos_system
   - confirm transfer หัก FIFO `purchase_order_items.consumed_qty` จากสาขาต้นทาง
   - สร้าง transfer PO ในสาขาปลายทางโดยใช้ weighted avg cost ของของที่โอน
   - `categories.stock_kg` global ไม่ถูกลด เพราะของยังอยู่ในระบบ แค่ย้ายสาขา
-  - E2E test: BR2→BR1 50kg แล้วขายจาก BR1 30kg สำเร็จ; stock ต่อสาขาอัปเดตถูก
+   - E2E test: BR2→BR1 50kg แล้วขายจาก BR1 30kg สำเร็จ; stock ต่อสาขาอัปเดตถูก
+
+---
+
+## 🧠 Session 2026-07-26 — รูป Item Photo ไม่ผูกกับ item_id (Fix Complete)
+
+### ปัญหา
+- เวลาถ่ายรูปสินค้าตอนทำ PO รูปถูก upload ไปที่ server แต่ `purchase_order_item_id = NULL`
+- สาเหตุ: `createWithItems()` ไม่ return item IDs → frontend ไม่มีทางส่ง `item_id` ไปกับ photo
+- seller-history.html จึงไม่แสดง item photos thumbnails (ดูได้แค่รูปบัตรประชาชน)
+
+### แก้ไข (3 ไฟล์)
+| ไฟล์ | แก้ไข |
+|:-----|:------|
+| `customizations/api/Models/PurchaseOrder.php` | `createWithItems()` เก็บ `$itemMappings[]` {id, client_key} หลัง insert แต่ละ item, return `items` array |
+| `customizations/api/Controllers/PurchaseOrdersController.php` | รับ `client_key` จาก items payload |
+| `base-pos/assets/js/purchase-orders.js` | ส่ง `client_key: it._tempId`, สร้าง `tempIdToItemId` map, upload รูปพร้อม `item_id` |
+
+### Verify
+- PHP syntax 23/23 ✅
+- API test: PO + photo upload + DB check ✅
+- Data Center API ส่ง item photos ครบ ✅
+- Edge cases: upload ไม่มี item_id (fallback) ได้ ✅
+- Full test suite: 78/88 pass (failures = pre-existing FIFO/Sale Lot tests ไม่เกี่ยวกับ photo) ✅
+
+### ข้อสรุป
+- รูปสินค้าเก็บไว้ดูในระบบประวัติเท่านั้น (seller-history.html, PO detail)
+- **ไม่มีรูปสินค้าออกไปที่บิลใบรับซื้อ** — print-receipt.html แสดงแค่ชื่อ + น้ำหนัก + ราคา
+- commit: `ad5f1f0` + unstaged changes

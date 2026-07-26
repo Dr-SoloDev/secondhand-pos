@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>พิมพ์ใบรับซื้อ - ความร้อน</title>
+  <style>
+    /* ── Thermal 80mm receipt styles ── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'IBM Plex Sans Thai', 'Sarabun', 'Courier New', monospace;
+      background: #fff;
+      color: #000;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    #printControls {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: #1e293b; padding: 10px 16px;
+      display: flex; gap: 10px; align-items: center;
+      z-index: 999;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    #printControls button {
+      padding: 10px 24px; border: none; border-radius: 6px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    #btnPrintThermal { background: #D97706; color: #fff; }
+    #btnPrintThermal:hover { background: #b85e00; }
+    #btnClose { background: #475569; color: #fff; }
+    #btnClose:hover { background: #334155; }
+    #refNoDisplay { color: #94a3b8; font-size: 13px; margin-left: auto; }
+
+    .receipt {
+      width: 80mm;
+      max-width: 80mm;
+      margin: 60px auto 0;
+      padding: 4mm 3mm;
+      background: #fff;
+    }
+
+    /* header */
+    .receipt-header { text-align: center; margin-bottom: 6px; }
+    .receipt-header .shop-name { font-size: 16px; font-weight: 800; letter-spacing: 1px; }
+    .receipt-header .branch { font-size: 11px; color: #444; }
+    .receipt-header .receipt-title { font-size: 13px; font-weight: 700; margin-top: 2px; }
+    .divider-dash { border: none; border-top: 1px dashed #333; margin: 4px 0; }
+
+    /* meta info */
+    .meta-row { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px; }
+    .meta-row .label { color: #555; }
+    .meta-row .value { font-weight: 600; }
+
+    /* seller */
+    .seller-info { font-size: 10px; margin: 4px 0; }
+    .seller-info strong { font-size: 11px; }
+
+    /* table */
+    table.receipt-table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 10px; }
+    table.receipt-table th {
+      border-bottom: 1px solid #333; border-top: 1px solid #333;
+      padding: 2px 2px; text-align: left; font-size: 9px;
+    }
+    table.receipt-table th:nth-child(2),
+    table.receipt-table th:nth-child(3) { text-align: center; }
+    table.receipt-table th:last-child { text-align: right; }
+    table.receipt-table td {
+      padding: 2px 2px; border-bottom: 1px dotted #ccc; vertical-align: top;
+    }
+    table.receipt-table td:nth-child(2),
+    table.receipt-table td:nth-child(3) { text-align: center; white-space: nowrap; }
+    table.receipt-table td:last-child { text-align: right; white-space: nowrap; font-weight: 600; }
+
+    /* total */
+    .total-row {
+      display: flex; justify-content: space-between;
+      font-size: 14px; font-weight: 800; padding: 4px 0;
+      border-top: 1px solid #333; border-bottom: 1px solid #333;
+      margin: 4px 0;
+    }
+
+    /* payment */
+    .payment-row { text-align: right; font-size: 11px; margin-bottom: 4px; }
+
+    /* cashier */
+    .cashier-info { font-size: 9px; color: #555; text-align: center; margin: 2px 0; }
+
+    /* precious metal section */
+    .precious-section { margin-top: 6px; font-size: 9px; }
+    .precious-section .declaration { font-style: italic; margin: 2px 0; }
+    .precious-section .sig-line {
+      border-bottom: 1px solid #333;
+      height: 20px; margin: 4px 0;
+    }
+    .precious-section .sig-label { font-size: 9px; color: #555; }
+    .precious-section .warning { font-size: 8px; color: #888; margin-top: 4px; }
+
+    /* footer */
+    .receipt-footer {
+      text-align: center; font-size: 9px; color: #555;
+      margin-top: 6px; padding-top: 4px;
+      border-top: 1px dashed #333;
+    }
+
+    /* states */
+    #loadingState, #errorState {
+      text-align: center; padding: 40px; font-size: 14px; color: #555;
+    }
+    #errorState { color: #c00; }
+
+    /* ── Print styles ── */
+    @media print {
+      body { background: #fff; }
+      #printControls { display: none !important; }
+      .receipt { margin: 0 auto; width: 80mm; }
+      @page { size: 80mm 297mm; margin: 0; }
+    }
+
+    @media (max-width: 360px) {
+      .receipt { width: 100%; padding: 2mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Controls -->
+  <div id="printControls">
+    <button id="btnPrintThermal" onclick="printThermal()">🖨️ พิมพ์</button>
+    <button id="btnClose" onclick="window.close()">ปิด</button>
+    <span id="refNoDisplay"></span>
+  </div>
+
+  <div id="loadingState">กำลังโหลดข้อมูล...</div>
+  <div id="errorState" style="display:none"></div>
+
+  <div id="receiptContainer" style="display:none"></div>
+
+  <script src="../assets/js/config.js"></script>
+  <script>
+    function maskId(id) {
+      if (!id) return '';
+      const s = String(id).replace(/\D/g, '');
+      if (s.length < 4) return s;
+      return s.slice(0, 1) + '-XXXX-XXXXX-' + s.slice(-2) + '-X';
+    }
+    function fmtCurrency(v) {
+      return (parseFloat(v) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtDateTime(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      if (isNaN(d)) return s;
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = d.getFullYear() + 543;
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${dd}/${mm}/${yy} ${hh}:${mi}`;
+    }
+    function esc(s) {
+      if (!s) return '';
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function buildThermalReceipt(po) {
+      const dt = fmtDateTime(po.created_at);
+      const branchLabel = [po.branch_name, po.branch_code ? 'สาขา '+po.branch_code : ''].filter(Boolean).join(' · ');
+
+      // Item rows — compact for thermal
+      const itemRows = (po.items || []).map(it => {
+        const dq = parseFloat(it.weight_deduction || 0);
+        const q  = parseFloat(it.quantity || 0);
+        const net = Math.max(0, q - dq);
+        const deductStr = dq > 0 ? dq.toFixed(1) : '-';
+        return `<tr>
+          <td>${esc(it.item_name)}</td>
+          <td>${deductStr}</td>
+          <td>${net.toFixed(1)}</td>
+          <td>${fmtCurrency(it.total_price)}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="4" style="text-align:center;color:#999;padding:4px">ไม่มีรายการ</td></tr>';
+
+      const payMap = { cash: 'เงินสด', bank: 'โอน', qr: 'QR', promptpay: 'พร้อมเพย์' };
+      const payment = payMap[po.payment_method] || po.payment_method || '-';
+
+      // Precious metal addendum
+      const preciousHtml = po.is_precious_metal ? `
+        <div class="precious-section">
+          <div class="declaration">ข้าพเจ้านำสินค้านี้มาโดยสุจริต</div>
+          <div class="sig-label">ลายเซ็นผู้ขาย: _________________________</div>
+          <div class="warning">⚠️ ทางร้านไม่รับซื้อของลักทรัพย์</div>
+        </div>` : '';
+
+      return `
+        <div class="receipt">
+          <div class="receipt-header">
+            <div class="shop-name">รักษ์สะอาดรีไซเคิล</div>
+            <div class="branch">${esc(branchLabel)}</div>
+            <div class="receipt-title">ใบรับซื้อของเก่า</div>
+          </div>
+          <hr class="divider-dash">
+
+          <div class="meta-row">
+            <span class="label">เลขที่</span>
+            <span class="value">${esc(po.reference_no)}</span>
+          </div>
+          <div class="meta-row">
+            <span class="label">วันที่</span>
+            <span class="value">${esc(dt)}</span>
+          </div>
+
+          <div class="seller-info">
+            <strong>${esc(po.seller_name || '-')}</strong>
+            ${po.seller_id_card ? `<br>บัตร ${maskId(po.seller_id_card)}` : ''}
+          </div>
+
+          <hr class="divider-dash">
+
+          <table class="receipt-table">
+            <thead>
+              <tr>
+                <th>สินค้า</th>
+                <th>หัก</th>
+                <th>สุทธิ</th>
+                <th>รวม</th>
+              </tr>
+            </thead>
+            <tbody>${itemRows}</tbody>
+          </table>
+
+          <div class="total-row">
+            <span>รวมทั้งสิ้น</span>
+            <span>฿ ${fmtCurrency(po.total_amount)}</span>
+          </div>
+
+          <div class="payment-row">ชำระ: ${esc(payment)}</div>
+          <div class="cashier-info">แคชเชียร์: ${esc(po.user_name || '-')}</div>
+
+          ${preciousHtml}
+
+          <hr class="divider-dash">
+          <div class="receipt-footer">
+            ${po.branch_phone ? esc(po.branch_phone) + '<br>' : ''}
+            บริการดี ราคาดี ตาชั่งมาตรฐาน<br>
+            ขอบคุณที่ใช้บริการ 🙏
+          </div>
+        </div>`;
+    }
+
+    function printThermal() {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        // fallback
+        window.print();
+        return;
+      }
+      const content = document.getElementById('receiptContainer').innerHTML;
+      printWindow.document.write(`
+        <!DOCTYPE html><html lang="th"><head>
+        <meta charset="UTF-8">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', monospace; font-size: 12px; color: #000; background: #fff; width: 80mm; }
+          .receipt { width: 80mm; padding: 3mm; }
+          .receipt-header { text-align: center; margin-bottom: 6px; }
+          .receipt-header .shop-name { font-size: 15px; font-weight: 800; }
+          .receipt-header .branch { font-size: 10px; color: #444; }
+          .receipt-header .receipt-title { font-size: 12px; font-weight: 700; margin-top: 2px; }
+          hr { border: none; border-top: 1px dashed #333; margin: 4px 0; }
+          .meta-row { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px; }
+          .seller-info { font-size: 10px; margin: 4px 0; }
+          .seller-info strong { font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 10px; }
+          th { border-bottom: 1px solid #333; border-top: 1px solid #333; padding: 2px; text-align: left; font-size: 9px; }
+          th:nth-child(2), th:nth-child(3) { text-align: center; }
+          th:last-child { text-align: right; }
+          td { padding: 2px; border-bottom: 1px dotted #ccc; }
+          td:nth-child(2), td:nth-child(3) { text-align: center; }
+          td:last-child { text-align: right; font-weight: 600; }
+          .total-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; padding: 4px 0; border-top: 1px solid #333; border-bottom: 1px solid #333; margin: 4px 0; }
+          .payment-row { text-align: right; font-size: 10px; }
+          .cashier-info { font-size: 9px; color: #555; text-align: center; }
+          .receipt-footer { text-align: center; font-size: 9px; color: #555; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #333; }
+          .precious-section { margin-top: 4px; font-size: 9px; }
+          .precious-section .declaration { font-style: italic; }
+          .precious-section .sig-line { border-bottom: 1px solid #333; height: 18px; margin: 4px 0; }
+          @page { size: 80mm 297mm; margin: 0; }
+          @media print { body { width: 80mm; } }
+        </style>
+        </head><body>${content}</body></html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => { printWindow.print(); }, 500);
+    }
+
+    async function loadAndRender() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (!id) { showError('ไม่พบข้อมูล'); return; }
+
+      try {
+        const res = await fetch(`${window.apiPath}/purchase-orders/print?id=${encodeURIComponent(id)}`, {
+          credentials: 'include'
+        });
+        if (res.status === 401) { window.location.href = '../index.html'; return; }
+        const data = await res.json();
+        if (!res.ok || data.status !== 'success') {
+          showError(data.message || 'โหลดไม่สำเร็จ');
+          return;
+        }
+        render(data.data);
+      } catch (e) {
+        showError('ไม่สามารถโหลดข้อมูล');
+      }
+    }
+
+    function render(po) {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('refNoDisplay').textContent = `เลขที่: ${po.reference_no}`;
+      document.title = `พิมพ์ ${po.reference_no}`;
+
+      const html = buildThermalReceipt(po);
+      const container = document.getElementById('receiptContainer');
+      container.innerHTML = html;
+      container.style.display = 'block';
+
+      // Auto-print if ?auto=1
+      if (new URLSearchParams(window.location.search).get('auto') === '1') {
+        setTimeout(() => printThermal(), 800);
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loadingState').style.display = 'none';
+      const el = document.getElementById('errorState');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    loadAndRender();
+  </script>
+</body>
+</html>

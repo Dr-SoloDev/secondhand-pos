@@ -239,3 +239,30 @@ unitInput.value = defaultUnit;
 **Category:** correction
 - API URL ที่ถูกต้อง: `http://localhost:8080/api/index.php/{route}`
 - ❌ `/api/{route}` → 404 เสมอ
+
+---
+
+## photo-upload-must-include-purchase-order-item-id
+**Category:** correction
+- Photo upload (`POST /purchase-orders/photos?id={poId}`) ต้องส่ง `item_id` ใน FormData เพื่อผูก item photo กับ item
+- ถ้าไม่ส่ง `purchase_order_item_id = NULL` → seller history แสดงรูปไม่ถูก
+- Backend รับ `$_POST['item_id']` ที่ `PhotoUploadController.php:87` → `$itemId = isset($_POST['item_id']) ? intval(...) : null`
+
+---
+
+## create-items-must-return-item-ids
+**Category:** correction
+- `PurchaseOrder::createWithItems()` ต้อง return `items` array พร้อม `{id, client_key}` เพื่อให้ frontend map tempId → itemId
+- ถ้าไม่ return → frontend ไม่มีทางรู้ว่าสร้าง item ID อะไรบ้าง → upload รูปไม่ได้
+- `PurchaseOrder.php:222-225`: collect `$itemMappings[]` หลัง `$this->db->lastInsertId()`
+- `PurchaseOrder.php:250-254`: return  `'items' => $itemMappings` ใน response
+
+---
+
+## frontend-tempid-to-itemid-mapping-after-po-save
+**Category:** insight
+- Frontend ใช้ `_tempId` เป็น client-side ID ใน cart
+- ต้องส่ง `client_key: it._tempId` ใน items payload ตอน POST PO
+- หลัง save PO → map `tempIdToItemId[client_key] = id` จาก response
+- ตอน upload รูป → `uploadItemPhoto(poId, file, tempIdToItemId[tempId])`
+- ดู `purchase-orders.js:778-786` (mapping) และ `purchase-orders.js:804` (use)

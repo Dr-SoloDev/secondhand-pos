@@ -755,6 +755,7 @@ async function savePurchaseOrder() {
       total_price: it.total_price,
       price_tier: it.price_tier,
       notes: it.notes,
+      client_key: it._tempId,
     })),
     idempotency_key: idempotencyKey,
   };
@@ -772,6 +773,18 @@ async function savePurchaseOrder() {
     showNotification(`บันทึกสำเร็จ! เลขที่: ${res.data.reference_no} ยอดรวม ${formatCurrency(res.data.total_amount)}`, 'success');
 
     console.log('[SavePO] ✓ PO saved successfully, ID:', poId);
+
+    // Build tempId → itemId mapping จาก response
+    const tempIdToItemId = {};
+    if (res.data.items && Array.isArray(res.data.items)) {
+      res.data.items.forEach(mapping => {
+        if (mapping.client_key) {
+          tempIdToItemId[mapping.client_key] = mapping.id;
+          console.log('[SavePO] Item mapping:', mapping.client_key, '→', mapping.id);
+        }
+      });
+    }
+    console.log('[SavePO] tempIdToItemId:', tempIdToItemId);
     console.log('[SavePO] Uploading photos - pendingItemPhotos keys:', Object.keys(pendingItemPhotos));
 
     // อัปโหลดลายเซ็น
@@ -788,8 +801,14 @@ async function savePurchaseOrder() {
       showUploadProgress();
       let uploaded = 0;
       for (const [tempId, file] of Object.entries(pendingItemPhotos)) {
-        console.log('[SavePO] Uploading photo for tempId:', tempId, 'file:', file.name);
-        await uploadItemPhoto(poId, file);
+        const itemId = tempIdToItemId[tempId] || null;
+        console.log('[SavePO] Uploading photo for tempId:', tempId, '→ itemId:', itemId, 'file:', file.name);
+        try {
+          await uploadItemPhoto(poId, file, itemId);
+        } catch (uploadErr) {
+          console.warn('[SavePO] Upload failed for', tempId, ':', uploadErr);
+          // continue — ไม่ block รูปอื่น
+        }
         uploaded++;
         showUploadProgress((uploaded / itemPhotoCount) * 100);
       }
@@ -997,6 +1016,12 @@ window.showReceipt = async function(id) {
   const btnPrint = document.getElementById('btnOpenPrint');
   if (btnPrint) {
     btnPrint.onclick = () => window.open(`print-receipt.html?id=${id}&auto=1`, '_blank');
+  }
+
+  // Thermal print button handler
+  const btnThermal = document.getElementById('btnOpenPrintThermal');
+  if (btnThermal) {
+    btnThermal.onclick = () => window.open(`print-receipt-thermal.html?id=${id}&auto=1`, '_blank');
   }
 
   // WF-01: สร้าง QR code หลังเปิด modal
@@ -1542,9 +1567,12 @@ async function uploadSellerIdPhoto(sellerId, file) {
 }
 
 // ── Upload single item photo to PO ─────────────────────────
-async function uploadItemPhoto(poId, file) {
+async function uploadItemPhoto(poId, file, itemId = null) {
   const formData = new FormData();
   formData.append('photo', file);
+  if (itemId) {
+    formData.append('item_id', itemId);
+  }
 
   try {
     const res = await fetch(`/api/index.php/purchase-orders/photos?id=${poId}`, {

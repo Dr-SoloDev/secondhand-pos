@@ -133,6 +133,7 @@ class PurchaseOrdersController extends Controller
                 'total_price' => floatval($item['total_price'] ?? (floatval($item['quantity'] ?? 1) * floatval($item['unit_price'] ?? 0))),
                 'price_tier' => !empty($item['price_tier']) ? intval($item['price_tier']) : null,
                 'notes' => isset($item['notes']) ? trim((string)$item['notes']) : null,
+                'client_key' => $item['client_key'] ?? null,
             ];
         }
 

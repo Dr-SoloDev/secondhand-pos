@@ -171,6 +171,7 @@ class PurchaseOrder extends Model
         $this->db->beginTransaction();
         try {
             $totalAmount = 0;
+            $itemMappings = [];
             foreach ($items as $item) {
                 $totalAmount += (float)($item['total_price'] ?? 0);
             }
@@ -217,6 +218,12 @@ class PurchaseOrder extends Model
                     'notes' => $item['notes'] ?? null,
                 ]);
 
+                $itemId = (int)$this->db->lastInsertId();
+                $itemMappings[] = [
+                    'id' => $itemId,
+                    'client_key' => $item['client_key'] ?? null,
+                ];
+
                 // ── Branch Stock: UPSERT per-branch per-item (ADD-001) ──
                 if ($categoryId) {
                     $branchStock = new BranchStock();
@@ -240,7 +247,12 @@ class PurchaseOrder extends Model
             );
 
             $this->db->commit();
-            return ['id' => $poId, 'reference_no' => $referenceNo, 'total_amount' => $totalAmount];
+            return [
+                'id' => $poId,
+                'reference_no' => $referenceNo,
+                'total_amount' => $totalAmount,
+                'items' => $itemMappings,
+            ];
         } catch (Exception $e) {
             $this->db->rollBack();
             throw $e;
