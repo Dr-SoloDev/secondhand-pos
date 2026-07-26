@@ -29,8 +29,7 @@ docker compose up -d         # start web (8080) + db (3307) + caddy
 | Direction | Counterparty | Volume | System |
 |-----------|-------------|--------|--------|
 | ← รับซื้อ (in) | ผู้ขายรายย่อย | ทุกวัน, หลายคน | Purchase Orders |
-| → ขาย Lot (out) | ศูนย์ใหญ่/โรงงาน | นานๆ ที, ปริมาณมาก | Sale Lots |
-| → ขายปลีก | ลูกค้าทั่วไป | ปกติ | POS / Sales |
+| → ขาย Lot (out) | ศูนย์ใหญ่/โรงงาน + ลูกค้าวอร์คอิน | นานๆ ที, ปริมาณมาก/บันทึกหน้าร้าน | Sale Lots |
 
 ---
 
@@ -69,7 +68,7 @@ code/
 
 ### Core Business
 - **Purchase Orders (รับซื้อ):** Multi-item PO with catalog autocomplete, seller search, weight deduction, price tiers, precious metal receipt flag, receipt printing
-- **Sale Lots (ขาย Lot):** Auto-confirmed sale lots, confirmed-lot edit via restore/reapply stock, cancel → restore stock, FIFO or weighted-average costing, profit tracking, actual revenue recording, transport cost
+- **Sale Lots (ขาย Lot):** Auto-confirmed sale lots, confirmed-lot edit via restore/reapply stock, cancel → restore stock, FIFO or weighted-average costing, profit tracking, actual revenue recording, transport cost, ใช้แทนการขายปลีกหน้าร้านสำหรับลูกค้าวอร์คอิน
 - **Stock Transfers (โอนสต็อก):** Cross-branch stock transfer with pending→confirm/cancel workflow + logistics tracking (carrier, plate, driver)
 - **Sellers (ผู้ขาย):** ID card (13-digit) validation, duplicate detection, blacklist with reason/timestamp/who, vehicle plate tracking, photo upload, PDPA consent, search index
 - **Inventory:** `branch_stock` per-branch per-item stock tracking, alert thresholds, `categories.stock_kg` compatibility backfill, price tiers (3 tiers per category), unit management (kg/piece)

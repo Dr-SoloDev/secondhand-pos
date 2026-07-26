@@ -135,9 +135,12 @@ class SaleLot extends Model
                 if ($qty <= 0 || empty($itemName)) {
                     throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
                 }
+                if ($catId <= 0) {
+                    throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
+                }
 
                 $subtotal  = $qty * $unitPrice;
-                $itemCost = $catId > 0 ? $this->calculateCost($branchId, $catId, $itemName, $qty) : 0;
+                $itemCost = $this->calculateCost($branchId, $catId, $itemName, $qty);
 
                 $totalAmount += $subtotal;
                 $totalCost   += $itemCost;
@@ -225,10 +228,13 @@ class SaleLot extends Model
                 if ($qty <= 0 || empty($itemName)) {
                     throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
                 }
+                if ($catId <= 0) {
+                    throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
+                }
 
                 $subtotal = $qty * $unitPrice;
                 try {
-                    $itemCost = $catId > 0 ? $this->calculateCost($branchId, $catId, $itemName, $qty) : 0;
+                    $itemCost = $this->calculateCost($branchId, $catId, $itemName, $qty);
                 } catch (Exception $e) {
                     $itemCost = 0;
                 }
@@ -314,8 +320,11 @@ class SaleLot extends Model
                 if ($qty <= 0 || empty($itemName)) {
                     throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
                 }
+                if ($catId <= 0) {
+                    throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
+                }
 
-                $itemCost = $catId > 0 ? $this->calculateCost($branchId, $catId, $itemName, $qty) : 0;
+                $itemCost = $this->calculateCost($branchId, $catId, $itemName, $qty);
                 $totalAmount += $qty * $unitPrice;
                 $totalCost   += $itemCost;
 
@@ -431,15 +440,14 @@ class SaleLot extends Model
         $totalCost = 0.0;
         foreach ($items as $item) {
             if (empty($item['category_id'])) {
-                $itemCost = 0.0;
-            } else {
-                $itemCost = $this->calculateCost(
-                    (int)$lot['branch_id'],
-                    (int)$item['category_id'],
-                    $item['item_name'],
-                    (float)$item['quantity_kg']
-                );
+                throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
             }
+            $itemCost = $this->calculateCost(
+                (int)$lot['branch_id'],
+                (int)$item['category_id'],
+                $item['item_name'],
+                (float)$item['quantity_kg']
+            );
             $this->db->query(
                 "UPDATE sale_lot_items SET fifo_cost = ? WHERE id = ?",
                 [$itemCost, $item['id']]

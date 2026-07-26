@@ -33,6 +33,7 @@ Relevant files:
 - `POST /sale-lots/confirm?id=X` and `POST /sale-lots/cancel?id=X` are branch-scoped for non-admin users.
 - `POST /sale-lots/record-revenue?id=X` stores `actual_revenue`, note, and date.
 - Cancel restores stock using the latest consumed purchase batches first.
+- This flow now replaces the legacy retail sales screen for walk-in customers.
 
 ## Purchase Orders
 

@@ -235,15 +235,22 @@ async function searchSlCatalog(idx, q) {
     const items = res.status === 'success' ? (res.data || []) : [];
     if (!items.length) { box.style.display = 'none'; return; }
 
-    box.innerHTML = items.map(it => {
+    box.innerHTML = '';
+    items.forEach(it => {
       const tiers = it.tier_prices || [];
       const priceInfo = tiers.length ? ` · ${tiers[0].price} ฿/${it.default_unit||'กก.'}` : '';
-      return `<div class="seller-item" style="cursor:pointer;padding:8px 10px;border-bottom:1px solid #f0f0f0"
-        onclick="selectSlCatalog(${idx}, ${it.id}, '${escapeHtml(it.name)}', ${it.category_id||0}, ${it.default_price||0})">
-        <strong>${escapeHtml(it.code)}</strong> — ${escapeHtml(it.name)}
-        <span style="color:#888;font-size:12px">${it.category_name ? `(${escapeHtml(it.category_name)})` : ''}${priceInfo}</span>
-      </div>`;
-    }).join('');
+      const div = document.createElement('div');
+      div.className = 'seller-item';
+      div.style.cursor = 'pointer';
+      div.style.padding = '8px 10px';
+      div.style.borderBottom = '1px solid #f0f0f0';
+      div.innerHTML = `<strong>${escapeHtml(it.code)}</strong> — ${escapeHtml(it.name)}
+        <span style="color:#888;font-size:12px">${it.category_name ? `(${escapeHtml(it.category_name)})` : ''}${priceInfo}</span>`;
+      div.addEventListener('click', () => {
+        selectSlCatalog(idx, it.id, it.name, it.category_id || 0, it.default_price || 0);
+      });
+      box.appendChild(div);
+    });
     box.style.display = 'block';
   }, 250);
 }
@@ -392,9 +399,33 @@ async function saveLot() {
   if (!branchId) { showNotification('กรุณาเลือกสาขา', 'error'); return; }
   if (lineItems.length === 0) { showNotification('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ', 'error'); return; }
 
-  const validItems = lineItems.filter(it => it.item_name && parseFloat(it.quantity_kg) > 0);
+  const validItems = [];
+  for (const it of lineItems) {
+    const hasAnyValue = [it.catalog_id, it.item_name, it.category_id, it.quantity_kg, it.unit_price]
+      .some(value => String(value ?? '').trim() !== '');
+    if (!hasAnyValue) continue;
+
+    const itemName = String(it.item_name || '').trim();
+    const quantityKg = parseFloat(it.quantity_kg);
+    const categoryId = parseInt(it.category_id, 10);
+
+    if (!itemName || !Number.isFinite(quantityKg) || quantityKg <= 0 || !Number.isFinite(categoryId) || categoryId <= 0) {
+      showNotification('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อกและระบุน้ำหนักมากกว่า 0', 'error');
+      return;
+    }
+
+    validItems.push({
+      ...(it.id ? { id: it.id } : {}),
+      catalog_id: it.catalog_id ? parseInt(it.catalog_id, 10) : null,
+      item_name: itemName,
+      category_id: categoryId,
+      quantity_kg: quantityKg,
+      unit_price: parseFloat(it.unit_price) || 0,
+    });
+  }
+
   if (validItems.length === 0) {
-    showNotification('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อกและระบุน้ำหนักมากกว่า 0', 'error');
+    showNotification('กรุณาเพิ่มรายการสินค้าจากแคตตาล็อกอย่างน้อย 1 รายการ', 'error');
     return;
   }
 
@@ -414,14 +445,7 @@ async function saveLot() {
       description: it.description.trim(),
       amount: parseFloat(it.amount) || 0,
     })) : null,
-    items: validItems.map(it => ({
-      ...(it.id ? { id: it.id } : {}),
-      catalog_id: it.catalog_id ? parseInt(it.catalog_id) : null,
-      item_name: it.item_name,
-      category_id: it.category_id ? parseInt(it.category_id) : null,
-      quantity_kg: parseFloat(it.quantity_kg),
-      unit_price: parseFloat(it.unit_price) || 0,
-    })),
+    items: validItems,
     idempotency_key: idempotencyKey,
   };
 

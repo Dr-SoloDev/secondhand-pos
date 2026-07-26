@@ -35,12 +35,17 @@ test_sale_lots() {
   }")
   assert_contains "$res" '"status":"success"' "Create sale lot"
 
-  # 3. Create sale lot without items — rejected
+  # 3. Create sale lot without category_id — rejected
   local fail_res
   fail_res=$(api_post "sale-lots" "{
     \"branch_id\":$branch_id,
-    \"buyer_name\":\"No Items Buyer\",
-    \"items\":[]
+    \"buyer_name\":\"No Category Buyer\",
+    \"sale_date\":\"$(date +%Y-%m-%d)\",
+    \"items\":[{
+      \"item_name\":\"Manual Walk-in Item\",
+      \"quantity_kg\":1,
+      \"unit_price\":25
+    }]
   }")
-  assert_contains "$fail_res" '"status":"error"' "Create sale lot without items rejected"
+  assert_contains "$fail_res" '"status":"error"' "Create sale lot without category rejected"
 }

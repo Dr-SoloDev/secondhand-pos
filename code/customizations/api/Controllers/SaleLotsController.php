@@ -90,9 +90,16 @@ class SaleLotsController extends Controller
             if (empty($item['quantity_kg'])) {
                 Response::error('แต่ละรายการต้องมีน้ำหนัก', 400);
             }
+            if (empty($item['category_id'])) {
+                Response::error('แต่ละรายการต้องเลือกหมวดหมู่', 400);
+            }
+            $itemName = trim((string)($item['item_name'] ?? ''));
+            if ($itemName === '') {
+                Response::error('แต่ละรายการต้องมีชื่อสินค้า', 400);
+            }
             $cleanItems[] = [
                 'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
-                'item_name'   => !empty($item['item_name']) ? trim((string)$item['item_name']) : 'สินค้า',
+                'item_name'   => $itemName,
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 'quantity_kg' => floatval($item['quantity_kg']),
                 'unit_price'  => floatval($item['unit_price'] ?? 0),
@@ -148,9 +155,12 @@ class SaleLotsController extends Controller
         $cleanItems = [];
         foreach ($data['items'] as $item) {
             if (empty($item['quantity_kg'])) Response::error('แต่ละรายการต้องมีน้ำหนัก', 400);
+            if (empty($item['category_id'])) Response::error('แต่ละรายการต้องเลือกหมวดหมู่', 400);
+            $itemName = trim((string)($item['item_name'] ?? ''));
+            if ($itemName === '') Response::error('แต่ละรายการต้องมีชื่อสินค้า', 400);
             $cleanItems[] = [
                 'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
-                'item_name'   => !empty($item['item_name']) ? trim((string)$item['item_name']) : 'สินค้า',
+                'item_name'   => $itemName,
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 'quantity_kg' => floatval($item['quantity_kg']),
                 'unit_price'  => floatval($item['unit_price'] ?? 0),

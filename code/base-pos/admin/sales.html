@@ -1,237 +1,50 @@
 <!DOCTYPE html>
 <html lang="th">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ขายปลีก - รักษ์สะอาดรีไซเคิล</title>
+  <title>ย้ายไปขาย Lot - รักษ์สะอาดรีไซเคิล</title>
+  <meta http-equiv="refresh" content="0;url=sale-lots.html">
+  <script>
+    window.location.replace('sale-lots.html');
+  </script>
   <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f8fafc;
+      color: #1f2937;
+      font-family: inherit;
+    }
+    .legacy-redirect {
+      width: min(100%, 420px);
+      padding: 24px;
+      text-align: center;
+    }
+    .legacy-redirect h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      line-height: 1.3;
+    }
+    .legacy-redirect p {
+      margin: 0 0 20px;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #64748b;
+    }
+  </style>
 </head>
-
 <body>
-  <div class="app-container">
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <a href="index.html" class="sidebar-brand">
-          <img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon">
-          <span>รักษ์สะอาด</span>
-        </a>
-      </div>
-      <ul class="sidebar-menu">
-        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
-        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
-        <li><a href="catalog.html"><i class="icon-additem"></i><span>แคตตาล็อกสินค้า</span></a></li>
-        <li><a href="sellers.html"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
-        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
-        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
-        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
-         <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
-         <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
-        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
-        <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
-        <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
-        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
-        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
-        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
-      </ul>
-    </aside>
-
-    <main class="content-area">
-      <div class="topbar">
-        <div class="user-dropdown">
-          <button class="user-dropdown-toggle">
-            <div class="user-avatar"><i class="icon-user"></i></div>
-            <span class="user-name" id="currentUser"></span>
-            <i class="icon-down"></i>
-          </button>
-          <div class="user-dropdown-menu">
-            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
-            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
-            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="page-header">
-        <h1>จัดการรายการขาย</h1>
-        <div>
-          <button class="btn btn-secondary" id="exportSalesBtn">
-            <i class="icon-download"></i> ส่งออก
-          </button>
-          <a href="sale-lots.html" class="btn btn-primary">
-            <i class="icon-additem"></i> ขายใหม่
-          </a>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">รายการขาย</h2>
-          <div class="card-tools">
-            <input type="text" id="saleSearch" class="form-control" placeholder="ค้นหาด้วยเลขที่อ้างอิงหรือลูกค้า...">
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="filters">
-            <div class="date-range">
-              <div class="form-group">
-                <label for="dateFrom">จากวันที่</label>
-                <input type="date" id="dateFrom" class="form-control">
-              </div>
-              <div class="form-group">
-                <label for="dateTo">ถึงวันที่</label>
-                <input type="date" id="dateTo" class="form-control">
-              </div>
-            </div>
-            <select id="paymentStatusFilter" class="form-control">
-              <option value="">ทุกสถานะ</option>
-              <option value="paid">ชำระแล้ว</option>
-              <option value="partial">ชำระบางส่วน</option>
-              <option value="pending">รอชำระ</option>
-              <option value="voided">ยกเลิก</option>
-            </select>
-            <select id="paymentMethodFilter" class="form-control">
-              <option value="">ทุกวิธีชำระ</option>
-              <option value="cash">เงินสด</option>
-              <option value="card">บัตรเครดิต/เดบิต</option>
-              <option value="bank_transfer">โอนธนาคาร</option>
-              <option value="other">อื่นๆ</option>
-            </select>
-            <button class="btn btn-primary" id="filterSalesBtn">
-              <i class="icon-search"></i> กรอง
-            </button>
-          </div>
-
-          <div class="table-container">
-            <table class="data-table" id="salesTable">
-              <thead>
-                <tr>
-                  <th>เลขที่อ้างอิง</th>
-                  <th>วันที่</th>
-                  <th>ลูกค้า</th>
-                  <th>รายการ</th>
-                  <th>จำนวนเงิน</th>
-                  <th>การชำระ</th>
-                  <th>สถานะ</th>
-                  <th>จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                <!-- Sales data will be loaded here -->
-              </tbody>
-            </table>
-          </div>
-          <div class="pagination" id="salesPagination">
-            <!-- Pagination will be added here -->
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-
-  <!-- Sale Detail Modal -->
-  <div class="modal" id="saleDetailModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>รายละเอียดการขาย</h2>
-        <button class="close-modal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="sale-header">
-          <div class="sale-info">
-            <p><strong>เลขที่อ้างอิง:</strong> <span id="saleReference"></span></p>
-            <p><strong>วันที่:</strong> <span id="saleDate"></span></p>
-            <p><strong>ลูกค้า:</strong> <span id="saleCustomer"></span></p>
-            <p><strong>พนักงานขาย:</strong> <span id="saleCashier"></span></p>
-          </div>
-          <div class="sale-status">
-            <p><strong>สถานะ:</strong> <span id="saleStatus"></span></p>
-            <p><strong>วิธีชำระ:</strong> <span id="salePaymentMethod"></span></p>
-          </div>
-        </div>
-
-        <div class="table-container">
-          <table class="data-table" id="saleItemsTable">
-            <thead>
-              <tr>
-                <th>สินค้า</th>
-                <th>รหัสสินค้า</th>
-                <th>จำนวน</th>
-                <th>ราคาต่อหน่วย</th>
-                <th>ส่วนลด</th>
-                <th>รวม</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Sale items will be loaded here -->
-            </tbody>
-          </table>
-        </div>
-
-        <div class="sale-summary">
-          <div class="summary-row">
-            <div class="summary-label">ยอดรวม</div>
-            <div class="summary-value" id="saleSubtotal">฿0.00</div>
-          </div>
-          <div class="summary-row">
-            <div class="summary-label">ส่วนลด</div>
-            <div class="summary-value" id="saleDiscount">฿0.00</div>
-          </div>
-          <div class="summary-row">
-            <div class="summary-label">ภาษี</div>
-            <div class="summary-value" id="saleTax">฿0.00</div>
-          </div>
-          <div class="summary-row total-row">
-            <div class="summary-label">รวม</div>
-            <div class="summary-value" id="saleTotal">฿0.00</div>
-          </div>
-        </div>
-
-        <div class="sale-notes">
-          <p><strong>หมายเหตุ:</strong></p>
-          <p id="saleNotes">-</p>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-danger" id="voidSaleBtn">
-          <i class="icon-ban"></i> ยกเลิกการขาย
-        </button>
-        <button class="btn btn-secondary" id="printReceiptBtn">
-          <i class="icon-print"></i> พิมพ์ใบเสร็จ
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Void Sale Modal -->
-  <div class="modal" id="voidSaleModal">
-    <div class="modal-content modal-sm">
-      <div class="modal-header">
-        <h2>ยกเลิกการขาย</h2>
-        <button class="close-modal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p>แน่ใจหรือไม่ที่จะยกเลิกรายการขายนี้?</p>
-        <p class="text-danger"><strong>คำเตือน:</strong> การกระทำนี้ไม่สามารถยกเลิกได้ และสินค้าทั้งหมดจะถูกคืนสต็อก</p>
-        <input type="hidden" id="voidSaleId">
-        <div class="form-group">
-          <label for="voidReason">เหตุผลที่ยกเลิก</label>
-          <textarea id="voidReason" class="form-control" required></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" id="cancelVoidBtn">ยกเลิก</button>
-        <button class="btn btn-danger" id="confirmVoidBtn">ยกเลิกการขาย</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="notification-container"></div>
-
-  <script src="../assets/js/config.js"></script>
-  <script src="../assets/js/common.js"></script>
-  <script src="../assets/js/sales.js"></script>
-<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
+  <main class="legacy-redirect">
+    <h1>ช่องขายปลีกถูกยกเลิกแล้ว</h1>
+    <p>ระบบจะพาไปหน้า <strong>ขาย Lot</strong> เพื่อใช้บันทึกรายการลูกค้าวอร์คอินแทน</p>
+    <a class="btn btn-primary" href="sale-lots.html">ไปหน้าขาย Lot</a>
+  </main>
+  <noscript>
+    <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
+  </noscript>
 </body>
-
 </html>
