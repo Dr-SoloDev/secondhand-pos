@@ -131,19 +131,25 @@ function renderLots() {
       <td>
         <div class="action-cell">
           ${lot.status === 'draft' ? `
-            <button class="btn btn-sm btn-success" onclick="confirmLot(${lot.id})">ยืนยัน</button>
-            <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})">แก้ไข</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')">ลบ</button>
+            <button class="btn btn-sm btn-success" onclick="confirmLot(${lot.id})" title="ยืนยัน Lot → ตัดสต็อก">✓</button>
+            <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})" title="แก้ไข Lot (แบบร่าง)">✎</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" title="ลบ Lot (แบบร่าง)">✕</button>
           ` : ''}
           ${lot.status === 'confirmed' ? `
-            <button class="btn btn-sm btn-primary" onclick="openRevenueModal(${lot.id}, '${escapeHtml(lot.reference_no || '')}', ${lot.actual_revenue || 'null'})">บันทึกรายรับ</button>
-            <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})">แก้ไข</button>
-            <button class="btn btn-sm btn-danger" onclick="cancelLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')">ยกเลิก</button>
+            <button class="btn btn-sm btn-primary" onclick="openRevenueModal(${lot.id}, '${escapeHtml(lot.reference_no || '')}', ${lot.actual_revenue || 'null'})" title="บันทึกรายรับจากบิลโรงงาน">💰</button>
+            <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})" title="แก้ไข Lot (ต้องสร้างใหม่)">✎</button>
+            <button class="btn btn-sm btn-danger" onclick="cancelLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" title="ยกเลิก Lot → คืนสต็อก">✕</button>
           ` : ''}
           ${lot.status === 'cancelled' ? `
-            <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" style="padding:3px 8px">ลบ</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" style="padding:3px 8px" title="ลบ Lot ที่ยกเลิก">✕</button>
           ` : ''}
         </div>
+      </td>
+      <td style="font-size:11px;color:#888;text-align:center">
+        ${lot.status === 'draft' ? 'บันทึกก่อน<br>ตัดสต็อก' : ''}
+        ${lot.status === 'confirmed' && !lot.actual_revenue ? 'กรอกบิล<br>โรงงาน' : ''}
+        ${lot.status === 'confirmed' && lot.actual_revenue ? '✓ ครบ' : ''}
+        ${lot.status === 'cancelled' ? 'ยกเลิกแล้ว' : ''}
       </td>
     </tr>`;
   }).join('');
@@ -199,14 +205,12 @@ function renderLineItems() {
         <div class="form-group" style="margin:0">
           <label style="font-size:11px;color:var(--color-text-lighter)">น้ำหนัก (กก.)</label>
           <input type="number" class="form-control" min="0" step="0.01" value="${item.quantity_kg}"
-            onchange="updateLineItem(${idx}, 'quantity_kg', this.value)"
-            oninput="updateLineItem(${idx}, 'quantity_kg', this.value)">
+            onchange="updateLineItem(${idx}, 'quantity_kg', this.value)">
         </div>
         <div class="form-group" style="margin:0">
           <label style="font-size:11px;color:var(--color-text-lighter)">ราคา/กก. (฿)</label>
           <input type="number" class="form-control" min="0" step="0.01" value="${item.unit_price}"
-            onchange="updateLineItem(${idx}, 'unit_price', this.value)"
-            oninput="updateLineItem(${idx}, 'unit_price', this.value)">
+            onchange="updateLineItem(${idx}, 'unit_price', this.value)">
         </div>
       </div>
       <div class="item-subtotal">รวม: <strong>${formatCurrency(subtotal)}</strong></div>
@@ -323,7 +327,7 @@ function calcExpensesTotal() {
 }
 
 function resetForm() {
-  document.getElementById('modalTitle').textContent = 'ขาย Lot ใหม่';
+  document.getElementById('modalTitle').textContent = 'สร้าง Lot ใหม่';
   document.getElementById('buyerName').value = '';
   document.getElementById('saleDate').value = new Date().toISOString().slice(0, 10);
   document.getElementById('branchSelect').value = '';
@@ -343,7 +347,7 @@ async function openModal(id) {
   resetForm();
   if (id) {
     editId = id;
-    document.getElementById('modalTitle').textContent = 'แก้ไข Lot ขาย';
+    document.getElementById('modalTitle').textContent = 'แก้ไข Lot';
     document.getElementById('saveLotBtn').textContent = 'กำลังโหลด...';
     document.getElementById('saveLotBtn').disabled = true;
 
@@ -461,10 +465,10 @@ async function saveLot() {
   }
 
   btn.disabled = false;
-  btn.textContent = 'บันทึก Lot ขาย';
+  btn.textContent = 'บันทึก (แบบร่าง)';
 
   if (res.status === 'success') {
-    showNotification(editId ? 'แก้ไข Lot สำเร็จ' : 'บันทึก Lot สำเร็จ', 'success');
+    showNotification(editId ? 'แก้ไข Lot สำเร็จ' : 'สร้าง Lot สำเร็จ', 'success');
     document.getElementById('saleLotModal').classList.remove('show');
     editId = null;
     resetForm();

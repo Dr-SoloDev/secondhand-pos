@@ -290,8 +290,14 @@ class SaleLot extends Model
         }
     }
 
-    // แก้ไข Sale Lot ที่ confirmed แล้ว: คืนสต็อกเดิม → update → หักสต็อกใหม่
+    // แก้ไข Sale Lot ที่ confirmed แล้ว: ไม่อนุญาต
+    // ให้สร้าง Lot ใหม่แบบ draft แล้วยืนยันเมื่อมีข้อมูลบิล
     public function updateConfirmed($id, $data)
+    {
+        throw new Exception('แก้ไข Lot ที่ยืนยันแล้วไม่ได้ — โปรดสร้าง Lot ใหม่');
+    }
+
+    public function updateConfirmed_old($id, $data)
     {
         $lot = $this->db->fetch(
             "SELECT id, status, branch_id FROM {$this->table} WHERE id = ?",

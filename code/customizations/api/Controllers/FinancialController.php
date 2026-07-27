@@ -43,12 +43,14 @@ class FinancialController extends Controller
             $params['bindings_sl']
         );
 
-        // ค่าใช้จ่ายจาก expenses JSON ใน sale_lots
-        $expRow = $db->fetch(
-            "SELECT COALESCE(SUM(
-               (SELECT COALESCE(SUM(CAST(jt.amount AS DECIMAL(12,2))), 0)
-                FROM JSON_TABLE(sl.expenses, '\$[*]' COLUMNS (amount VARCHAR(20) PATH '\$.amount')) jt)
-             ), 0) AS total_expenses
+        // ค่าใช้จ่ายจาก expenses JSON ใน sale_lots (transport_cost + lot-level expenses)
+        $lotExpRow = $db->fetch(
+            "SELECT
+               COALESCE(SUM(sl.transport_cost), 0) AS total_transport,
+               COALESCE(SUM(
+                  (SELECT COALESCE(SUM(CAST(jt.amount AS DECIMAL(12,2))), 0)
+                   FROM JSON_TABLE(sl.expenses, '\$[*]' COLUMNS (amount VARCHAR(20) PATH '\$.amount')) jt)
+               ), 0) AS total_lot_expenses
              FROM sale_lots sl
              WHERE sl.status = 'confirmed'
                AND {$params['date_filter_sl']}
@@ -64,12 +66,17 @@ class FinancialController extends Controller
             $params['month_raw']
         );
 
+        $totalTransport  = floatval($lotExpRow['total_transport'] ?? 0);
+        $totalLotExpenses = floatval($lotExpRow['total_lot_expenses'] ?? 0);
+        $totalLotExpenses += $totalTransport;
+
         Response::success('สำเร็จ', [
             'total_purchase'    => $purchase['total_purchase'] ?? 0,
             'total_kg'          => $kgRow['total_kg'] ?? 0,
             'total_revenue'     => $revenue['total_revenue'] ?? 0,
             'total_lots'        => $revenue['total_lots'] ?? 0,
-            'total_expenses'    => floatval($expRow['total_expenses'] ?? 0),
+            'total_expenses'    => $totalLotExpenses,
+            'total_lot_expenses'=> $totalLotExpenses,
             'total_biz_expenses'=> floatval($bizExpenses),
             'filters'           => [
                 'period'   => $params['period_raw'],
@@ -299,13 +306,30 @@ class FinancialController extends Controller
             $po = $db->fetch("SELECT COALESCE(SUM(total_amount),0) AS v FROM purchase_orders WHERE status='completed' AND $poWhere", $poBind);
             $sl = $db->fetch("SELECT COALESCE(SUM(actual_revenue),0) AS v FROM sale_lots WHERE status='confirmed' AND actual_revenue IS NOT NULL AND $slWhere", $slBind);
             $biz = (new BusinessExpense())->sumByPeriod($pBranch, $pPeriod, $pYear, $pMonth);
+
+            // Transport cost + lot-level expenses (matching summary() endpoint)
+            $lotExp = $db->fetch(
+                "SELECT
+                   COALESCE(SUM(sl.transport_cost), 0) AS transport,
+                   COALESCE(SUM(
+                      (SELECT COALESCE(SUM(CAST(jt.amount AS DECIMAL(12,2))), 0)
+                       FROM JSON_TABLE(sl.expenses, '\$[*]' COLUMNS (amount VARCHAR(20) PATH '\$.amount')) jt)
+                   ), 0) AS lot_expenses
+                 FROM sale_lots sl
+                 WHERE sl.status = 'confirmed' AND $slWhere",
+                $slBind
+            );
+            $totalLotExp = floatval($lotExp['transport'] ?? 0) + floatval($lotExp['lot_expenses'] ?? 0);
+
             $purchase = floatval($po['v'] ?? 0);
             $revenue  = floatval($sl['v'] ?? 0);
-            $profit   = $revenue - $purchase - floatval($biz);
+            $bizVal   = floatval($biz);
+            $profit   = $revenue - $purchase - $totalLotExp - $bizVal;
             $rows = [
                 ['รายจ่ายรับซื้อของ', number_format($purchase, 2)],
                 ['รายรับขาย Lot',      number_format($revenue, 2)],
-                ['ค่าใช้จ่ายประจำร้าน', number_format(floatval($biz), 2)],
+                ['ค่าใช้จ่าย Lot (รถ/อื่น)', number_format($totalLotExp, 2)],
+                ['ค่าใช้จ่ายประจำร้าน', number_format($bizVal, 2)],
                 ['กำไร/ขาดทุนสุทธิ',  number_format($profit, 2)],
             ];
         }

@@ -155,21 +155,10 @@ function formatMonthLabel(year, monthIndex) {
 }
 
 function updateScopeLabels() {
-  const branchLabel = document.getElementById('reportBranchLabel');
-  const monthLabel = document.getElementById('reportMonthLabel');
-  const monthRange = getMonthRange(currentReportMonth);
-
-  if (branchLabel) {
-    branchLabel.textContent = `สาขา: ${currentBranchName}`;
-  }
-
-  if (monthLabel) {
-    monthLabel.textContent = `ช่วงรายงาน: ${monthRange.label}`;
-  }
-
   const purchaseScope = document.getElementById('purchaseOrdersScope');
   const saleScope = document.getElementById('saleLotsScope');
   const employeesScope = document.getElementById('employeesScope');
+  const monthRange = getMonthRange(currentReportMonth);
 
   if (purchaseScope) purchaseScope.textContent = `${currentBranchName} · ${monthRange.label}`;
   if (saleScope) saleScope.textContent = `${currentBranchName} · ${monthRange.label}`;

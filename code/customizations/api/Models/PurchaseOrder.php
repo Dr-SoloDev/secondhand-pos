@@ -105,61 +105,12 @@ class PurchaseOrder extends Model
 
     public function cancel($id)
     {
-        $po = $this->db->fetch(
-            "SELECT id, branch_id, status, seller_id, total_amount FROM {$this->table} WHERE id = ?",
-            [$id]
-        );
-        if (!$po) {
-            throw new Exception('ไม่พบใบรับซื้อ');
-        }
-        if ($po['status'] === 'cancelled') {
-            throw new Exception('ใบรับซื้อถูกยกเลิกไปแล้ว');
-        }
-
-        $this->db->beginTransaction();
-        try {
-            // STOCK FIX: Restore stock when PO is cancelled
-            $items = $this->db->fetchAll(
-                "SELECT category_id, item_name, (quantity - weight_deduction - consumed_qty) as net_unconsumed
-                 FROM purchase_order_items
-                 WHERE purchase_order_id = ? AND category_id IS NOT NULL",
-                [$id]
-            );
-            foreach ($items as $item) {
-                $netQty = max(0, (float)$item['net_unconsumed']);
-                if ($netQty > 0) {
-                    // ── Branch Stock: deduct per-branch per-item (ADD-001) ──
-                    $branchStock = new BranchStock();
-                    $branchStock->deduct($po['branch_id'], $item['category_id'], $item['item_name'], $netQty);
-
-                    // ── Dual-write: categories.stock_kg (backward compat) ──
-                    $this->db->query(
-                        "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",
-                        [$netQty, $item['category_id']]
-                    );
-                }
-            }
-
-            $this->db->query(
-                "UPDATE {$this->table} SET status = 'cancelled', updated_at = NOW() WHERE id = ?",
-                [$id]
-            );
-
-            // Also revert seller stats
-            $this->db->query(
-                "UPDATE sellers
-                 SET total_transactions = GREATEST(0, COALESCE(total_transactions, 0) - 1),
-                     total_amount = GREATEST(0, COALESCE(total_amount, 0) - ?)
-                 WHERE id = ?",
-                [$po['total_amount'], $po['seller_id']]
-            );
-
-            $this->db->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
+        // NOTE: cancel() is NO LONGER USED.
+        // SaleLot.restoreStock() handles stock reversal via LIFO on PO items.
+        // PO cancellation (cancelPurchaseOrder in controller) only flips status
+        // and does NOT touch stock — stock was never deducted at PO create time.
+        // This method is kept as a stub for backward compat with old callers.
+        throw new Exception('ใบรับซื้อถูกยกเลิกแล้ว — โปรดใช้ Sale Lot cancel แทน');
     }
 
     public function createWithItems($data, $items, $userId)

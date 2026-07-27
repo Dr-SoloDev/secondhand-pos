@@ -50,22 +50,12 @@
         </div>
       </div>
 
-      <div class="reports-page-header">
-        <div class="reports-page-title">
-          <h1>รายงานข้อมูล</h1>
-          <p>สรุปข้อมูลตามสิทธิ์ของผู้ใช้ ผู้จัดการสาขาเห็นเฉพาะสาขาของตน ส่วนผู้ดูแลระบบเห็นภาพรวมทุกสาขา</p>
+      <div class="page-header">
+        <h1>รายงานข้อมูล</h1>
+        <div class="reports-filter">
+          <label for="reportMonth">เดือนรายงาน</label>
+          <input type="month" id="reportMonth" class="form-control">
         </div>
-        <div class="reports-toolbar">
-          <div class="form-group reports-period-group">
-            <label for="reportMonth">เดือนรายงาน</label>
-            <input type="month" id="reportMonth" class="form-control form-control-md">
-          </div>
-        </div>
-      </div>
-
-      <div class="report-scope-bar">
-        <span class="report-scope-chip" id="reportBranchLabel">-</span>
-        <span class="report-scope-chip" id="reportMonthLabel">-</span>
       </div>
 
       <section class="card report-card" id="branchSummaryCard">
@@ -426,6 +416,7 @@
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
   <script src="../assets/js/reports.js"></script>
+  <script src="../assets/js/animations.js"></script>
   <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 </body>
 </html>

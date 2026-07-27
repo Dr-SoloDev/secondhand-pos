@@ -1,56 +1,14 @@
 /* Reports */
-.reports-page-header {
+.reports-filter {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+  gap: 6px;
 }
 
-.reports-page-title h1 {
-  margin: 0;
-  font-size: 32px;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-.reports-page-title p {
-  margin: 6px 0 0;
-  color: var(--color-text-light);
-  font-size: 14px;
-}
-
-.reports-toolbar {
-  min-width: 220px;
-}
-
-.reports-period-group {
-  margin-bottom: 0;
-}
-
-.reports-period-group label {
-  margin-bottom: 4px;
+.reports-filter label {
   font-size: 12px;
-}
-
-.report-scope-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.report-scope-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-white);
   color: var(--color-text-light);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
 }
 
 .report-card {

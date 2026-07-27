@@ -78,7 +78,7 @@ class SaleLotsController extends Controller
             'branch_id'      => intval($data['branch_id']),
             'buyer_name'     => trim((string)$data['buyer_name']),
             'sale_date'      => $this->sanitizeInput($data['sale_date']),
-            'status'         => 'confirmed',
+            'status'         => 'draft',
             'notes'          => isset($data['notes']) ? trim((string)$data['notes']) : null,
             'transport_cost' => (float)($data['transport_cost'] ?? 0),
             'expenses'       => $data['expenses'] ?? null,
@@ -205,6 +205,9 @@ class SaleLotsController extends Controller
         $model = new SaleLot();
         $lot   = $model->getById($id);
         if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+        if ($lot['status'] !== 'draft') {
+            Response::error('ยืนยัน Lot ได้เฉพาะ Lot ที่ยังไม่ยืนยันเท่านั้น', 400);
+        }
 
         // SECURITY: non-admin ยืนยันได้เฉพาะ Sale Lot ของสาขาตัวเอง
         if (($this->user['role'] ?? '') !== 'admin') {
