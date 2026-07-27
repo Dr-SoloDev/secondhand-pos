@@ -23,7 +23,7 @@ class SaleLotsController extends Controller
 
         $model  = new SaleLot();
         $result = $model->getAll($filters['branch_id'], $filters);
-        Response::success('ดึงรายการ Sale Lots สำเร็จ', ['items' => $result]);
+        Response::success('ดึงรายการ Sale Lots สำเร็จ', ['items' => $result, 'filters' => $filters]);
     }
 
     // ดึง Sale Lot เดียวพร้อมรายการสินค้าและข้อมูลกำไร

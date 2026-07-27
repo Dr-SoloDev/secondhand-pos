@@ -1,6 +1,29 @@
 <?php
 class EmployeesController extends Controller
 {
+    private function getScopedBranchId()
+    {
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $branchId = intval($this->user['branch_id'] ?? 0);
+            if (!$branchId) {
+                Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+            }
+            return $branchId;
+        }
+
+        return null;
+    }
+
+    private function assertEmployeeBranchAccess($employee)
+    {
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->getScopedBranchId();
+            if (!$employee || (int)($employee['branch_id'] ?? 0) !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์เข้าถึงข้อมูลพนักงานสาขานี้', 403);
+            }
+        }
+    }
+
     public function index()
     {
         $this->requireAuth(['admin', 'manager']);
@@ -12,9 +35,14 @@ class EmployeesController extends Controller
             'search' => isset($_GET['search']) ? $this->sanitizeInput($_GET['search']) : null,
         ];
 
+        $userBranch = $this->getScopedBranchId();
+        if ($userBranch !== null) {
+            $filters['branch_id'] = $userBranch;
+        }
+
         $model = new Employee();
         $result = $model->getAll($page, $limit, $filters);
-        Response::success('Employees retrieved successfully', $result);
+        Response::success('Employees retrieved successfully', array_merge($result, ['filters' => $filters]));
     }
 
     public function show()
@@ -32,6 +60,7 @@ class EmployeesController extends Controller
             Response::error('Employee not found', 404);
             return;
         }
+        $this->assertEmployeeBranchAccess($employee);
         Response::success('Employee retrieved successfully', $employee);
     }
 
@@ -39,7 +68,10 @@ class EmployeesController extends Controller
     {
         $this->requireAuth(['admin', 'manager']);
         $data = $this->getRequestData();
-
+        $userBranch = $this->getScopedBranchId();
+        if ($userBranch !== null) {
+            $data['branch_id'] = $userBranch;
+        }
         $this->validateRequiredFields($data, ['branch_id', 'full_name']);
 
         $data = $this->sanitizeInput($data);
@@ -66,8 +98,18 @@ class EmployeesController extends Controller
 
         $data = $this->getRequestData();
         $data = $this->sanitizeInput($data);
+        $userBranch = $this->getScopedBranchId();
+        if ($userBranch !== null) {
+            $data['branch_id'] = $userBranch;
+        }
 
         $model = new Employee();
+        $employee = $model->getById($id);
+        if (!$employee) {
+            Response::error('Employee not found', 404);
+            return;
+        }
+        $this->assertEmployeeBranchAccess($employee);
         $model->update($id, $data);
 
         $employee = $model->getById($id);
@@ -84,6 +126,12 @@ class EmployeesController extends Controller
         }
 
         $model = new Employee();
+        $employee = $model->getById($id);
+        if (!$employee) {
+            Response::error('Employee not found', 404);
+            return;
+        }
+        $this->assertEmployeeBranchAccess($employee);
         $model->delete($id);
         Response::success('Employee deleted successfully');
     }
@@ -95,6 +143,12 @@ class EmployeesController extends Controller
         $this->validateRequiredFields($data, ['employee_id', 'salary_date', 'amount']);
 
         $model = new Employee();
+        $employee = $model->getById($data['employee_id']);
+        if (!$employee) {
+            Response::error('Employee not found', 404);
+            return;
+        }
+        $this->assertEmployeeBranchAccess($employee);
 
         $expenseId = $model->autoCreateSalaryExpense(
             $data['employee_id'],
@@ -117,6 +171,12 @@ class EmployeesController extends Controller
         $this->validateRequiredFields($data, ['employee_id', 'salary_date', 'amount']);
 
         $model = new Employee();
+        $employee = $model->getById($data['employee_id']);
+        if (!$employee) {
+            Response::error('Employee not found', 404);
+            return;
+        }
+        $this->assertEmployeeBranchAccess($employee);
 
         $expenseId = $model->autoCreateSSOExpense(
             $data['employee_id'],

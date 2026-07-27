@@ -14,6 +14,16 @@ UPDATE branches SET address = 'อ.ศีขรภูมิ จ.สุริน�
 UPDATE branches SET address = 'อ.สังขะ จ.สุรินทร์',        phone = '044-xxx-xxx', manager_name = 'คุณประยุทธ' WHERE code = 'BR04';
 
 -- ------------------------------------------------------------
+-- บัญชีผู้จัดการสาขาสำหรับ demo / smoke test
+-- ใช้รหัสผ่านเดียวกับ admin demo: admin
+-- ------------------------------------------------------------
+INSERT IGNORE INTO users (username, password, full_name, email, role, branch_id, status) VALUES
+('manager-br01', '$2y$10$Ze69xx0dmcFDLZlBlIah6.oZtEl6g6Cme5i2/o8O1VP0Obj3Ya0Gy', 'ผู้จัดการสาขา 1', 'manager-br01@example.com', 'manager', 1, 'active'),
+('manager-br02', '$2y$10$Ze69xx0dmcFDLZlBlIah6.oZtEl6g6Cme5i2/o8O1VP0Obj3Ya0Gy', 'ผู้จัดการสาขา 2', 'manager-br02@example.com', 'manager', 2, 'active'),
+('manager-br03', '$2y$10$Ze69xx0dmcFDLZlBlIah6.oZtEl6g6Cme5i2/o8O1VP0Obj3Ya0Gy', 'ผู้จัดการสาขา 3', 'manager-br03@example.com', 'manager', 3, 'active'),
+('manager-br04', '$2y$10$Ze69xx0dmcFDLZlBlIah6.oZtEl6g6Cme5i2/o8O1VP0Obj3Ya0Gy', 'ผู้จัดการสาขา 4', 'manager-br04@example.com', 'manager', 4, 'active');
+
+-- ------------------------------------------------------------
 -- ผู้ขายตัวอย่าง 8 ราย
 -- ------------------------------------------------------------
 INSERT INTO sellers (id_card, full_name, phone, address, notes, is_blacklisted) VALUES

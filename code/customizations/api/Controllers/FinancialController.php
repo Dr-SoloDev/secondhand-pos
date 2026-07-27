@@ -4,7 +4,7 @@ class FinancialController extends Controller
     // ดึง summary cards: total_purchase, total_revenue, total_expenses, total_kg, total_lots
     public function summary()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'manager']);
         $params = $this->getPeriodParams();
 
         $db = Database::getInstance();
@@ -71,13 +71,19 @@ class FinancialController extends Controller
             'total_lots'        => $revenue['total_lots'] ?? 0,
             'total_expenses'    => floatval($expRow['total_expenses'] ?? 0),
             'total_biz_expenses'=> floatval($bizExpenses),
+            'filters'           => [
+                'period'   => $params['period_raw'],
+                'year'     => $params['year_raw'],
+                'month'    => $params['month_raw'],
+                'branch_id'=> $params['branch_id_raw'],
+            ],
         ]);
     }
 
     // ดึงรายการ Lot ที่มี actual_revenue (สำหรับตารางรายละเอียด)
     public function lotRevenues()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'manager']);
         $params = $this->getPeriodParams();
         $db = Database::getInstance();
 
@@ -99,7 +105,7 @@ class FinancialController extends Controller
     // ดึงรายจ่ายรับซื้อแยกตามหมวดหมู่
     public function purchaseByCategory()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'manager']);
         $params = $this->getPeriodParams();
         $db = Database::getInstance();
 
@@ -126,7 +132,7 @@ class FinancialController extends Controller
     // ดึงรายการ business expenses
     public function listExpenses()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'manager']);
         $params   = $this->getPeriodParams();
         $model    = new BusinessExpense();
         $items    = $model->listByPeriod(
@@ -181,6 +187,13 @@ class FinancialController extends Controller
         $month    = intval($_GET['month']    ?? date('n'));
         $branchId = isset($_GET['branch_id']) ? intval($_GET['branch_id']) : null;
 
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $branchId = intval($this->user['branch_id'] ?? 0) ?: null;
+            if (!$branchId) {
+                Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+            }
+        }
+
         // date filter สำหรับ purchase_orders (created_at)
         if ($period === 'month') {
             $dateFilterPO = "YEAR(po.created_at) = ? AND MONTH(po.created_at) = ?";
@@ -219,7 +232,7 @@ class FinancialController extends Controller
     // GET /api/financial/export?period=month&year=2026&month=6&branch_id=&type=purchases|salelots|expenses|summary
     public function exportCsv()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'manager']);
         $params = $this->getPeriodParams();
         $type   = $_GET['type'] ?? 'summary';
         $db     = Database::getInstance();

@@ -1,96 +1,144 @@
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize reports page
-  initReports();
+let currentUser = null;
+let branches = [];
+let currentBranchId = null;
+let currentBranchName = '';
+let currentReportMonth = '';
 
-  // Set default dates (current month)
-  setDefaultDates();
+const reportState = {
+  summary: null,
+  purchaseOrders: [],
+  saleLots: [],
+  inventory: {
+    categories: [],
+    alerts: [],
+    alertSummary: null,
+  },
+  employees: [],
+  tax: null,
+};
 
-  // Event listeners for report type selection
-  document.querySelectorAll('.report-type-item').forEach(item => {
-    item.addEventListener('click', function() {
-      switchReportType(this.dataset.report);
-    });
-  });
-
-  // Event listeners for report generation
-  document.getElementById('generateSalesReport').addEventListener('click', generateSalesReport);
-  document.getElementById('generateProductsReport').addEventListener('click', generateProductsReport);
-  document.getElementById('generateInventoryReport').addEventListener('click', generateInventoryReport);
-  document.getElementById('generateCashierReport').addEventListener('click', generateCashierReport);
-  document.getElementById('generateTaxReport').addEventListener('click', generateTaxReport);
-  document.getElementById('generatePurchaseReport').addEventListener('click', generatePurchaseReport);
-  document.getElementById('generateSalelotReport').addEventListener('click', generateSalelotReport);
-
-  // Export and print buttons
-  document.getElementById('exportReportBtn').addEventListener('click', exportCurrentReport);
-  document.getElementById('printReportBtn').addEventListener('click', printCurrentReport);
+document.addEventListener('DOMContentLoaded', async () => {
+  await initReports();
 });
 
-// Global variables
-let currentReportType = 'sales';
-let categories = [];
-let users = [];
-let currentReportData = null;
-
-// Initialize reports
 async function initReports() {
+  currentUser = await requireAuth();
+  if (!currentUser) {
+    return;
+  }
+
+  if (!['admin', 'manager'].includes(currentUser.role)) {
+    showNotification('หน้านี้สำหรับผู้จัดการสาขาเท่านั้น', 'error');
+    window.location.href = 'index.html';
+    return;
+  }
+
+  if (currentUser.role !== 'admin') {
+    document.querySelectorAll('.admin-only').forEach((el) => {
+      el.style.display = 'none';
+    });
+  }
+
+  currentBranchId = currentUser.role === 'admin' ? '' : (currentUser.branch_id ? String(currentUser.branch_id) : '');
+  if (currentUser.role !== 'admin' && !currentBranchId) {
+    showNotification('ไม่พบสาขาที่ผูกกับบัญชีนี้', 'error');
+    window.location.href = 'index.html';
+    return;
+  }
+
+  if (currentUser.role === 'admin') {
+    currentBranchName = 'ทุกสาขา';
+  } else {
+    await loadBranchLookup();
+  }
+  setDefaultMonth();
+  setDefaultTaxDates();
+  bindEvents();
+  updateScopeLabels();
+  setLoadingState();
+  await Promise.all([
+    loadMonthlyReports(),
+    loadInventoryReport(),
+    loadEmployeesReport(),
+    loadTaxReport(),
+  ]);
+}
+
+function bindEvents() {
+  document.getElementById('reportMonth')?.addEventListener('change', async function() {
+    currentReportMonth = this.value || getCurrentMonthValue();
+    updateScopeLabels();
+    await loadMonthlyReports();
+  });
+
+  document.getElementById('generateTaxReport')?.addEventListener('click', loadTaxReport);
+
+  document.addEventListener('click', handleReportActionClick);
+}
+
+async function loadBranchLookup() {
+  if (currentUser?.role === 'admin') {
+    currentBranchName = 'ทุกสาขา';
+    return;
+  }
+
   try {
-    // Load categories for dropdowns
-    const categoryResponse = await apiRequest('inventory/categories');
-    if (categoryResponse.status === 'success') {
-      categories = categoryResponse.data;
-      populateCategoryDropdowns();
+    const res = await apiRequest('branches/active');
+    if (res.status === 'success') {
+      branches = Array.isArray(res.data) ? res.data : [];
     }
-
-    // Load users for cashier dropdown
-    const userResponse = await apiRequest('users/all');
-    if (userResponse.status === 'success') {
-      users = userResponse.data.filter(user => ['cashier', 'manager', 'admin'].includes(user.role));
-      populateUserDropdown();
-    }
-
-    // Generate initial sales report
-    generateSalesReport();
   } catch (error) {
-    console.error('Failed to initialize reports:', error);
-    showNotification('โหลดข้อมูลรายงานไม่สำเร็จ', 'error');
+    console.error('Failed to load branches:', error);
+  }
+
+  const branch = branches.find((item) => String(item.id) === currentBranchId);
+  currentBranchName = branch?.name || currentUser.branch_name || `สาขา ${currentBranchId}`;
+}
+
+function getCurrentMonthValue() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${now.getFullYear()}-${month}`;
+}
+
+function setDefaultMonth() {
+  const monthInput = document.getElementById('reportMonth');
+  currentReportMonth = monthInput?.value || getCurrentMonthValue();
+  if (monthInput) {
+    monthInput.value = currentReportMonth;
   }
 }
 
-// Set default dates (current month)
-function setDefaultDates() {
-  const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-
-  const todayStr = formatDateForInput(today);
-  const firstDayStr = formatDateForInput(firstDay);
-
-  // Set sales report dates
-  document.getElementById('salesDateFrom').value = firstDayStr;
-  document.getElementById('salesDateTo').value = todayStr;
-
-  // Set product sales report dates
-  document.getElementById('productsDateFrom').value = firstDayStr;
-  document.getElementById('productsDateTo').value = todayStr;
-
-  // Set cashier report dates
-  document.getElementById('cashierDateFrom').value = firstDayStr;
-  document.getElementById('cashierDateTo').value = todayStr;
-
-  // Set tax report dates
-  document.getElementById('taxDateFrom').value = firstDayStr;
-  document.getElementById('taxDateTo').value = todayStr;
-
-  // Set purchase report dates
-  document.getElementById('purchaseDateFrom').value = firstDayStr;
-  document.getElementById('purchaseDateTo').value = todayStr;
-
-  // Set sale lot report dates
-  document.getElementById('salelotDateFrom').value = firstDayStr;
-  document.getElementById('salelotDateTo').value = todayStr;
+function setDefaultTaxDates() {
+  const { dateFrom, dateTo } = getMonthRange(currentReportMonth || getCurrentMonthValue());
+  const fromInput = document.getElementById('taxDateFrom');
+  const toInput = document.getElementById('taxDateTo');
+  if (fromInput) fromInput.value = dateFrom;
+  if (toInput) toInput.value = dateTo;
+  const periodInput = document.getElementById('taxPeriod');
+  if (periodInput && !periodInput.value) {
+    periodInput.value = 'daily';
+  }
 }
 
-// Format date for input fields (YYYY-MM-DD)
+function getMonthRange(monthValue) {
+  const value = monthValue || getCurrentMonthValue();
+  const [yearPart, monthPart] = value.split('-').map((part) => parseInt(part, 10));
+  const year = Number.isFinite(yearPart) ? yearPart : new Date().getFullYear();
+  const monthIndex = Number.isFinite(monthPart) ? monthPart - 1 : new Date().getMonth();
+
+  const start = new Date(year, monthIndex, 1);
+  const end = new Date(year, monthIndex + 1, 0);
+
+  return {
+    year,
+    month: monthIndex + 1,
+    dateFrom: formatDateForInput(start),
+    dateTo: formatDateForInput(end),
+    label: formatMonthLabel(year, monthIndex),
+  };
+}
+
 function formatDateForInput(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -98,1187 +146,755 @@ function formatDateForInput(date) {
   return `${year}-${month}-${day}`;
 }
 
-// Populate category dropdowns
-function populateCategoryDropdowns() {
-  const productsCategorySelect = document.getElementById('productsCategory');
-  const inventoryCategorySelect = document.getElementById('inventoryCategory');
-
-  // Clear existing options (except the first one)
-  while (productsCategorySelect.options.length > 1) {
-    productsCategorySelect.remove(1);
-  }
-  while (inventoryCategorySelect.options.length > 1) {
-    inventoryCategorySelect.remove(1);
-  }
-
-  // Add categories to dropdowns
-  categories.forEach(category => {
-    if (category.status === 'active') {
-      const productOption = document.createElement('option');
-      productOption.value = category.id;
-      productOption.textContent = category.name;
-      productsCategorySelect.appendChild(productOption);
-
-      const inventoryOption = document.createElement('option');
-      inventoryOption.value = category.id;
-      inventoryOption.textContent = category.name;
-      inventoryCategorySelect.appendChild(inventoryOption);
-    }
-  });
+function formatMonthLabel(year, monthIndex) {
+  const date = new Date(year, monthIndex, 1);
+  return new Intl.DateTimeFormat('th-TH', {
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
 }
 
-// Populate user dropdown
-function populateUserDropdown() {
-  const cashierSelect = document.getElementById('cashierUser');
+function updateScopeLabels() {
+  const branchLabel = document.getElementById('reportBranchLabel');
+  const monthLabel = document.getElementById('reportMonthLabel');
+  const monthRange = getMonthRange(currentReportMonth);
 
-  // Clear existing options (except the first one)
-  while (cashierSelect.options.length > 1) {
-    cashierSelect.remove(1);
+  if (branchLabel) {
+    branchLabel.textContent = `สาขา: ${currentBranchName}`;
   }
 
-  // Add users to dropdown
-  users.forEach(user => {
-    const option = document.createElement('option');
-    option.value = user.id;
-    option.textContent = `${user.username} (${user.full_name})`;
-    cashierSelect.appendChild(option);
-  });
-}
-
-// Switch between report types
-function switchReportType(reportType) {
-  currentReportType = reportType;
-
-  // Update active state in report type selection
-  document.querySelectorAll('.report-type-item').forEach(item => {
-    if (item.dataset.report === reportType) {
-      item.classList.add('active');
-    } else {
-      item.classList.remove('active');
-    }
-  });
-
-  // Hide all report sections
-  document.querySelectorAll('.report-section').forEach(section => {
-    section.style.display = 'none';
-  });
-
-  // Show selected report section
-  document.getElementById(`${reportType}Report`).style.display = 'block';
-
-  // Generate report based on type
-  switch (reportType) {
-    case 'sales':
-      generateSalesReport();
-      break;
-    case 'products':
-      generateProductsReport();
-      break;
-    case 'inventory':
-      generateInventoryReport();
-      break;
-    case 'cashier':
-      generateCashierReport();
-      break;
-    case 'tax':
-      generateTaxReport();
-      break;
-    case 'purchase':
-      generatePurchaseReport();
-      break;
-    case 'salelot':
-      generateSalelotReport();
-      break;
+  if (monthLabel) {
+    monthLabel.textContent = `ช่วงรายงาน: ${monthRange.label}`;
   }
+
+  const purchaseScope = document.getElementById('purchaseOrdersScope');
+  const saleScope = document.getElementById('saleLotsScope');
+  const employeesScope = document.getElementById('employeesScope');
+
+  if (purchaseScope) purchaseScope.textContent = `${currentBranchName} · ${monthRange.label}`;
+  if (saleScope) saleScope.textContent = `${currentBranchName} · ${monthRange.label}`;
+  if (employeesScope) employeesScope.textContent = currentBranchName;
 }
 
-// Generate sales report
-async function generateSalesReport() {
+function setLoadingState() {
+  setSummaryLoading();
+  showTableLoading('summaryBreakdownBody', 2, 4);
+  showTableLoading('purchaseOrdersBody', 6, 5);
+  showTableLoading('saleLotsBody', 8, 5);
+  showTableLoading('inventoryCategoriesBody', 4, 5);
+  showTableLoading('inventoryAlertsBody', 4, 5);
+  showTableLoading('employeesBody', 6, 5);
+  showTableLoading('taxReportBody', 4, 5);
+}
+
+function setSummaryLoading() {
+  document.getElementById('summaryPurchase').textContent = '...';
+  document.getElementById('summaryPurchaseKg').textContent = '...';
+  document.getElementById('summaryRevenue').textContent = '...';
+  document.getElementById('summaryLots').textContent = '...';
+  document.getElementById('summaryExpenses').textContent = '...';
+  document.getElementById('summaryExpenseNote').textContent = '...';
+  document.getElementById('summaryNetProfit').textContent = '...';
+  document.getElementById('summaryMargin').textContent = '...';
+}
+
+async function loadMonthlyReports() {
+  const range = getMonthRange(currentReportMonth);
+
+  await Promise.all([
+    loadBranchSummary(range),
+    loadPurchaseOrders(range),
+    loadSaleLots(range),
+  ]);
+}
+
+async function loadBranchSummary(range) {
   try {
-    const dateFrom = document.getElementById('salesDateFrom').value;
-    const dateTo = document.getElementById('salesDateTo').value;
-    const groupBy = document.getElementById('salesGroupBy').value;
-
-    if (!dateFrom || !dateTo) {
-      showNotification('กรุณาเลือกช่วงวันที่', 'error');
-      return;
+    const res = await apiRequest(`financial/summary?period=month&year=${range.year}&month=${range.month}`);
+    if (res.status !== 'success') {
+      throw new Error(res.message || 'โหลดสรุปสาขาไม่สำเร็จ');
     }
 
-    showNotification('กำลังสร้างรายงานขาย...', 'info');
-    showTableLoading(document.querySelector('#salesReportTable tbody'), 8, 5);
-
-    const response = await apiRequest(`reports/sales-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
-
-    if (response.status === 'success') {
-      currentReportData = response.data;
-      renderSalesReport(response.data);
-    } else {
-      showNotification(response.message || 'สร้างรายงานขายไม่สำเร็จ', 'error');
-    }
+    const data = res.data || {};
+    const summary = normalizeSummaryData(data, range);
+    reportState.summary = summary;
+    renderBranchSummary(summary);
   } catch (error) {
-    console.error('Error generating sales report:', error);
-    showNotification('สร้างรายงานขายไม่สำเร็จ', 'error');
+    console.error('Failed to load branch summary:', error);
+    renderErrorRow('summaryBreakdownBody', 2, 'โหลดข้อมูลสรุปไม่สำเร็จ');
   }
 }
 
-// Render sales report
-function renderSalesReport(data) {
-  // Update summary values
-  document.getElementById('totalOrders').textContent = data.totals.total_orders;
-  document.getElementById('totalSales').textContent = formatCurrency(data.totals.total_sales);
-  document.getElementById('totalDiscounts').textContent = formatCurrency(data.totals.total_discounts);
-  document.getElementById('totalTax').textContent = formatCurrency(data.totals.total_tax);
+function normalizeSummaryData(data, range) {
+  const totalPurchase = parseFloat(data.total_purchase || 0);
+  const totalKg = parseFloat(data.total_kg || 0);
+  const totalRevenue = parseFloat(data.total_revenue || 0);
+  const totalLots = parseInt(data.total_lots || 0, 10);
+  const totalExpenses = parseFloat(data.total_expenses || 0);
+  const totalBizExpenses = parseFloat(data.total_biz_expenses || 0);
+  const netProfit = totalRevenue - totalPurchase - totalExpenses - totalBizExpenses;
+  const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-  // Render table
-  const tableBody = document.querySelector('#salesReportTable tbody');
-  tableBody.innerHTML = '';
-
-  if (data.report_data.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="6" class="text-center">No data available for the selected period</td>';
-    tableBody.appendChild(row);
-  } else {
-    data.report_data.forEach(row => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${row.label}</td>
-        <td>${row.order_count}</td>
-        <td>${formatCurrency(row.total_amount)}</td>
-        <td>${formatCurrency(row.discount_amount)}</td>
-        <td>${formatCurrency(row.tax_amount)}</td>
-        <td>${formatCurrency(row.grand_total)}</td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  // Render chart
-  renderSalesChart(data);
-
-  showNotification('สร้างรายงานขายสำเร็จ', 'success');
+  return {
+    periodLabel: range.label,
+    totalPurchase,
+    totalKg,
+    totalRevenue,
+    totalLots,
+    totalExpenses,
+    totalBizExpenses,
+    netProfit,
+    margin,
+  };
 }
 
-// Render sales chart
-function renderSalesChart(data) {
-  const chartContainer = document.getElementById('salesChart');
-  const canvas = chartContainer.querySelector('canvas');
+function renderBranchSummary(summary) {
+  document.getElementById('summaryPurchase').textContent = formatCurrency(summary.totalPurchase);
+  document.getElementById('summaryPurchaseKg').textContent = `${summary.totalKg.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} กก.`;
+  document.getElementById('summaryRevenue').textContent = formatCurrency(summary.totalRevenue);
+  document.getElementById('summaryLots').textContent = `${summary.totalLots.toLocaleString('th-TH')} Lot`;
+  document.getElementById('summaryExpenses').textContent = formatCurrency(summary.totalExpenses + summary.totalBizExpenses);
+  document.getElementById('summaryExpenseNote').textContent = `Lot ${formatCurrency(summary.totalExpenses)} + สาขา ${formatCurrency(summary.totalBizExpenses)}`;
 
-  // If canvas already exists, destroy previous chart
-  if (canvas) {
-    const chartInstance = Chart.getChart(canvas);
-    if (chartInstance) {
-      chartInstance.destroy();
-    }
-  }
+  const profitValue = document.getElementById('summaryNetProfit');
+  profitValue.textContent = `${summary.netProfit >= 0 ? '+' : ''}${formatCurrency(summary.netProfit)}`;
+  profitValue.className = `report-kpi-value ${summary.netProfit >= 0 ? 'report-kpi-income' : 'report-kpi-expense'}`;
+  document.getElementById('summaryMargin').textContent = `margin ${summary.margin.toFixed(1)}%`;
 
-  // Create new canvas
-  const newCanvas = document.createElement('canvas');
-  chartContainer.innerHTML = '';
-  chartContainer.appendChild(newCanvas);
+  const rows = [
+    ['ยอดรับซื้อของ', formatCurrency(summary.totalPurchase)],
+    ['น้ำหนักรับซื้อ', `${summary.totalKg.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} กก.`],
+    ['รายรับขาย Lot', formatCurrency(summary.totalRevenue)],
+    ['ค่าใช้จ่ายต่อ Lot', formatCurrency(summary.totalExpenses)],
+    ['ค่าใช้จ่ายประจำสาขา', formatCurrency(summary.totalBizExpenses)],
+    ['กำไรสุทธิ', `${summary.netProfit >= 0 ? '+' : ''}${formatCurrency(summary.netProfit)}`],
+  ];
 
-  // Prepare data for chart
-  const labels = data.report_data.map(row => row.label);
-  const salesData = data.report_data.map(row => row.grand_total);
-
-  // Create chart
-  new Chart(newCanvas, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'ยอดขาย',
-        data: salesData,
-        backgroundColor: 'rgba(37, 117, 252, 0.7)',
-        borderColor: '#2575fc',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: function(value) {
-              return formatCurrency(value);
-            }
-          }
-        }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              return 'Sales: ' + formatCurrency(context.raw);
-            }
-          }
-        }
-      }
-    }
-  });
+  renderTableBody('summaryBreakdownBody', rows.map(([label, value]) => `
+    <tr>
+      <td>${escapeHtml(label)}</td>
+      <td class="text-right ${label === 'กำไรสุทธิ' ? (summary.netProfit >= 0 ? 'report-kpi-income' : 'report-kpi-expense') : ''}">${escapeHtml(value)}</td>
+    </tr>
+  `).join(''));
 }
 
-// Generate product sales report
-async function generateProductsReport() {
+async function loadPurchaseOrders(range) {
   try {
-    const dateFrom = document.getElementById('productsDateFrom').value;
-    const dateTo = document.getElementById('productsDateTo').value;
-    const categoryId = document.getElementById('productsCategory').value;
-
-    if (!dateFrom || !dateTo) {
-      showNotification('กรุณาเลือกช่วงวันที่', 'error');
-      return;
-    }
-
-    showNotification('กำลังสร้างรายงานสินค้า...', 'info');
-    showTableLoading(document.querySelector('#productsReportTable tbody'), 8, 5);
-
     const params = new URLSearchParams({
-      date_from: dateFrom,
-      date_to: dateTo,
-      limit: 50
+      date_from: range.dateFrom,
+      date_to: range.dateTo,
+      limit: '1000',
     });
-
-    if (categoryId) {
-      params.append('category_id', categoryId);
+    const res = await apiRequest(`purchase-orders?${params.toString()}`);
+    if (res.status !== 'success') {
+      throw new Error(res.message || 'โหลดข้อมูลรับซื้อไม่สำเร็จ');
     }
 
-    const response = await apiRequest(`reports/product-sales?${params.toString()}`);
-
-    if (response.status === 'success') {
-      currentReportData = response.data;
-      renderProductsReport(response.data);
-    } else {
-      showNotification(response.message || 'สร้างรายงานสินค้าไม่สำเร็จ', 'error');
-    }
+    const items = res.data?.items || [];
+    reportState.purchaseOrders = items;
+    renderPurchaseOrders(items, res.data?.pagination || null, range);
   } catch (error) {
-    console.error('Error generating product sales report:', error);
-    showNotification('สร้างรายงานสินค้าไม่สำเร็จ', 'error');
+    console.error('Failed to load purchase orders:', error);
+    renderErrorRow('purchaseOrdersBody', 6, 'โหลดข้อมูลรับซื้อไม่สำเร็จ');
   }
 }
 
-// Render product sales report
-function renderProductsReport(data) {
-  // Find top product and calculate totals
-  let topProduct = '-';
-  let totalQty = 0;
-  let totalRev = 0;
-
-  if (data.length > 0) {
-    const sorted = [...data].sort((a, b) => b.total_sales - a.total_sales);
-    topProduct = sorted[0].name;
-
-    data.forEach(product => {
-      totalQty += product.quantity_sold;
-      totalRev += product.total_sales;
-    });
-  }
-
-  // Update summary values
-  document.getElementById('topProduct').textContent = topProduct;
-  document.getElementById('totalQuantity').textContent = totalQty;
-  document.getElementById('totalRevenue').textContent = formatCurrency(totalRev);
-
-  // Render table
-  const tableBody = document.querySelector('#productsReportTable tbody');
-  tableBody.innerHTML = '';
-
-  if (data.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="6" class="text-center">No data available for the selected period</td>';
-    tableBody.appendChild(row);
-  } else {
-    data.forEach(product => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${product.sku}</td>
-        <td>${product.name}</td>
-        <td>${product.category_name || 'Uncategorized'}</td>
-        <td>${product.quantity_sold}</td>
-        <td>${formatCurrency(product.total_sales)}</td>
-        <td>${product.order_count}</td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  // Render chart
-  renderProductsChart(data);
-
-  showNotification('สร้างรายงานสินค้าสำเร็จ', 'success');
-}
-
-// Render products chart
-function renderProductsChart(data) {
-  const chartContainer = document.getElementById('productsChart');
-  const canvas = chartContainer.querySelector('canvas');
-
-  // If canvas already exists, destroy previous chart
-  if (canvas) {
-    const chartInstance = Chart.getChart(canvas);
-    if (chartInstance) {
-      chartInstance.destroy();
-    }
-  }
-
-  // Create new canvas
-  const newCanvas = document.createElement('canvas');
-  chartContainer.innerHTML = '';
-  chartContainer.appendChild(newCanvas);
-
-  // Prepare data for chart (top 10 products by sales)
-  const sortedData = [...data].sort((a, b) => b.total_sales - a.total_sales).slice(0, 10);
-  const labels = sortedData.map(product => product.name);
-  const salesData = sortedData.map(product => product.total_sales);
-
-  // Create chart
-  new Chart(newCanvas, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'รายรับ',
-        data: salesData,
-        backgroundColor: 'rgba(46, 204, 113, 0.7)',
-        borderColor: '#2ecc71',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      scales: {
-        x: {
-          beginAtZero: true,
-          ticks: {
-            callback: function(value) {
-              return formatCurrency(value);
-            }
-          }
-        }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              return 'Revenue: ' + formatCurrency(context.raw);
-            }
-          }
-        },
-        legend: {
-          display: false
-        }
-      }
-    }
-  });
-}
-
-// Generate inventory report
-async function generateInventoryReport() {
-  try {
-    const categoryId = document.getElementById('inventoryCategory').value;
-    const stockStatus = document.getElementById('inventoryStatus').value;
-
-    showNotification('กำลังสร้างรายงานสต็อก...', 'info');
-    showTableLoading(document.querySelector('#inventoryReportTable tbody'), 10, 5);
-
-    const params = new URLSearchParams();
-
-    if (categoryId) {
-      params.append('category_id', categoryId);
-    }
-
-    if (stockStatus !== 'all') {
-      params.append('stock_status', stockStatus);
-    }
-
-    const response = await apiRequest(`reports/inventory-report?${params.toString()}`);
-
-    if (response.status === 'success') {
-      currentReportData = response.data;
-      renderInventoryReport(response.data);
-    } else {
-      showNotification(response.message || 'สร้างรายงานสต็อกไม่สำเร็จ', 'error');
-    }
-  } catch (error) {
-    console.error('Error generating inventory report:', error);
-    showNotification('สร้างรายงานสต็อกไม่สำเร็จ', 'error');
-  }
-}
-
-// Render inventory report
-function renderInventoryReport(data) {
-  // Update summary values
-  document.getElementById('totalProducts').textContent = data.totals.total_items;
-  document.getElementById('inventoryQuantity').textContent = data.totals.total_quantity;
-  document.getElementById('inventoryValue').textContent = formatCurrency(data.totals.total_value);
-  document.getElementById('lowStockCount').textContent = data.totals.low_stock_count;
-
-  // Render table
-  const tableBody = document.querySelector('#inventoryReportTable tbody');
-  tableBody.innerHTML = '';
-
-  if (data.inventory.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="8" class="text-center">No inventory data available</td>';
-    tableBody.appendChild(row);
-  } else {
-    data.inventory.forEach(item => {
-      const tr = document.createElement('tr');
-
-      // Determine stock status
-      let stockStatus = 'Normal';
-      let statusClass = '';
-
-      if (item.quantity <= 0) {
-        stockStatus = 'Out of Stock';
-        statusClass = 'text-danger';
-      } else if (item.quantity <= item.low_stock_threshold) {
-        stockStatus = 'Low Stock';
-        statusClass = 'text-warning';
-      }
-
-      tr.innerHTML = `
-      <td>${item.sku}</td>
-      <td>${item.name}</td>
-      <td>${item.category_name || 'Uncategorized'}</td>
-      <td class="${statusClass}">${item.quantity}</td>
-      <td>${item.low_stock_threshold}</td>
-      <td>${formatCurrency(item.cost)}</td>
-      <td>${formatCurrency(item.inventory_value)}</td>
-      <td class="${statusClass}">${stockStatus}</td>
-    `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  // Render chart
-  renderInventoryChart(data);
-
-  showNotification('สร้างรายงานสต็อกสำเร็จ', 'success');
-}
-
-// Render inventory chart
-function renderInventoryChart(data) {
-  const chartContainer = document.getElementById('inventoryChart');
-  const canvas = chartContainer.querySelector('canvas');
-
-  // If canvas already exists, destroy previous chart
-  if (canvas) {
-    const chartInstance = Chart.getChart(canvas);
-    if (chartInstance) {
-      chartInstance.destroy();
-    }
-  }
-
-  // Create new canvas
-  const newCanvas = document.createElement('canvas');
-  chartContainer.innerHTML = '';
-  chartContainer.appendChild(newCanvas);
-
-  // Group by category and calculate total quantity per category
-  const categoryData = {};
-  data.inventory.forEach(item => {
-    const category = item.category_name || 'Uncategorized';
-    if (!categoryData[category]) {
-      categoryData[category] = 0;
-    }
-    categoryData[category] += item.quantity;
-  });
-
-  const categories = Object.keys(categoryData);
-  const quantities = Object.values(categoryData);
-
-  // Create chart
-  new Chart(newCanvas, {
-    type: 'pie',
-    data: {
-      labels: categories,
-      datasets: [{
-        data: quantities,
-        backgroundColor: [
-          'rgba(52, 152, 219, 0.7)',
-          'rgba(155, 89, 182, 0.7)',
-          'rgba(52, 73, 94, 0.7)',
-          'rgba(230, 126, 34, 0.7)',
-          'rgba(231, 76, 60, 0.7)',
-          'rgba(241, 196, 15, 0.7)',
-          'rgba(46, 204, 113, 0.7)',
-          'rgba(26, 188, 156, 0.7)',
-          'rgba(127, 140, 141, 0.7)'
-        ],
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'right'
-        },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              const label = context.label || '';
-              const value = context.raw || 0;
-              const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
-              const percentage = Math.round((value / total) * 100);
-              return `${label}: ${value} units (${percentage}%)`;
-            }
-          }
-        }
-      }
-    }
-  });
-}
-
-// Generate cashier performance report
-async function generateCashierReport() {
-  try {
-    const dateFrom = document.getElementById('cashierDateFrom').value;
-    const dateTo = document.getElementById('cashierDateTo').value;
-    const userId = document.getElementById('cashierUser').value;
-
-    if (!dateFrom || !dateTo) {
-      showNotification('กรุณาเลือกช่วงวันที่', 'error');
-      return;
-    }
-
-    showNotification('กำลังสร้างรายงานพนักงาน...', 'info');
-    showTableLoading(document.querySelector('#cashierReportTable tbody'), 6, 5);
-
-    const params = new URLSearchParams({
-      date_from: dateFrom,
-      date_to: dateTo
-    });
-
-    if (userId) {
-      params.append('user_id', userId);
-    }
-
-    const response = await apiRequest(`reports/cashier-performance?${params.toString()}`);
-
-    if (response.status === 'success') {
-      currentReportData = response.data;
-      renderCashierReport(response.data);
-    } else {
-      showNotification(response.message || 'สร้างรายงานพนักงานไม่สำเร็จ', 'error');
-    }
-  } catch (error) {
-    console.error('Error generating cashier report:', error);
-    showNotification('สร้างรายงานพนักงานไม่สำเร็จ', 'error');
-  }
-}
-
-// Render cashier performance report
-function renderCashierReport(data) {
-  // Render table
-  const tableBody = document.querySelector('#cashierReportTable tbody');
-  tableBody.innerHTML = '';
-
-  if (data.cashiers.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="6" class="text-center">No data available for the selected period</td>';
-    tableBody.appendChild(row);
-  } else {
-    data.cashiers.forEach(cashier => {
-      const tr = document.createElement('tr');
-
-      // Calculate average order value
-      const avgOrderValue = cashier.total_sales / (cashier.order_count || 1);
-
-      tr.innerHTML = `
-      <td>${cashier.full_name} (${cashier.username})</td>
-      <td>${cashier.order_count}</td>
-      <td>${cashier.items_sold}</td>
-      <td>${formatCurrency(cashier.total_sales)}</td>
-      <td>${formatCurrency(avgOrderValue)}</td>
-      <td>${cashier.cancelled_orders}</td>
-    `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  // Render chart
-  renderCashierChart(data);
-
-  showNotification('สร้างรายงานพนักงานสำเร็จ', 'success');
-}
-
-// Render cashier chart
-function renderCashierChart(data) {
-  const chartContainer = document.getElementById('cashierChart');
-  const canvas = chartContainer.querySelector('canvas');
-
-  // If canvas already exists, destroy previous chart
-  if (canvas) {
-    const chartInstance = Chart.getChart(canvas);
-    if (chartInstance) {
-      chartInstance.destroy();
-    }
-  }
-
-  // Create new canvas
-  const newCanvas = document.createElement('canvas');
-  chartContainer.innerHTML = '';
-  chartContainer.appendChild(newCanvas);
-
-  // Prepare data for chart
-  const labels = data.cashiers.map(cashier => cashier.username);
-  const salesData = data.cashiers.map(cashier => cashier.total_sales);
-  const ordersData = data.cashiers.map(cashier => cashier.order_count);
-
-  // Create chart
-  new Chart(newCanvas, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'ยอดขาย',
-          data: salesData,
-          backgroundColor: 'rgba(52, 152, 219, 0.7)',
-          borderColor: '#3498db',
-          borderWidth: 1,
-          yAxisID: 'y'
-        },
-        {
-          label: 'จำนวนออเดอร์',
-          data: ordersData,
-          backgroundColor: 'rgba(46, 204, 113, 0.7)',
-          borderColor: '#2ecc71',
-          borderWidth: 1,
-          yAxisID: 'y1'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true,
-          position: 'left',
-          title: {
-            display: true,
-            text: 'ยอดขาย'
-          },
-          ticks: {
-            callback: function(value) {
-              return formatCurrency(value);
-            }
-          }
-        },
-        y1: {
-          beginAtZero: true,
-          position: 'right',
-          title: {
-            display: true,
-            text: 'จำนวนออเดอร์'
-          },
-          grid: {
-            drawOnChartArea: false
-          }
-        }
-      }
-    }
-  });
-}
-
-// Generate purchase report
-async function generatePurchaseReport() {
-  try {
-    const dateFrom = document.getElementById('purchaseDateFrom').value;
-    const dateTo = document.getElementById('purchaseDateTo').value;
-    const groupBy = document.getElementById('purchaseGroupBy').value;
-
-    if (!dateFrom || !dateTo) {
-      showNotification('กรุณาเลือกช่วงวันที่', 'error');
-      return;
-    }
-
-    showNotification('กำลังสร้างรายงานรับซื้อ...', 'info');
-    showTableLoading(document.querySelector('#purchaseReportTable tbody'), 6, 5);
-
-    const response = await apiRequest(`reports/purchase-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
-
-    if (response.status === 'success') {
-      currentReportData = response.data;
-      renderPurchaseReport(response.data);
-    } else {
-      showNotification(response.message || 'สร้างรายงานรับซื้อไม่สำเร็จ', 'error');
-    }
-  } catch (error) {
-    console.error('Error generating purchase report:', error);
-    showNotification('สร้างรายงานรับซื้อไม่สำเร็จ', 'error');
-  }
-}
-
-function renderPurchaseReport(data) {
-  document.getElementById('purchaseTotalOrders').textContent = data.totals.total_orders;
-  document.getElementById('purchaseTotalAmount').textContent = formatCurrency(data.totals.total_amount);
-  const avgAmount = data.totals.total_orders > 0 ? data.totals.total_amount / data.totals.total_orders : 0;
-  document.getElementById('purchaseAvgAmount').textContent = formatCurrency(avgAmount);
-
-  const tableBody = document.querySelector('#purchaseReportTable tbody');
-  tableBody.innerHTML = '';
-
-  if (data.report_data.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="4" class="text-center">No data available for the selected period</td>';
-    tableBody.appendChild(row);
-  } else {
-    data.report_data.forEach(row => {
-      const tr = document.createElement('tr');
-      const avg = row.order_count > 0 ? row.total_amount / row.order_count : 0;
-      tr.innerHTML = `
-        <td>${row.label}</td>
-        <td>${row.order_count}</td>
-        <td>${formatCurrency(row.total_amount)}</td>
-        <td>${formatCurrency(avg)}</td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  renderPurchaseReportChart(data);
-  showNotification('สร้างรายงานรับซื้อสำเร็จ', 'success');
-}
-
-function renderPurchaseReportChart(data) {
-  const chartContainer = document.getElementById('purchaseReportChart');
-  const canvas = chartContainer.querySelector('canvas');
-  if (canvas) {
-    const chartInstance = Chart.getChart(canvas);
-    if (chartInstance) chartInstance.destroy();
-  }
-  const newCanvas = document.createElement('canvas');
-  chartContainer.innerHTML = '';
-  chartContainer.appendChild(newCanvas);
-
-  const labels = data.report_data.map(row => row.label);
-  const values = data.report_data.map(row => row.total_amount);
-
-  new Chart(newCanvas, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'ยอดรับซื้อ',
-        data: values,
-        backgroundColor: 'rgba(37, 117, 252, 0.7)',
-        borderColor: '#2575fc',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: { label: ctx => 'ยอดรับซื้อ: ' + formatCurrency(ctx.raw) }
-        }
-      }
-    }
-  });
-}
-
-// Generate sale lot report
-async function generateSalelotReport() {
-  try {
-    const dateFrom = document.getElementById('salelotDateFrom').value;
-    const dateTo = document.getElementById('salelotDateTo').value;
-    const groupBy = document.getElementById('salelotGroupBy').value;
-
-    if (!dateFrom || !dateTo) {
-      showNotification('กรุณาเลือกช่วงวันที่', 'error');
-      return;
-    }
-
-    showNotification('กำลังสร้างรายงานขาย Lot...', 'info');
-    showTableLoading(document.querySelector('#salelotReportTable tbody'), 8, 5);
-
-    const response = await apiRequest(`reports/sale-lot-report?date_from=${dateFrom}&date_to=${dateTo}&group_by=${groupBy}`);
-
-    if (response.status === 'success') {
-      currentReportData = response.data;
-      renderSalelotReport(response.data);
-    } else {
-      showNotification(response.message || 'สร้างรายงานขาย Lot ไม่สำเร็จ', 'error');
-    }
-  } catch (error) {
-    console.error('Error generating sale lot report:', error);
-    showNotification('สร้างรายงานขาย Lot ไม่สำเร็จ', 'error');
-  }
-}
-
-function renderSalelotReport(data) {
-  document.getElementById('salelotTotalLots').textContent = data.totals.total_lots;
-  document.getElementById('salelotTotalAmount').textContent = formatCurrency(data.totals.total_amount);
-  document.getElementById('salelotTotalCost').textContent = formatCurrency(data.totals.total_cost);
-  document.getElementById('salelotTotalProfit').textContent = formatCurrency(data.totals.total_profit);
-
-  const tableBody = document.querySelector('#salelotReportTable tbody');
-  tableBody.innerHTML = '';
-
-  if (data.report_data.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="6" class="text-center">No data available for the selected period</td>';
-    tableBody.appendChild(row);
-  } else {
-    data.report_data.forEach(row => {
-      const tr = document.createElement('tr');
-      const margin = row.total_amount > 0 ? ((row.profit / row.total_amount) * 100).toFixed(1) : '0.0';
-      tr.innerHTML = `
-        <td>${row.label}</td>
-        <td>${row.lot_count}</td>
-        <td>${formatCurrency(row.total_amount)}</td>
-        <td>${formatCurrency(row.total_cost)}</td>
-        <td>${formatCurrency(row.profit)}</td>
-        <td>${margin}%</td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  renderSalelotReportChart(data);
-  showNotification('สร้างรายงานขาย Lot สำเร็จ', 'success');
-}
-
-function renderSalelotReportChart(data) {
-  const chartContainer = document.getElementById('salelotReportChart');
-  const canvas = chartContainer.querySelector('canvas');
-  if (canvas) {
-    const chartInstance = Chart.getChart(canvas);
-    if (chartInstance) chartInstance.destroy();
-  }
-  const newCanvas = document.createElement('canvas');
-  chartContainer.innerHTML = '';
-  chartContainer.appendChild(newCanvas);
-
-  const labels = data.report_data.map(row => row.label);
-  const amounts = data.report_data.map(row => row.total_amount);
-  const profits = data.report_data.map(row => row.profit);
-
-  new Chart(newCanvas, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'ยอดขาย',
-          data: amounts,
-          backgroundColor: 'rgba(52, 152, 219, 0.7)',
-          borderColor: '#3498db',
-          borderWidth: 1
-        },
-        {
-          label: 'กำไร',
-          data: profits,
-          backgroundColor: 'rgba(46, 204, 113, 0.7)',
-          borderColor: '#2ecc71',
-          borderWidth: 1
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { beginAtZero: true, ticks: { callback: v => formatCurrency(v) } }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: { label: ctx => ctx.dataset.label + ': ' + formatCurrency(ctx.raw) }
-        }
-      }
-    }
-  });
-}
-
-// Generate tax report
-async function generateTaxReport() {
-  try {
-    const dateFrom = document.getElementById('taxDateFrom').value;
-    const dateTo = document.getElementById('taxDateTo').value;
-    const taxPeriod = document.getElementById('taxPeriod').value;
-
-    if (!dateFrom || !dateTo) {
-      showNotification('กรุณาเลือกช่วงวันที่', 'error');
-      return;
-    }
-
-    showNotification('กำลังสร้างรายงานภาษี...', 'info');
-    showTableLoading(document.querySelector('#taxReportTable tbody'), 6, 5);
-
-    const params = new URLSearchParams({
-      date_from: dateFrom,
-      date_to: dateTo,
-      period: taxPeriod
-    });
-
-    const response = await apiRequest(`reports/tax-report?${params.toString()}`);
-
-    if (response.status === 'success') {
-      currentReportData = response.data;
-      renderTaxReport(response.data);
-    } else {
-      showNotification(response.message || 'สร้างรายงานภาษีไม่สำเร็จ', 'error');
-    }
-  } catch (error) {
-    console.error('Error generating tax report:', error);
-    showNotification('สร้างรายงานภาษีไม่สำเร็จ', 'error');
-  }
-}
-
-// Render tax report
-function renderTaxReport(data) {
-  // Update summary values
-  document.getElementById('taxableSales').textContent = formatCurrency(data.totals.taxable_sales);
-  document.getElementById('taxCollected').textContent = formatCurrency(data.totals.tax_collected);
-
-  // Calculate average tax rate
-  const avgTaxRate = (data.totals.tax_collected / data.totals.taxable_sales) * 100 || 0;
-  document.getElementById('taxRate').textContent = avgTaxRate.toFixed(2) + '%';
-
-  // Render table
-  const tableBody = document.querySelector('#taxReportTable tbody');
-  tableBody.innerHTML = '';
-
-  if (data.periods.length === 0) {
-    const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="4" class="text-center">No data available for the selected period</td>';
-    tableBody.appendChild(row);
-  } else {
-    data.periods.forEach(period => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-      <td>${period.period}</td>
-      <td>${formatCurrency(period.taxable_sales)}</td>
-      <td>${formatCurrency(period.tax_collected)}</td>
-      <td>${formatCurrency(period.taxable_sales + period.tax_collected)}</td>
-    `;
-      tableBody.appendChild(tr);
-    });
-  }
-
-  showNotification('สร้างรายงานภาษีสำเร็จ', 'success');
-}
-
-// Export current report
-function exportCurrentReport() {
-  if (!currentReportData) {
-    showNotification('กรุณาสร้างรายงานก่อน', 'error');
+function renderPurchaseOrders(items, pagination, range) {
+  const count = items.length;
+  const total = items.reduce((sum, item) => sum + parseFloat(item.total_amount || 0), 0);
+  const sellers = new Set(items.map((item) => item.seller_name || item.seller_id || item.seller_id_card).filter(Boolean));
+  const avg = count > 0 ? total / count : 0;
+
+  document.getElementById('purchaseOrdersCount').textContent = count.toLocaleString('th-TH');
+  document.getElementById('purchaseOrdersTotal').textContent = formatCurrency(total);
+  document.getElementById('purchaseOrdersAverage').textContent = `เฉลี่ย ${formatCurrency(avg)}`;
+  document.getElementById('purchaseOrdersSellers').textContent = sellers.size.toLocaleString('th-TH');
+
+  const note = pagination && pagination.total > count
+    ? `${count.toLocaleString('th-TH')} จาก ${pagination.total.toLocaleString('th-TH')} รายการ`
+    : `${count.toLocaleString('th-TH')} รายการในช่วง ${range.label}`;
+  document.getElementById('purchaseOrdersScope').textContent = `${currentBranchName} · ${note}`;
+
+  if (count === 0) {
+    renderErrorRow('purchaseOrdersBody', 6, 'ไม่มีข้อมูลรับซื้อในช่วงที่เลือก');
     return;
   }
 
-  let filename, csvContent;
+  renderTableBody('purchaseOrdersBody', items.map((item) => {
+    const statusClass = getStatusClass(item.status);
+    return `
+      <tr>
+        <td style="font-family:monospace">${escapeHtml(item.reference_no || `PO-${item.id}`)}</td>
+        <td>${escapeHtml(formatDisplayDate(item.created_at || item.sale_date))}</td>
+        <td>${escapeHtml(item.seller_name || '-')}</td>
+        <td class="text-right">${formatCurrency(item.total_amount || 0)}</td>
+        <td>${escapeHtml(formatPaymentMethod(item.payment_method))}</td>
+        <td><span class="report-badge ${statusClass.className}">${escapeHtml(statusClass.label)}</span></td>
+      </tr>
+    `;
+  }).join(''));
+}
 
-  switch (currentReportType) {
-    case 'sales':
-      filename = `sales_report_${formatDateForFilename(new Date())}.csv`;
-      csvContent = generateSalesReportCSV(currentReportData);
-      break;
-    case 'products':
-      filename = `product_sales_report_${formatDateForFilename(new Date())}.csv`;
-      csvContent = generateProductsReportCSV(currentReportData);
-      break;
-    case 'inventory':
-      filename = `inventory_report_${formatDateForFilename(new Date())}.csv`;
-      csvContent = generateInventoryReportCSV(currentReportData);
-      break;
-    case 'cashier':
-      filename = `cashier_performance_report_${formatDateForFilename(new Date())}.csv`;
-      csvContent = generateCashierReportCSV(currentReportData);
-      break;
-    case 'tax':
-      filename = `tax_report_${formatDateForFilename(new Date())}.csv`;
-      csvContent = generateTaxReportCSV(currentReportData);
-      break;
-    case 'purchase':
-      filename = `purchase_report_${formatDateForFilename(new Date())}.csv`;
-      csvContent = generatePurchaseReportCSV(currentReportData);
-      break;
-    case 'salelot':
-      filename = `salelot_report_${formatDateForFilename(new Date())}.csv`;
-      csvContent = generateSalelotReportCSV(currentReportData);
-      break;
+async function loadSaleLots(range) {
+  try {
+    const params = new URLSearchParams({
+      date_from: range.dateFrom,
+      date_to: range.dateTo,
+      limit: '1000',
+    });
+    const res = await apiRequest(`sale-lots?${params.toString()}`);
+    if (res.status !== 'success') {
+      throw new Error(res.message || 'โหลดข้อมูลขาย Lot ไม่สำเร็จ');
+    }
+
+    const items = res.data?.items || [];
+    reportState.saleLots = items;
+    renderSaleLots(items, res.data?.pagination || null, range);
+  } catch (error) {
+    console.error('Failed to load sale lots:', error);
+    renderErrorRow('saleLotsBody', 8, 'โหลดข้อมูลขาย Lot ไม่สำเร็จ');
+  }
+}
+
+function renderSaleLots(items, pagination, range) {
+  const count = items.length;
+  const revenue = items.reduce((sum, item) => sum + parseFloat(item.actual_revenue || 0), 0);
+  const cost = items.reduce((sum, item) => sum + parseFloat(item.total_cost || 0), 0);
+  const profit = revenue - cost;
+  const avg = count > 0 ? revenue / count : 0;
+
+  document.getElementById('saleLotsCount').textContent = count.toLocaleString('th-TH');
+  document.getElementById('saleLotsRevenue').textContent = formatCurrency(revenue);
+  document.getElementById('saleLotsAverage').textContent = `เฉลี่ย ${formatCurrency(avg)}`;
+  document.getElementById('saleLotsProfit').textContent = `${profit >= 0 ? '+' : ''}${formatCurrency(profit)}`;
+  document.getElementById('saleLotsProfit').className = `report-kpi-value ${profit >= 0 ? 'report-kpi-income' : 'report-kpi-expense'}`;
+  document.getElementById('saleLotsCost').textContent = `ต้นทุน ${formatCurrency(cost)}`;
+
+  const note = pagination && pagination.total > count
+    ? `${count.toLocaleString('th-TH')} จาก ${pagination.total.toLocaleString('th-TH')} รายการ`
+    : `${count.toLocaleString('th-TH')} Lot ในช่วง ${range.label}`;
+  document.getElementById('saleLotsScope').textContent = `${currentBranchName} · ${note}`;
+
+  if (count === 0) {
+    renderErrorRow('saleLotsBody', 8, 'ไม่มีข้อมูลขาย Lot ในช่วงที่เลือก');
+    return;
   }
 
-  // Create download link
-  const bom = '\uFEFF';
-  const blob = new Blob([bom + csvContent], {type: 'text/csv;charset=utf-8;'});
+  renderTableBody('saleLotsBody', items.map((item) => {
+    const revenueValue = parseFloat(item.actual_revenue || 0);
+    const costValue = parseFloat(item.total_cost || 0);
+    const profitValue = revenueValue - costValue;
+    const statusClass = getStatusClass(item.status);
+
+    return `
+      <tr>
+        <td style="font-family:monospace">${escapeHtml(item.reference_no || `SL-${item.id}`)}</td>
+        <td>${escapeHtml(formatDisplayDate(item.sale_date || item.created_at))}</td>
+        <td>${escapeHtml(item.buyer_name || '-')}</td>
+        <td class="text-right">${formatCurrency(item.total_amount || 0)}</td>
+        <td class="text-right">${revenueValue > 0 ? formatCurrency(revenueValue) : '<span class="report-muted">ยังไม่บันทึก</span>'}</td>
+        <td class="text-right">${formatCurrency(costValue)}</td>
+        <td class="text-right ${profitValue >= 0 ? 'report-kpi-income' : 'report-kpi-expense'}">${profitValue >= 0 ? '+' : ''}${formatCurrency(profitValue)}</td>
+        <td><span class="report-badge ${statusClass.className}">${escapeHtml(statusClass.label)}</span></td>
+      </tr>
+    `;
+  }).join(''));
+}
+
+async function loadInventoryReport() {
+  try {
+    const [categoriesRes, alertsRes] = await Promise.all([
+      apiRequest('inventory/categories'),
+      apiRequest('inventory/stock-alerts'),
+    ]);
+
+    if (categoriesRes.status !== 'success') {
+      throw new Error(categoriesRes.message || 'โหลดข้อมูลคลังไม่สำเร็จ');
+    }
+
+    const categories = Array.isArray(categoriesRes.data) ? categoriesRes.data : [];
+    const alerts = alertsRes.status === 'success' ? (alertsRes.data?.items || []) : [];
+    const alertSummary = alertsRes.status === 'success' ? alertsRes.data?.summary || null : null;
+
+    reportState.inventory = {
+      categories,
+      alerts,
+      alertSummary,
+    };
+    renderInventory(categories, alerts, alertSummary);
+  } catch (error) {
+    console.error('Failed to load inventory report:', error);
+    renderErrorRow('inventoryCategoriesBody', 4, 'โหลดข้อมูลคลังไม่สำเร็จ');
+    renderErrorRow('inventoryAlertsBody', 4, 'โหลดข้อมูลแจ้งเตือนไม่สำเร็จ');
+  }
+}
+
+function renderInventory(categories, alerts, alertSummary) {
+  const count = categories.length;
+  const totalKg = categories.reduce((sum, item) => sum + parseFloat(item.stock_kg || 0), 0);
+  const lowCount = alertSummary?.below_threshold ?? alerts.length;
+  const zeroCount = alertSummary?.zero_stock ?? 0;
+
+  document.getElementById('inventoryCategoriesCount').textContent = count.toLocaleString('th-TH');
+  document.getElementById('inventoryTotalKg').textContent = totalKg.toLocaleString('th-TH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 3,
+  });
+  document.getElementById('inventoryLowCount').textContent = lowCount.toLocaleString('th-TH');
+  document.getElementById('inventoryStockSummary').textContent = `${zeroCount} หมดสต็อก · ${lowCount} ใกล้หมด`;
+
+  if (count === 0) {
+    renderErrorRow('inventoryCategoriesBody', 4, 'ไม่มีข้อมูลคลัง');
+  } else {
+    renderTableBody('inventoryCategoriesBody', categories.map((item) => {
+      const stockKg = parseFloat(item.stock_kg || 0);
+      const threshold = item.alert_threshold === null || item.alert_threshold === undefined
+        ? null
+        : parseFloat(item.alert_threshold);
+      const status = getInventoryStatus(stockKg, threshold);
+      return `
+        <tr>
+          <td>${escapeHtml(item.name || '-')}</td>
+          <td class="text-right">${stockKg.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
+          <td class="text-right">${threshold === null || Number.isNaN(threshold) ? '-' : threshold.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
+          <td><span class="report-badge ${status.className}">${escapeHtml(status.label)}</span></td>
+        </tr>
+      `;
+    }).join(''));
+  }
+
+  if (!alerts || alerts.length === 0) {
+    renderErrorRow('inventoryAlertsBody', 4, 'ไม่มีรายการแจ้งเตือน');
+    return;
+  }
+
+  renderTableBody('inventoryAlertsBody', alerts.map((item) => {
+    const stockKg = parseFloat(item.stock_kg || 0);
+    const threshold = item.alert_threshold === null || item.alert_threshold === undefined
+      ? 0
+      : parseFloat(item.alert_threshold);
+    const status = getInventoryStatus(stockKg, threshold);
+    return `
+      <tr>
+        <td>${escapeHtml(item.item_name || '-')}</td>
+        <td>${escapeHtml(item.category_name || '-')}</td>
+        <td class="text-right">${stockKg.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
+        <td class="text-right">${threshold.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
+      </tr>
+    `;
+  }).join(''));
+}
+
+async function loadEmployeesReport() {
+  try {
+    const params = new URLSearchParams({ limit: '500' });
+    if (currentBranchId) {
+      params.set('branch_id', currentBranchId);
+    }
+    const res = await apiRequest(`employees?${params.toString()}`);
+    if (res.status !== 'success') {
+      throw new Error(res.message || 'โหลดข้อมูลพนักงานไม่สำเร็จ');
+    }
+
+    const items = res.data?.items || [];
+    reportState.employees = items;
+    renderEmployees(items);
+  } catch (error) {
+    console.error('Failed to load employees report:', error);
+    renderErrorRow('employeesBody', 6, 'โหลดข้อมูลพนักงานไม่สำเร็จ');
+  }
+}
+
+function renderEmployees(items) {
+  const total = items.length;
+  const active = items.filter((item) => item.status === 'active').length;
+  const inactive = items.filter((item) => item.status !== 'active').length;
+  const salaryTotal = items.reduce((sum, item) => sum + parseFloat(item.salary || 0), 0);
+
+  document.getElementById('employeesTotal').textContent = total.toLocaleString('th-TH');
+  document.getElementById('employeesActive').textContent = active.toLocaleString('th-TH');
+  document.getElementById('employeesInactive').textContent = inactive.toLocaleString('th-TH');
+  document.getElementById('employeesSalaryTotal').textContent = formatCurrency(salaryTotal);
+
+  if (total === 0) {
+    renderErrorRow('employeesBody', 6, 'ไม่มีข้อมูลพนักงานในสาขานี้');
+    return;
+  }
+
+  renderTableBody('employeesBody', items.map((item) => {
+    const statusClass = item.status === 'active'
+      ? 'report-badge-success'
+      : 'report-badge-warning';
+    const statusLabel = item.status === 'active' ? 'กำลังทำงาน' : 'ออกแล้ว';
+
+    return `
+      <tr>
+        <td>${escapeHtml(item.full_name || '-')}</td>
+        <td>${escapeHtml(item.position || '-')}</td>
+        <td>${escapeHtml(item.phone || '-')}</td>
+        <td class="text-right">${parseFloat(item.salary || 0) > 0 ? formatCurrency(item.salary) : '-'}</td>
+        <td class="text-right">${parseFloat(item.daily_wage || 0) > 0 ? formatCurrency(item.daily_wage) : '-'}</td>
+        <td><span class="report-badge ${statusClass}">${statusLabel}</span></td>
+      </tr>
+    `;
+  }).join(''));
+}
+
+async function loadTaxReport() {
+  try {
+    const dateFrom = document.getElementById('taxDateFrom')?.value || getMonthRange(currentReportMonth).dateFrom;
+    const dateTo = document.getElementById('taxDateTo')?.value || getMonthRange(currentReportMonth).dateTo;
+    const period = document.getElementById('taxPeriod')?.value || 'daily';
+
+    const params = new URLSearchParams({
+      date_from: dateFrom,
+      date_to: dateTo,
+      period,
+    });
+
+    const res = await apiRequest(`reports/tax-report?${params.toString()}`);
+    if (res.status !== 'success') {
+      throw new Error(res.message || 'โหลดรายงานภาษีไม่สำเร็จ');
+    }
+
+    const data = res.data || { periods: [], totals: {} };
+    reportState.tax = data;
+    renderTaxReport(data);
+  } catch (error) {
+    console.error('Failed to load tax report:', error);
+    renderErrorRow('taxReportBody', 4, 'โหลดรายงานภาษีไม่สำเร็จ');
+  }
+}
+
+function renderTaxReport(data) {
+  const periods = Array.isArray(data.periods) ? data.periods : [];
+  const taxableSales = parseFloat(data.totals?.taxable_sales || 0);
+  const taxCollected = parseFloat(data.totals?.tax_collected || 0);
+  const taxRate = taxableSales > 0 ? (taxCollected / taxableSales) * 100 : 0;
+
+  document.getElementById('taxableSales').textContent = formatCurrency(taxableSales);
+  document.getElementById('taxCollected').textContent = formatCurrency(taxCollected);
+  document.getElementById('taxRate').textContent = `${taxRate.toFixed(1)}%`;
+
+  if (periods.length === 0) {
+    renderErrorRow('taxReportBody', 4, 'ไม่มีข้อมูลภาษีในช่วงที่เลือก');
+    return;
+  }
+
+  renderTableBody('taxReportBody', periods.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.period || '-')}</td>
+      <td class="text-right">${formatCurrency(item.taxable_sales || 0)}</td>
+      <td class="text-right">${formatCurrency(item.tax_collected || 0)}</td>
+      <td class="text-right">${formatCurrency((parseFloat(item.taxable_sales || 0) + parseFloat(item.tax_collected || 0)))}</td>
+    </tr>
+  `).join(''));
+}
+
+function handleReportActionClick(event) {
+  const button = event.target.closest('[data-report-action]');
+  if (!button) {
+    return;
+  }
+
+  const action = button.dataset.reportAction;
+  const key = button.dataset.reportKey;
+  if (!action || !key) {
+    return;
+  }
+
+  event.preventDefault();
+
+  if (action === 'export') {
+    exportReportCard(key);
+  } else if (action === 'print') {
+    printReportCard(key);
+  }
+}
+
+function exportReportCard(key) {
+  const monthLabel = getMonthRange(currentReportMonth).label;
+  const scopeSlug = currentBranchId || 'all-branches';
+  const filename = `report-${key}-${scopeSlug}-${currentReportMonth || getCurrentMonthValue()}.csv`;
+  let csv = '';
+
+  switch (key) {
+    case 'summary':
+      csv = buildCsv([
+        ['รายการ', 'จำนวน'],
+        ['ยอดรับซื้อของ', formatCurrency(reportState.summary?.totalPurchase || 0)],
+        ['น้ำหนักรับซื้อ', `${(reportState.summary?.totalKg || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} กก.`],
+        ['รายรับขาย Lot', formatCurrency(reportState.summary?.totalRevenue || 0)],
+        ['ค่าใช้จ่ายต่อ Lot', formatCurrency(reportState.summary?.totalExpenses || 0)],
+        ['ค่าใช้จ่ายประจำสาขา', formatCurrency(reportState.summary?.totalBizExpenses || 0)],
+        ['กำไรสุทธิ', `${(reportState.summary?.netProfit || 0) >= 0 ? '+' : ''}${formatCurrency(reportState.summary?.netProfit || 0)}`],
+        ['ช่วงรายงาน', monthLabel],
+        ['สาขา', currentBranchName],
+      ]);
+      break;
+    case 'purchaseOrders':
+      csv = buildCsv([
+        ['เลขที่', 'วันที่', 'ผู้ขาย', 'ยอดรวม', 'วิธีจ่าย', 'สถานะ'],
+        ...reportState.purchaseOrders.map((item) => [
+          item.reference_no || '',
+          formatDisplayDate(item.created_at || item.sale_date),
+          item.seller_name || '',
+          item.total_amount || 0,
+          formatPaymentMethod(item.payment_method),
+          getStatusLabel(item.status),
+        ]),
+      ]);
+      break;
+    case 'saleLots':
+      csv = buildCsv([
+        ['เลขที่', 'วันที่', 'ผู้ซื้อ', 'ยอดขาย', 'รายรับจริง', 'ต้นทุน', 'กำไร', 'สถานะ'],
+        ...reportState.saleLots.map((item) => {
+          const actualRevenue = parseFloat(item.actual_revenue || 0);
+          const cost = parseFloat(item.total_cost || 0);
+          const profit = actualRevenue - cost;
+          return [
+            item.reference_no || '',
+            formatDisplayDate(item.sale_date || item.created_at),
+            item.buyer_name || '',
+            item.total_amount || 0,
+            actualRevenue > 0 ? actualRevenue : '',
+            cost,
+            profit,
+            getStatusLabel(item.status),
+          ];
+        }),
+      ]);
+      break;
+    case 'inventory':
+      csv = buildCsv([
+        ['หมวดหมู่', 'สต็อก (กก.)', 'เกณฑ์แจ้งเตือน', 'สถานะ'],
+        ...reportState.inventory.categories.map((item) => {
+          const stockKg = parseFloat(item.stock_kg || 0);
+          const threshold = item.alert_threshold === null || item.alert_threshold === undefined ? '' : item.alert_threshold;
+          const status = getInventoryStatus(stockKg, threshold === '' ? null : parseFloat(threshold));
+          return [
+            item.name || '',
+            stockKg.toFixed(3),
+            threshold === '' ? '-' : threshold,
+            status.label,
+          ];
+        }),
+        [],
+        ['รายการแจ้งเตือน', 'หมวด', 'สต็อก (กก.)', 'เกณฑ์'],
+        ...reportState.inventory.alerts.map((item) => [
+          item.item_name || '',
+          item.category_name || '',
+          parseFloat(item.stock_kg || 0).toFixed(3),
+          item.alert_threshold ?? 0,
+        ]),
+      ]);
+      break;
+    case 'employees':
+      csv = buildCsv([
+        ['ชื่อ-นามสกุล', 'ตำแหน่ง', 'เบอร์โทร', 'เงินเดือน', 'ค่าแรงรายวัน', 'สถานะ'],
+        ...reportState.employees.map((item) => [
+          item.full_name || '',
+          item.position || '',
+          item.phone || '',
+          item.salary || 0,
+          item.daily_wage || 0,
+          getStatusLabel(item.status),
+        ]),
+      ]);
+      break;
+    case 'tax':
+      csv = buildCsv([
+        ['รอบระยะเวลา', 'ยอดขายที่ต้องเสียภาษี', 'ภาษีที่เก็บ', 'รวม'],
+        ...(Array.isArray(reportState.tax?.periods) ? reportState.tax.periods : []).map((item) => [
+          item.period || '',
+          item.taxable_sales || 0,
+          item.tax_collected || 0,
+          (parseFloat(item.taxable_sales || 0) + parseFloat(item.tax_collected || 0)),
+        ]),
+      ]);
+      break;
+    default:
+      showNotification('ไม่พบข้อมูลสำหรับส่งออก', 'error');
+      return;
+  }
+
+  downloadCsv(filename, csv);
+}
+
+function printReportCard(key) {
+  const cardMap = {
+    summary: 'branchSummaryCard',
+    purchaseOrders: 'purchaseOrdersCard',
+    saleLots: 'saleLotsCard',
+    inventory: 'inventoryCard',
+    employees: 'employeesCard',
+    tax: 'taxCard',
+  };
+
+  const card = document.getElementById(cardMap[key]);
+  if (!card) {
+    showNotification('ไม่พบข้อมูลสำหรับพิมพ์', 'error');
+    return;
+  }
+
+  const title = card.querySelector('.card-title')?.textContent || 'รายงาน';
+  const clone = card.cloneNode(true);
+  clone.querySelectorAll('.report-card-actions').forEach((node) => node.remove());
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    showNotification('ไม่สามารถเปิดหน้าพิมพ์ได้', 'error');
+    return;
+  }
+
+  printWindow.document.write(`
+    <html lang="th">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${escapeHtml(title)}</title>
+      <style>
+        body { font-family: 'IBM Plex Sans Thai', sans-serif; margin: 24px; color: #1e293b; }
+        h1 { margin: 0 0 8px; font-size: 22px; }
+        .meta { margin-bottom: 16px; font-size: 13px; color: #64748b; }
+        .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+        .report-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .report-kpi { border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; }
+        .report-kpi-label { font-size: 11px; color: #64748b; margin-bottom: 6px; }
+        .report-kpi-value { font-size: 18px; font-weight: 700; }
+        .report-kpi-sub { font-size: 11px; color: #64748b; margin-top: 4px; }
+        .table-container { overflow: visible; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border-bottom: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; font-size: 12px; vertical-align: top; }
+        th { background: #f8fafc; }
+        .text-right { text-align: right; }
+        .report-badge { display: inline-flex; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+        .report-badge-success { background: #d1fae5; color: #047857; }
+        .report-badge-warning { background: #fef3c7; color: #b45309; }
+        .report-badge-danger { background: #fee2e2; color: #b91c1c; }
+        .report-empty-cell { text-align: center; color: #64748b; padding: 20px !important; }
+      </style>
+    </head>
+    <body>
+      <h1>${escapeHtml(title)}</h1>
+      <div class="meta">สาขา: ${escapeHtml(currentBranchName)} · ช่วงรายงาน: ${escapeHtml(getMonthRange(currentReportMonth).label)}</div>
+      ${clone.outerHTML}
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  setTimeout(() => printWindow.print(), 400);
+}
+
+function buildCsv(rows) {
+  return rows.map((row) => {
+    if (!Array.isArray(row) || row.length === 0) {
+      return '';
+    }
+
+    return row.map(escapeCsvValue).join(',');
+  }).join('\n');
+}
+
+function escapeCsvValue(value) {
+  const text = value === null || value === undefined ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename, csv) {
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename);
-  link.style.visibility = 'hidden';
+  link.href = url;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+  link.remove();
   URL.revokeObjectURL(url);
 }
 
-// Print current report
-function printCurrentReport() {
-  if (!currentReportData) {
-    showNotification('กรุณาสร้างรายงานก่อน', 'error');
+function renderTableBody(targetId, html) {
+  const body = document.getElementById(targetId);
+  if (!body) {
+    return;
+  }
+  body.innerHTML = html;
+}
+
+function renderErrorRow(targetId, columns, message) {
+  const body = document.getElementById(targetId);
+  if (!body) {
     return;
   }
 
-  // Get the report section to print
-  const reportSection = document.getElementById(`${currentReportType}Report`);
-
-  // Create a new window for printing
-  const printWindow = window.open('', '_blank');
-  const reportTitle = document.querySelector(`.report-type-item[data-report="${currentReportType}"] span`).textContent;
-
-  // Generate printer-friendly content
-  printWindow.document.write(`
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <title>${reportTitle}</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 20px; }
-      h1 { text-align: center; margin-bottom: 20px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-      th { background-color: #f2f2f2; }
-      .summary { display: flex; flex-wrap: wrap; margin-bottom: 20px; }
-      .summary-item { margin-right: 30px; margin-bottom: 10px; }
-      .summary-label { font-weight: 400; }
-      .text-danger { color: #dc3545; }
-      .text-warning { color: #ffc107; }
-      .text-center { text-align: center; }
-      @media print {
-        @page { size: landscape; }
-      }
-    </style>
-  </head>
-  <body>
-    <h1>${reportTitle}</h1>
-    <div class="report-date">
-      Generated on: ${new Date().toLocaleString()}
-    </div>
-    ${reportSection.querySelector('.report-summary') ?
-      `<div class="summary">
-        ${reportSection.querySelector('.report-summary').innerHTML}
-      </div>` : ''}
-    <div class="table-container">
-      ${reportSection.querySelector('.data-table').outerHTML}
-    </div>
-  </body>
-  </html>
-`);
-
-  printWindow.document.close();
-
-  // Add a small delay to ensure content is loaded
-  setTimeout(() => {
-    printWindow.print();
-    // Don't close the window after printing to allow user to see the preview
-  }, 500);
+  body.innerHTML = `<tr><td colspan="${columns}" class="report-empty-cell">${escapeHtml(message)}</td></tr>`;
 }
 
-// Generate CSV content for sales report
-function generateSalesReportCSV(data) {
-  let csvContent = 'Period,Orders,Sales,Discounts,Tax,Total\n';
+function getInventoryStatus(stockKg, threshold) {
+  if (stockKg <= 0) {
+    return { label: 'หมดสต็อก', className: 'report-badge-danger' };
+  }
 
-  data.report_data.forEach(row => {
-    csvContent += `${row.label},${row.order_count},${row.total_amount},${row.discount_amount},${row.tax_amount},${row.grand_total}\n`;
+  if (threshold !== null && Number.isFinite(threshold) && threshold > 0 && stockKg <= threshold) {
+    return { label: 'ใกล้หมด', className: 'report-badge-warning' };
+  }
+
+  return { label: 'ปกติ', className: 'report-badge-success' };
+}
+
+function getStatusClass(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'confirmed' || normalized === 'completed' || normalized === 'active') {
+    return { label: getStatusLabel(normalized), className: 'report-badge-success' };
+  }
+
+  if (normalized === 'draft' || normalized === 'pending') {
+    return { label: getStatusLabel(normalized), className: 'report-badge-warning' };
+  }
+
+  if (normalized === 'cancelled' || normalized === 'inactive') {
+    return { label: getStatusLabel(normalized), className: 'report-badge-danger' };
+  }
+
+  return { label: getStatusLabel(normalized), className: 'report-badge-warning' };
+}
+
+function getStatusLabel(status) {
+  const normalized = String(status || '').toLowerCase();
+  const map = {
+    confirmed: 'ยืนยันแล้ว',
+    completed: 'สำเร็จ',
+    draft: 'แบบร่าง',
+    pending: 'รอดำเนินการ',
+    cancelled: 'ยกเลิก',
+    active: 'กำลังทำงาน',
+    inactive: 'ออกแล้ว',
+    paid: 'ชำระแล้ว',
+    cash: 'เงินสด',
+    bank_transfer: 'โอนธนาคาร',
+  };
+
+  return map[normalized] || status || '-';
+}
+
+function formatPaymentMethod(value) {
+  return getStatusLabel(value);
+}
+
+function formatDisplayDate(value) {
+  if (!value) {
+    return '-';
+  }
+
+  const normalized = String(value).includes('T') ? String(value) : `${String(value).slice(0, 10)}T00:00:00`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    return String(value).slice(0, 10);
+  }
+
+  return date.toLocaleDateString('th-TH', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
   });
-
-  // Add totals row
-  csvContent += `Total,${data.totals.total_orders},${data.totals.total_sales},${data.totals.total_discounts},${data.totals.total_tax},${data.totals.total_grand}\n`;
-
-  return csvContent;
-}
-
-// Generate CSV content for product sales report
-function generateProductsReportCSV(data) {
-  let csvContent = 'SKU,Product,Category,Quantity Sold,Revenue,Orders\n';
-
-  data.forEach(product => {
-    csvContent += `${product.sku},"${product.name.replace(/"/g, '""')}",${product.category_name || 'Uncategorized'},${product.quantity_sold},${product.total_sales},${product.order_count}\n`;
-  });
-
-  return csvContent;
-}
-
-// Generate CSV content for inventory report
-function generateInventoryReportCSV(data) {
-  let csvContent = 'SKU,Product,Category,Quantity,Low Stock Threshold,Unit Cost,Value,Status\n';
-
-  data.inventory.forEach(item => {
-    let stockStatus = 'Normal';
-
-    if (item.quantity <= 0) {
-      stockStatus = 'Out of Stock';
-    } else if (item.quantity <= item.low_stock_threshold) {
-      stockStatus = 'Low Stock';
-    }
-
-    csvContent += `${item.sku},"${item.name.replace(/"/g, '""')}",${item.category_name || 'Uncategorized'},${item.quantity},${item.low_stock_threshold},${item.cost},${item.inventory_value},${stockStatus}\n`;
-  });
-
-  return csvContent;
-}
-
-// Generate CSV content for cashier report
-function generateCashierReportCSV(data) {
-  let csvContent = 'Cashier,Orders,Items Sold,Total Sales,Average Order Value,Cancelled Orders\n';
-
-  data.cashiers.forEach(cashier => {
-    const avgOrderValue = cashier.total_sales / (cashier.order_count || 1);
-
-    csvContent += `${cashier.full_name} (${cashier.username}),${cashier.order_count},${cashier.items_sold},${cashier.total_sales},${avgOrderValue.toFixed(2)},${cashier.cancelled_orders}\n`;
-  });
-
-  return csvContent;
-}
-
-// Generate CSV content for tax report
-function generateTaxReportCSV(data) {
-  let csvContent = 'Period,Taxable Sales,Tax Collected,Total\n';
-
-  data.periods.forEach(period => {
-    csvContent += `${period.period},${period.taxable_sales},${period.tax_collected},${period.taxable_sales + period.tax_collected}\n`;
-  });
-
-  // Add totals row
-  csvContent += `Total,${data.totals.taxable_sales},${data.totals.tax_collected},${data.totals.taxable_sales + data.totals.tax_collected}\n`;
-
-  return csvContent;
-}
-
-function generatePurchaseReportCSV(data) {
-  let csvContent = 'Period,Orders,Total Amount,Average Amount\n';
-  data.report_data.forEach(row => {
-    const avg = row.order_count > 0 ? (row.total_amount / row.order_count).toFixed(2) : '0.00';
-    csvContent += `${row.label},${row.order_count},${row.total_amount},${avg}\n`;
-  });
-  csvContent += `Total,${data.totals.total_orders},${data.totals.total_amount},${data.totals.total_orders > 0 ? (data.totals.total_amount / data.totals.total_orders).toFixed(2) : '0.00'}\n`;
-  return csvContent;
-}
-
-function generateSalelotReportCSV(data) {
-  let csvContent = 'Period,Lots,Amount,Cost,Profit,Margin\n';
-  data.report_data.forEach(row => {
-    const margin = row.total_amount > 0 ? ((row.profit / row.total_amount) * 100).toFixed(1) : '0.0';
-    csvContent += `${row.label},${row.lot_count},${row.total_amount},${row.total_cost},${row.profit},${margin}%\n`;
-  });
-  csvContent += `Total,${data.totals.total_lots},${data.totals.total_amount},${data.totals.total_cost},${data.totals.total_profit},${data.totals.total_amount > 0 ? ((data.totals.total_profit / data.totals.total_amount) * 100).toFixed(1) : '0.0'}%\n`;
-  return csvContent;
-}
-
-// Format date for filename (YYYY-MM-DD)
-function formatDateForFilename(date) {
-  return date.toISOString().split('T')[0];
 }

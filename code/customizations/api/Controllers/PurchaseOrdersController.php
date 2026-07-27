@@ -23,7 +23,7 @@ class PurchaseOrdersController extends Controller
 
         $model = new PurchaseOrder();
         $result = $model->getPaginated($pagination['page'], $pagination['limit'], $filters);
-        Response::success('Purchase orders retrieved', $result);
+        Response::success('Purchase orders retrieved', array_merge($result, ['filters' => $filters]));
     }
 
     public function getPurchaseOrder($id)

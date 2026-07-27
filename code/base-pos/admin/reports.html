@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="th">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>รายงาน - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css">
 </head>
-
 <body>
   <div class="app-container">
     <aside class="sidebar">
@@ -25,8 +23,8 @@
         <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
         <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
         <li><a href="reports.html" class="active"><i class="icon-report"></i><span>รายงาน</span></a></li>
-         <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
-         <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+        <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
+        <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
         <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
         <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
         <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
@@ -52,510 +50,382 @@
         </div>
       </div>
 
-      <div class="page-header">
-        <h1>รายงาน</h1>
-        <div>
-          <button class="btn btn-secondary" id="exportReportBtn">
-            <i class="icon-download"></i> ส่งออก
-          </button>
-          <button class="btn btn-primary" id="printReportBtn">
-            <i class="icon-print"></i> พิมพ์
-          </button>
+      <div class="reports-page-header">
+        <div class="reports-page-title">
+          <h1>รายงานข้อมูล</h1>
+          <p>สรุปข้อมูลตามสิทธิ์ของผู้ใช้ ผู้จัดการสาขาเห็นเฉพาะสาขาของตน ส่วนผู้ดูแลระบบเห็นภาพรวมทุกสาขา</p>
+        </div>
+        <div class="reports-toolbar">
+          <div class="form-group reports-period-group">
+            <label for="reportMonth">เดือนรายงาน</label>
+            <input type="month" id="reportMonth" class="form-control form-control-md">
+          </div>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header">
-          <h2 class="card-title">ประเภทรายงาน</h2>
+      <div class="report-scope-bar">
+        <span class="report-scope-chip" id="reportBranchLabel">-</span>
+        <span class="report-scope-chip" id="reportMonthLabel">-</span>
+      </div>
+
+      <section class="card report-card" id="branchSummaryCard">
+        <div class="card-header report-card-header">
+          <h2 class="card-title">รายรับรายจ่ายประจำสาขา</h2>
+          <div class="report-card-actions">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="summary" title="ส่งออกสรุป">
+              <i class="icon-download"></i>
+            </button>
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="summary" title="พิมพ์สรุป">
+              <i class="icon-print"></i>
+            </button>
+          </div>
         </div>
         <div class="card-body">
-          <div class="report-types">
-            <div class="report-type-item active" data-report="sales">
-              <i class="icon-stats"></i>
-              <span>รายงานการขาย</span>
+          <div class="report-kpi-grid" id="branchSummaryKpis">
+            <div class="report-kpi">
+              <div class="report-kpi-label">ยอดรับซื้อ</div>
+              <div class="report-kpi-value" id="summaryPurchase">฿0.00</div>
+              <div class="report-kpi-sub" id="summaryPurchaseKg">0 กก.</div>
             </div>
-            <div class="report-type-item" data-report="products">
-              <i class="icon-product"></i>
-              <span>รายงานสินค้า</span>
+            <div class="report-kpi">
+              <div class="report-kpi-label">รายรับขาย Lot</div>
+              <div class="report-kpi-value report-kpi-income" id="summaryRevenue">฿0.00</div>
+              <div class="report-kpi-sub" id="summaryLots">0 Lot</div>
             </div>
-            <div class="report-type-item" data-report="inventory">
-              <i class="icon-product"></i>
-              <span>สถานะสินค้าคงคลัง</span>
+            <div class="report-kpi">
+              <div class="report-kpi-label">ค่าใช้จ่ายรวม</div>
+              <div class="report-kpi-value report-kpi-expense" id="summaryExpenses">฿0.00</div>
+              <div class="report-kpi-sub" id="summaryExpenseNote">-</div>
             </div>
-            <div class="report-type-item" data-report="cashier">
-              <i class="icon-user"></i>
-              <span>ประสิทธิภาพพนักงาน</span>
+            <div class="report-kpi">
+              <div class="report-kpi-label">กำไรสุทธิ</div>
+              <div class="report-kpi-value" id="summaryNetProfit">฿0.00</div>
+              <div class="report-kpi-sub" id="summaryMargin">-</div>
             </div>
-            <div class="report-type-item" data-report="tax">
-              <i class="icon-billing"></i>
-              <span>รายงานภาษี</span>
-            </div>
-            <div class="report-type-item" data-report="purchase">
-              <i class="icon-cart"></i>
-              <span>รายงานรับซื้อ</span>
-            </div>
-            <div class="report-type-item" data-report="salelot">
-              <i class="icon-stats"></i>
-              <span>รายงานขาย Lot</span>
-            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table report-table" id="summaryBreakdownTable">
+              <thead>
+                <tr>
+                  <th>รายการ</th>
+                  <th class="text-right">จำนวน</th>
+                </tr>
+              </thead>
+              <tbody id="summaryBreakdownBody">
+                <tr><td colspan="2" class="report-empty-cell">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Sales Report -->
-      <div class="report-section" id="salesReport">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">รายงานการขาย</h2>
-          </div>
-          <div class="card-body">
-            <div class="filters">
-              <div class="date-range">
-                <div class="form-group">
-                  <label for="salesDateFrom">จากวันที่</label>
-                  <input type="date" id="salesDateFrom" class="form-control">
-                </div>
-                <div class="form-group">
-                  <label for="salesDateTo">ถึงวันที่</label>
-                  <input type="date" id="salesDateTo" class="form-control">
-                </div>
-              </div>
-              <select id="salesGroupBy" class="form-control">
-                <option value="day">รายวัน</option>
-                <option value="month">รายเดือน</option>
-                <option value="year">รายปี</option>
-              </select>
-              <button class="btn btn-primary" id="generateSalesReport">สร้างรายงาน</button>
-            </div>
-
-            <div class="report-summary">
-              <div class="summary-item">
-                <div class="summary-label">ออเดอร์ทั้งหมด</div>
-                <div class="summary-value" id="totalOrders">0</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">ยอดขายรวม</div>
-                <div class="summary-value" id="totalSales">฿0.00</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">ส่วนลดรวม</div>
-                <div class="summary-value" id="totalDiscounts">฿0.00</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">ภาษีรวม</div>
-                <div class="summary-value" id="totalTax">฿0.00</div>
-              </div>
-            </div>
-
-            <div class="chart-container" id="salesChart">
-              <!-- Sales chart will be rendered here -->
-            </div>
-
-            <div class="table-container">
-              <table class="data-table" id="salesReportTable">
-                <thead>
-                  <tr>
-                    <th>รอบระยะเวลา</th>
-                    <th>ออเดอร์</th>
-                    <th>ยอดขาย</th>
-                    <th>ส่วนลด</th>
-                    <th>ภาษี</th>
-                    <th>รวม</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Sales report data will be loaded here -->
-                </tbody>
-              </table>
-            </div>
+      <section class="card report-card" id="purchaseOrdersCard">
+        <div class="card-header report-card-header">
+          <h2 class="card-title">รายงานการรับซื้อ</h2>
+          <div class="report-card-actions">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="purchaseOrders" title="ส่งออกข้อมูลรับซื้อ">
+              <i class="icon-download"></i>
+            </button>
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="purchaseOrders" title="พิมพ์ข้อมูลรับซื้อ">
+              <i class="icon-print"></i>
+            </button>
           </div>
         </div>
-      </div>
-
-      <!-- Product Sales Report -->
-      <div class="report-section" id="productsReport" style="display: none;">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">รายงานสินค้า</h2>
+        <div class="card-body">
+          <div class="report-kpi-grid report-kpi-grid-compact">
+            <div class="report-kpi">
+              <div class="report-kpi-label">จำนวนบิล</div>
+              <div class="report-kpi-value" id="purchaseOrdersCount">0</div>
+              <div class="report-kpi-sub" id="purchaseOrdersScope">-</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">ยอดรวมในช่วง</div>
+              <div class="report-kpi-value report-kpi-expense" id="purchaseOrdersTotal">฿0.00</div>
+              <div class="report-kpi-sub" id="purchaseOrdersAverage">เฉลี่ย ฿0.00</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">จำนวนผู้ขาย</div>
+              <div class="report-kpi-value" id="purchaseOrdersSellers">0</div>
+              <div class="report-kpi-sub">ผู้ขายที่พบในข้อมูล</div>
+            </div>
           </div>
-          <div class="card-body">
-            <div class="filters">
-              <div class="date-range">
-                <div class="form-group">
-                  <label for="productsDateFrom">จากวันที่</label>
-                  <input type="date" id="productsDateFrom" class="form-control">
-                </div>
-                <div class="form-group">
-                  <label for="productsDateTo">ถึงวันที่</label>
-                  <input type="date" id="productsDateTo" class="form-control">
-                </div>
-              </div>
-              <select id="productsCategory" class="form-control">
-                <option value="">ทุกหมวดหมู่</option>
-                <!-- Categories will be loaded here -->
-              </select>
-              <button class="btn btn-primary" id="generateProductsReport">สร้างรายงาน</button>
-            </div>
 
-            <div class="report-summary">
-              <div class="summary-item">
-                <div class="summary-label">สินค้าขายดี</div>
-                <div class="summary-value" id="topProduct">-</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">จำนวนที่ขายได้</div>
-                <div class="summary-value" id="totalQuantity">0</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">รายได้รวม</div>
-                <div class="summary-value" id="totalRevenue">฿0.00</div>
-              </div>
-            </div>
+          <div class="table-container">
+            <table class="data-table report-table" id="purchaseOrdersTable">
+              <thead>
+                <tr>
+                  <th>เลขที่</th>
+                  <th>วันที่</th>
+                  <th>ผู้ขาย</th>
+                  <th class="text-right">ยอดรวม</th>
+                  <th>วิธีจ่าย</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="purchaseOrdersBody">
+                <tr><td colspan="6" class="report-empty-cell">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
-            <div class="chart-container" id="productsChart">
-              <!-- Products chart will be rendered here -->
+      <section class="card report-card" id="saleLotsCard">
+        <div class="card-header report-card-header">
+          <h2 class="card-title">รายงานขาย Lot</h2>
+          <div class="report-card-actions">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="saleLots" title="ส่งออกข้อมูลขาย Lot">
+              <i class="icon-download"></i>
+            </button>
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="saleLots" title="พิมพ์ข้อมูลขาย Lot">
+              <i class="icon-print"></i>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="report-kpi-grid report-kpi-grid-compact">
+            <div class="report-kpi">
+              <div class="report-kpi-label">จำนวน Lot</div>
+              <div class="report-kpi-value" id="saleLotsCount">0</div>
+              <div class="report-kpi-sub" id="saleLotsScope">-</div>
             </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">รายรับจริง</div>
+              <div class="report-kpi-value report-kpi-income" id="saleLotsRevenue">฿0.00</div>
+              <div class="report-kpi-sub" id="saleLotsAverage">เฉลี่ย ฿0.00</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">กำไรสุทธิ</div>
+              <div class="report-kpi-value" id="saleLotsProfit">฿0.00</div>
+              <div class="report-kpi-sub" id="saleLotsCost">ต้นทุน ฿0.00</div>
+            </div>
+          </div>
 
+          <div class="table-container">
+            <table class="data-table report-table" id="saleLotsTable">
+              <thead>
+                <tr>
+                  <th>เลขที่</th>
+                  <th>วันที่</th>
+                  <th>ผู้ซื้อ</th>
+                  <th class="text-right">ยอดขาย</th>
+                  <th class="text-right">รายรับจริง</th>
+                  <th class="text-right">ต้นทุน</th>
+                  <th class="text-right">กำไร</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="saleLotsBody">
+                <tr><td colspan="8" class="report-empty-cell">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="card report-card" id="inventoryCard">
+        <div class="card-header report-card-header">
+          <h2 class="card-title">สถานะสินค้าคงคลัง</h2>
+          <div class="report-card-actions">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="inventory" title="ส่งออกข้อมูลคลัง">
+              <i class="icon-download"></i>
+            </button>
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="inventory" title="พิมพ์ข้อมูลคลัง">
+              <i class="icon-print"></i>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="report-kpi-grid report-kpi-grid-compact">
+            <div class="report-kpi">
+              <div class="report-kpi-label">หมวดหมู่</div>
+              <div class="report-kpi-value" id="inventoryCategoriesCount">0</div>
+              <div class="report-kpi-sub" id="inventoryStockSummary">-</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">สต็อกรวม</div>
+              <div class="report-kpi-value" id="inventoryTotalKg">0.000</div>
+              <div class="report-kpi-sub">กก.</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">ใกล้หมด</div>
+              <div class="report-kpi-value report-kpi-expense" id="inventoryLowCount">0</div>
+              <div class="report-kpi-sub">รายการที่ต้องเช็ก</div>
+            </div>
+          </div>
+
+          <div class="report-subsection">
+            <div class="report-subsection-title">สต็อกตามหมวด</div>
             <div class="table-container">
-              <table class="data-table" id="productsReportTable">
+              <table class="data-table report-table" id="inventoryCategoriesTable">
                 <thead>
                   <tr>
-                    <th>รหัสสินค้า</th>
-                    <th>สินค้า</th>
                     <th>หมวดหมู่</th>
-                    <th>จำนวนที่ขาย</th>
-                    <th>รายได้</th>
-                    <th>ออเดอร์</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Product sales data will be loaded here -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Inventory Report -->
-      <div class="report-section" id="inventoryReport" style="display: none;">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">สถานะสินค้าคงคลัง</h2>
-          </div>
-          <div class="card-body">
-            <div class="filters">
-              <select id="inventoryCategory" class="form-control">
-                <option value="">ทุกหมวดหมู่</option>
-                <!-- Categories will be loaded here -->
-              </select>
-              <select id="inventoryStatus" class="form-control">
-                <option value="all">ทุกสถานะ</option>
-                <option value="low">สินค้าใกล้หมด</option>
-                <option value="out">หมดสต็อก</option>
-              </select>
-              <button class="btn btn-primary" id="generateInventoryReport">สร้างรายงาน</button>
-            </div>
-
-            <div class="report-summary">
-              <div class="summary-item">
-                <div class="summary-label">สินค้าทั้งหมด</div>
-                <div class="summary-value" id="totalProducts">0</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">จำนวนรวม</div>
-                <div class="summary-value" id="inventoryQuantity">0</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">มูลค่าสินค้าคงคลัง</div>
-                <div class="summary-value" id="inventoryValue">฿0.00</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">สินค้าใกล้หมด</div>
-                <div class="summary-value" id="lowStockCount">0</div>
-              </div>
-            </div>
-
-            <div class="chart-container" id="inventoryChart">
-              <!-- Inventory chart will be rendered here -->
-            </div>
-
-            <div class="table-container">
-              <table class="data-table" id="inventoryReportTable">
-                <thead>
-                  <tr>
-                    <th>รหัสสินค้า</th>
-                    <th>สินค้า</th>
-                    <th>หมวดหมู่</th>
-                    <th>จำนวน</th>
-                    <th>เกณฑ์สต็อกขั้นต่ำ</th>
-                    <th>ราคาทุนต่อหน่วย</th>
-                    <th>มูลค่า</th>
+                    <th class="text-right">สต็อก (กก.)</th>
+                    <th class="text-right">เกณฑ์แจ้งเตือน</th>
                     <th>สถานะ</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <!-- Inventory data will be loaded here -->
+                <tbody id="inventoryCategoriesBody">
+                  <tr><td colspan="4" class="report-empty-cell">กำลังโหลด...</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Cashier Report -->
-      <div class="report-section" id="cashierReport" style="display: none;">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">ประสิทธิภาพพนักงาน</h2>
-          </div>
-          <div class="card-body">
-            <div class="filters">
-              <div class="date-range">
-                <div class="form-group">
-                  <label for="cashierDateFrom">จากวันที่</label>
-                  <input type="date" id="cashierDateFrom" class="form-control">
-                </div>
-                <div class="form-group">
-                  <label for="cashierDateTo">ถึงวันที่</label>
-                  <input type="date" id="cashierDateTo" class="form-control">
-                </div>
-              </div>
-              <select id="cashierUser" class="form-control">
-                <option value="">พนักงานทั้งหมด</option>
-                <!-- Cashiers will be loaded here -->
-              </select>
-              <button class="btn btn-primary" id="generateCashierReport">สร้างรายงาน</button>
-            </div>
-
-            <div class="chart-container" id="cashierChart">
-              <!-- Cashier chart will be rendered here -->
-            </div>
-
+          <div class="report-subsection">
+            <div class="report-subsection-title">รายการแจ้งเตือน</div>
             <div class="table-container">
-              <table class="data-table" id="cashierReportTable">
+              <table class="data-table report-table" id="inventoryAlertsTable">
                 <thead>
                   <tr>
-                    <th>พนักงานขาย</th>
-                    <th>ออเดอร์</th>
-                    <th>สินค้าที่ขาย</th>
-                    <th>ยอดขายรวม</th>
-                    <th>มูลค่าออเดอร์เฉลี่ย</th>
-                    <th>ออเดอร์ที่ยกเลิก</th>
+                    <th>รายการ</th>
+                    <th>หมวด</th>
+                    <th class="text-right">สต็อก (กก.)</th>
+                    <th class="text-right">เกณฑ์</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <!-- Cashier performance data will be loaded here -->
+                <tbody id="inventoryAlertsBody">
+                  <tr><td colspan="4" class="report-empty-cell">กำลังโหลด...</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Purchase Report -->
-      <div class="report-section" id="purchaseReport" style="display: none;">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">รายงานการรับซื้อ</h2>
-          </div>
-          <div class="card-body">
-            <div class="filters">
-              <div class="date-range">
-                <div class="form-group">
-                  <label for="purchaseDateFrom">จากวันที่</label>
-                  <input type="date" id="purchaseDateFrom" class="form-control">
-                </div>
-                <div class="form-group">
-                  <label for="purchaseDateTo">ถึงวันที่</label>
-                  <input type="date" id="purchaseDateTo" class="form-control">
-                </div>
-              </div>
-              <select id="purchaseGroupBy" class="form-control">
-                <option value="day">รายวัน</option>
-                <option value="month">รายเดือน</option>
-                <option value="year">รายปี</option>
-              </select>
-              <button class="btn btn-primary" id="generatePurchaseReport">สร้างรายงาน</button>
-            </div>
-
-            <div class="report-summary">
-              <div class="summary-item">
-                <div class="summary-label">ออเดอร์ทั้งหมด</div>
-                <div class="summary-value" id="purchaseTotalOrders">0</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">ยอดรับซื้อรวม</div>
-                <div class="summary-value" id="purchaseTotalAmount">฿0.00</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">เฉลี่ย/ออเดอร์</div>
-                <div class="summary-value" id="purchaseAvgAmount">฿0.00</div>
-              </div>
-            </div>
-
-            <div class="chart-container" id="purchaseReportChart">
-              <!-- Purchase chart will be rendered here -->
-            </div>
-
-            <div class="table-container">
-              <table class="data-table" id="purchaseReportTable">
-                <thead>
-                  <tr>
-                    <th>รอบระยะเวลา</th>
-                    <th>ออเดอร์</th>
-                    <th>ยอดรับซื้อ</th>
-                    <th>เฉลี่ย/ออเดอร์</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Purchase report data will be loaded here -->
-                </tbody>
-              </table>
-            </div>
+      <section class="card report-card" id="employeesCard">
+        <div class="card-header report-card-header">
+          <h2 class="card-title">ประสิทธิภาพพนักงาน</h2>
+          <div class="report-card-actions">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="employees" title="ส่งออกข้อมูลพนักงาน">
+              <i class="icon-download"></i>
+            </button>
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="employees" title="พิมพ์ข้อมูลพนักงาน">
+              <i class="icon-print"></i>
+            </button>
           </div>
         </div>
-      </div>
-
-      <!-- Sale Lot Report -->
-      <div class="report-section" id="salelotReport" style="display: none;">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">รายงานการขาย Lot</h2>
+        <div class="card-body">
+          <div class="report-kpi-grid report-kpi-grid-compact">
+            <div class="report-kpi">
+              <div class="report-kpi-label">พนักงานทั้งหมด</div>
+              <div class="report-kpi-value" id="employeesTotal">0</div>
+              <div class="report-kpi-sub" id="employeesScope">-</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">กำลังทำงาน</div>
+              <div class="report-kpi-value report-kpi-income" id="employeesActive">0</div>
+              <div class="report-kpi-sub">สถานะ active</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">ออกแล้ว</div>
+              <div class="report-kpi-value report-kpi-expense" id="employeesInactive">0</div>
+              <div class="report-kpi-sub">สถานะ inactive</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">เงินเดือนรวม</div>
+              <div class="report-kpi-value" id="employeesSalaryTotal">฿0.00</div>
+              <div class="report-kpi-sub">เฉพาะฐานเงินเดือน</div>
+            </div>
           </div>
-          <div class="card-body">
-            <div class="filters">
-              <div class="date-range">
-                <div class="form-group">
-                  <label for="salelotDateFrom">จากวันที่</label>
-                  <input type="date" id="salelotDateFrom" class="form-control">
-                </div>
-                <div class="form-group">
-                  <label for="salelotDateTo">ถึงวันที่</label>
-                  <input type="date" id="salelotDateTo" class="form-control">
-                </div>
-              </div>
-              <select id="salelotGroupBy" class="form-control">
-                <option value="day">รายวัน</option>
-                <option value="month">รายเดือน</option>
-                <option value="year">รายปี</option>
-              </select>
-              <button class="btn btn-primary" id="generateSalelotReport">สร้างรายงาน</button>
-            </div>
 
-            <div class="report-summary">
-              <div class="summary-item">
-                <div class="summary-label">Lot ทั้งหมด</div>
-                <div class="summary-value" id="salelotTotalLots">0</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">ยอดขายรวม</div>
-                <div class="summary-value" id="salelotTotalAmount">฿0.00</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">ต้นทุนรวม</div>
-                <div class="summary-value" id="salelotTotalCost">฿0.00</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">กำไรขั้นต้น</div>
-                <div class="summary-value" id="salelotTotalProfit">฿0.00</div>
-              </div>
-            </div>
-
-            <div class="chart-container" id="salelotReportChart">
-              <!-- Sale lot chart will be rendered here -->
-            </div>
-
-            <div class="table-container">
-              <table class="data-table" id="salelotReportTable">
-                <thead>
-                  <tr>
-                    <th>รอบระยะเวลา</th>
-                    <th>จำนวน Lot</th>
-                    <th>ยอดขาย</th>
-                    <th>ต้นทุน</th>
-                    <th>กำไรขั้นต้น</th>
-                    <th>อัตรากำไร</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Sale lot report data will be loaded here -->
-                </tbody>
-              </table>
-            </div>
+          <div class="table-container">
+            <table class="data-table report-table" id="employeesTable">
+              <thead>
+                <tr>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>ตำแหน่ง</th>
+                  <th>เบอร์โทร</th>
+                  <th class="text-right">เงินเดือน</th>
+                  <th class="text-right">ค่าแรงรายวัน</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="employeesBody">
+                <tr><td colspan="6" class="report-empty-cell">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Tax Report -->
-      <div class="report-section" id="taxReport" style="display: none;">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">รายงานภาษี</h2>
-          </div>
-          <div class="card-body">
-            <div class="filters">
-              <div class="date-range">
-                <div class="form-group">
-                  <label for="taxDateFrom">จากวันที่</label>
-                  <input type="date" id="taxDateFrom" class="form-control">
-                </div>
-                <div class="form-group">
-                  <label for="taxDateTo">ถึงวันที่</label>
-                  <input type="date" id="taxDateTo" class="form-control">
-                </div>
-              </div>
-              <select id="taxPeriod" class="form-control">
-                <option value="daily">รายวัน</option>
-                <option value="monthly">รายเดือน</option>
-                <option value="quarterly">รายไตรมาส</option>
-              </select>
-              <button class="btn btn-primary" id="generateTaxReport">สร้างรายงาน</button>
-            </div>
-
-            <div class="report-summary">
-              <div class="summary-item">
-                <div class="summary-label">ยอดขายรวม</div>
-                <div class="summary-value" id="taxableSales">฿0.00</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">ภาษีรวม</div>
-                <div class="summary-value" id="taxCollected">฿0.00</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">อัตราภาษีเฉลี่ย</div>
-                <div class="summary-value" id="taxRate">0%</div>
-              </div>
-            </div>
-
-            <div class="table-container">
-              <table class="data-table" id="taxReportTable">
-                <thead>
-                  <tr>
-                    <th>รอบระยะเวลา</th>
-                    <th>ยอดขายที่ต้องเสียภาษี</th>
-                    <th>ภาษีที่เก็บ</th>
-                    <th>รวม</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Tax data will be loaded here -->
-                </tbody>
-              </table>
-            </div>
+      <section class="card report-card" id="taxCard">
+        <div class="card-header report-card-header">
+          <h2 class="card-title">รายงานภาษี</h2>
+          <div class="report-card-actions">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="tax" title="ส่งออกรายงานภาษี">
+              <i class="icon-download"></i>
+            </button>
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="tax" title="พิมพ์รายงานภาษี">
+              <i class="icon-print"></i>
+            </button>
           </div>
         </div>
-      </div>
+        <div class="card-body">
+          <div class="filters report-filters">
+            <div class="date-range">
+              <div class="form-group">
+                <label for="taxDateFrom">จากวันที่</label>
+                <input type="date" id="taxDateFrom" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="taxDateTo">ถึงวันที่</label>
+                <input type="date" id="taxDateTo" class="form-control">
+              </div>
+            </div>
+            <select id="taxPeriod" class="form-control">
+              <option value="daily">รายวัน</option>
+              <option value="monthly">รายเดือน</option>
+              <option value="quarterly">รายไตรมาส</option>
+            </select>
+            <button class="btn btn-primary" id="generateTaxReport" type="button">สร้างรายงาน</button>
+          </div>
+
+          <div class="report-kpi-grid report-kpi-grid-compact">
+            <div class="report-kpi">
+              <div class="report-kpi-label">ยอดขายที่ต้องเสียภาษี</div>
+              <div class="report-kpi-value report-kpi-income" id="taxableSales">฿0.00</div>
+              <div class="report-kpi-sub">ฐานภาษีรวม</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">ภาษีรวม</div>
+              <div class="report-kpi-value report-kpi-expense" id="taxCollected">฿0.00</div>
+              <div class="report-kpi-sub">ยอดภาษีที่เก็บ</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">อัตราภาษีเฉลี่ย</div>
+              <div class="report-kpi-value" id="taxRate">0%</div>
+              <div class="report-kpi-sub">จากข้อมูลที่เลือก</div>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table report-table" id="taxReportTable">
+              <thead>
+                <tr>
+                  <th>รอบระยะเวลา</th>
+                  <th class="text-right">ยอดขายที่ต้องเสียภาษี</th>
+                  <th class="text-right">ภาษีที่เก็บ</th>
+                  <th class="text-right">รวม</th>
+                </tr>
+              </thead>
+              <tbody id="taxReportBody">
+                <tr><td colspan="4" class="report-empty-cell">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
   <div id="notification-container"></div>
 
-  <script src="../assets/js/vendor/chart.umd.min.js"></script>
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
   <script src="../assets/js/reports.js"></script>
-<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
+  <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 </body>
-
 </html>

@@ -467,7 +467,8 @@ class ReportService
             'filters' => [
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
-                'group_by' => $groupBy
+                'group_by' => $groupBy,
+                'branch_id' => $branchId
             ]
         ];
     }
@@ -680,29 +681,38 @@ class ReportService
      */
     public function getCashierPerformanceReport($dateFrom, $dateTo, $userId = null, $branchId = null)
     {
-        $conditions = ["DATE(s.created_at) BETWEEN ? AND ?"];
-        $params = [$dateFrom, $dateTo];
-
-        if ($userId) {
-            $conditions[] = "u.id = ?";
-            $params[] = $userId;
-        }
-
-        $whereClause = !empty($conditions) ? " WHERE ".implode(' AND ', $conditions) : "";
-
         $branchFilterS2 = $branchId ? 'AND s2.branch_id = ?' : '';
         $branchFilterDirect = $branchId ? 'AND branch_id = ?' : '';
         $branchFilterJoin = $branchId ? 'AND s.branch_id = ?' : '';
 
-        // Build params: 3 date pairs, each optionally followed by branchId
-        $subqueryParams = [];
-        foreach (range(1, 3) as $i) {
-            $subqueryParams[] = $dateFrom;
-            $subqueryParams[] = $dateTo;
-            if ($branchId) {
-                $subqueryParams[] = $branchId;
-            }
+        $queryParams = [];
+
+        // items_sold subquery
+        $queryParams[] = $dateFrom;
+        $queryParams[] = $dateTo;
+        if ($branchId) {
+            $queryParams[] = $branchId;
         }
+
+        // cancelled_orders subquery
+        $queryParams[] = $dateFrom;
+        $queryParams[] = $dateTo;
+        if ($branchId) {
+            $queryParams[] = $branchId;
+        }
+
+        // main sales join
+        $queryParams[] = $dateFrom;
+        $queryParams[] = $dateTo;
+        if ($branchId) {
+            $queryParams[] = $branchId;
+        }
+
+        if ($userId) {
+            $queryParams[] = $userId;
+        }
+
+        $userFilter = $userId ? 'AND u.id = ?' : '';
 
         $cashiers = $this->db->fetchAll(
             "SELECT
@@ -714,18 +724,21 @@ class ReportService
         AND DATE(s2.created_at) BETWEEN ? AND ?
         AND s2.payment_status != 'voided'
         $branchFilterS2) as items_sold,
-        SUM(CASE WHEN s.payment_status != 'voided' THEN s.grand_total ELSE 0 END) as total_sales,
+        COALESCE(SUM(s.grand_total), 0) as total_sales,
         (SELECT COUNT(*) FROM sales
         WHERE user_id = u.id
         AND payment_status = 'voided'
         AND DATE(created_at) BETWEEN ? AND ?
         $branchFilterDirect) as cancelled_orders
     FROM users u
-    LEFT JOIN sales s ON u.id = s.user_id AND DATE(s.created_at) BETWEEN ? AND ? $branchFilterJoin
+    LEFT JOIN sales s ON u.id = s.user_id AND DATE(s.created_at) BETWEEN ? AND ?
+        AND s.payment_status != 'voided'
+        $branchFilterJoin
     WHERE u.role IN ('admin', 'manager', 'cashier')
+        $userFilter
     GROUP BY u.id, u.username, u.full_name
     ORDER BY total_sales DESC",
-            array_merge($subqueryParams, $params)
+            $queryParams
         );
 
         // Ensure proper data types
@@ -741,7 +754,8 @@ class ReportService
             'filters' => [
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
-                'user_id' => $userId
+                'user_id' => $userId,
+                'branch_id' => $branchId
             ]
         ];
     }
@@ -829,7 +843,8 @@ class ReportService
             'filters' => [
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
-                'group_by' => $groupBy
+                'group_by' => $groupBy,
+                'branch_id' => $branchId
             ]
         ];
     }
@@ -899,7 +914,8 @@ class ReportService
             'filters' => [
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
-                'group_by' => $groupBy
+                'group_by' => $groupBy,
+                'branch_id' => $branchId
             ]
         ];
     }
@@ -1063,20 +1079,21 @@ class ReportService
         $branchFilter
     GROUP BY {$groupFormat}
     ORDER BY MIN(created_at) ASC",
-            $params
+    $params
         );
 
         // Calculate totals
         $totalTaxableSales = 0;
         $totalTaxCollected = 0;
 
-        foreach ($taxData as &$period) {
-            $period['taxable_sales'] = floatval($period['taxable_sales']);
-            $period['tax_collected'] = floatval($period['tax_collected']);
+        foreach ($taxData as &$periodRow) {
+            $periodRow['taxable_sales'] = floatval($periodRow['taxable_sales']);
+            $periodRow['tax_collected'] = floatval($periodRow['tax_collected']);
 
-            $totalTaxableSales += $period['taxable_sales'];
-            $totalTaxCollected += $period['tax_collected'];
+            $totalTaxableSales += $periodRow['taxable_sales'];
+            $totalTaxCollected += $periodRow['tax_collected'];
         }
+        unset($periodRow);
 
         return [
             'periods' => $taxData,
@@ -1087,7 +1104,8 @@ class ReportService
             'filters' => [
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
-                'period' => $period
+                'period' => $period,
+                'branch_id' => $branchId
             ]
         ];
     }
