@@ -1,17 +1,55 @@
 <?php
 class AuthController extends Controller
 {
+    private const DEFAULT_LOGIN_MAX_ATTEMPTS = 0;
+    private const DEFAULT_LOGIN_LOCKOUT_SECONDS = 120;
+
+    private function getLoginMaxAttempts()
+    {
+        $configured = getenv('LOGIN_MAX_ATTEMPTS');
+        if ($configured === false || $configured === '') {
+            return self::DEFAULT_LOGIN_MAX_ATTEMPTS;
+        }
+
+        $value = intval($configured);
+        if ($value <= 0) {
+            return 0;
+        }
+
+        return max(3, min(100, $value));
+    }
+
+    private function getLoginLockoutSeconds()
+    {
+        $value = intval(getenv('LOGIN_LOCKOUT_SECONDS') ?: self::DEFAULT_LOGIN_LOCKOUT_SECONDS);
+        return max(30, min(3600, $value));
+    }
+
+    private function formatRetryAfter($seconds)
+    {
+        if ($seconds < 60) {
+            return "{$seconds} วินาที";
+        }
+
+        return ceil($seconds / 60) . ' นาที';
+    }
+
     private function checkRateLimit()
     {
         $ip = ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown';
         $db = Database::getInstance();
         $row = $db->fetch("SELECT attempts, window_start FROM login_attempts WHERE ip = ?", [$ip]);
+        $maxAttempts = $this->getLoginMaxAttempts();
+        if ($maxAttempts <= 0) {
+            return;
+        }
 
         if ($row) {
             $windowAge = time() - strtotime($row['window_start']);
-            if ($windowAge < 900 && $row['attempts'] >= 5) {
-                $retryAfter = ceil((900 - $windowAge) / 60);
-                Response::error("Too many login attempts. Try again in {$retryAfter} minutes.", 429);
+            $lockoutSeconds = $this->getLoginLockoutSeconds();
+            if ($windowAge < $lockoutSeconds && $row['attempts'] >= $maxAttempts) {
+                $retryAfter = $this->formatRetryAfter($lockoutSeconds - $windowAge);
+                Response::error("ลองเข้าสู่ระบบผิดหลายครั้ง กรุณารอ {$retryAfter}", 429);
                 exit;
             }
         }
@@ -19,13 +57,18 @@ class AuthController extends Controller
 
     private function recordFailedAttempt()
     {
+        if ($this->getLoginMaxAttempts() <= 0) {
+            return;
+        }
+
         $ip = ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown';
         $db = Database::getInstance();
+        $lockoutSeconds = $this->getLoginLockoutSeconds();
         $db->query(
             "INSERT INTO login_attempts (ip, attempts, window_start) VALUES (?, 1, NOW())
              ON DUPLICATE KEY UPDATE
-               attempts = IF(window_start < NOW() - INTERVAL 15 MINUTE, 1, attempts + 1),
-               window_start = IF(window_start < NOW() - INTERVAL 15 MINUTE, NOW(), window_start)",
+               attempts = IF(window_start < NOW() - INTERVAL {$lockoutSeconds} SECOND, 1, attempts + 1),
+               window_start = IF(window_start < NOW() - INTERVAL {$lockoutSeconds} SECOND, NOW(), window_start)",
             [$ip]
         );
     }
