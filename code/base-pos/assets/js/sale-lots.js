@@ -137,7 +137,6 @@ function renderLots() {
           ` : ''}
           ${lot.status === 'confirmed' ? `
             <button class="btn btn-sm btn-primary" onclick="openRevenueModal(${lot.id}, '${escapeHtml(lot.reference_no || '')}', ${lot.actual_revenue || 'null'})" title="บันทึกรายรับจากบิลโรงงาน">💰</button>
-            <button class="btn btn-sm btn-secondary" onclick="openModal(${lot.id})" title="แก้ไข Lot (ต้องสร้างใหม่)">✎</button>
             <button class="btn btn-sm btn-danger" onclick="cancelLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" title="ยกเลิก Lot → คืนสต็อก">✕</button>
           ` : ''}
           ${lot.status === 'cancelled' ? `
@@ -327,7 +326,8 @@ function calcExpensesTotal() {
 }
 
 function resetForm() {
-  document.getElementById('modalTitle').textContent = 'สร้าง Lot ใหม่';
+  document.getElementById('modalTitle').textContent = 'สร้าง Lot แบบร่าง';
+  document.getElementById('saveLotBtn').textContent = 'บันทึก (แบบร่าง)';
   document.getElementById('buyerName').value = '';
   document.getElementById('saleDate').value = new Date().toISOString().slice(0, 10);
   document.getElementById('branchSelect').value = '';
@@ -352,7 +352,7 @@ async function openModal(id) {
     document.getElementById('saveLotBtn').disabled = true;
 
     const res = await apiRequest(`sale-lots/sale-lot?id=${id}`);
-    document.getElementById('saveLotBtn').textContent = 'บันทึก Lot ขาย';
+    document.getElementById('saveLotBtn').textContent = 'บันทึก (แบบร่าง)';
     document.getElementById('saveLotBtn').disabled = false;
 
     if (res.status !== 'success') {

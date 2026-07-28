@@ -100,6 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
     switch (role) {
       case 'admin':
       case 'manager':
+      case 'super_manager':
         window.location.href = `${basePath}/admin/index.html`;
         break;
       case 'cashier':

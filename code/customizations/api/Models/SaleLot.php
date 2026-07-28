@@ -103,7 +103,7 @@ class SaleLot extends Model
         return $lot;
     }
 
-    // สร้าง Sale Lot ใหม่พร้อมรายการสินค้า คำนวณ FIFO cost และบันทึก
+    // สร้าง Sale Lot ใหม่เป็น draft เท่านั้น ยังไม่ตัดสต็อกจนกว่าจะ confirm
     public function create($data)
     {
         // ตรวจสอบฟิลด์ที่จำเป็น
@@ -123,7 +123,7 @@ class SaleLot extends Model
             $totalAmount = 0;
             $totalCost   = 0;
 
-            // คำนวณ FIFO cost และราคารวมแต่ละรายการล่วงหน้า
+            // คำนวณยอดขายและต้นทุนประมาณการสำหรับ draft โดยไม่ล็อก/ตัดสต็อก
             $preparedItems = [];
             foreach ($data['items'] as $item) {
                 $qty       = (float)($item['quantity_kg'] ?? 0);
@@ -139,8 +139,12 @@ class SaleLot extends Model
                     throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
                 }
 
-                $subtotal  = $qty * $unitPrice;
-                $itemCost = $this->calculateCost($branchId, $catId, $itemName, $qty);
+                $subtotal = $qty * $unitPrice;
+                try {
+                    $itemCost = $this->calculateProvisionalCost($branchId, $catId, $itemName, $qty);
+                } catch (Exception $e) {
+                    $itemCost = 0;
+                }
 
                 $totalAmount += $subtotal;
                 $totalCost   += $itemCost;
@@ -165,7 +169,7 @@ class SaleLot extends Model
                 'total_amount'  => $totalAmount,
                 'total_cost'    => $totalCost,
                 'transport_cost' => (float)($data['transport_cost'] ?? 0),
-                'status'        => $data['status'] ?? 'draft',
+                'status'        => 'draft',
                 'notes'         => isset($data['notes']) ? trim((string)$data['notes']) : null,
                 'expenses'      => isset($data['expenses']) ? json_encode($data['expenses']) : null,
                 'created_by'    => $data['created_by'] ?? null,
@@ -182,9 +186,6 @@ class SaleLot extends Model
                     'fifo_cost'    => $item['fifo_cost'],
                 ]);
             }
-
-            // ตัดสต็อกภายใน transaction เดียวกัน — ป้องกัน create สำเร็จแต่ deductStock ล้มเหลว
-            $this->deductStock($lotId);
 
             $this->db->commit();
             return ['id' => $lotId, 'reference_no' => $referenceNo, 'total_amount' => $totalAmount, 'total_cost' => $totalCost];
@@ -234,7 +235,7 @@ class SaleLot extends Model
 
                 $subtotal = $qty * $unitPrice;
                 try {
-                    $itemCost = $this->calculateCost($branchId, $catId, $itemName, $qty);
+                    $itemCost = $this->calculateProvisionalCost($branchId, $catId, $itemName, $qty);
                 } catch (Exception $e) {
                     $itemCost = 0;
                 }
@@ -295,91 +296,6 @@ class SaleLot extends Model
     public function updateConfirmed($id, $data)
     {
         throw new Exception('แก้ไข Lot ที่ยืนยันแล้วไม่ได้ — โปรดสร้าง Lot ใหม่');
-    }
-
-    public function updateConfirmed_old($id, $data)
-    {
-        $lot = $this->db->fetch(
-            "SELECT id, status, branch_id FROM {$this->table} WHERE id = ?",
-            [$id]
-        );
-        if (!$lot) throw new Exception('ไม่พบ Sale Lot');
-        if ($lot['status'] !== 'confirmed') throw new Exception('ใช้ได้เฉพาะ Sale Lot ที่ confirmed แล้ว');
-
-        $this->db->beginTransaction();
-        try {
-            $this->restoreStock($id);
-            $this->db->query("DELETE FROM sale_lot_items WHERE sale_lot_id = ?", [$id]);
-
-            $branchId    = intval($lot['branch_id']);
-            $totalAmount = 0;
-            $totalCost   = 0;
-            $preparedItems = [];
-
-            foreach ($data['items'] as $item) {
-                $qty       = (float)($item['quantity_kg'] ?? 0);
-                $unitPrice = (float)($item['unit_price'] ?? 0);
-                $catId     = intval($item['category_id'] ?? 0);
-                $itemName  = trim((string)($item['item_name'] ?? ''));
-                $catalogId = intval($item['catalog_id'] ?? 0) ?: null;
-
-                if ($qty <= 0 || empty($itemName)) {
-                    throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
-                }
-                if ($catId <= 0) {
-                    throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
-                }
-
-                $itemCost = $this->calculateCost($branchId, $catId, $itemName, $qty);
-                $totalAmount += $qty * $unitPrice;
-                $totalCost   += $itemCost;
-
-                $preparedItems[] = [
-                    'catalog_id'  => $catalogId,
-                    'item_name'   => $itemName,
-                    'category_id' => $catId ?: null,
-                    'quantity_kg' => $qty,
-                    'unit_price'  => $unitPrice,
-                    'fifo_cost'   => $itemCost,
-                ];
-            }
-
-            $this->db->query(
-                "UPDATE {$this->table}
-                 SET buyer_name=?, sale_date=?, total_amount=?, total_cost=?, transport_cost=?, notes=?, expenses=?, updated_by=?, updated_at=NOW()
-                 WHERE id=?",
-                [
-                    trim((string)$data['buyer_name']),
-                    $data['sale_date'],
-                    $totalAmount,
-                    $totalCost,
-                    (float)($data['transport_cost'] ?? 0),
-                    isset($data['notes']) ? trim((string)$data['notes']) : null,
-                    isset($data['expenses']) ? json_encode($data['expenses']) : null,
-                    $data['updated_by'] ?? null,
-                    $id,
-                ]
-            );
-
-            foreach ($preparedItems as $item) {
-                $this->db->insert('sale_lot_items', [
-                    'sale_lot_id' => $id,
-                    'catalog_id'  => $item['catalog_id'],
-                    'item_name'   => $item['item_name'],
-                    'category_id' => $item['category_id'],
-                    'quantity_kg' => $item['quantity_kg'],
-                    'unit_price'  => $item['unit_price'],
-                    'fifo_cost'   => $item['fifo_cost'],
-                ]);
-            }
-
-            $this->deductStock($id);
-            $this->db->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
     }
 
     // เปลี่ยนสถานะ: draft->confirmed ตัดสต็อก, confirmed->cancelled คืนสต็อก
@@ -486,6 +402,63 @@ class SaleLot extends Model
         return $this->calculateFifoCost($branch_id, $category_id, $item_name, $quantity_kg);
     }
 
+    // ต้นทุนประมาณการสำหรับ draft: อ่านอย่างเดียว ไม่ล็อกแถวและไม่บังคับให้สต็อกพอ
+    private function calculateProvisionalCost($branch_id, $category_id, $item_name, $quantity_kg)
+    {
+        $method = $this->getCostMethod($branch_id);
+        if ($method === 'weighted') {
+            $row = $this->db->fetch(
+                "SELECT
+                    COALESCE(SUM(poi.quantity - poi.consumed_qty), 0) AS total_qty,
+                    COALESCE(SUM((poi.quantity - poi.consumed_qty) * poi.unit_price), 0) AS total_value
+                 FROM purchase_order_items poi
+                 INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
+                 WHERE po.branch_id = ?
+                   AND poi.category_id = ?
+                   AND poi.item_name = ?
+                   AND po.status = 'completed'
+                   AND (poi.quantity - poi.consumed_qty) > 0",
+                [$branch_id, $category_id, $item_name]
+            );
+
+            $totalQty = (float)$row['total_qty'];
+            if ($totalQty <= 0 || $totalQty < (float)$quantity_kg) {
+                return 0;
+            }
+
+            return ((float)$row['total_value'] / $totalQty) * (float)$quantity_kg;
+        }
+
+        $rows = $this->db->fetchAll(
+            "SELECT poi.quantity,
+                    poi.unit_price,
+                    poi.consumed_qty
+             FROM purchase_order_items poi
+             INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
+             WHERE po.branch_id = ?
+               AND poi.category_id = ?
+               AND poi.item_name = ?
+               AND po.status = 'completed'
+               AND (poi.quantity - poi.consumed_qty) > 0
+             ORDER BY po.created_at ASC",
+            [$branch_id, $category_id, $item_name]
+        );
+
+        $remaining = (float)$quantity_kg;
+        $totalCost = 0.0;
+
+        foreach ($rows as $row) {
+            if ($remaining <= 0) break;
+
+            $available = (float)$row['quantity'] - (float)$row['consumed_qty'];
+            $take = min($available, $remaining);
+            $totalCost += $take * (float)$row['unit_price'];
+            $remaining -= $take;
+        }
+
+        return $remaining > 0 ? 0 : $totalCost;
+    }
+
     // คำนวณต้นทุนแบบถัวเฉลี่ย (Weighted Average)
     public function calculateWeightedAvgCost($branch_id, $category_id, $item_name, $quantity_kg)
     {
@@ -583,6 +556,20 @@ class SaleLot extends Model
 
             // ── Branch Stock: deduct per-branch per-item (ADD-001) ──
             if ($categoryId && $itemName) {
+                $availableBranchStock = (float)$this->db->fetchColumn(
+                    "SELECT stock_kg
+                     FROM branch_stock
+                     WHERE branch_id = ?
+                       AND category_id = ?
+                       AND item_name = ?
+                     FOR UPDATE",
+                    [$lot['branch_id'], $categoryId, $itemName]
+                );
+                if ($availableBranchStock < $remaining) {
+                    $short = $remaining - $availableBranchStock;
+                    throw new Exception("สต็อก {$itemName} ไม่เพียงพอ (ขาด {$short} กก.)");
+                }
+
                 $branchStock = new BranchStock();
                 $branchStock->deduct($lot['branch_id'], $categoryId, $itemName, $remaining);
             }
@@ -629,6 +616,10 @@ class SaleLot extends Model
                 }
 
                 $remaining -= $take;
+            }
+
+            if ($remaining > 0) {
+                throw new Exception("สต็อก {$itemName} ไม่เพียงพอ (ขาด {$remaining} กก.)");
             }
         }
     }

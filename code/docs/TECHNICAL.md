@@ -28,9 +28,11 @@ Relevant files:
 
 ## Sale Lots
 
-- `POST /sale-lots` creates the lot as `confirmed` immediately.
-- `PUT /sale-lots/sale-lot?id=X` updates confirmed lots by restoring stock, replacing items, then deducting stock again.
-- `POST /sale-lots/confirm?id=X` and `POST /sale-lots/cancel?id=X` are branch-scoped for non-admin users.
+- `POST /sale-lots` creates a `draft` lot only. Draft create does not mutate `branch_stock`, `categories.stock_kg`, or `purchase_order_items.consumed_qty`.
+- `PUT /sale-lots/sale-lot?id=X` updates draft lots only and does not mutate stock.
+- `POST /sale-lots/confirm?id=X` recomputes cost from current stock, changes the lot to `confirmed`, and deducts `branch_stock`, `categories.stock_kg`, and `purchase_order_items.consumed_qty` in one transaction.
+- `POST /sale-lots/cancel?id=X` works only from `confirmed`, changes the lot to `cancelled`, and restores stock once.
+- Confirm and cancel are branch-scoped for non-admin users.
 - `POST /sale-lots/record-revenue?id=X` stores `actual_revenue`, note, and date.
 - Cancel restores stock using the latest consumed purchase batches first.
 - This flow now replaces the legacy retail sales screen for walk-in customers.

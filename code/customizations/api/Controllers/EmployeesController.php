@@ -14,6 +14,34 @@ class EmployeesController extends Controller
         return null;
     }
 
+    private function resolveReadBranchId()
+    {
+        $requestedBranch = null;
+        $branchProvided = isset($_GET['branch_id']) && $_GET['branch_id'] !== '';
+
+        if ($branchProvided) {
+            if (!is_numeric($_GET['branch_id']) || intval($_GET['branch_id']) < 0) {
+                Response::error('branch_id ไม่ถูกต้อง', 400);
+            }
+            $requestedBranch = intval($_GET['branch_id']);
+            if ($requestedBranch === 0) {
+                $requestedBranch = null;
+            }
+        }
+
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return $requestedBranch;
+        }
+
+        $branchId = intval($this->user['branch_id'] ?? 0);
+        if (!$branchId) {
+            Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+        }
+
+        return $branchId;
+    }
+
     private function assertEmployeeBranchAccess($employee)
     {
         if (($this->user['role'] ?? '') !== 'admin') {
@@ -24,9 +52,22 @@ class EmployeesController extends Controller
         }
     }
 
+    private function assertEmployeeReadAccess($employee)
+    {
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return;
+        }
+
+        $userBranch = $this->getScopedBranchId();
+        if (!$employee || (int)($employee['branch_id'] ?? 0) !== (int)$userBranch) {
+            Response::error('ไม่มีสิทธิ์เข้าถึงข้อมูลพนักงานสาขานี้', 403);
+        }
+    }
+
     public function index()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
         $limit = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 20;
         $filters = [
@@ -35,9 +76,9 @@ class EmployeesController extends Controller
             'search' => isset($_GET['search']) ? $this->sanitizeInput($_GET['search']) : null,
         ];
 
-        $userBranch = $this->getScopedBranchId();
-        if ($userBranch !== null) {
-            $filters['branch_id'] = $userBranch;
+        $readBranch = $this->resolveReadBranchId();
+        if ($readBranch !== null) {
+            $filters['branch_id'] = $readBranch;
         }
 
         $model = new Employee();
@@ -47,7 +88,7 @@ class EmployeesController extends Controller
 
     public function show()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $id = isset($_GET['id']) ? intval($_GET['id']) : null;
         if (!$id) {
             Response::error('Missing employee ID', 400);
@@ -60,7 +101,7 @@ class EmployeesController extends Controller
             Response::error('Employee not found', 404);
             return;
         }
-        $this->assertEmployeeBranchAccess($employee);
+        $this->assertEmployeeReadAccess($employee);
         Response::success('Employee retrieved successfully', $employee);
     }
 
@@ -121,7 +162,7 @@ class EmployeesController extends Controller
         $this->requireAuth(['admin']);
         $id = isset($_GET['id']) ? intval($_GET['id']) : null;
         if (!$id) {
-            Response::error('Missing employee I requireAuthD', 400);
+            Response::error('Missing employee ID', 400);
             return;
         }
 

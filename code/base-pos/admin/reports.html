@@ -53,8 +53,16 @@
       <div class="page-header">
         <h1>รายงานข้อมูล</h1>
         <div class="reports-filter">
-          <label for="reportMonth">เดือนรายงาน</label>
-          <input type="month" id="reportMonth" class="form-control">
+          <div class="reports-filter-field" id="reportBranchField">
+            <label for="reportBranch">สาขา</label>
+            <select id="reportBranch" class="form-control" aria-label="เลือกสาขารายงาน">
+              <option value="">ทุกสาขา</option>
+            </select>
+          </div>
+          <div class="reports-filter-field">
+            <label for="reportMonth">เดือนรายงาน</label>
+            <input type="month" id="reportMonth" class="form-control">
+          </div>
         </div>
       </div>
 
@@ -62,10 +70,10 @@
         <div class="card-header report-card-header">
           <h2 class="card-title">รายรับรายจ่ายประจำสาขา</h2>
           <div class="report-card-actions">
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="summary" title="ส่งออกสรุป">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="summary" title="ส่งออกสรุปรายรับรายจ่าย" aria-label="ส่งออกสรุปรายรับรายจ่าย">
               <i class="icon-download"></i>
             </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="summary" title="พิมพ์สรุป">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="summary" title="พิมพ์สรุปรายรับรายจ่าย" aria-label="พิมพ์สรุปรายรับรายจ่าย">
               <i class="icon-print"></i>
             </button>
           </div>
@@ -114,10 +122,14 @@
         <div class="card-header report-card-header">
           <h2 class="card-title">รายงานการรับซื้อ</h2>
           <div class="report-card-actions">
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="purchaseOrders" title="ส่งออกข้อมูลรับซื้อ">
+            <input type="date" id="dailyExportDate" class="form-control report-daily-date" aria-label="วันที่ส่งออก Excel รายวัน">
+            <button class="btn btn-primary btn-sm report-daily-export-btn" type="button" id="btnExportDaily" title="ส่งออก Excel รายวัน" aria-label="ส่งออก Excel รายวัน">
+              <i class="icon-download"></i> Excel
+            </button>
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="purchaseOrders" title="ส่งออกข้อมูลรับซื้อ" aria-label="ส่งออกข้อมูลรับซื้อ">
               <i class="icon-download"></i>
             </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="purchaseOrders" title="พิมพ์ข้อมูลรับซื้อ">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="purchaseOrders" title="พิมพ์ข้อมูลรับซื้อ" aria-label="พิมพ์ข้อมูลรับซื้อ">
               <i class="icon-print"></i>
             </button>
           </div>
@@ -165,10 +177,10 @@
         <div class="card-header report-card-header">
           <h2 class="card-title">รายงานขาย Lot</h2>
           <div class="report-card-actions">
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="saleLots" title="ส่งออกข้อมูลขาย Lot">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="saleLots" title="ส่งออกข้อมูลขาย Lot" aria-label="ส่งออกข้อมูลขาย Lot">
               <i class="icon-download"></i>
             </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="saleLots" title="พิมพ์ข้อมูลขาย Lot">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="saleLots" title="พิมพ์ข้อมูลขาย Lot" aria-label="พิมพ์ข้อมูลขาย Lot">
               <i class="icon-print"></i>
             </button>
           </div>
@@ -218,10 +230,10 @@
         <div class="card-header report-card-header">
           <h2 class="card-title">สถานะสินค้าคงคลัง</h2>
           <div class="report-card-actions">
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="inventory" title="ส่งออกข้อมูลคลัง">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="inventory" title="ส่งออกข้อมูลคลัง" aria-label="ส่งออกข้อมูลคลัง">
               <i class="icon-download"></i>
             </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="inventory" title="พิมพ์ข้อมูลคลัง">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="inventory" title="พิมพ์ข้อมูลคลัง" aria-label="พิมพ์ข้อมูลคลัง">
               <i class="icon-print"></i>
             </button>
           </div>
@@ -231,12 +243,12 @@
             <div class="report-kpi">
               <div class="report-kpi-label">หมวดหมู่</div>
               <div class="report-kpi-value" id="inventoryCategoriesCount">0</div>
-              <div class="report-kpi-sub" id="inventoryStockSummary">-</div>
+              <div class="report-kpi-sub" id="inventoryScope">-</div>
             </div>
             <div class="report-kpi">
               <div class="report-kpi-label">สต็อกรวม</div>
               <div class="report-kpi-value" id="inventoryTotalKg">0.000</div>
-              <div class="report-kpi-sub">กก.</div>
+              <div class="report-kpi-sub" id="inventoryStockSummary">กก.</div>
             </div>
             <div class="report-kpi">
               <div class="report-kpi-label">ใกล้หมด</div>
@@ -289,10 +301,10 @@
         <div class="card-header report-card-header">
           <h2 class="card-title">ประสิทธิภาพพนักงาน</h2>
           <div class="report-card-actions">
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="employees" title="ส่งออกข้อมูลพนักงาน">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="employees" title="ส่งออกข้อมูลพนักงาน" aria-label="ส่งออกข้อมูลพนักงาน">
               <i class="icon-download"></i>
             </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="employees" title="พิมพ์ข้อมูลพนักงาน">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="employees" title="พิมพ์ข้อมูลพนักงาน" aria-label="พิมพ์ข้อมูลพนักงาน">
               <i class="icon-print"></i>
             </button>
           </div>
@@ -345,10 +357,10 @@
         <div class="card-header report-card-header">
           <h2 class="card-title">รายงานภาษี</h2>
           <div class="report-card-actions">
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="tax" title="ส่งออกรายงานภาษี">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="tax" title="ส่งออกรายงานภาษี" aria-label="ส่งออกรายงานภาษี">
               <i class="icon-download"></i>
             </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="tax" title="พิมพ์รายงานภาษี">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="tax" title="พิมพ์รายงานภาษี" aria-label="พิมพ์รายงานภาษี">
               <i class="icon-print"></i>
             </button>
           </div>
@@ -387,7 +399,7 @@
             <div class="report-kpi">
               <div class="report-kpi-label">อัตราภาษีเฉลี่ย</div>
               <div class="report-kpi-value" id="taxRate">0%</div>
-              <div class="report-kpi-sub">จากข้อมูลที่เลือก</div>
+              <div class="report-kpi-sub" id="taxScope">จากข้อมูลที่เลือก</div>
             </div>
           </div>
 

@@ -89,6 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const userJson = localStorage.getItem('posUser');
   if (userJson) {
     const user = JSON.parse(userJson);
+    applyRoleNavigation(user);
     const userNameElem = document.querySelector('.user-name');
     if (userNameElem) {
       userNameElem.textContent = user.full_name || user.username;
@@ -110,6 +111,41 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+
+function applyRoleNavigation(user) {
+  const role = user?.role || '';
+  const isAdmin = role === 'admin';
+  const isSuperManager = role === 'super_manager';
+
+  if (!isAdmin) {
+    document.querySelectorAll('.admin-only').forEach((el) => {
+      const href = el.querySelector('a')?.getAttribute('href') || '';
+      const canReadFinancial = isSuperManager && href.includes('financial-summary.html');
+      el.style.display = canReadFinancial ? '' : 'none';
+    });
+  }
+
+  if (!isSuperManager) return;
+
+  const blockedLinks = [
+    'users.html',
+    'settings.html',
+    'branches.html',
+    'employees.html',
+    'expenses.html',
+    'stock-transfers.html',
+    'price-board.html',
+  ];
+
+  document.querySelectorAll('a').forEach((link) => {
+    const href = link.getAttribute('href') || '';
+    if (blockedLinks.some((blocked) => href.includes(blocked))) {
+      const item = link.closest('li');
+      const wrapper = item || link;
+      wrapper.style.display = 'none';
+    }
+  });
+}
 
 // ตรวจสอบ auth และ return user object — redirect ถ้าไม่ได้ login
 async function requireAuth() {
@@ -392,8 +428,8 @@ function openProfileModal() {
               <input type="text" id="profileFullName" class="form-control" required>
             </div>
             <div class="form-group">
-              <label for="profileEmail">Email</label>
-              <input type="email" id="profileEmail" class="form-control" required>
+              <label for="profilePhone">เบอร์โทร</label>
+              <input type="tel" id="profilePhone" class="form-control" required>
             </div>
             <div class="form-group">
               <label for="profileRole">บทบาท</label>
@@ -431,7 +467,7 @@ function openProfileModal() {
     // กรอกข้อมูลในฟอร์ม
     document.getElementById('profileUsername').value = user.username || '';
     document.getElementById('profileFullName').value = user.full_name || '';
-    document.getElementById('profileEmail').value = user.email || '';
+    document.getElementById('profilePhone').value = user.phone || '';
     document.getElementById('profileRole').value = user.role || '';
   }
 
@@ -443,16 +479,16 @@ function openProfileModal() {
 async function saveProfileChanges() {
   try {
     const fullName = document.getElementById('profileFullName').value;
-    const email = document.getElementById('profileEmail').value;
+    const phone = document.getElementById('profilePhone').value;
 
-    if (!fullName || !email) {
+    if (!fullName || !phone) {
       showNotification('กรุณากรอกข้อมูลให้ครบ', 'error');
       return;
     }
 
     const response = await apiRequest('users/profile', 'PUT', {
       full_name: fullName,
-      email: email
+      phone: phone
     });
 
     if (response.status === 'success') {
@@ -461,7 +497,7 @@ async function saveProfileChanges() {
       if (userJson) {
         const user = JSON.parse(userJson);
         user.full_name = fullName;
-        user.email = email;
+        user.phone = phone;
         localStorage.setItem('posUser', JSON.stringify(user));
 
         // อัพเดตชื่อที่แสดงบน UI

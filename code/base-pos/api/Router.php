@@ -123,6 +123,8 @@ class Router
         $this->routes[] = ['route' => 'users/profile', 'controller' => 'UsersController', 'method' => 'getProfile', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'users/profile', 'controller' => 'UsersController', 'method' => 'updateProfile', 'verb' => 'PUT'];
         $this->routes[] = ['route' => 'users/change-own-password', 'controller' => 'UsersController', 'method' => 'changeOwnPassword', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'users/reset-password', 'controller' => 'UsersController', 'method' => 'resetPassword', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'users/view-password', 'controller' => 'UsersController', 'method' => 'resetPassword', 'verb' => 'POST'];
 
         // Settings routes
         $this->routes[] = ['route' => 'settings/store', 'controller' => 'SettingsController', 'method' => 'getStoreSettings', 'verb' => 'GET'];
@@ -172,6 +174,7 @@ class Router
         $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'upload', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'list',   'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders/photo-token', 'controller' => 'PhotoUploadController', 'method' => 'photoToken', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-orders/daily-export', 'controller' => 'PurchaseOrdersController', 'method' => 'exportDaily', 'verb' => 'POST'];
 
         // Item Conditions routes
         $this->routes[] = ['route' => 'item-conditions', 'controller' => 'ItemConditionsController', 'method' => 'getConditions', 'verb' => 'GET'];
@@ -208,12 +211,22 @@ class Router
         $this->routes[] = ['route' => 'financial/expenses',             'controller' => 'FinancialController', 'method' => 'createExpense',        'verb' => 'POST'];
         $this->routes[] = ['route' => 'financial/expenses',             'controller' => 'FinancialController', 'method' => 'deleteExpense',        'verb' => 'DELETE'];
         $this->routes[] = ['route' => 'financial/export',               'controller' => 'FinancialController', 'method' => 'exportCsv',            'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/export-excel',         'controller' => 'FinancialController', 'method' => 'exportExcel',          'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/monthly-trend',        'controller' => 'FinancialController', 'method' => 'monthlyTrend',         'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/branch-comparison',    'controller' => 'FinancialController', 'method' => 'branchComparison',     'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/top-sellers',          'controller' => 'FinancialController', 'method' => 'topSellers',           'verb' => 'GET'];
+        $this->routes[] = ['route' => 'financial/top-buyers',           'controller' => 'FinancialController', 'method' => 'topBuyers',            'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-catalog/price-board',   'controller' => 'PurchaseItemCatalogController', 'method' => 'getPriceBoard', 'verb' => 'GET'];
         // Stock Transfers
         $this->routes[] = ['route' => 'stock-transfers',         'controller' => 'StockTransfersController', 'method' => 'index',   'verb' => 'GET'];
         $this->routes[] = ['route' => 'stock-transfers',         'controller' => 'StockTransfersController', 'method' => 'store',   'verb' => 'POST'];
         $this->routes[] = ['route' => 'stock-transfers/confirm', 'controller' => 'StockTransfersController', 'method' => 'confirm', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'stock-transfers/cancel',  'controller' => 'StockTransfersController', 'method' => 'cancel',  'verb' => 'POST'];
+
+        // Print routes
+        $this->routes[] = ['route' => 'print/thermal-purchase', 'controller' => 'PrintController', 'method' => 'thermalPurchase', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'print/status',           'controller' => 'PrintController', 'method' => 'status',          'verb' => 'GET'];
+        $this->routes[] = ['route' => 'print/test',             'controller' => 'PrintController', 'method' => 'test',            'verb' => 'GET'];
 
         // Employee routes
         $this->routes[] = ['route' => 'employees',                   'controller' => 'EmployeesController', 'method' => 'index',               'verb' => 'GET'];

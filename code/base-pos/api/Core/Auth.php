@@ -20,7 +20,7 @@ class Auth
         $db = Database::getInstance();
 
         $user = $db->fetch(
-            "SELECT id, username, password, full_name, email, role, status, branch_id FROM users WHERE username = ?",
+            "SELECT id, username, password, full_name, phone, role, status, branch_id FROM users WHERE username = ?",
             [$username]
         );
 

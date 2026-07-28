@@ -1018,10 +1018,41 @@ window.showReceipt = async function(id) {
     btnPrint.onclick = () => window.open(`print-receipt.html?id=${id}&auto=1`, '_blank');
   }
 
-  // Thermal print button handler
+  // Thermal print button handler — ส่งตรงไปยังเครื่องพิมพ์ผ่าน Print Server API
   const btnThermal = document.getElementById('btnOpenPrintThermal');
   if (btnThermal) {
-    btnThermal.onclick = () => window.open(`print-receipt-thermal.html?id=${id}&auto=1`, '_blank');
+    btnThermal.onclick = async () => {
+      btnThermal.disabled = true;
+      btnThermal.textContent = '⏳ กำลังพิมพ์...';
+      try {
+        const res = await fetch(`${window.apiPath}/print/thermal-purchase`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          btnThermal.textContent = '✅ พิมพ์สำเร็จ';
+          setTimeout(() => {
+            btnThermal.innerHTML = '<i class="icon-print"></i> พิมพ์ความร้อน';
+            btnThermal.disabled = false;
+          }, 2000);
+        } else {
+          btnThermal.textContent = '❌ ' + (data.message || 'พิมพ์ไม่สำเร็จ');
+          btnThermal.disabled = false;
+          setTimeout(() => {
+            btnThermal.innerHTML = '<i class="icon-print"></i> พิมพ์ความร้อน';
+          }, 3000);
+        }
+      } catch (e) {
+        btnThermal.textContent = '❌ ไม่สามารถเชื่อมต่อ';
+        btnThermal.disabled = false;
+        setTimeout(() => {
+          btnThermal.innerHTML = '<i class="icon-print"></i> พิมพ์ความร้อน';
+        }, 3000);
+      }
+    };
   }
 
   // WF-01: สร้าง QR code หลังเปิด modal

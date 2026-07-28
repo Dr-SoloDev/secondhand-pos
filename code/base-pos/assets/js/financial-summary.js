@@ -1,11 +1,12 @@
-// financial-summary.js — สรุปธุรกิจ (admin only)
+// financial-summary.js — สรุปธุรกิจ
 
 let branches = [];
 
 async function init() {
   const user = await requireAuth();
   if (!user) return;
-  document.getElementById('userName').textContent = user.username || '-';
+  const userNameEl = document.getElementById('userName') || document.getElementById('currentUser');
+  if (userNameEl) userNameEl.textContent = user.username || '-';
 
   if (user.role !== 'admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
@@ -16,7 +17,20 @@ async function init() {
     if (res.status === 'success') {
       branches = res.data?.items || res.data || [];
       const sel = document.getElementById('branchFilter');
-      branches.forEach(b => sel.appendChild(new Option(b.name, b.id)));
+      const canViewAllBranches = ['admin', 'super_manager'].includes(user.role);
+      const visibleBranches = canViewAllBranches
+        ? branches
+        : branches.filter(b => String(b.id) === String(user.branch_id));
+
+      if (!canViewAllBranches) {
+        sel.innerHTML = '';
+        sel.disabled = true;
+      }
+
+      visibleBranches.forEach(b => sel.appendChild(new Option(b.name, b.id)));
+      if (!canViewAllBranches && user.branch_id) {
+        sel.value = String(user.branch_id);
+      }
     }
   } catch (e) {
     showNotification('โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่', 'error');
@@ -166,3 +180,262 @@ document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
   localStorage.removeItem('posUser');
   window.location.href = '../index.html';
 });
+
+// === Chart Instances ===
+let trendChart = null;
+let profitChart = null;
+let branchChart = null;
+
+// === Monthly Trend Chart ===
+function drawTrendChart(data) {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if (trendChart) trendChart.destroy();
+
+  const months = data.map(d => d.month_th);
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: 'รายรับขาย Lot',
+          data: data.map(d => d.revenue),
+          borderColor: '#059669',
+          backgroundColor: 'rgba(5,150,105,0.1)',
+          fill: true,
+          tension: 0.3,
+        },
+        {
+          label: 'รายจ่ายรับซื้อ',
+          data: data.map(d => d.purchase),
+          borderColor: '#dc2626',
+          backgroundColor: 'rgba(220,38,38,0.1)',
+          fill: true,
+          tension: 0.3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => '฿' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v.toLocaleString()) } },
+      },
+    },
+  });
+}
+
+// === Profit Chart ===
+function drawProfitChart(data) {
+  const ctx = document.getElementById('profitChart').getContext('2d');
+  if (profitChart) profitChart.destroy();
+
+  const months = data.map(d => d.month_th);
+  const profits = data.map(d => d.profit);
+  const colors = profits.map(v => v >= 0 ? '#059669' : '#dc2626');
+
+  profitChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [{
+        label: 'กำไร (บาท)',
+        data: profits,
+        backgroundColor: colors,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => '฿' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v.toLocaleString()) } },
+      },
+    },
+  });
+}
+
+// === Branch Comparison Chart ===
+function drawBranchChart(data) {
+  const ctx = document.getElementById('branchChart').getContext('2d');
+  if (branchChart) branchChart.destroy();
+
+  const names = data.map(d => d.branch_name);
+  branchChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: names,
+      datasets: [
+        {
+          label: 'รายรับ',
+          data: data.map(d => d.revenue),
+          backgroundColor: '#059669',
+          borderRadius: 4,
+        },
+        {
+          label: 'รายจ่าย',
+          data: data.map(d => d.purchase),
+          backgroundColor: '#dc2626',
+          borderRadius: 4,
+        },
+        {
+          label: 'กำไร',
+          data: data.map(d => d.profit),
+          backgroundColor: '#d97706',
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: { ticks: { callback: v => '฿' + (v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v.toLocaleString()) } },
+      },
+    },
+  });
+}
+
+// === Top Sellers ===
+async function loadTopSellers() {
+  try {
+    const params = buildPeriodParams();
+    const res = await apiRequest(`financial/top-sellers?${params}`, 'GET');
+    if (res.status === 'success') renderTopSellers(res.data?.items || []);
+  } catch (e) {
+    console.error('Top sellers load failed:', e);
+  }
+}
+
+function renderTopSellers(items) {
+  const tbody = document.getElementById('topSellersBody');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888">ไม่มีข้อมูล</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map((item, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${escapeHtml(item.seller_name || '-')}</td>
+    <td>${item.bill_count || 0}</td>
+    <td class="text-right" style="color:var(--color-danger)">${formatCurrency(parseFloat(item.total_amount || 0))}</td>
+  </tr>`).join('');
+}
+
+// === Top Buyers ===
+async function loadTopBuyers() {
+  try {
+    const params = buildPeriodParams();
+    const res = await apiRequest(`financial/top-buyers?${params}`, 'GET');
+    if (res.status === 'success') renderTopBuyers(res.data?.items || []);
+  } catch (e) {
+    console.error('Top buyers load failed:', e);
+  }
+}
+
+function renderTopBuyers(items) {
+  const tbody = document.getElementById('topBuyersBody');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888">ไม่มีข้อมูล</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map((item, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${escapeHtml(item.buyer_name || '-')}</td>
+    <td>${item.lot_count || 0}</td>
+    <td class="text-right" style="color:var(--color-success)">${formatCurrency(parseFloat(item.total_revenue || 0))}</td>
+  </tr>`).join('');
+}
+
+// === Build period params string ===
+function buildPeriodParams() {
+  const periodType = document.getElementById('periodType').value;
+  const year       = document.getElementById('periodYear').value;
+  const month      = document.getElementById('periodMonth').value;
+  const branchId   = document.getElementById('branchFilter').value;
+  let params = `period=${periodType}&year=${year}`;
+  if (periodType === 'month') params += `&month=${month}`;
+  if (branchId) params += `&branch_id=${branchId}`;
+  return params;
+}
+
+// === Export Excel ===
+async function exportExcel(type) {
+  const params = buildPeriodParams();
+  const url = `${window.apiPath}/financial/export-excel?type=${type}&${params}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.click();
+  showNotification('กำลังดาวน์โหลด...', 'success');
+}
+
+// === Print Report ===
+function printReport() {
+  const content = document.querySelector('.page-header')?.cloneNode(true) || '';
+  const cards = document.querySelectorAll('.card');
+  const cardHtml = Array.from(cards).map(card => card.outerHTML).join('\n');
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    showNotification('เปิดหน้าต่างพิมพ์ไม่สำเร็จ กรุณาอนุญาต popup', 'error');
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="th">
+    <head>
+      <meta charset="utf-8">
+      <title>รายงานสรุปธุรกิจ</title>
+      <link rel="stylesheet" href="../assets/css/main.css">
+      <style>
+        @media print {
+          body { margin: 0; }
+          .card { break-inside: avoid; }
+          h1 { text-align: center; }
+        }
+      </style>
+    </head>
+    <body>
+      <h1>รายงานสรุปธุรกิจ — รักษ์สะอาดรีไซเคิล</h1>
+      ${content}
+      ${cardHtml}
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  setTimeout(() => printWindow.print(), 500);
+}
+
+// === Override loadSummary to also load charts and Top 5 ===
+const _origLoadSummary = loadSummary;
+loadSummary = async function() {
+  await _origLoadSummary();
+  await loadCharts();
+  await loadTopSellers();
+  await loadTopBuyers();
+};
+
+// === Load Charts ===
+async function loadCharts() {
+  try {
+    const params = buildPeriodParams();
+
+    // Monthly trend
+    const trendRes = await apiRequest(`financial/monthly-trend?${params}`, 'GET');
+    if (trendRes.status === 'success' && trendRes.data?.trend) {
+      drawTrendChart(trendRes.data.trend);
+      drawProfitChart(trendRes.data.trend);
+    }
+
+    // Branch comparison
+    const branchRes = await apiRequest(`financial/branch-comparison?${params}`, 'GET');
+    if (branchRes.status === 'success' && branchRes.data?.comparison) {
+      drawBranchChart(branchRes.data.comparison);
+    }
+  } catch (e) {
+    console.error('Charts load failed:', e);
+  }
+}

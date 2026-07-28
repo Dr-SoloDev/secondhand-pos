@@ -89,7 +89,7 @@
         <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
          <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
          <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
-        <li class="admin-only"><a href="financial-summary.html" class="active"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+        <li><a href="financial-summary.html" class="active"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
         <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
         <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
         <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
@@ -137,10 +137,11 @@
         </select>
         <button class="btn btn-primary" onclick="loadSummary()">ดูข้อมูล</button>
         <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="exportCsv('summary')">⬇ สรุป</button>
+          <button class="btn btn-secondary btn-sm" onclick="printReport()">🖨️ พิมพ์</button>
           <button class="btn btn-secondary btn-sm" onclick="exportCsv('purchases')">⬇ รับซื้อ</button>
           <button class="btn btn-secondary btn-sm" onclick="exportCsv('salelots')">⬇ ขาย Lot</button>
           <button class="btn btn-secondary btn-sm" onclick="exportCsv('expenses')">⬇ ค่าใช้จ่าย</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportCsv('summary')">⬇ สรุปรวม</button>
         </div>
       </div>
 
@@ -170,6 +171,72 @@
           <div class="label">กำไร/ขาดทุนสุทธิ</div>
           <div class="value profit" id="netProfit">฿0.00</div>
           <div class="sub" id="profitMargin">-</div>
+        </div>
+      </div>
+
+      <!-- Monthly Trend Chart -->
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-header">
+          <h2 class="card-title">แนวโน้มรายได้-รายจ่ายรายเดือน</h2>
+        </div>
+        <div class="card-body">
+          <div class="chart-container" style="height:300px">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profit Chart & Branch Comparison -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:24px;margin-bottom:24px">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">กำไรสุทธิรายเดือน</h2>
+          </div>
+          <div class="card-body">
+            <div class="chart-container" style="height:280px">
+              <canvas id="profitChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">เปรียบเทียบรายสาขา</h2>
+          </div>
+          <div class="card-body">
+            <div class="chart-container" style="height:280px">
+              <canvas id="branchChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top 5 Sellers & Buyers -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;margin-bottom:24px">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Top 5 ผู้ขาย</h2>
+          </div>
+          <div class="card-body">
+            <table class="data-table" id="topSellersTable">
+              <thead><tr><th>#</th><th>ชื่อผู้ขาย</th><th>จำนวนบิล</th><th class="text-right">ยอดรวม</th></tr></thead>
+              <tbody id="topSellersBody">
+                <tr><td colspan="4" style="text-align:center;color:#888">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Top 5 ผู้ซื้อ Lot</h2>
+          </div>
+          <div class="card-body">
+            <table class="data-table" id="topBuyersTable">
+              <thead><tr><th>#</th><th>ชื่อผู้ซื้อ</th><th>จำนวน Lot</th><th class="text-right">ยอดรวม</th></tr></thead>
+              <tbody id="topBuyersBody">
+                <tr><td colspan="4" style="text-align:center;color:#888">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -229,6 +296,7 @@
 
   <div id="notification-container"></div>
 
+  <script src="../assets/js/vendor/chart.umd.min.js"></script>
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
   <script src="../assets/js/financial-summary.js"></script>

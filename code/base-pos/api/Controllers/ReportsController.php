@@ -2,11 +2,12 @@
 class ReportsController extends Controller
 {
     /**
-     * SECURITY: Non-admin บังคับ scope ที่ branch ของตัวเองเสมอ
+     * SECURITY: Non-admin / non-super_manager บังคับ scope ที่ branch ของตัวเองเสมอ
      */
     private function enforceBranchScope()
     {
-        if (($this->user['role'] ?? '') !== 'admin') {
+        $allowed = ['admin', 'super_manager'];
+        if (!in_array(($this->user['role'] ?? ''), $allowed)) {
             $userBranch = $this->user['branch_id'] ?? null;
             if (!$userBranch) {
                 Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);

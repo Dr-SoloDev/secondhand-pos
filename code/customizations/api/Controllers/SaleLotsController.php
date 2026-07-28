@@ -13,13 +13,9 @@ class SaleLotsController extends Controller
             'date_to'   => isset($_GET['date_to'])   ? $this->sanitizeInput($_GET['date_to'])   : null,
         ];
 
-        // SECURITY: non-admin บังคับ scope ที่ branch ของตัวเองเสมอ — ห้าม query สาขาอื่น
-        if (($this->user['role'] ?? '') !== 'admin') {
-            $filters['branch_id'] = $this->user['branch_id'] ?? null;
-            if (!$filters['branch_id']) {
-                Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
-            }
-        }
+        // Read policy: admin/super_manager may read all branches or filter by branch_id.
+        // Other roles remain forced to their own branch.
+        $filters['branch_id'] = $this->resolveReadBranchId();
 
         $model  = new SaleLot();
         $result = $model->getAll($filters['branch_id'], $filters);
@@ -36,18 +32,12 @@ class SaleLotsController extends Controller
         $lot   = $model->getById($id);
         if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
 
-        // SECURITY: non-admin ดูได้เฉพาะ Sale Lot ของสาขาตัวเอง
-        if (($this->user['role'] ?? '') !== 'admin') {
-            $userBranch = $this->user['branch_id'] ?? null;
-            if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
-                Response::error('ไม่มีสิทธิ์เข้าถึง Sale Lot นี้', 403);
-            }
-        }
+        $this->assertReadBranchAccess($lot['branch_id'] ?? null, 'ไม่มีสิทธิ์เข้าถึง Sale Lot นี้');
 
         Response::success('ดึงข้อมูล Sale Lot สำเร็จ', $lot);
     }
 
-    // สร้าง Sale Lot ใหม่ — confirmed ทันที (บันทึกจากบิลที่ขายไปแล้ว)
+    // สร้าง Sale Lot ใหม่เป็น draft เท่านั้น ยังไม่ตัดสต็อกจนกว่าจะ confirm
     public function store()
     {
         $this->requireAuth(['admin', 'manager']);
@@ -120,14 +110,14 @@ class SaleLotsController extends Controller
                 'create_sale_lot',
                 "Created Sale Lot: {$result['reference_no']} (฿{$result['total_amount']})"
             );
-            Response::success('สร้าง Sale Lot สำเร็จ', $result);
+            Response::success('บันทึก Sale Lot แบบร่างสำเร็จ', $result);
         } catch (Exception $e) {
             error_log('SaleLot store failed: ' . $e->getMessage());
-            Response::error('สร้าง Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
+            Response::error($e->getMessage() ?: 'สร้าง Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 400);
         }
     }
 
-    // อัปเดต Sale Lot: draft → update ปกติ, confirmed → restore+update+deduct stock ใหม่
+    // อัปเดต Sale Lot ได้เฉพาะ draft; confirmed ต้องยกเลิกหรือสร้าง Lot ใหม่
     public function update($id)
     {
         $this->requireAuth(['admin', 'manager']);
@@ -227,7 +217,7 @@ class SaleLotsController extends Controller
             Response::success('ยืนยัน Sale Lot สำเร็จ', null);
         } catch (Exception $e) {
             error_log('SaleLot confirm failed: ' . $e->getMessage());
-            Response::error('ยืนยัน Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
+            Response::error($e->getMessage() ?: 'ยืนยัน Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 400);
         }
     }
 
@@ -259,7 +249,7 @@ class SaleLotsController extends Controller
             Response::success('ยกเลิก Sale Lot สำเร็จ', null);
         } catch (Exception $e) {
             error_log('SaleLot cancel failed: ' . $e->getMessage());
-            Response::error('ยกเลิก Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
+            Response::error($e->getMessage() ?: 'ยกเลิก Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 400);
         }
     }
 
@@ -339,6 +329,47 @@ class SaleLotsController extends Controller
         } catch (Exception $e) {
             error_log('SaleLot destroy failed: ' . $e->getMessage());
             Response::error('ลบ Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
+        }
+    }
+
+    private function resolveReadBranchId()
+    {
+        $requestedBranch = null;
+        $branchProvided = isset($_GET['branch_id']) && $_GET['branch_id'] !== '';
+
+        if ($branchProvided) {
+            if (!is_numeric($_GET['branch_id']) || intval($_GET['branch_id']) < 0) {
+                Response::error('branch_id ไม่ถูกต้อง', 400);
+            }
+            $requestedBranch = intval($_GET['branch_id']);
+            if ($requestedBranch === 0) {
+                $requestedBranch = null;
+            }
+        }
+
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return $requestedBranch;
+        }
+
+        $userBranch = intval($this->user['branch_id'] ?? 0);
+        if (!$userBranch) {
+            Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+        }
+
+        return $userBranch;
+    }
+
+    private function assertReadBranchAccess($branchId, $message)
+    {
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return;
+        }
+
+        $userBranch = intval($this->user['branch_id'] ?? 0);
+        if (!$userBranch || (int)$branchId !== $userBranch) {
+            Response::error($message, 403);
         }
     }
 }

@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('userActivityFilter').addEventListener('change', loadActivityLog);
   document.getElementById('savePassword').addEventListener('click', changePassword);
   document.getElementById('cancelPassword').addEventListener('click', hidePasswordModal);
+  document.getElementById('closeResetPassword').addEventListener('click', hideResetPasswordModal);
+  document.getElementById('copyPasswordBtn').addEventListener('click', copyPassword);
 
   // Close modals when clicking on X
   document.querySelectorAll('.close-modal').forEach(button => {
@@ -92,7 +94,7 @@ function renderUsers(usersToRender) {
     row.innerHTML = `
       <td>${user.username}</td>
       <td>${user.full_name}</td>
-      <td>${user.email}</td>
+      <td>${user.phone || '-'}</td>
       <td><span class="badge badge-info">${user.role}</span></td>
       <td>
         <span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-danger'}">
@@ -104,7 +106,10 @@ function renderUsers(usersToRender) {
         <button class="btn btn-sm btn-info edit-user" data-id="${user.id}">
           <i class="icon-edit"></i>
         </button>
-        <button class="btn btn-sm btn-warning change-password" data-id="${user.id}">
+        <button class="btn btn-sm btn-warning change-password" data-id="${user.id}" title="เปลี่ยนรหัสผ่าน">
+          <i class="icon-password"></i>
+        </button>
+        <button class="btn btn-sm btn-secondary reset-password" data-id="${user.id}" title="รีเซ็ตรหัสผ่าน">
           <i class="icon-password"></i>
         </button>
         <button class="btn btn-sm btn-danger delete-user" data-id="${user.id}">
@@ -128,6 +133,13 @@ function renderUsers(usersToRender) {
     button.addEventListener('click', function() {
       const userId = this.dataset.id;
       showPasswordModal(userId);
+    });
+  });
+
+  document.querySelectorAll('.reset-password').forEach(button => {
+    button.addEventListener('click', function() {
+      const userId = this.dataset.id;
+      resetPassword(userId);
     });
   });
 
@@ -170,7 +182,7 @@ function filterUsers() {
     filtered = filtered.filter(user => {
       return user.username.toLowerCase().includes(searchTerm) ||
         user.full_name.toLowerCase().includes(searchTerm) ||
-        user.email.toLowerCase().includes(searchTerm);
+        String(user.phone || '').toLowerCase().includes(searchTerm);
     });
   }
 
@@ -225,7 +237,7 @@ async function editUser(userId) {
       document.getElementById('userId').value = user.id;
       document.getElementById('username').value = user.username;
       document.getElementById('username').disabled = true; // Username cannot be changed
-      document.getElementById('email').value = user.email;
+      document.getElementById('phone').value = user.phone || '';
       document.getElementById('fullName').value = user.full_name;
       document.getElementById('role').value = user.role;
       document.getElementById('status').value = user.status;
@@ -284,7 +296,7 @@ async function saveUser() {
     // Gather form data
     const userData = {
       username: document.getElementById('username').value,
-      email: document.getElementById('email').value,
+      phone: document.getElementById('phone').value,
       full_name: document.getElementById('fullName').value,
       role: document.getElementById('role').value,
       status: document.getElementById('status').value
@@ -393,6 +405,45 @@ async function changePassword() {
   } catch (error) {
     console.error('Error changing password:', error);
     showNotification('เปลี่ยนรหัสผ่านไม่สำเร็จ', 'error');
+  }
+}
+
+// Reset user password and display the generated temporary password once.
+async function resetPassword(userId) {
+  if (!confirm('รีเซ็ตรหัสผ่านผู้ใช้นี้และสร้างรหัสผ่านชั่วคราวใหม่?')) {
+    return;
+  }
+
+  try {
+    const response = await apiRequest('users/reset-password', 'POST', { user_id: userId });
+
+    if (response.status === 'success') {
+      const data = response.data;
+      document.getElementById('resetPasswordUserName').textContent = data.full_name || data.username;
+      document.getElementById('tempPassword').value = data.temporary_password;
+      document.getElementById('resetPasswordModal').classList.add('show');
+    } else {
+      showNotification(response.message || 'รีเซ็ตรหัสผ่านไม่สำเร็จ', 'error');
+    }
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    showNotification('รีเซ็ตรหัสผ่านไม่สำเร็จ', 'error');
+  }
+}
+
+function hideResetPasswordModal() {
+  document.getElementById('resetPasswordModal').classList.remove('show');
+}
+
+async function copyPassword() {
+  const passwordField = document.getElementById('tempPassword');
+  try {
+    await navigator.clipboard.writeText(passwordField.value);
+    showNotification('คัดลอกรหัสผ่านเรียบร้อยแล้ว', 'success');
+  } catch {
+    passwordField.select();
+    document.execCommand('copy');
+    showNotification('คัดลอกรหัสผ่านเรียบร้อยแล้ว', 'success');
   }
 }
 

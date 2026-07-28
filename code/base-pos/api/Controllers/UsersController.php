@@ -19,13 +19,13 @@ class UsersController extends Controller
 
         // Get and validate request data
         $data = $this->getRequestData();
-        $this->validateRequiredFields($data, ['username', 'password', 'email', 'full_name', 'role']);
+        $this->validateRequiredFields($data, ['username', 'password', 'phone', 'full_name', 'role']);
 
         // Sanitize input
         $data = $this->sanitizeInput($data);
 
         // Validate role
-        $validRoles = ['admin', 'manager', 'cashier'];
+        $validRoles = ['admin', 'manager', 'cashier', 'super_manager'];
         if (!in_array($data['role'], $validRoles)) {
             Response::error('Invalid role', 400);
         }
@@ -37,7 +37,7 @@ class UsersController extends Controller
             $userId = $userModel->create([
                 'username' => $data['username'],
                 'password' => $data['password'],
-                'email' => $data['email'],
+                'phone' => $data['phone'],
                 'full_name' => $data['full_name'],
                 'role' => $data['role'],
                 'status' => isset($data['status']) ? $data['status'] : 'active'
@@ -102,7 +102,7 @@ class UsersController extends Controller
 
         // Validate role if provided
         if (isset($data['role'])) {
-            $validRoles = ['admin', 'manager', 'cashier'];
+            $validRoles = ['admin', 'manager', 'cashier', 'super_manager'];
             if (!in_array($data['role'], $validRoles)) {
                 Response::error('Invalid role', 400);
             }
@@ -122,11 +122,11 @@ class UsersController extends Controller
             unset($data['status']);
         }
 
-        // Check email uniqueness
-        if (isset($data['email']) && $data['email'] !== $user['email']) {
-            $emailExists = $userModel->findByEmail($data['email']);
-            if ($emailExists) {
-                Response::error('Email already in use by another user', 400);
+        // Check phone uniqueness
+        if (isset($data['phone']) && $data['phone'] !== $user['phone']) {
+            $phoneExists = $userModel->findByPhone($data['phone']);
+            if ($phoneExists) {
+                Response::error('หมายเลขนี้ถูกใช้งานแล้ว', 400);
             }
         }
 
@@ -284,23 +284,23 @@ class UsersController extends Controller
         // Sanitize input
         $data = $this->sanitizeInput($data);
 
-        // Only allow updating full_name and email
+        // Only allow updating full_name and phone
         $updateData = [];
 
         if (isset($data['full_name'])) {
             $updateData['full_name'] = $data['full_name'];
         }
 
-        if (isset($data['email'])) {
-            // Check email uniqueness
+        if (isset($data['phone'])) {
+            // Check phone uniqueness
             $userModel = new User();
-            $emailExists = $userModel->findByEmail($data['email']);
+            $phoneExists = $userModel->findByPhone($data['phone']);
 
-            if ($emailExists && $emailExists['id'] != $userId) {
-                Response::error('Email already in use by another user', 400);
+            if ($phoneExists && $phoneExists['id'] != $userId) {
+                Response::error('หมายเลขนี้ถูกใช้งานแล้ว', 400);
             }
 
-            $updateData['email'] = $data['email'];
+            $updateData['phone'] = $data['phone'];
         }
 
         if (empty($updateData)) {
@@ -365,5 +365,51 @@ class UsersController extends Controller
             error_log('Own password change failed: ' . $e->getMessage());
             Response::error('Failed to change password', 500);
         }
-}
+    }
+
+    /**
+     * Reset a user's password to a temporary password.
+     * Only owner/admin system accounts map to the existing admin role.
+     */
+    public function resetPassword()
+    {
+        $this->requireAuth(['admin']);
+
+        $data = $this->getRequestData();
+        $userId = isset($data['user_id']) ? intval($data['user_id']) : 0;
+
+        if (!$userId) {
+            Response::error('User ID is required', 400);
+        }
+
+        $userModel = new User();
+        $user = $userModel->findById($userId);
+
+        if (!$user) {
+            Response::error('User not found', 404);
+        }
+
+        // Generate a temporary password
+        $tempPassword = bin2hex(random_bytes(8)); // 16-char random password
+
+        try {
+            $userModel->updatePassword($userId, $tempPassword);
+
+            Logger::logActivity(
+                $this->user['user_id'],
+                'reset_password',
+                "Reset password for user: {$user['username']}"
+            );
+
+            Response::success('Temporary password generated', [
+                'user_id' => $user['id'],
+                'username' => $user['username'],
+                'full_name' => $user['full_name'],
+                'temporary_password' => $tempPassword
+            ]);
+        } catch (Exception $e) {
+            error_log('Password generation failed: ' . $e->getMessage());
+            Response::error('Failed to generate temporary password', 500);
+        }
+    }
 }

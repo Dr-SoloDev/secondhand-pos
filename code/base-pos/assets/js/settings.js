@@ -1,4 +1,11 @@
 document.addEventListener('DOMContentLoaded', function() {
+  const userJson = localStorage.getItem('posUser');
+  const currentUser = userJson ? JSON.parse(userJson) : null;
+  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
+    window.location.href = `${basePath}/admin/index.html`;
+    return;
+  }
+
   // Initialize settings page
   loadSettings();
 

@@ -5,41 +5,35 @@ class InventoryController extends Controller
     public function getCategories()
     {
         $this->requireAuth();
-        $branchId = isset($_GET['branch_id']) ? intval($_GET['branch_id']) : 0;
-        $userBranch = $this->enforceBranchScope();
-        if ($userBranch !== null) {
-            $branchId = $userBranch;
-        }
+        $branchId = $this->resolveReadBranchId();
 
         $categoryModel = new Category();
         $categories = $categoryModel->findAll('name ASC');
 
+        // branch_stock is the inventory source of truth. Null branch means all branches.
+        $stockSql = "SELECT category_id,
+                            ROUND(SUM(stock_kg), 3) AS stock_kg
+                     FROM branch_stock";
+        $stockParams = [];
         if ($branchId) {
-            // Per-branch mode: aggregate stock from branch_stock (SSoT)
-            $branchStocks = $this->db->fetchAll(
-                "SELECT category_id,
-                        ROUND(SUM(stock_kg), 3) AS stock_kg
-                 FROM branch_stock
-                 WHERE branch_id = ?
-                 GROUP BY category_id",
-                [$branchId]
-            );
-
-            // Build lookup: category_id => stock_kg
-            $stockMap = [];
-            foreach ($branchStocks as $row) {
-                $catId = (int)$row['category_id'];
-                if ($catId > 0) {
-                    $stockMap[$catId] = (float)$row['stock_kg'];
-                }
-            }
-
-            // Override stock_kg for each category
-            foreach ($categories as &$cat) {
-                $cat['stock_kg'] = $stockMap[(int)$cat['id']] ?? 0;
-            }
-            unset($cat);
+            $stockSql .= " WHERE branch_id = ?";
+            $stockParams[] = $branchId;
         }
+        $stockSql .= " GROUP BY category_id";
+
+        $branchStocks = $this->db->fetchAll($stockSql, $stockParams);
+        $stockMap = [];
+        foreach ($branchStocks as $row) {
+            $catId = (int)$row['category_id'];
+            if ($catId > 0) {
+                $stockMap[$catId] = (float)$row['stock_kg'];
+            }
+        }
+
+        foreach ($categories as &$cat) {
+            $cat['stock_kg'] = $stockMap[(int)$cat['id']] ?? 0;
+        }
+        unset($cat);
 
         Response::success('Categories retrieved', $categories);
     }
@@ -509,29 +503,41 @@ class InventoryController extends Controller
     }
 
     /**
-     * SECURITY: Non-admin บังคับ scope ที่ branch ของตัวเองเสมอ
+     * Read policy: admin/super_manager may read all branches or filter by branch_id.
+     * Other roles remain forced to their own branch.
      */
-    private function enforceBranchScope()
+    private function resolveReadBranchId()
     {
-        if (($this->user['role'] ?? '') !== 'admin') {
-            $userBranch = $this->user['branch_id'] ?? null;
-            if (!$userBranch) {
-                Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+        $requestedBranch = null;
+        $branchProvided = isset($_GET['branch_id']) && $_GET['branch_id'] !== '';
+
+        if ($branchProvided) {
+            if (!is_numeric($_GET['branch_id']) || intval($_GET['branch_id']) < 0) {
+                Response::error('branch_id ไม่ถูกต้อง', 400);
             }
-            return $userBranch;
+            $requestedBranch = intval($_GET['branch_id']);
+            if ($requestedBranch === 0) {
+                $requestedBranch = null;
+            }
         }
-        return null; // admin: no restriction
+
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return $requestedBranch;
+        }
+
+        $userBranch = intval($this->user['branch_id'] ?? 0);
+        if (!$userBranch) {
+            Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+        }
+
+        return $userBranch;
     }
 
     public function getStockAlerts()
     {
         $this->requireAuth();
-        $userBranch = $this->enforceBranchScope();
-        $branchId = isset($_GET['branch_id']) && is_numeric($_GET['branch_id'])
-            ? intval($_GET['branch_id']) : null;
-        if ($userBranch !== null) {
-            $branchId = $userBranch;
-        }
+        $branchId = $this->resolveReadBranchId();
 
         // Query branch_stock for items below threshold
         // Joined with categories to get the alert_threshold
@@ -545,8 +551,8 @@ class InventoryController extends Controller
 
         // Alert: stock_kg <= 0 (out of stock) OR stock_kg <= alert_threshold
         // When categories.alert_threshold is NULL, treat as threshold = 0
-        $where[] = "(c.alert_threshold IS NOT NULL AND bs.stock_kg <= c.alert_threshold)
-                    OR (c.alert_threshold IS NULL AND bs.stock_kg <= 0)";
+        $where[] = "((c.alert_threshold IS NOT NULL AND bs.stock_kg <= c.alert_threshold)
+                    OR (c.alert_threshold IS NULL AND bs.stock_kg <= 0))";
 
         $whereClause = " WHERE " . implode(' AND ', $where);
 
@@ -601,11 +607,7 @@ class InventoryController extends Controller
     {
         $this->requireAuth();
         $categoryId = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
-        $branchId   = isset($_GET['branch_id'])   ? intval($_GET['branch_id'])   : 0;
-        $userBranch = $this->enforceBranchScope();
-        if ($userBranch !== null) {
-            $branchId = $userBranch;
-        }
+        $branchId = $this->resolveReadBranchId();
 
         if (!$categoryId) {
             Response::error('ต้องระบุ category_id', 400);
@@ -620,11 +622,15 @@ class InventoryController extends Controller
             return;
         }
 
-        // Query item-level stock จาก branch_stock (SSoT)
+        // Query item-level stock จาก branch_stock (SSoT). Null branch means all branches.
         $sql = "SELECT
                     bs.item_name,
-                    bs.stock_kg,
-                    bs.unit_price AS latest_unit_price
+                    ROUND(SUM(bs.stock_kg), 3) AS stock_kg,
+                    CASE
+                        WHEN SUM(bs.stock_kg) > 0
+                        THEN ROUND(SUM(bs.stock_kg * bs.unit_price) / SUM(bs.stock_kg), 4)
+                        ELSE 0
+                    END AS latest_unit_price
                 FROM branch_stock bs
                 WHERE bs.category_id = ?";
         $params = [$categoryId];
@@ -634,7 +640,8 @@ class InventoryController extends Controller
             $params[] = $branchId;
         }
 
-        $sql .= " ORDER BY bs.stock_kg DESC, bs.item_name ASC";
+        $sql .= " GROUP BY bs.item_name
+                  ORDER BY stock_kg DESC, bs.item_name ASC";
 
         $items = $this->db->fetchAll($sql, $params) ?: [];
 
@@ -651,14 +658,11 @@ class InventoryController extends Controller
         }
         $totalItems = count($formattedItems);
 
-        // Per-branch: แสดง stock_kg จริงที่ query ได้ (ไม่ใช่ global categories.stock_kg)
-        $catStockKg = $branchId ? $totalStockKg : (float)$category['stock_kg'];
-
         Response::success('สำเร็จ', [
             'category' => [
                 'id'       => (int)$category['id'],
                 'name'     => $category['name'],
-                'stock_kg' => $catStockKg,
+                'stock_kg' => $totalStockKg,
             ],
             'items'          => $formattedItems,
             'total_items'    => $totalItems,

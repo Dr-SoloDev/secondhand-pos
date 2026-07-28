@@ -27,31 +27,30 @@ async function initReports() {
     return;
   }
 
-  if (!['admin', 'manager'].includes(currentUser.role)) {
+  if (!['admin', 'manager', 'super_manager'].includes(currentUser.role)) {
     showNotification('หน้านี้สำหรับผู้จัดการสาขาเท่านั้น', 'error');
     window.location.href = 'index.html';
     return;
   }
 
-  if (currentUser.role !== 'admin') {
+  if (currentUser.role !== 'admin' && currentUser.role !== 'super_manager') {
     document.querySelectorAll('.admin-only').forEach((el) => {
       el.style.display = 'none';
     });
   }
 
-  currentBranchId = currentUser.role === 'admin' ? '' : (currentUser.branch_id ? String(currentUser.branch_id) : '');
-  if (currentUser.role !== 'admin' && !currentBranchId) {
+  const isFullAccess = ['admin', 'super_manager'].includes(currentUser.role);
+  currentBranchId = isFullAccess ? '' : (currentUser.branch_id ? String(currentUser.branch_id) : '');
+  if (!isFullAccess && !currentBranchId) {
     showNotification('ไม่พบสาขาที่ผูกกับบัญชีนี้', 'error');
     window.location.href = 'index.html';
     return;
   }
 
-  if (currentUser.role === 'admin') {
-    currentBranchName = 'ทุกสาขา';
-  } else {
-    await loadBranchLookup();
-  }
+  await loadBranchLookup();
+  setupBranchSelector();
   setDefaultMonth();
+  setDefaultDailyExportDate();
   setDefaultTaxDates();
   bindEvents();
   updateScopeLabels();
@@ -67,8 +66,17 @@ async function initReports() {
 function bindEvents() {
   document.getElementById('reportMonth')?.addEventListener('change', async function() {
     currentReportMonth = this.value || getCurrentMonthValue();
+    setDefaultTaxDates();
     updateScopeLabels();
-    await loadMonthlyReports();
+    await reloadAllReports();
+  });
+
+  document.getElementById('reportBranch')?.addEventListener('change', async function() {
+    currentBranchId = this.value || '';
+    updateCurrentBranchName();
+    updateScopeLabels();
+    setLoadingState();
+    await reloadAllReports();
   });
 
   document.getElementById('generateTaxReport')?.addEventListener('click', loadTaxReport);
@@ -77,22 +85,107 @@ function bindEvents() {
 }
 
 async function loadBranchLookup() {
-  if (currentUser?.role === 'admin') {
-    currentBranchName = 'ทุกสาขา';
-    return;
-  }
-
   try {
     const res = await apiRequest('branches/active');
     if (res.status === 'success') {
-      branches = Array.isArray(res.data) ? res.data : [];
+      branches = normalizeBranchList(res.data);
     }
   } catch (error) {
     console.error('Failed to load branches:', error);
   }
 
-  const branch = branches.find((item) => String(item.id) === currentBranchId);
+  updateCurrentBranchName();
+}
+
+function normalizeBranchList(data) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.items)) {
+    return data.items;
+  }
+
+  return [];
+}
+
+function setupBranchSelector() {
+  const select = document.getElementById('reportBranch');
+  const field = document.getElementById('reportBranchField');
+  if (!select) {
+    return;
+  }
+
+  const isFullAccess = canViewAllBranches();
+  let visibleBranches = isFullAccess
+    ? branches
+    : branches.filter((branch) => String(branch.id) === currentBranchId);
+
+  if (!isFullAccess && visibleBranches.length === 0 && currentBranchId) {
+    visibleBranches = [{
+      id: currentBranchId,
+      name: currentUser.branch_name || `สาขา ${currentBranchId}`,
+    }];
+  }
+
+  select.innerHTML = isFullAccess
+    ? '<option value="">ทุกสาขา</option>'
+    : '';
+
+  visibleBranches.forEach((branch) => {
+    select.appendChild(new Option(branch.name || `สาขา ${branch.id}`, String(branch.id)));
+  });
+
+  select.value = currentBranchId || '';
+  select.disabled = !isFullAccess;
+  if (field) {
+    field.hidden = false;
+  }
+  updateCurrentBranchName();
+}
+
+function canViewAllBranches() {
+  return ['admin', 'super_manager'].includes(currentUser?.role);
+}
+
+function updateCurrentBranchName() {
+  if (!currentBranchId) {
+    currentBranchName = 'ทุกสาขา';
+    return;
+  }
+
+  const branch = branches.find((item) => String(item.id) === String(currentBranchId));
   currentBranchName = branch?.name || currentUser.branch_name || `สาขา ${currentBranchId}`;
+}
+
+function addBranchParam(params) {
+  if (currentBranchId) {
+    params.set('branch_id', currentBranchId);
+  }
+  return params;
+}
+
+function getScopeSlug() {
+  return currentBranchId ? `branch-${currentBranchId}` : 'all-branches';
+}
+
+function getReportPeriodText(key) {
+  if (key === 'tax') {
+    const dateFrom = document.getElementById('taxDateFrom')?.value || getMonthRange(currentReportMonth).dateFrom;
+    const dateTo = document.getElementById('taxDateTo')?.value || getMonthRange(currentReportMonth).dateTo;
+    return `${formatDisplayDate(dateFrom)} - ${formatDisplayDate(dateTo)}`;
+  }
+
+  return getMonthRange(currentReportMonth).label;
+}
+
+async function reloadAllReports() {
+  await Promise.all([
+    loadMonthlyReports(),
+    loadInventoryReport(),
+    loadEmployeesReport(),
+    loadTaxReport(),
+  ]);
 }
 
 function getCurrentMonthValue() {
@@ -107,6 +200,11 @@ function setDefaultMonth() {
   if (monthInput) {
     monthInput.value = currentReportMonth;
   }
+}
+
+function setDefaultDailyExportDate() {
+  const el = document.getElementById('dailyExportDate');
+  if (el) el.value = new Date().toISOString().slice(0, 10);
 }
 
 function setDefaultTaxDates() {
@@ -158,11 +256,15 @@ function updateScopeLabels() {
   const purchaseScope = document.getElementById('purchaseOrdersScope');
   const saleScope = document.getElementById('saleLotsScope');
   const employeesScope = document.getElementById('employeesScope');
+  const inventoryScope = document.getElementById('inventoryScope');
+  const taxScope = document.getElementById('taxScope');
   const monthRange = getMonthRange(currentReportMonth);
 
   if (purchaseScope) purchaseScope.textContent = `${currentBranchName} · ${monthRange.label}`;
   if (saleScope) saleScope.textContent = `${currentBranchName} · ${monthRange.label}`;
   if (employeesScope) employeesScope.textContent = currentBranchName;
+  if (inventoryScope) inventoryScope.textContent = currentBranchName;
+  if (taxScope) taxScope.textContent = `${currentBranchName} · จากข้อมูลที่เลือก`;
 }
 
 function setLoadingState() {
@@ -199,7 +301,12 @@ async function loadMonthlyReports() {
 
 async function loadBranchSummary(range) {
   try {
-    const res = await apiRequest(`financial/summary?period=month&year=${range.year}&month=${range.month}`);
+    const params = addBranchParam(new URLSearchParams({
+      period: 'month',
+      year: String(range.year),
+      month: String(range.month),
+    }));
+    const res = await apiRequest(`financial/summary?${params.toString()}`);
     if (res.status !== 'success') {
       throw new Error(res.message || 'โหลดสรุปสาขาไม่สำเร็จ');
     }
@@ -274,6 +381,7 @@ async function loadPurchaseOrders(range) {
       date_to: range.dateTo,
       limit: '1000',
     });
+    addBranchParam(params);
     const res = await apiRequest(`purchase-orders?${params.toString()}`);
     if (res.status !== 'success') {
       throw new Error(res.message || 'โหลดข้อมูลรับซื้อไม่สำเร็จ');
@@ -331,6 +439,7 @@ async function loadSaleLots(range) {
       date_to: range.dateTo,
       limit: '1000',
     });
+    addBranchParam(params);
     const res = await apiRequest(`sale-lots?${params.toString()}`);
     if (res.status !== 'success') {
       throw new Error(res.message || 'โหลดข้อมูลขาย Lot ไม่สำเร็จ');
@@ -392,9 +501,13 @@ function renderSaleLots(items, pagination, range) {
 
 async function loadInventoryReport() {
   try {
+    const params = new URLSearchParams();
+    addBranchParam(params);
+    const query = params.toString();
+    const suffix = query ? `?${query}` : '';
     const [categoriesRes, alertsRes] = await Promise.all([
-      apiRequest('inventory/categories'),
-      apiRequest('inventory/stock-alerts'),
+      apiRequest(`inventory/categories${suffix}`),
+      apiRequest(`inventory/stock-alerts${suffix}`),
     ]);
 
     if (categoriesRes.status !== 'success') {
@@ -430,6 +543,7 @@ function renderInventory(categories, alerts, alertSummary) {
     maximumFractionDigits: 3,
   });
   document.getElementById('inventoryLowCount').textContent = lowCount.toLocaleString('th-TH');
+  document.getElementById('inventoryScope').textContent = currentBranchName;
   document.getElementById('inventoryStockSummary').textContent = `${zeroCount} หมดสต็อก · ${lowCount} ใกล้หมด`;
 
   if (count === 0) {
@@ -477,9 +591,7 @@ function renderInventory(categories, alerts, alertSummary) {
 async function loadEmployeesReport() {
   try {
     const params = new URLSearchParams({ limit: '500' });
-    if (currentBranchId) {
-      params.set('branch_id', currentBranchId);
-    }
+    addBranchParam(params);
     const res = await apiRequest(`employees?${params.toString()}`);
     if (res.status !== 'success') {
       throw new Error(res.message || 'โหลดข้อมูลพนักงานไม่สำเร็จ');
@@ -540,6 +652,7 @@ async function loadTaxReport() {
       date_to: dateTo,
       period,
     });
+    addBranchParam(params);
 
     const res = await apiRequest(`reports/tax-report?${params.toString()}`);
     if (res.status !== 'success') {
@@ -564,6 +677,7 @@ function renderTaxReport(data) {
   document.getElementById('taxableSales').textContent = formatCurrency(taxableSales);
   document.getElementById('taxCollected').textContent = formatCurrency(taxCollected);
   document.getElementById('taxRate').textContent = `${taxRate.toFixed(1)}%`;
+  document.getElementById('taxScope').textContent = `${currentBranchName} · จากข้อมูลที่เลือก`;
 
   if (periods.length === 0) {
     renderErrorRow('taxReportBody', 4, 'ไม่มีข้อมูลภาษีในช่วงที่เลือก');
@@ -601,9 +715,41 @@ function handleReportActionClick(event) {
   }
 }
 
+// Daily Excel export
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('#btnExportDaily');
+  if (!btn) return;
+
+  e.preventDefault();
+  const dateVal = document.getElementById('dailyExportDate').value || new Date().toISOString().slice(0, 10);
+  const payload = { date: dateVal };
+  if (currentBranchId) {
+    payload.branch_id = currentBranchId;
+  }
+
+  try {
+    const res = await apiRequest('purchase-orders/daily-export', 'POST', payload);
+    if (res.status === 'success') {
+      const blob = new Blob([res.data.html], { type: 'application/vnd.ms-excel' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = res.data.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotification('ส่งออกเรียบร้อย', 'success');
+    } else {
+      showNotification(res.message || 'ส่งออกไม่สำเร็จ', 'error');
+    }
+  } catch (err) {
+    console.error('Export daily failed:', err);
+    showNotification('ส่งออกไม่สำเร็จ', 'error');
+  }
+});
+
 function exportReportCard(key) {
   const monthLabel = getMonthRange(currentReportMonth).label;
-  const scopeSlug = currentBranchId || 'all-branches';
+  const scopeSlug = getScopeSlug();
   const filename = `report-${key}-${scopeSlug}-${currentReportMonth || getCurrentMonthValue()}.csv`;
   let csv = '';
 
@@ -623,6 +769,9 @@ function exportReportCard(key) {
       break;
     case 'purchaseOrders':
       csv = buildCsv([
+        ['สาขา', currentBranchName],
+        ['ช่วงรายงาน', monthLabel],
+        [],
         ['เลขที่', 'วันที่', 'ผู้ขาย', 'ยอดรวม', 'วิธีจ่าย', 'สถานะ'],
         ...reportState.purchaseOrders.map((item) => [
           item.reference_no || '',
@@ -636,6 +785,9 @@ function exportReportCard(key) {
       break;
     case 'saleLots':
       csv = buildCsv([
+        ['สาขา', currentBranchName],
+        ['ช่วงรายงาน', monthLabel],
+        [],
         ['เลขที่', 'วันที่', 'ผู้ซื้อ', 'ยอดขาย', 'รายรับจริง', 'ต้นทุน', 'กำไร', 'สถานะ'],
         ...reportState.saleLots.map((item) => {
           const actualRevenue = parseFloat(item.actual_revenue || 0);
@@ -656,6 +808,9 @@ function exportReportCard(key) {
       break;
     case 'inventory':
       csv = buildCsv([
+        ['สาขา', currentBranchName],
+        ['ช่วงรายงาน', monthLabel],
+        [],
         ['หมวดหมู่', 'สต็อก (กก.)', 'เกณฑ์แจ้งเตือน', 'สถานะ'],
         ...reportState.inventory.categories.map((item) => {
           const stockKg = parseFloat(item.stock_kg || 0);
@@ -680,6 +835,9 @@ function exportReportCard(key) {
       break;
     case 'employees':
       csv = buildCsv([
+        ['สาขา', currentBranchName],
+        ['ช่วงรายงาน', monthLabel],
+        [],
         ['ชื่อ-นามสกุล', 'ตำแหน่ง', 'เบอร์โทร', 'เงินเดือน', 'ค่าแรงรายวัน', 'สถานะ'],
         ...reportState.employees.map((item) => [
           item.full_name || '',
@@ -693,6 +851,9 @@ function exportReportCard(key) {
       break;
     case 'tax':
       csv = buildCsv([
+        ['สาขา', currentBranchName],
+        ['ช่วงรายงาน', getReportPeriodText('tax')],
+        [],
         ['รอบระยะเวลา', 'ยอดขายที่ต้องเสียภาษี', 'ภาษีที่เก็บ', 'รวม'],
         ...(Array.isArray(reportState.tax?.periods) ? reportState.tax.periods : []).map((item) => [
           item.period || '',
@@ -766,7 +927,7 @@ function printReportCard(key) {
     </head>
     <body>
       <h1>${escapeHtml(title)}</h1>
-      <div class="meta">สาขา: ${escapeHtml(currentBranchName)} · ช่วงรายงาน: ${escapeHtml(getMonthRange(currentReportMonth).label)}</div>
+      <div class="meta">สาขา: ${escapeHtml(currentBranchName)} · ช่วงรายงาน: ${escapeHtml(getReportPeriodText(key))}</div>
       ${clone.outerHTML}
     </body>
     </html>
