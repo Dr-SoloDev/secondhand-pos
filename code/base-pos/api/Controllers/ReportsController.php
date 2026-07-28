@@ -174,6 +174,25 @@ class ReportsController extends Controller
         Response::success('Purchase report data retrieved', $reportData);
     }
 
+    public function getPurchaseItemReport()
+    {
+        $this->requireAuth();
+        $branchId = $this->resolveBranchId();
+        $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : date('Y-m-01');
+        $dateTo = isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : date('Y-m-d');
+
+        $reportService = new ReportService();
+        $reportData = $reportService->getPurchaseItemReport($dateFrom, $dateTo, $branchId);
+
+        $reportData['filters'] = [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'branch_id' => $branchId,
+        ];
+
+        Response::success('Purchase item report data retrieved', $reportData);
+    }
+
     public function getSaleLotReport()
     {
         $this->requireAuth();

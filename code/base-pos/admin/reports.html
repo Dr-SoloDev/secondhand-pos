@@ -173,6 +173,59 @@
         </div>
       </section>
 
+      <section class="card report-card" id="purchaseItemsCard">
+        <div class="card-header report-card-header">
+          <h2 class="card-title">สรุปการรับซื้อแยกตามสินค้า</h2>
+          <div class="report-card-actions">
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="purchaseItems" title="ส่งออกสรุปสินค้า" aria-label="ส่งออกสรุปสินค้า">
+              <i class="icon-download"></i>
+            </button>
+            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="purchaseItems" title="พิมพ์สรุปสินค้า" aria-label="พิมพ์สรุปสินค้า">
+              <i class="icon-print"></i>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="report-kpi-grid report-kpi-grid-compact">
+            <div class="report-kpi">
+              <div class="report-kpi-label">จำนวนรายการสินค้า</div>
+              <div class="report-kpi-value" id="purchaseItemsCount">0</div>
+              <div class="report-kpi-sub" id="purchaseItemsScope">-</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">จำนวนบิลที่พบ</div>
+              <div class="report-kpi-value report-kpi-income" id="purchaseItemsBills">0</div>
+              <div class="report-kpi-sub">นับตามสินค้าที่ซื้อ</div>
+            </div>
+            <div class="report-kpi">
+              <div class="report-kpi-label">ยอดรวมสินค้า</div>
+              <div class="report-kpi-value report-kpi-expense" id="purchaseItemsTotal">฿0.00</div>
+              <div class="report-kpi-sub" id="purchaseItemsWeight">0.000 กก.</div>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table report-table" id="purchaseItemsTable">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>สินค้า</th>
+                  <th>หมวด</th>
+                  <th class="text-right">จำนวนสุทธิ</th>
+                  <th class="text-right">ราคาเฉลี่ย/หน่วย</th>
+                  <th class="text-right">ยอดรวม</th>
+                  <th>หน่วย</th>
+                  <th class="text-right">บิล</th>
+                </tr>
+              </thead>
+              <tbody id="purchaseItemsBody">
+                <tr><td colspan="8" class="report-empty-cell">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section class="card report-card" id="saleLotsCard">
         <div class="card-header report-card-header">
           <h2 class="card-title">รายงานขาย Lot</h2>

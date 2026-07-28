@@ -849,6 +849,93 @@ class ReportService
         ];
     }
 
+    public function getPurchaseItemReport($dateFrom, $dateTo, $branchId = null)
+    {
+        $branchFilter = $branchId ? 'AND po.branch_id = ?' : '';
+        $params = [$dateFrom, $dateTo];
+        if ($branchId) {
+            $params[] = $branchId;
+        }
+
+        $items = $this->db->fetchAll(
+            "SELECT
+                DATE(po.created_at) AS purchase_date,
+                poi.item_name,
+                poi.category_id,
+                COALESCE(c.name, 'ไม่ระบุหมวด') AS category_name,
+                COALESCE(poi.unit, 'ชิ้น') AS unit,
+                COUNT(DISTINCT po.id) AS bill_count,
+                COUNT(poi.id) AS line_count,
+                COALESCE(SUM(poi.quantity), 0) AS total_quantity,
+                COALESCE(SUM(poi.weight_deduction), 0) AS total_deduction,
+                COALESCE(SUM(
+                    GREATEST(
+                        COALESCE(poi.quantity, 0) - COALESCE(poi.weight_deduction, 0),
+                        0
+                    )
+                ), 0) AS net_quantity,
+                COALESCE(SUM(poi.total_price), 0) AS total_amount,
+                CASE
+                    WHEN SUM(
+                        GREATEST(
+                            COALESCE(poi.quantity, 0) - COALESCE(poi.weight_deduction, 0),
+                            0
+                        )
+                    ) > 0
+                    THEN SUM(poi.total_price) / SUM(
+                        GREATEST(
+                            COALESCE(poi.quantity, 0) - COALESCE(poi.weight_deduction, 0),
+                            0
+                        )
+                    )
+                    ELSE 0
+                END AS weighted_avg_unit_price
+             FROM purchase_order_items poi
+             JOIN purchase_orders po ON po.id = poi.purchase_order_id
+             LEFT JOIN categories c ON c.id = poi.category_id
+             WHERE po.status = 'completed'
+               AND DATE(po.created_at) BETWEEN ? AND ?
+               $branchFilter
+             GROUP BY
+                DATE(po.created_at),
+                poi.category_id,
+                c.name,
+                poi.item_name,
+                poi.unit
+             ORDER BY purchase_date DESC, poi.item_name ASC, poi.unit ASC",
+            $params
+        );
+
+        $totals = $this->db->fetch(
+            "SELECT
+                COUNT(DISTINCT po.id) AS total_bills,
+                COUNT(poi.id) AS total_rows,
+                COALESCE(SUM(
+                    GREATEST(
+                        COALESCE(poi.quantity, 0) - COALESCE(poi.weight_deduction, 0),
+                        0
+                    )
+                ), 0) AS total_net_quantity,
+                COALESCE(SUM(poi.total_price), 0) AS total_amount
+             FROM purchase_order_items poi
+             JOIN purchase_orders po ON po.id = poi.purchase_order_id
+             WHERE po.status = 'completed'
+               AND DATE(po.created_at) BETWEEN ? AND ?
+               $branchFilter",
+            $params
+        );
+
+        return [
+            'items' => $items ?: [],
+            'totals' => [
+                'total_bills' => intval($totals['total_bills'] ?? 0),
+                'total_rows' => intval($totals['total_rows'] ?? 0),
+                'total_net_quantity' => floatval($totals['total_net_quantity'] ?? 0),
+                'total_amount' => floatval($totals['total_amount'] ?? 0),
+            ],
+        ];
+    }
+
     public function getSaleLotReport($dateFrom, $dateTo, $groupBy = 'day', $branchId = null)
     {
         $branchFilter = $branchId ? 'AND sl.branch_id = ?' : '';

@@ -7,6 +7,7 @@ let currentReportMonth = '';
 const reportState = {
   summary: null,
   purchaseOrders: [],
+  purchaseItems: [],
   saleLots: [],
   inventory: {
     categories: [],
@@ -254,6 +255,7 @@ function formatMonthLabel(year, monthIndex) {
 
 function updateScopeLabels() {
   const purchaseScope = document.getElementById('purchaseOrdersScope');
+  const purchaseItemsScope = document.getElementById('purchaseItemsScope');
   const saleScope = document.getElementById('saleLotsScope');
   const employeesScope = document.getElementById('employeesScope');
   const inventoryScope = document.getElementById('inventoryScope');
@@ -261,6 +263,7 @@ function updateScopeLabels() {
   const monthRange = getMonthRange(currentReportMonth);
 
   if (purchaseScope) purchaseScope.textContent = `${currentBranchName} · ${monthRange.label}`;
+  if (purchaseItemsScope) purchaseItemsScope.textContent = `${currentBranchName} · ${monthRange.label}`;
   if (saleScope) saleScope.textContent = `${currentBranchName} · ${monthRange.label}`;
   if (employeesScope) employeesScope.textContent = currentBranchName;
   if (inventoryScope) inventoryScope.textContent = currentBranchName;
@@ -271,6 +274,7 @@ function setLoadingState() {
   setSummaryLoading();
   showTableLoading('summaryBreakdownBody', 2, 4);
   showTableLoading('purchaseOrdersBody', 6, 5);
+  showTableLoading('purchaseItemsBody', 8, 5);
   showTableLoading('saleLotsBody', 8, 5);
   showTableLoading('inventoryCategoriesBody', 4, 5);
   showTableLoading('inventoryAlertsBody', 4, 5);
@@ -295,6 +299,7 @@ async function loadMonthlyReports() {
   await Promise.all([
     loadBranchSummary(range),
     loadPurchaseOrders(range),
+    loadPurchaseItems(range),
     loadSaleLots(range),
   ]);
 }
@@ -430,6 +435,61 @@ function renderPurchaseOrders(items, pagination, range) {
       </tr>
     `;
   }).join(''));
+}
+
+async function loadPurchaseItems(range) {
+  try {
+    const params = new URLSearchParams({
+      date_from: range.dateFrom,
+      date_to: range.dateTo,
+    });
+    addBranchParam(params);
+    const res = await apiRequest(`reports/purchase-items?${params.toString()}`);
+    if (res.status !== 'success') {
+      throw new Error(res.message || 'โหลดสรุปการรับซื้อแยกสินค้าไม่สำเร็จ');
+    }
+
+    const data = res.data || {};
+    const items = data.items || [];
+    reportState.purchaseItems = items;
+    renderPurchaseItems(data, range);
+  } catch (error) {
+    console.error('Failed to load purchase items:', error);
+    renderErrorRow('purchaseItemsBody', 8, 'โหลดสรุปการรับซื้อแยกสินค้าไม่สำเร็จ');
+  }
+}
+
+function renderPurchaseItems(data, range) {
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const totals = data?.totals || {};
+  const count = items.length;
+  const totalBills = parseInt(totals.total_bills || 0, 10);
+  const totalWeight = parseFloat(totals.total_net_quantity || 0);
+  const totalAmount = parseFloat(totals.total_amount || 0);
+
+  document.getElementById('purchaseItemsCount').textContent = count.toLocaleString('th-TH');
+  document.getElementById('purchaseItemsBills').textContent = totalBills.toLocaleString('th-TH');
+  document.getElementById('purchaseItemsTotal').textContent = formatCurrency(totalAmount);
+  document.getElementById('purchaseItemsWeight').textContent = `${totalWeight.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} กก.`;
+  document.getElementById('purchaseItemsScope').textContent = `${currentBranchName} · ${range.label}`;
+
+  if (count === 0) {
+    renderErrorRow('purchaseItemsBody', 8, 'ไม่มีข้อมูลรับซื้อแยกสินค้าในช่วงที่เลือก');
+    return;
+  }
+
+  renderTableBody('purchaseItemsBody', items.map((item) => `
+    <tr>
+      <td>${escapeHtml(formatDisplayDate(item.purchase_date || ''))}</td>
+      <td>${escapeHtml(item.item_name || '-')}</td>
+      <td>${escapeHtml(item.category_name || '-')}</td>
+      <td class="text-right">${parseFloat(item.net_quantity || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
+      <td class="text-right">${formatCurrency(item.weighted_avg_unit_price || 0)}</td>
+      <td class="text-right">${formatCurrency(item.total_amount || 0)}</td>
+      <td>${escapeHtml(item.unit || '-')}</td>
+      <td class="text-right">${parseInt(item.bill_count || 0, 10).toLocaleString('th-TH')}</td>
+    </tr>
+  `).join(''));
 }
 
 async function loadSaleLots(range) {
@@ -783,6 +843,24 @@ function exportReportCard(key) {
         ]),
       ]);
       break;
+    case 'purchaseItems':
+      csv = buildCsv([
+        ['สาขา', currentBranchName],
+        ['ช่วงรายงาน', monthLabel],
+        [],
+        ['วันที่', 'สินค้า', 'หมวด', 'จำนวนสุทธิ', 'ราคาเฉลี่ย/หน่วย', 'ยอดรวม', 'หน่วย', 'จำนวนบิล'],
+        ...reportState.purchaseItems.map((item) => [
+          formatDisplayDate(item.purchase_date || ''),
+          item.item_name || '',
+          item.category_name || '',
+          item.net_quantity || 0,
+          item.weighted_avg_unit_price || 0,
+          item.total_amount || 0,
+          item.unit || '',
+          item.bill_count || 0,
+        ]),
+      ]);
+      break;
     case 'saleLots':
       csv = buildCsv([
         ['สาขา', currentBranchName],
@@ -875,6 +953,7 @@ function printReportCard(key) {
   const cardMap = {
     summary: 'branchSummaryCard',
     purchaseOrders: 'purchaseOrdersCard',
+    purchaseItems: 'purchaseItemsCard',
     saleLots: 'saleLotsCard',
     inventory: 'inventoryCard',
     employees: 'employeesCard',
