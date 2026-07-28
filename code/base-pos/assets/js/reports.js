@@ -6,14 +6,8 @@ let currentReportMonth = '';
 
 const reportState = {
   summary: null,
-  purchaseOrders: [],
   purchaseItems: [],
   saleLots: [],
-  inventory: {
-    categories: [],
-    alerts: [],
-    alertSummary: null,
-  },
   employees: [],
   tax: null,
 };
@@ -58,7 +52,6 @@ async function initReports() {
   setLoadingState();
   await Promise.all([
     loadMonthlyReports(),
-    loadInventoryReport(),
     loadEmployeesReport(),
     loadTaxReport(),
   ]);
@@ -183,7 +176,6 @@ function getReportPeriodText(key) {
 async function reloadAllReports() {
   await Promise.all([
     loadMonthlyReports(),
-    loadInventoryReport(),
     loadEmployeesReport(),
     loadTaxReport(),
   ]);
@@ -254,30 +246,23 @@ function formatMonthLabel(year, monthIndex) {
 }
 
 function updateScopeLabels() {
-  const purchaseScope = document.getElementById('purchaseOrdersScope');
   const purchaseItemsScope = document.getElementById('purchaseItemsScope');
   const saleScope = document.getElementById('saleLotsScope');
   const employeesScope = document.getElementById('employeesScope');
-  const inventoryScope = document.getElementById('inventoryScope');
   const taxScope = document.getElementById('taxScope');
   const monthRange = getMonthRange(currentReportMonth);
 
-  if (purchaseScope) purchaseScope.textContent = `${currentBranchName} · ${monthRange.label}`;
   if (purchaseItemsScope) purchaseItemsScope.textContent = `${currentBranchName} · ${monthRange.label}`;
   if (saleScope) saleScope.textContent = `${currentBranchName} · ${monthRange.label}`;
   if (employeesScope) employeesScope.textContent = currentBranchName;
-  if (inventoryScope) inventoryScope.textContent = currentBranchName;
   if (taxScope) taxScope.textContent = `${currentBranchName} · จากข้อมูลที่เลือก`;
 }
 
 function setLoadingState() {
   setSummaryLoading();
   showTableLoading('summaryBreakdownBody', 2, 4);
-  showTableLoading('purchaseOrdersBody', 6, 5);
   showTableLoading('purchaseItemsBody', 8, 5);
   showTableLoading('saleLotsBody', 8, 5);
-  showTableLoading('inventoryCategoriesBody', 4, 5);
-  showTableLoading('inventoryAlertsBody', 4, 5);
   showTableLoading('employeesBody', 6, 5);
   showTableLoading('taxReportBody', 4, 5);
 }
@@ -298,7 +283,6 @@ async function loadMonthlyReports() {
 
   await Promise.all([
     loadBranchSummary(range),
-    loadPurchaseOrders(range),
     loadPurchaseItems(range),
     loadSaleLots(range),
   ]);
@@ -377,64 +361,6 @@ function renderBranchSummary(summary) {
       <td class="text-right ${label === 'กำไรสุทธิ' ? (summary.netProfit >= 0 ? 'report-kpi-income' : 'report-kpi-expense') : ''}">${escapeHtml(value)}</td>
     </tr>
   `).join(''));
-}
-
-async function loadPurchaseOrders(range) {
-  try {
-    const params = new URLSearchParams({
-      date_from: range.dateFrom,
-      date_to: range.dateTo,
-      limit: '1000',
-    });
-    addBranchParam(params);
-    const res = await apiRequest(`purchase-orders?${params.toString()}`);
-    if (res.status !== 'success') {
-      throw new Error(res.message || 'โหลดข้อมูลรับซื้อไม่สำเร็จ');
-    }
-
-    const items = res.data?.items || [];
-    reportState.purchaseOrders = items;
-    renderPurchaseOrders(items, res.data?.pagination || null, range);
-  } catch (error) {
-    console.error('Failed to load purchase orders:', error);
-    renderErrorRow('purchaseOrdersBody', 6, 'โหลดข้อมูลรับซื้อไม่สำเร็จ');
-  }
-}
-
-function renderPurchaseOrders(items, pagination, range) {
-  const count = items.length;
-  const total = items.reduce((sum, item) => sum + parseFloat(item.total_amount || 0), 0);
-  const sellers = new Set(items.map((item) => item.seller_name || item.seller_id || item.seller_id_card).filter(Boolean));
-  const avg = count > 0 ? total / count : 0;
-
-  document.getElementById('purchaseOrdersCount').textContent = count.toLocaleString('th-TH');
-  document.getElementById('purchaseOrdersTotal').textContent = formatCurrency(total);
-  document.getElementById('purchaseOrdersAverage').textContent = `เฉลี่ย ${formatCurrency(avg)}`;
-  document.getElementById('purchaseOrdersSellers').textContent = sellers.size.toLocaleString('th-TH');
-
-  const note = pagination && pagination.total > count
-    ? `${count.toLocaleString('th-TH')} จาก ${pagination.total.toLocaleString('th-TH')} รายการ`
-    : `${count.toLocaleString('th-TH')} รายการในช่วง ${range.label}`;
-  document.getElementById('purchaseOrdersScope').textContent = `${currentBranchName} · ${note}`;
-
-  if (count === 0) {
-    renderErrorRow('purchaseOrdersBody', 6, 'ไม่มีข้อมูลรับซื้อในช่วงที่เลือก');
-    return;
-  }
-
-  renderTableBody('purchaseOrdersBody', items.map((item) => {
-    const statusClass = getStatusClass(item.status);
-    return `
-      <tr>
-        <td style="font-family:monospace">${escapeHtml(item.reference_no || `PO-${item.id}`)}</td>
-        <td>${escapeHtml(formatDisplayDate(item.created_at || item.sale_date))}</td>
-        <td>${escapeHtml(item.seller_name || '-')}</td>
-        <td class="text-right">${formatCurrency(item.total_amount || 0)}</td>
-        <td>${escapeHtml(formatPaymentMethod(item.payment_method))}</td>
-        <td><span class="report-badge ${statusClass.className}">${escapeHtml(statusClass.label)}</span></td>
-      </tr>
-    `;
-  }).join(''));
 }
 
 async function loadPurchaseItems(range) {
@@ -554,95 +480,6 @@ function renderSaleLots(items, pagination, range) {
         <td class="text-right">${formatCurrency(costValue)}</td>
         <td class="text-right ${profitValue >= 0 ? 'report-kpi-income' : 'report-kpi-expense'}">${profitValue >= 0 ? '+' : ''}${formatCurrency(profitValue)}</td>
         <td><span class="report-badge ${statusClass.className}">${escapeHtml(statusClass.label)}</span></td>
-      </tr>
-    `;
-  }).join(''));
-}
-
-async function loadInventoryReport() {
-  try {
-    const params = new URLSearchParams();
-    addBranchParam(params);
-    const query = params.toString();
-    const suffix = query ? `?${query}` : '';
-    const [categoriesRes, alertsRes] = await Promise.all([
-      apiRequest(`inventory/categories${suffix}`),
-      apiRequest(`inventory/stock-alerts${suffix}`),
-    ]);
-
-    if (categoriesRes.status !== 'success') {
-      throw new Error(categoriesRes.message || 'โหลดข้อมูลคลังไม่สำเร็จ');
-    }
-
-    const categories = Array.isArray(categoriesRes.data) ? categoriesRes.data : [];
-    const alerts = alertsRes.status === 'success' ? (alertsRes.data?.items || []) : [];
-    const alertSummary = alertsRes.status === 'success' ? alertsRes.data?.summary || null : null;
-
-    reportState.inventory = {
-      categories,
-      alerts,
-      alertSummary,
-    };
-    renderInventory(categories, alerts, alertSummary);
-  } catch (error) {
-    console.error('Failed to load inventory report:', error);
-    renderErrorRow('inventoryCategoriesBody', 4, 'โหลดข้อมูลคลังไม่สำเร็จ');
-    renderErrorRow('inventoryAlertsBody', 4, 'โหลดข้อมูลแจ้งเตือนไม่สำเร็จ');
-  }
-}
-
-function renderInventory(categories, alerts, alertSummary) {
-  const count = categories.length;
-  const totalKg = categories.reduce((sum, item) => sum + parseFloat(item.stock_kg || 0), 0);
-  const lowCount = alertSummary?.below_threshold ?? alerts.length;
-  const zeroCount = alertSummary?.zero_stock ?? 0;
-
-  document.getElementById('inventoryCategoriesCount').textContent = count.toLocaleString('th-TH');
-  document.getElementById('inventoryTotalKg').textContent = totalKg.toLocaleString('th-TH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 3,
-  });
-  document.getElementById('inventoryLowCount').textContent = lowCount.toLocaleString('th-TH');
-  document.getElementById('inventoryScope').textContent = currentBranchName;
-  document.getElementById('inventoryStockSummary').textContent = `${zeroCount} หมดสต็อก · ${lowCount} ใกล้หมด`;
-
-  if (count === 0) {
-    renderErrorRow('inventoryCategoriesBody', 4, 'ไม่มีข้อมูลคลัง');
-  } else {
-    renderTableBody('inventoryCategoriesBody', categories.map((item) => {
-      const stockKg = parseFloat(item.stock_kg || 0);
-      const threshold = item.alert_threshold === null || item.alert_threshold === undefined
-        ? null
-        : parseFloat(item.alert_threshold);
-      const status = getInventoryStatus(stockKg, threshold);
-      return `
-        <tr>
-          <td>${escapeHtml(item.name || '-')}</td>
-          <td class="text-right">${stockKg.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
-          <td class="text-right">${threshold === null || Number.isNaN(threshold) ? '-' : threshold.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
-          <td><span class="report-badge ${status.className}">${escapeHtml(status.label)}</span></td>
-        </tr>
-      `;
-    }).join(''));
-  }
-
-  if (!alerts || alerts.length === 0) {
-    renderErrorRow('inventoryAlertsBody', 4, 'ไม่มีรายการแจ้งเตือน');
-    return;
-  }
-
-  renderTableBody('inventoryAlertsBody', alerts.map((item) => {
-    const stockKg = parseFloat(item.stock_kg || 0);
-    const threshold = item.alert_threshold === null || item.alert_threshold === undefined
-      ? 0
-      : parseFloat(item.alert_threshold);
-    const status = getInventoryStatus(stockKg, threshold);
-    return `
-      <tr>
-        <td>${escapeHtml(item.item_name || '-')}</td>
-        <td>${escapeHtml(item.category_name || '-')}</td>
-        <td class="text-right">${stockKg.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
-        <td class="text-right">${threshold.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
       </tr>
     `;
   }).join(''));
@@ -827,22 +664,6 @@ function exportReportCard(key) {
         ['สาขา', currentBranchName],
       ]);
       break;
-    case 'purchaseOrders':
-      csv = buildCsv([
-        ['สาขา', currentBranchName],
-        ['ช่วงรายงาน', monthLabel],
-        [],
-        ['เลขที่', 'วันที่', 'ผู้ขาย', 'ยอดรวม', 'วิธีจ่าย', 'สถานะ'],
-        ...reportState.purchaseOrders.map((item) => [
-          item.reference_no || '',
-          formatDisplayDate(item.created_at || item.sale_date),
-          item.seller_name || '',
-          item.total_amount || 0,
-          formatPaymentMethod(item.payment_method),
-          getStatusLabel(item.status),
-        ]),
-      ]);
-      break;
     case 'purchaseItems':
       csv = buildCsv([
         ['สาขา', currentBranchName],
@@ -882,33 +703,6 @@ function exportReportCard(key) {
             getStatusLabel(item.status),
           ];
         }),
-      ]);
-      break;
-    case 'inventory':
-      csv = buildCsv([
-        ['สาขา', currentBranchName],
-        ['ช่วงรายงาน', monthLabel],
-        [],
-        ['หมวดหมู่', 'สต็อก (กก.)', 'เกณฑ์แจ้งเตือน', 'สถานะ'],
-        ...reportState.inventory.categories.map((item) => {
-          const stockKg = parseFloat(item.stock_kg || 0);
-          const threshold = item.alert_threshold === null || item.alert_threshold === undefined ? '' : item.alert_threshold;
-          const status = getInventoryStatus(stockKg, threshold === '' ? null : parseFloat(threshold));
-          return [
-            item.name || '',
-            stockKg.toFixed(3),
-            threshold === '' ? '-' : threshold,
-            status.label,
-          ];
-        }),
-        [],
-        ['รายการแจ้งเตือน', 'หมวด', 'สต็อก (กก.)', 'เกณฑ์'],
-        ...reportState.inventory.alerts.map((item) => [
-          item.item_name || '',
-          item.category_name || '',
-          parseFloat(item.stock_kg || 0).toFixed(3),
-          item.alert_threshold ?? 0,
-        ]),
       ]);
       break;
     case 'employees':
@@ -952,10 +746,8 @@ function exportReportCard(key) {
 function printReportCard(key) {
   const cardMap = {
     summary: 'branchSummaryCard',
-    purchaseOrders: 'purchaseOrdersCard',
     purchaseItems: 'purchaseItemsCard',
     saleLots: 'saleLotsCard',
-    inventory: 'inventoryCard',
     employees: 'employeesCard',
     tax: 'taxCard',
   };

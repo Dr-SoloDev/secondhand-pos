@@ -118,61 +118,6 @@
         </div>
       </section>
 
-      <section class="card report-card" id="purchaseOrdersCard">
-        <div class="card-header report-card-header">
-          <h2 class="card-title">รายงานการรับซื้อ</h2>
-          <div class="report-card-actions">
-            <input type="date" id="dailyExportDate" class="form-control report-daily-date" aria-label="วันที่ส่งออก Excel รายวัน">
-            <button class="btn btn-primary btn-sm report-daily-export-btn" type="button" id="btnExportDaily" title="ส่งออก Excel รายวัน" aria-label="ส่งออก Excel รายวัน">
-              <i class="icon-download"></i> Excel
-            </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="purchaseOrders" title="ส่งออกข้อมูลรับซื้อ" aria-label="ส่งออกข้อมูลรับซื้อ">
-              <i class="icon-download"></i>
-            </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="purchaseOrders" title="พิมพ์ข้อมูลรับซื้อ" aria-label="พิมพ์ข้อมูลรับซื้อ">
-              <i class="icon-print"></i>
-            </button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="report-kpi-grid report-kpi-grid-compact">
-            <div class="report-kpi">
-              <div class="report-kpi-label">จำนวนบิล</div>
-              <div class="report-kpi-value" id="purchaseOrdersCount">0</div>
-              <div class="report-kpi-sub" id="purchaseOrdersScope">-</div>
-            </div>
-            <div class="report-kpi">
-              <div class="report-kpi-label">ยอดรวมในช่วง</div>
-              <div class="report-kpi-value report-kpi-expense" id="purchaseOrdersTotal">฿0.00</div>
-              <div class="report-kpi-sub" id="purchaseOrdersAverage">เฉลี่ย ฿0.00</div>
-            </div>
-            <div class="report-kpi">
-              <div class="report-kpi-label">จำนวนผู้ขาย</div>
-              <div class="report-kpi-value" id="purchaseOrdersSellers">0</div>
-              <div class="report-kpi-sub">ผู้ขายที่พบในข้อมูล</div>
-            </div>
-          </div>
-
-          <div class="table-container">
-            <table class="data-table report-table" id="purchaseOrdersTable">
-              <thead>
-                <tr>
-                  <th>เลขที่</th>
-                  <th>วันที่</th>
-                  <th>ผู้ขาย</th>
-                  <th class="text-right">ยอดรวม</th>
-                  <th>วิธีจ่าย</th>
-                  <th>สถานะ</th>
-                </tr>
-              </thead>
-              <tbody id="purchaseOrdersBody">
-                <tr><td colspan="6" class="report-empty-cell">กำลังโหลด...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
       <section class="card report-card" id="purchaseItemsCard">
         <div class="card-header report-card-header">
           <h2 class="card-title">สรุปการรับซื้อแยกตามสินค้า</h2>
@@ -275,77 +220,6 @@
                 <tr><td colspan="8" class="report-empty-cell">กำลังโหลด...</td></tr>
               </tbody>
             </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="card report-card" id="inventoryCard">
-        <div class="card-header report-card-header">
-          <h2 class="card-title">สถานะสินค้าคงคลัง</h2>
-          <div class="report-card-actions">
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="export" data-report-key="inventory" title="ส่งออกข้อมูลคลัง" aria-label="ส่งออกข้อมูลคลัง">
-              <i class="icon-download"></i>
-            </button>
-            <button class="btn btn-secondary report-icon-btn" type="button" data-report-action="print" data-report-key="inventory" title="พิมพ์ข้อมูลคลัง" aria-label="พิมพ์ข้อมูลคลัง">
-              <i class="icon-print"></i>
-            </button>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="report-kpi-grid report-kpi-grid-compact">
-            <div class="report-kpi">
-              <div class="report-kpi-label">หมวดหมู่</div>
-              <div class="report-kpi-value" id="inventoryCategoriesCount">0</div>
-              <div class="report-kpi-sub" id="inventoryScope">-</div>
-            </div>
-            <div class="report-kpi">
-              <div class="report-kpi-label">สต็อกรวม</div>
-              <div class="report-kpi-value" id="inventoryTotalKg">0.000</div>
-              <div class="report-kpi-sub" id="inventoryStockSummary">กก.</div>
-            </div>
-            <div class="report-kpi">
-              <div class="report-kpi-label">ใกล้หมด</div>
-              <div class="report-kpi-value report-kpi-expense" id="inventoryLowCount">0</div>
-              <div class="report-kpi-sub">รายการที่ต้องเช็ก</div>
-            </div>
-          </div>
-
-          <div class="report-subsection">
-            <div class="report-subsection-title">สต็อกตามหมวด</div>
-            <div class="table-container">
-              <table class="data-table report-table" id="inventoryCategoriesTable">
-                <thead>
-                  <tr>
-                    <th>หมวดหมู่</th>
-                    <th class="text-right">สต็อก (กก.)</th>
-                    <th class="text-right">เกณฑ์แจ้งเตือน</th>
-                    <th>สถานะ</th>
-                  </tr>
-                </thead>
-                <tbody id="inventoryCategoriesBody">
-                  <tr><td colspan="4" class="report-empty-cell">กำลังโหลด...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="report-subsection">
-            <div class="report-subsection-title">รายการแจ้งเตือน</div>
-            <div class="table-container">
-              <table class="data-table report-table" id="inventoryAlertsTable">
-                <thead>
-                  <tr>
-                    <th>รายการ</th>
-                    <th>หมวด</th>
-                    <th class="text-right">สต็อก (กก.)</th>
-                    <th class="text-right">เกณฑ์</th>
-                  </tr>
-                </thead>
-                <tbody id="inventoryAlertsBody">
-                  <tr><td colspan="4" class="report-empty-cell">กำลังโหลด...</td></tr>
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       </section>
