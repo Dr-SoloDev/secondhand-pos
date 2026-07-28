@@ -154,19 +154,19 @@ async function loadBoard() {
       <table class="price-table">
         <thead><tr>
           <th style="text-align:left">สินค้า</th>
-          <th>หน่วย</th>
           ${tierColumns.map(col => `<th>${escapeHtml(col.label)}</th>`).join('')}
+          <th>หน่วย</th>
         </tr></thead>
         <tbody>`;
     rows.forEach(item => {
-      const tierLookup = getTierPriceMap(item.tier_prices || []);
+      const tiers = getSortedTierPrices(item.tier_prices || []);
       html += `<tr>
         <td>${escapeHtml(item.name)}</td>
-        <td style="text-align:center;color:#666">${escapeHtml(item.default_unit || 'กก.')}</td>
         ${tierColumns.map(col => {
-          const tier = tierLookup.get(col.key);
+          const tier = tiers[col.index];
           return `<td class="text-right tier-price">${tier ? formatPrice(tier.price) : '—'}</td>`;
         }).join('')}
+        <td style="text-align:center;color:#666">${escapeHtml(item.default_unit || 'กก.')}</td>
       </tr>`;
     });
     html += `</tbody></table></div>`;
@@ -176,63 +176,18 @@ async function loadBoard() {
 }
 
 function getTierColumns(items) {
-  const columns = new Map();
-  items.forEach(item => {
-    (item.tier_prices || []).forEach((tier, index) => {
-      const key = getTierKey(tier, index);
-      if (!columns.has(key)) {
-        columns.set(key, {
-          key,
-          label: getTierLabel(tier, index)
-        });
-      }
-    });
-  });
+  const maxTierCount = items.reduce((max, item) => {
+    return Math.max(max, (item.tier_prices || []).length);
+  }, 0);
 
-  return Array.from(columns.values()).sort(compareTierColumns);
+  return Array.from({ length: maxTierCount }, (_, index) => ({
+    index,
+    label: `บิล${index + 1}`
+  }));
 }
 
-function getTierPriceMap(tiers) {
-  const map = new Map();
-  tiers.forEach((tier, index) => {
-    map.set(getTierKey(tier, index), tier);
-  });
-  return map;
-}
-
-function getTierKey(tier, fallbackIndex) {
-  const label = String(tier?.label || '');
-  const billNumber = getTierBillNumber(label);
-  if (billNumber !== null) {
-    return `bill-${String(billNumber).padStart(3, '0')}`;
-  }
-
-  return `label-${label.trim() || fallbackIndex + 1}`;
-}
-
-function getTierLabel(tier, fallbackIndex) {
-  const label = String(tier?.label || '').trim();
-  const billNumber = getTierBillNumber(label);
-  if (billNumber !== null) {
-    return `บิล${billNumber}`;
-  }
-
-  return label || `ระดับ ${fallbackIndex + 1}`;
-}
-
-function getTierBillNumber(label) {
-  const match = String(label || '').match(/\d+/);
-  return match ? parseInt(match[0], 10) : null;
-}
-
-function compareTierColumns(a, b) {
-  const aBill = a.key.match(/^bill-(\d+)$/);
-  const bBill = b.key.match(/^bill-(\d+)$/);
-
-  if (aBill && bBill) return Number(aBill[1]) - Number(bBill[1]);
-  if (aBill) return -1;
-  if (bBill) return 1;
-  return a.label.localeCompare(b.label, 'th');
+function getSortedTierPrices(tiers) {
+  return tiers.slice().sort((a, b) => parseFloat(a.price || 0) - parseFloat(b.price || 0));
 }
 
 function formatPrice(value) {
