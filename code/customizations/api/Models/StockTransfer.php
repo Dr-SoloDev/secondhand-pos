@@ -7,6 +7,11 @@ class StockTransfer extends Model
     {
         $where = [];
         $params = [];
+        if (!empty($filters['branch_id'])) {
+            $where[] = "(st.from_branch_id = ? OR st.to_branch_id = ?)";
+            $params[] = $filters['branch_id'];
+            $params[] = $filters['branch_id'];
+        }
         if (!empty($filters['from_branch_id'])) {
             $where[] = "st.from_branch_id = ?";
             $params[] = $filters['from_branch_id'];
@@ -46,19 +51,23 @@ class StockTransfer extends Model
 
         $stmt = $this->db->prepare(
             "INSERT INTO stock_transfers
-               (reference_no,from_branch_id,to_branch_id,category_id,weight_kg,
+               (reference_no,from_branch_id,to_branch_id,category_id,item_name,weight_kg,
                 note,transporter_name,vehicle_plate,created_by)
-             VALUES (?,?,?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?)"
         );
         $this->db->execute($stmt, [
             $ref, $data['from_branch_id'], $data['to_branch_id'],
-            $data['category_id'], $data['weight_kg'],
+            $data['category_id'], trim($data['item_name']), $data['weight_kg'],
             $data['note'] ?? null,
             $data['transporter_name'] ?? null,
             $data['vehicle_plate'] ?? null,
             $userId,
         ]);
-        return ['id' => intval($this->db->lastInsertId()), 'reference_no' => $ref];
+        return [
+            'id' => intval($this->db->lastInsertId()),
+            'reference_no' => $ref,
+            'created_at' => date('Y-m-d H:i:s'),
+        ];
     }
 
     private function getTransferSellerId($branchId)
@@ -71,39 +80,72 @@ class StockTransfer extends Model
         if ($sellerId) return (int)$sellerId;
 
         $stmt = $this->db->prepare(
-            "INSERT INTO sellers (id_card, full_name, notes, branch_id)
-             VALUES (?, 'โอนสต็อกระหว่างสาขา', 'system placeholder สำหรับ stock transfer', ?)"
+            "INSERT INTO sellers (id_card, full_name, notes)
+             VALUES (?, 'โอนสต็อกระหว่างสาขา', 'system placeholder สำหรับ stock transfer')"
         );
-        $this->db->execute($stmt, [$idCard, $branchId]);
+        $this->db->execute($stmt, [$idCard]);
         return (int)$this->db->lastInsertId();
     }
 
     public function confirm($id, $userId, $receivedWeight = null, $receiveNote = null)
     {
-        $st = $this->db->fetch("SELECT * FROM stock_transfers WHERE id = ? AND status = 'pending'", [$id]);
-        if (!$st) throw new Exception('ไม่พบใบโอนหรือดำเนินการแล้ว');
-
-        $fromBranch   = (int)$st['from_branch_id'];
-        $toBranch     = (int)$st['to_branch_id'];
-        $categoryId   = (int)$st['category_id'];
-        $orderedWeight = (float)$st['weight_kg'];
-        $weightNeeded  = $receivedWeight !== null ? (float)$receivedWeight : $orderedWeight;
-
         $this->db->beginTransaction();
         try {
-            // ── 1. เช็คสต็อกจริงจาก PO items ต้นทาง (ไม่ใช่ global stock_kg) ──
-            $availableRows = $this->db->fetchAll(
+            // Lock transfer first so a pending transfer cannot be confirmed twice.
+            $st = $this->db->fetch(
+                "SELECT * FROM stock_transfers WHERE id = ? FOR UPDATE",
+                [$id]
+            );
+            if (!$st) {
+                throw new Exception('ไม่พบใบโอน');
+            }
+            if ($st['status'] !== 'pending') {
+                throw new Exception('ใบโอนนี้ดำเนินการแล้ว');
+            }
+
+            $fromBranch    = (int)$st['from_branch_id'];
+            $toBranch      = (int)$st['to_branch_id'];
+            $categoryId    = (int)$st['category_id'];
+            $itemName      = trim((string)($st['item_name'] ?? ''));
+            $orderedWeight = (float)$st['weight_kg'];
+            $weightNeeded  = $receivedWeight !== null ? (float)$receivedWeight : $orderedWeight;
+
+            // New transfers must be item-specific. Old pending documents without item_name
+            // remain confirmable with their legacy category-level behaviour.
+            if ($itemName !== '') {
+                $branchStockQty = (float)$this->db->fetchColumn(
+                    "SELECT stock_kg
+                     FROM branch_stock
+                     WHERE branch_id = ? AND category_id = ? AND item_name = ?
+                     FOR UPDATE",
+                    [$fromBranch, $categoryId, $itemName]
+                );
+                if ($branchStockQty < $weightNeeded) {
+                    throw new Exception(
+                        "สต็อก {$itemName} ที่สาขาต้นทางไม่เพียงพอ (มี " .
+                        number_format($branchStockQty, 2) . " กก. ต้องการ " .
+                        number_format($weightNeeded, 2) . " กก.)"
+                    );
+                }
+            }
+
+            // Check and consume source PO stock. Use net weight so transfer matches branch_stock.
+            $availableSql =
                 "SELECT poi.id, poi.item_name,
-                        (poi.quantity - poi.consumed_qty) AS avail, poi.unit_price
+                        (poi.quantity - COALESCE(poi.weight_deduction, 0) - poi.consumed_qty) AS avail,
+                        poi.unit_price
                  FROM purchase_order_items poi
                  JOIN purchase_orders po ON poi.purchase_order_id = po.id
                  WHERE po.branch_id = ? AND poi.category_id = ?
                    AND po.status = 'completed'
-                   AND (poi.quantity - poi.consumed_qty) > 0
-                 ORDER BY po.created_at ASC
-                 FOR UPDATE",
-                [$fromBranch, $categoryId]
-            );
+                   AND (poi.quantity - COALESCE(poi.weight_deduction, 0) - poi.consumed_qty) > 0";
+            $availableParams = [$fromBranch, $categoryId];
+            if ($itemName !== '') {
+                $availableSql .= " AND TRIM(poi.item_name) = ?";
+                $availableParams[] = $itemName;
+            }
+            $availableSql .= " ORDER BY po.created_at ASC, poi.id ASC FOR UPDATE";
+            $availableRows = $this->db->fetchAll($availableSql, $availableParams);
 
             $totalAvail = array_sum(array_column($availableRows, 'avail'));
             if ($totalAvail < $weightNeeded) {
@@ -119,27 +161,31 @@ class StockTransfer extends Model
             foreach ($availableRows as $row) {
                 if ($remaining <= 0) break;
                 $take = min((float)$row['avail'], $remaining);
-                $itemName = $row['item_name'] ?? '';
+                $sourceItemName = trim((string)($row['item_name'] ?? ''));
+                if ($sourceItemName === '') {
+                    throw new Exception('ไม่พบชื่อสินค้าในสต็อกต้นทาง');
+                }
 
                 $stmt = $this->db->prepare(
                     "UPDATE purchase_order_items
                      SET consumed_qty = consumed_qty + ?
-                     WHERE id = ? AND consumed_qty + ? <= quantity"
+                     WHERE id = ?
+                       AND consumed_qty + ? <= quantity - COALESCE(weight_deduction, 0)"
                 );
                 $this->db->execute($stmt, [$take, $row['id'], $take]);
+                if (!$stmt->rowCount()) {
+                    throw new Exception('สต็อกถูกใช้งานโดยรายการอื่นแล้ว กรุณาลองใหม่');
+                }
 
                 $rowCost = $take * (float)$row['unit_price'];
                 $totalCost += $rowCost;
                 $remaining -= $take;
 
-                // Group by item_name
-                if ($itemName) {
-                    if (!isset($itemBatches[$itemName])) {
-                        $itemBatches[$itemName] = ['qty' => 0, 'cost' => 0];
-                    }
-                    $itemBatches[$itemName]['qty'] += $take;
-                    $itemBatches[$itemName]['cost'] += $rowCost;
+                if (!isset($itemBatches[$sourceItemName])) {
+                    $itemBatches[$sourceItemName] = ['qty' => 0, 'cost' => 0];
                 }
+                $itemBatches[$sourceItemName]['qty'] += $take;
+                $itemBatches[$sourceItemName]['cost'] += $rowCost;
             }
 
             $transferSellerId = $this->getTransferSellerId($toBranch);
@@ -219,7 +265,28 @@ class StockTransfer extends Model
 
     public function cancel($id)
     {
-        $stmt = $this->db->prepare("UPDATE stock_transfers SET status='cancelled' WHERE id=? AND status='pending'");
-        $this->db->execute($stmt, [$id]);
+        $this->db->beginTransaction();
+        try {
+            $st = $this->db->fetch(
+                "SELECT id, status FROM stock_transfers WHERE id = ? FOR UPDATE",
+                [$id]
+            );
+            if (!$st) {
+                throw new Exception('ไม่พบใบโอน');
+            }
+            if ($st['status'] !== 'pending') {
+                throw new Exception('ยกเลิกได้เฉพาะใบโอนที่รอตรวจรับ');
+            }
+
+            $stmt = $this->db->prepare(
+                "UPDATE stock_transfers SET status = 'cancelled' WHERE id = ?"
+            );
+            $this->db->execute($stmt, [$id]);
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 }

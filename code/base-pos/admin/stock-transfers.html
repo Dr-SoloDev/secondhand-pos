@@ -50,7 +50,7 @@
     </div>
 
     <!-- ฟอร์มสร้างใบโอน -->
-    <div class="card" style="margin-bottom:24px">
+    <div class="card" id="transferCreateCard" style="margin-bottom:24px">
       <div class="card-header"><h2 class="card-title">สร้างใบโอนสต็อก</h2></div>
       <div class="card-body">
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;align-items:end">
@@ -64,7 +64,7 @@
           </div>
           <div>
             <label style="font-size:12px;display:block;margin-bottom:4px">รายการสินค้า</label>
-            <select id="categorySelect" class="form-control"></select>
+            <select id="itemSelect" class="form-control"></select>
           </div>
           <div>
             <label style="font-size:12px;display:block;margin-bottom:4px">น้ำหนัก (กก.)</label>
@@ -133,26 +133,6 @@
   </main>
 </div>
 
-<!-- Modal ใบโอนสต็อก (พิมพ์) -->
-<div id="printModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:8px;padding:16px;width:480px;max-width:95vw">
-    <style>
-      @media print {
-        @page { size: A5; margin: 8mm; }
-        body > *:not(#printModal) { display: none !important; }
-        #printModal { position: static !important; background: none !important; }
-        #printModal > div { box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }
-        #printModalActions { display: none !important; }
-      }
-    </style>
-    <div id="printSlip" style="font-family:'Sarabun',sans-serif;font-size:13px;padding:12px"></div>
-    <div id="printModalActions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-      <button class="btn btn-secondary" onclick="document.getElementById('printModal').style.display='none'">ปิด</button>
-      <button class="btn btn-primary" onclick="window.print()">พิมพ์</button>
-    </div>
-  </div>
-</div>
-
 <!-- Modal ตรวจรับสินค้า -->
 <div id="receiveModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:8px;padding:24px;width:420px;max-width:95vw">
@@ -197,10 +177,17 @@
 <script src="../assets/js/config.js"></script>
 <script src="../assets/js/common.js"></script>
 <script>
+let transferUser = null;
+
 async function init() {
   const user = await requireAuth();
   if (!user) return;
+  transferUser = user;
   document.getElementById('currentUser').textContent = user.username || '-';
+  const canManageTransfers = ['admin', 'manager'].includes(user.role);
+  if (!canManageTransfers) {
+    document.getElementById('transferCreateCard').style.display = 'none';
+  }
 
   const [branchRes, catRes] = await Promise.all([
     apiRequest('branches/active'),
@@ -215,14 +202,29 @@ async function init() {
       from.appendChild(new Option(b.name, b.id));
       to.appendChild(new Option(b.name, b.id));
     });
-    if (branches.length > 1) to.selectedIndex = 1;
+    if (user.role !== 'admin' && user.branch_id) {
+      from.value = String(user.branch_id);
+      from.disabled = true;
+      const firstDestination = branches.find(b => Number(b.id) !== Number(user.branch_id));
+      if (firstDestination) to.value = String(firstDestination.id);
+    } else if (branches.length > 1) {
+      to.selectedIndex = 1;
+    }
   }
 
   if (catRes.status === 'success') {
-    const sel = document.getElementById('categorySelect');
-    (catRes.data || []).forEach(c => {
-      sel.appendChild(new Option(`${c.name} (${c.category_name})`, c.category_id));
+    const sel = document.getElementById('itemSelect');
+    const catalogItems = (catRes.data || []).filter(c => c.category_id && c.name);
+    catalogItems.forEach(c => {
+      const option = new Option(`${c.name} (${c.category_name || '-'})`, c.id);
+      option.dataset.categoryId = c.category_id;
+      option.dataset.itemName = c.name;
+      option.dataset.categoryName = c.category_name || '';
+      sel.appendChild(option);
     });
+    if (!catalogItems.length) {
+      sel.appendChild(new Option('ไม่มีรายการสินค้าที่กำหนดหมวดหมู่', ''));
+    }
   }
 
   loadTransfers();
@@ -252,18 +254,25 @@ async function loadTransfers() {
       ? `<span style="color:${Math.abs(parseFloat(t.received_weight_kg)-parseFloat(t.weight_kg))>0.001?'#e67e22':'#27ae60'};font-weight:600">${parseFloat(t.received_weight_kg).toLocaleString('th-TH',{minimumFractionDigits:3})}</span>`
       : '-';
 
-    const actions = t.status === 'pending'
-      ? `<button class="btn btn-sm btn-success" onclick="openReceiveModal(${t.id},${t.weight_kg})">✓ ตรวจรับ</button>
-         <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="cancelTransfer(${t.id})">ยกเลิก</button>
-          <button class="btn btn-sm btn-secondary" style="margin-left:4px" onclick='printTransfer(${JSON.stringify(t)})'>พิมพ์</button>`
-      : `<button class="btn btn-sm btn-secondary" onclick='printTransfer(${JSON.stringify(t)})'>พิมพ์</button>`;
+    const isAdmin = transferUser?.role === 'admin';
+    const branchId = Number(transferUser?.branch_id || 0);
+    const canConfirm = t.status === 'pending' && (isAdmin || Number(t.to_branch_id) === branchId);
+    const canCancel = t.status === 'pending' && (isAdmin || Number(t.from_branch_id) === branchId);
+    const actions = [
+      canConfirm ? `<button class="btn btn-sm btn-success" onclick="openReceiveModal(${t.id},${t.weight_kg})">✓ ตรวจรับ</button>` : '',
+      canCancel ? `<button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="cancelTransfer(${t.id})">ยกเลิก</button>` : '',
+      `<button class="btn btn-sm btn-secondary" style="margin-left:4px" data-transfer="${escapeHtml(JSON.stringify(t))}" onclick="printTransferFromData(this)">พิมพ์</button>`,
+    ].join('');
+    const itemLabel = t.item_name
+      ? `${escapeHtml(t.item_name)}${t.category_name ? `<div style="font-size:11px;color:#666">${escapeHtml(t.category_name)}</div>` : ''}`
+      : escapeHtml(t.category_name || '-');
 
     return `<tr>
       <td style="font-family:monospace;font-size:12px">${escapeHtml(t.reference_no)}</td>
       <td style="font-size:12px">${(t.created_at||'').slice(0,10)}</td>
       <td>${escapeHtml(t.from_branch_name||'-')}</td>
       <td>${escapeHtml(t.to_branch_name||'-')}</td>
-      <td>${escapeHtml(t.category_name||'-')}</td>
+      <td>${itemLabel}</td>
       <td class="text-right">${orderedKg}</td>
       <td class="text-right">${receivedKg}</td>
       <td style="font-size:12px">${escapeHtml(t.transporter_name||'-')}</td>
@@ -280,13 +289,17 @@ async function loadTransfers() {
 async function createTransfer() {
   const fromId    = parseInt(document.getElementById('fromBranch').value);
   const toId      = parseInt(document.getElementById('toBranch').value);
-  const catId     = parseInt(document.getElementById('categorySelect').value);
+  const itemSel   = document.getElementById('itemSelect');
+  const itemOpt   = itemSel.options[itemSel.selectedIndex];
+  const catId     = parseInt(itemOpt?.dataset.categoryId);
+  const itemName  = itemOpt?.dataset.itemName?.trim() || '';
   const weight    = parseFloat(document.getElementById('weightKg').value);
   const note      = document.getElementById('transferNote').value.trim();
   const transporter = document.getElementById('transporterName').value.trim();
   const vehicle   = document.getElementById('vehiclePlate').value.trim();
 
   if (fromId === toId) { showNotification('ต้นทางและปลายทางต้องต่างกัน', 'error'); return; }
+  if (!catId || !itemName) { showNotification('กรุณาเลือกรายการสินค้า', 'error'); return; }
   if (!(weight > 0))   { showNotification('กรุณาระบุน้ำหนัก', 'error'); return; }
 
   const createBtn = document.querySelector('button[onclick="createTransfer()"]');
@@ -294,20 +307,22 @@ async function createTransfer() {
   try {
     const res = await apiRequest('stock-transfers', 'POST', {
       from_branch_id: fromId, to_branch_id: toId, category_id: catId,
-      weight_kg: weight, note, transporter_name: transporter || null, vehicle_plate: vehicle || null,
+      item_name: itemName, weight_kg: weight, note,
+      transporter_name: transporter || null, vehicle_plate: vehicle || null,
     });
 
     if (res.status === 'success') {
       const fromSel = document.getElementById('fromBranch');
       const toSel   = document.getElementById('toBranch');
-      const catSel  = document.getElementById('categorySelect');
       const currentUser = JSON.parse(localStorage.getItem('posUser') || '{}');
       printTransfer({
+        ...res.data,
         reference_no:      res.data.reference_no,
-        created_at:        new Date().toISOString().slice(0,10),
+        created_at:        res.data.created_at || new Date().toISOString().slice(0,10),
         from_branch_name:  fromSel.options[fromSel.selectedIndex]?.text || '-',
         to_branch_name:    toSel.options[toSel.selectedIndex]?.text || '-',
-        category_name:     catSel.options[catSel.selectedIndex]?.text || '-',
+        item_name:         itemName,
+        category_name:     itemOpt?.dataset.categoryName || '-',
         weight_kg:         weight,
         transporter_name:  transporter || null,
         vehicle_plate:     vehicle || null,
@@ -319,7 +334,6 @@ async function createTransfer() {
         document.getElementById(id).value = '';
       });
       loadTransfers();
-      printTransfer(res.data);
     } else {
       showNotification(res.message || 'เกิดข้อผิดพลาด', 'error');
     }
@@ -378,43 +392,6 @@ async function submitReceive() {
   }
 }
 
-function printTransfer(t) {
-  const statusTh = { pending:'รอตรวจรับ', confirmed:'รับแล้ว', cancelled:'ยกเลิก' }[t.status] || t.status;
-  const orderedKg = parseFloat(t.weight_kg).toLocaleString('th-TH',{minimumFractionDigits:3});
-  const receivedKg = t.received_weight_kg != null
-    ? parseFloat(t.received_weight_kg).toLocaleString('th-TH',{minimumFractionDigits:3}) : '-';
-
-  document.getElementById('printSlip').innerHTML = `
-    <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:12px">
-      <div style="font-size:16px;font-weight:700">ใบโอนสต็อก</div>
-      <div style="font-size:11px;color:#555">Stock Transfer Receipt</div>
-    </div>
-    <table style="width:100%;font-size:13px;border-collapse:collapse">
-      <tr><td style="color:#555;width:40%">เลขที่ใบโอน</td><td style="font-weight:600;font-family:monospace">${escapeHtml(t.reference_no)}</td></tr>
-      <tr><td style="color:#555">วันที่</td><td>${(t.created_at||'').slice(0,10)}</td></tr>
-      <tr><td style="color:#555">จากสาขา</td><td>${escapeHtml(t.from_branch_name||'-')}</td></tr>
-      <tr><td style="color:#555">ไปสาขา</td><td>${escapeHtml(t.to_branch_name||'-')}</td></tr>
-      <tr><td style="color:#555">รายการสินค้า</td><td>${escapeHtml(t.category_name||'-')}</td></tr>
-      <tr style="font-size:15px;font-weight:700"><td style="color:#555">น้ำหนักโอน</td><td>${orderedKg} กก.</td></tr>
-      ${t.received_weight_kg != null ? `<tr><td style="color:#555">น้ำหนักรับจริง</td><td style="color:${Math.abs(parseFloat(t.received_weight_kg)-parseFloat(t.weight_kg))>0.001?'#e67e22':'#27ae60'};font-weight:600">${receivedKg} กก.</td></tr>` : ''}
-      <tr style="border-top:1px solid #eee"><td style="color:#555">คนขนของ</td><td>${escapeHtml(t.transporter_name||'-')}</td></tr>
-      <tr><td style="color:#555">ทะเบียนรถ</td><td style="font-family:monospace;font-weight:600">${escapeHtml(t.vehicle_plate||'-')}</td></tr>
-      <tr style="border-top:1px solid #eee"><td style="color:#555">ออกใบโดย</td><td>${escapeHtml(t.created_by_name||'-')}</td></tr>
-      ${t.confirmed_by_name ? `<tr><td style="color:#555">รับโดย</td><td>${escapeHtml(t.confirmed_by_name)}</td></tr>` : ''}
-      ${t.note ? `<tr><td style="color:#555">หมายเหตุ</td><td>${escapeHtml(t.note)}</td></tr>` : ''}
-      ${t.receive_note ? `<tr><td style="color:#555">หมายเหตุรับ</td><td style="color:#e67e22">${escapeHtml(t.receive_note)}</td></tr>` : ''}
-    </table>
-    <div style="border-top:1px solid #333;margin-top:16px;padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:32px;font-size:12px">
-      <div style="text-align:center">
-        <div style="border-top:1px solid #999;margin-top:40px;padding-top:4px">ผู้ส่งออก</div>
-      </div>
-      <div style="text-align:center">
-        <div style="border-top:1px solid #999;margin-top:40px;padding-top:4px">ผู้รับของ</div>
-      </div>
-    </div>
-    <div style="text-align:center;font-size:10px;color:#aaa;margin-top:8px">สถานะ: ${statusTh}</div>`;
-
-
 async function cancelTransfer(id) {
   if (!confirm('ยืนยันการยกเลิกใบโอนนี้?')) return;
   const res = await apiRequest('stock-transfers/cancel', 'POST', { id });
@@ -426,10 +403,24 @@ function escapeHtml(s) {
   return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function printTransferFromData(button) {
+  try {
+    printTransfer(JSON.parse(button.dataset.transfer || '{}'));
+  } catch (error) {
+    console.error('Cannot parse stock transfer for printing:', error);
+    showNotification('ไม่สามารถเปิดใบโอนเพื่อพิมพ์ได้', 'error');
+  }
+}
+
 function printTransfer(t) {
   const statusLabel = {pending:'รอยืนยัน', confirmed:'ยืนยันแล้ว', cancelled:'ยกเลิก'}[t.status] || t.status;
   const weight = parseFloat(t.weight_kg||0).toLocaleString('th-TH',{minimumFractionDigits:3});
   const dt = (t.created_at||'').slice(0,16).replace('T',' ');
+  const itemName = t.item_name || t.category_name || '-';
+  const categoryName = t.item_name && t.category_name ? t.category_name : '';
+  const receivedWeight = t.received_weight_kg != null ? parseFloat(t.received_weight_kg) : null;
+  const receivedWeightText = receivedWeight != null ? receivedWeight.toLocaleString('th-TH',{minimumFractionDigits:3}) : '-';
+  const weightDiff = receivedWeight != null ? Math.abs(receivedWeight - parseFloat(t.weight_kg||0)) : 0;
 
   document.getElementById('printTransferContent').innerHTML = `
     <style>
@@ -460,14 +451,15 @@ function printTransfer(t) {
           <strong>${escapeHtml(t.to_branch_name||'-')}</strong>
         </div>
         <div style="display:flex;justify-content:space-between">
-          <span style="color:#555">หมวดหมู่</span>
-          <span>${escapeHtml(t.category_name||'-')}</span>
+          <span style="color:#555">รายการสินค้า</span>
+          <span><strong>${escapeHtml(itemName)}</strong>${categoryName ? `<br><small style="color:#666">${escapeHtml(categoryName)}</small>` : ''}</span>
         </div>
       </div>
       <div style="background:#222;color:#fff;border-radius:3px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:11px;opacity:.8">น้ำหนักที่โอน</span>
         <span style="font-size:18px;font-weight:800">${weight} <span style="font-size:13px">กก.</span></span>
       </div>
+      ${receivedWeight != null ? `<div style="font-size:12px;margin-bottom:8px;color:${weightDiff>0.001?'#e67e22':'#27ae60'}">น้ำหนักรับจริง: <strong>${receivedWeightText} กก.</strong></div>` : ''}
       ${t.note ? `<div style="font-size:11px;color:#555;margin-bottom:8px">หมายเหตุ: ${escapeHtml(t.note)}</div>` : ''}
       <div style="display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:16px">
         <span>สร้างโดย: ${escapeHtml(t.created_by_name||'-')}</span>
