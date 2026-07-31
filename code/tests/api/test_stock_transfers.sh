@@ -26,6 +26,12 @@ test_stock_transfers() {
       python3 -c "import sys,json; d=json.load(sys.stdin); name=sys.argv[1]; items=d.get('data',{}).get('items',[]); print(next((str(it.get('stock_kg')) for it in items if it.get('item_name') == name), ''))" "$item" 2>/dev/null
   }
 
+  stock_transfer_item_stock_with_cookie() {
+    local cookie="$1" branch_id="$2" category_id="$3" item="$4"
+    curl -s -b "$cookie" "$API_BASE/inventory/category-items?category_id=$category_id&branch_id=$branch_id" |
+      python3 -c "import sys,json; d=json.load(sys.stdin); name=sys.argv[1]; items=d.get('data',{}).get('items',[]); print(next((str(it.get('stock_kg')) for it in items if it.get('item_name') == name), ''))" "$item" 2>/dev/null
+  }
+
   seller_id=$(api_get "sellers" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
   if [ -z "$seller_id" ]; then
     res=$(api_post "sellers" "{\"name\":\"Stock Transfer Test Seller\",\"branch_id\":$source_branch}")
@@ -108,4 +114,107 @@ test_stock_transfers() {
 
   res=$(api_post "stock-transfers/confirm" "{\"id\":$transfer_id,\"received_weight_kg\":1.0}")
   assert_contains "$res" '"status":"error"' "Transfer: Confirming the same transfer twice is rejected"
+
+  # Multi-item transfer created by the branch manager. The source branch is
+  # taken from the authenticated user; a client-supplied mismatch is rejected.
+  local multi_item_one multi_item_two cat_id_two source_cookie destination_cookie
+  local multi_transfer_id multi_from_branch multi_item_count multi_line_ids
+  local multi_line_one_id multi_line_two_id multi_confirmed_by
+  local multi_source_branch=3 multi_destination_branch=4
+  multi_item_one="QA Multi Transfer A $suffix"
+  multi_item_two="QA Multi Transfer B $suffix"
+  cat_id_two=$(api_get "inventory/categories" |
+    python3 -c "import sys,json; rows=json.load(sys.stdin).get('data',[]); ids=[str(r.get('id')) for r in rows if str(r.get('id')) != str(sys.argv[1])]; print(ids[0] if ids else '')" "$cat_id" 2>/dev/null)
+  [ -z "$cat_id_two" ] && cat_id_two=$cat_id
+
+  source_cookie="/tmp/stock_transfer_source_${suffix}.txt"
+  res=$(curl -s -c "$source_cookie" "$API_BASE/auth/login" \
+    -X POST -H 'Content-Type: application/json' \
+    -d '{"username":"manager-br03","password":"admin"}')
+  assert_contains "$res" '"status":"success"' "Transfer: Source manager login"
+
+  res=$(curl -s -b "$source_cookie" "$API_BASE/purchase-orders" \
+    -X POST -H 'Content-Type: application/json' \
+    -d "{
+      \"branch_id\":$multi_source_branch,
+      \"seller_id\":$seller_id,
+      \"payment_method\":\"cash\",
+      \"items\":[
+        {\"item_name\":\"$multi_item_one\",\"category_id\":$cat_id,\"quantity\":1.25,\"weight_deduction\":0,\"unit\":\"กก.\",\"unit_price\":11.00},
+        {\"item_name\":\"$multi_item_two\",\"category_id\":$cat_id_two,\"quantity\":0.80,\"weight_deduction\":0,\"unit\":\"กก.\",\"unit_price\":12.00}
+      ]
+    }")
+  assert_contains "$res" '"status":"success"' "Transfer: Create multi-item source stock"
+
+  res=$(curl -s -b "$source_cookie" "$API_BASE/stock-transfers" \
+    -X POST -H 'Content-Type: application/json' \
+    -d "{
+      \"from_branch_id\":$multi_destination_branch,
+      \"to_branch_id\":$destination_branch,
+      \"items\":[
+        {\"category_id\":$cat_id,\"item_name\":\"$multi_item_one\",\"weight_kg\":1.25},
+        {\"category_id\":$cat_id_two,\"item_name\":\"$multi_item_two\",\"weight_kg\":0.80}
+      ]
+    }")
+  assert_contains "$res" '"status":"error"' "Transfer: Reject source branch mismatch"
+
+  res=$(curl -s -b "$source_cookie" "$API_BASE/stock-transfers" \
+    -X POST -H 'Content-Type: application/json' \
+    -d "{
+      \"to_branch_id\":$multi_destination_branch,
+      \"items\":[
+        {\"category_id\":$cat_id,\"item_name\":\"$multi_item_one\",\"weight_kg\":1.25},
+        {\"category_id\":$cat_id_two,\"item_name\":\"$multi_item_two\",\"weight_kg\":0.80}
+      ],
+      \"note\":\"QA multi-item stock transfer $suffix\"
+    }")
+  multi_transfer_id=$(stock_transfer_extract_id "$res")
+  assert_contains "$res" '"status":"success"' "Transfer: Create multi-item pending transfer"
+  assert_neq "" "$multi_transfer_id" "Transfer: Multi-item transfer has ID"
+
+  res=$(curl -s -b "$source_cookie" "$API_BASE/stock-transfers?status=pending")
+  multi_from_branch=$(echo "$res" | python3 -c "import sys,json; d=json.load(sys.stdin); tid=int(sys.argv[1]); rows=d.get('data',{}).get('items',[]); row=next((r for r in rows if int(r.get('id',0)) == tid), {}); print(row.get('from_branch_id',''))" "$multi_transfer_id" 2>/dev/null)
+  multi_item_count=$(echo "$res" | python3 -c "import sys,json; d=json.load(sys.stdin); tid=int(sys.argv[1]); rows=d.get('data',{}).get('items',[]); row=next((r for r in rows if int(r.get('id',0)) == tid), {}); print(len(row.get('items',[])))" "$multi_transfer_id" 2>/dev/null)
+  multi_line_ids=$(echo "$res" | python3 -c "import sys,json; d=json.load(sys.stdin); tid=int(sys.argv[1]); rows=d.get('data',{}).get('items',[]); row=next((r for r in rows if int(r.get('id',0)) == tid), {}); print(' '.join(str(i.get('id')) for i in row.get('items',[]) if i.get('id')))" "$multi_transfer_id" 2>/dev/null)
+  assert_eq "$multi_source_branch" "$multi_from_branch" "Transfer: Multi-item source is locked to manager branch"
+  assert_eq "2" "$multi_item_count" "Transfer: List returns normalized item array"
+  assert_neq "" "$multi_line_ids" "Transfer: Multi-item lines have IDs"
+  read -r multi_line_one_id multi_line_two_id <<< "$multi_line_ids"
+
+  destination_cookie="/tmp/stock_transfer_destination_multi_${suffix}.txt"
+  res=$(curl -s -c "$destination_cookie" "$API_BASE/auth/login" \
+    -X POST -H 'Content-Type: application/json' \
+    -d '{"username":"manager-br04","password":"admin"}')
+  assert_contains "$res" '"status":"success"' "Transfer: Multi-item destination manager login"
+
+  res=$(curl -s -b "$destination_cookie" "$API_BASE/stock-transfers/confirm" \
+    -X POST -H 'Content-Type: application/json' \
+    -d "{
+      \"id\":$multi_transfer_id,
+      \"confirmed_by\":1,
+      \"receiver_id\":1,
+      \"items\":[
+        {\"id\":$multi_line_one_id,\"received_weight_kg\":1.25,\"receive_note\":\"Line A received\"},
+        {\"id\":$multi_line_two_id,\"received_weight_kg\":0.80,\"receive_note\":\"Line B received\"}
+      ],
+      \"receive_note\":\"QA multi-item received\"
+    }")
+  assert_contains "$res" '"status":"success"' "Transfer: Confirm multi-item receipt"
+
+  source_one_after=$(stock_transfer_item_stock_with_cookie "$source_cookie" "$multi_source_branch" "$cat_id" "$multi_item_one")
+  source_two_after=$(stock_transfer_item_stock_with_cookie "$source_cookie" "$multi_source_branch" "$cat_id_two" "$multi_item_two")
+  destination_one_after=$(stock_transfer_item_stock_with_cookie "$destination_cookie" "$multi_destination_branch" "$cat_id" "$multi_item_one")
+  destination_two_after=$(stock_transfer_item_stock_with_cookie "$destination_cookie" "$multi_destination_branch" "$cat_id_two" "$multi_item_two")
+  [ -z "$source_one_after" ] && source_one_after=0
+  [ -z "$source_two_after" ] && source_two_after=0
+  [ -z "$destination_one_after" ] && destination_one_after=0
+  [ -z "$destination_two_after" ] && destination_two_after=0
+  stock_transfer_float_eq "0" "$source_one_after" "Transfer: Multi-item source line A deducted"
+  stock_transfer_float_eq "0" "$source_two_after" "Transfer: Multi-item source line B deducted"
+  stock_transfer_float_eq "1.25" "$destination_one_after" "Transfer: Multi-item destination line A added"
+  stock_transfer_float_eq "0.8" "$destination_two_after" "Transfer: Multi-item destination line B added"
+
+  res=$(curl -s -b "$destination_cookie" "$API_BASE/stock-transfers?status=confirmed")
+  multi_confirmed_by=$(echo "$res" | python3 -c "import sys,json; d=json.load(sys.stdin); tid=int(sys.argv[1]); rows=d.get('data',{}).get('items',[]); row=next((r for r in rows if int(r.get('id',0)) == tid), {}); print(row.get('confirmed_by_name',''))" "$multi_transfer_id" 2>/dev/null)
+  assert_eq "ผู้จัดการสาขา 4" "$multi_confirmed_by" "Transfer: Confirmed by authenticated destination manager"
 }
