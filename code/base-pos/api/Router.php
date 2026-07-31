@@ -225,6 +225,7 @@ class Router
         $this->routes[] = ['route' => 'stock-transfers/cancel',  'controller' => 'StockTransfersController', 'method' => 'cancel',  'verb' => 'POST'];
 
         // Print routes
+        $this->routes[] = ['route' => 'print/thermal-purchase/preview', 'controller' => 'PrintController', 'method' => 'previewThermalPurchase', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'print/thermal-purchase', 'controller' => 'PrintController', 'method' => 'thermalPurchase', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'print/status',           'controller' => 'PrintController', 'method' => 'status',          'verb' => 'GET'];
         $this->routes[] = ['route' => 'print/test',             'controller' => 'PrintController', 'method' => 'test',            'verb' => 'GET'];

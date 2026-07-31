@@ -377,6 +377,26 @@
     </div>
   </div>
 
+  <!-- Thermal Print Preview Modal -->
+  <div class="modal" id="thermalPreviewModal">
+    <div class="modal-content modal-sm thermal-preview-modal">
+      <div class="modal-header">
+        <h2>ตัวอย่างบิลความร้อน</h2>
+        <button class="close-modal" id="thermalPreviewClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="thermal-preview-frame">
+          <img id="thermalPreviewImage" class="thermal-preview-image" alt="ตัวอย่างบิลความร้อน">
+        </div>
+        <div class="thermal-preview-error hidden" id="thermalPreviewError"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary close-modal" id="thermalPreviewCancel">ยกเลิก</button>
+        <button class="btn btn-success" id="thermalPreviewConfirm">✅ ยืนยันพิมพ์</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== Signature Modal ===== -->
   <div class="modal" id="signatureModal">
     <div class="modal-content modal-sm">

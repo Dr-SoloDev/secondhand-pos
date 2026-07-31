@@ -42,6 +42,26 @@ class Setting extends Model
         return $result;
     }
 
+    public function getReceiptSettings()
+    {
+        $defaults = [
+            'store_name' => 'รักษ์สะอาดรีไซเคิล',
+            'store_phone' => '',
+            'store_address' => '',
+            'tax_id' => '',
+            'receipt_footer' => 'ขอบคุณที่ใช้บริการ',
+            'receipt_welcome_message' => 'บริการดี ราคาดี ตาชั่งมาตรฐาน'
+        ];
+
+        $settings = $this->getSettingsByKeys(array_keys($defaults));
+        foreach ($defaults as $key => $defaultValue) {
+            $value = $settings[$key] ?? null;
+            $settings[$key] = trim((string)$value) !== '' ? $value : $defaultValue;
+        }
+
+        return $settings;
+    }
+
     /**
      * @param $settings
      */

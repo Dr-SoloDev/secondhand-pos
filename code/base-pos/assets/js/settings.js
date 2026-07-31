@@ -75,6 +75,8 @@ function populateStoreSettings(settings) {
   document.getElementById('storeName').value = settings.store_name || '';
   document.getElementById('storePhone').value = settings.store_phone || '';
   document.getElementById('storeAddress').value = settings.store_address || '';
+  document.getElementById('taxId').value = settings.tax_id || '';
+  document.getElementById('receiptWelcomeMessage').value = settings.receipt_welcome_message || '';
   document.getElementById('taxRate').value = settings.tax_rate || '7.00';
   document.getElementById('currencySymbol').value = settings.currency_symbol || '฿';
   document.getElementById('receiptFooter').value = settings.receipt_footer || '';
@@ -100,6 +102,8 @@ async function saveStoreSettings() {
       store_name: formData.get('store_name'),
       store_phone: formData.get('store_phone'),
       store_address: formData.get('store_address'),
+      tax_id: formData.get('tax_id'),
+      receipt_welcome_message: formData.get('receipt_welcome_message'),
       tax_rate: formData.get('tax_rate'),
       currency_symbol: formData.get('currency_symbol'),
       receipt_footer: formData.get('receipt_footer')

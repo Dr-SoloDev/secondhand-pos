@@ -18,6 +18,7 @@ let pendingSellerIdPhoto = null; // File | null
 let pendingNewItemPhoto = null; // File | null — ถ่ายตอนคีย์ก่อนกดเพิ่ม
 let activePhotoTarget = null; // { type: 'item', index: N } | { type: 'seller-id' }
 let cameraStream = null;
+const THERMAL_PRINT_BUTTON_TEXT = '🖨️ พิมพ์ความร้อน';
 
 // === Cart State Export (สำหรับ common.js save ก่อน 401) ===
 window.getCurrentCartState = function() {
@@ -1018,47 +1019,97 @@ window.showReceipt = async function(id) {
     btnPrint.onclick = () => window.open(`print-receipt.html?id=${id}&auto=1`, '_blank');
   }
 
-  // Thermal print button handler — ส่งตรงไปยังเครื่องพิมพ์ผ่าน Print Server API
+  // Thermal print button handler — โหลดภาพก่อน แล้วให้ผู้ใช้ยืนยันพิมพ์
   const btnThermal = document.getElementById('btnOpenPrintThermal');
   if (btnThermal) {
-    btnThermal.onclick = async () => {
-      btnThermal.disabled = true;
-      btnThermal.textContent = '⏳ กำลังพิมพ์...';
-      try {
-        const res = await fetch(`${window.apiPath}/print/thermal-purchase`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ id })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-          btnThermal.textContent = '✅ พิมพ์สำเร็จ';
-          setTimeout(() => {
-            btnThermal.innerHTML = '<i class="icon-print"></i> พิมพ์ความร้อน';
-            btnThermal.disabled = false;
-          }, 2000);
-        } else {
-          btnThermal.textContent = '❌ ' + (data.message || 'พิมพ์ไม่สำเร็จ');
-          btnThermal.disabled = false;
-          setTimeout(() => {
-            btnThermal.innerHTML = '<i class="icon-print"></i> พิมพ์ความร้อน';
-          }, 3000);
-        }
-      } catch (e) {
-        btnThermal.textContent = '❌ ไม่สามารถเชื่อมต่อ';
-        btnThermal.disabled = false;
-        setTimeout(() => {
-          btnThermal.innerHTML = '<i class="icon-print"></i> พิมพ์ความร้อน';
-        }, 3000);
-      }
-    };
+    btnThermal.onclick = () => openThermalPrintPreview(id, btnThermal);
   }
 
   // WF-01: สร้าง QR code หลังเปิด modal
   generatePhotoQR(id);
   loadPoPhotos(id);
 };
+
+async function openThermalPrintPreview(poId, triggerButton) {
+  setThermalButtonState(triggerButton, true, '⏳ กำลังเตรียม...');
+
+  try {
+    const data = await postPrintRequest('print/thermal-purchase/preview', { id: poId });
+    const imageBase64 = data.data?.image_base64 || data.image_base64 || '';
+    if (!imageBase64) {
+      throw new Error('ไม่พบภาพตัวอย่างบิล');
+    }
+
+    showThermalPreviewModal(poId, imageBase64, triggerButton);
+    setThermalButtonState(triggerButton, false, THERMAL_PRINT_BUTTON_TEXT);
+  } catch (e) {
+    const message = e.message || 'สร้างตัวอย่างบิลไม่สำเร็จ';
+    showNotification(message, 'error');
+    setThermalButtonState(triggerButton, false, '❌ ไม่สำเร็จ');
+    setTimeout(() => setThermalButtonState(triggerButton, false, THERMAL_PRINT_BUTTON_TEXT), 2500);
+  }
+}
+
+function showThermalPreviewModal(poId, imageBase64, triggerButton) {
+  const modal = document.getElementById('thermalPreviewModal');
+  const image = document.getElementById('thermalPreviewImage');
+  const confirmButton = document.getElementById('thermalPreviewConfirm');
+  const errorBox = document.getElementById('thermalPreviewError');
+  if (!modal || !image || !confirmButton || !errorBox) {
+    showNotification('ไม่พบหน้าต่างตัวอย่างบิล', 'error');
+    return;
+  }
+
+  image.src = `data:image/png;base64,${imageBase64}`;
+  errorBox.textContent = '';
+  errorBox.classList.add('hidden');
+  confirmButton.disabled = false;
+  confirmButton.textContent = '✅ ยืนยันพิมพ์';
+  confirmButton.onclick = () => confirmThermalPrint(poId, confirmButton, modal, triggerButton);
+  modal.classList.add('show');
+}
+
+async function confirmThermalPrint(poId, confirmButton, modal, triggerButton) {
+  confirmButton.disabled = true;
+  confirmButton.textContent = '⏳ กำลังพิมพ์...';
+
+  try {
+    await postPrintRequest('print/thermal-purchase', { id: poId });
+    modal.classList.remove('show');
+    showNotification('สั่งพิมพ์สำเร็จ', 'success');
+    setThermalButtonState(triggerButton, true, '✅ พิมพ์สำเร็จ');
+    setTimeout(() => setThermalButtonState(triggerButton, false, THERMAL_PRINT_BUTTON_TEXT), 2000);
+  } catch (e) {
+    const message = e.message || 'พิมพ์ไม่สำเร็จ';
+    const errorBox = document.getElementById('thermalPreviewError');
+    if (errorBox) {
+      errorBox.textContent = message;
+      errorBox.classList.remove('hidden');
+    }
+    confirmButton.disabled = false;
+    confirmButton.textContent = '✅ ยืนยันพิมพ์';
+  }
+}
+
+async function postPrintRequest(endpoint, payload) {
+  const res = await fetch(`${window.apiPath}/${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.status !== 'success') {
+    throw new Error(data.message || 'Print Server ไม่พร้อมทำงาน');
+  }
+  return data;
+}
+
+function setThermalButtonState(button, disabled, label) {
+  if (!button) return;
+  button.disabled = disabled;
+  button.textContent = label;
+}
 
 // ===== WF-01: โหลดรูปภาพ PO =====
 async function loadPoPhotos(poId) {

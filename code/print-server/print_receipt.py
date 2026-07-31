@@ -5,6 +5,7 @@ Usage: echo '{"id": 123, "type": "purchase"}' | python3 print_receipt.py
        python3 print_receipt.py --id 123 --type purchase
 """
 
+import base64
 import json
 import sys
 import subprocess
@@ -26,6 +27,18 @@ except ImportError:
 API_BASE = os.environ.get("PRINT_API_URL", "http://localhost:8080/api/index.php")
 PRINTER_NAME = os.environ.get("PRINTER_NAME", "Deli-S420")
 W = 32  # ตัวอักษรต่อบรรทัดสำหรับ 58mm thermal (~12cpi)
+DEFAULT_SHOP_NAME = 'รักษ์สะอาดรีไซเคิล'
+DEFAULT_RECEIPT_WELCOME_MESSAGE = 'บริการดี ราคาดี ตาชั่งมาตรฐาน'
+DEFAULT_RECEIPT_FOOTER = 'ขอบคุณที่ใช้บริการ'
+# Garuda includes Thai plus ASCII digits/Latin; some Noto Thai installs do not.
+THAI_FONT_PATHS = [
+    '/usr/share/fonts/truetype/tlwg/Garuda.ttf',
+    '/usr/share/fonts/truetype/tlwg/Loma.ttf',
+    '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
+    '/usr/share/fonts/truetype/noto/NotoLoopedThai-Regular.ttf',
+    '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+    '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+]
 
 # ── ESC/POS Commands ───────────────────────────────────────────────
 ESC = b'\x1b'
@@ -103,13 +116,63 @@ def mask_id_card(id_card):
     return f"{s[0]}-XXXX-XXXXX-{s[-2:]}-X"
 
 
+def receipt_value(data, keys, default=''):
+    for key in keys:
+        value = data.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return default
+
+
+def append_centered_lines(lines, text):
+    for line in str(text).splitlines():
+        line = line.strip()
+        if line:
+            lines.append(center(line))
+
+
+def first_existing_font_path():
+    for path in THAI_FONT_PATHS:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def matching_bold_font_path(regular_path):
+    candidates = [
+        regular_path.replace('-Regular.ttf', '-Bold.ttf'),
+        regular_path.replace('.ttf', '-Bold.ttf'),
+        regular_path.replace('Sans.ttf', 'Sans-Bold.ttf'),
+    ]
+    for path in candidates:
+        if path != regular_path and os.path.exists(path):
+            return path
+    return regular_path
+
+
 def build_purchase_receipt(po):
     """Build receipt text for purchase order (ใบรับซื้อ)"""
     lines = []
+    shop_name = receipt_value(po, ['shop_name', 'store_name'], DEFAULT_SHOP_NAME)
+    shop_address = receipt_value(po, ['shop_address', 'store_address'])
+    tax_id = receipt_value(po, ['tax_id'])
+    shop_phone = receipt_value(po, ['shop_phone', 'store_phone', 'branch_phone'])
+    welcome_message = receipt_value(po, ['receipt_welcome_message'], DEFAULT_RECEIPT_WELCOME_MESSAGE)
+    receipt_footer = receipt_value(po, ['receipt_footer'], DEFAULT_RECEIPT_FOOTER)
 
     # ── Header ──
     lines.append("=" * W)
-    lines.append(center("รักษ์สะอาดรีไซเคิล"))
+    append_centered_lines(lines, shop_name)
+    if shop_address:
+        append_centered_lines(lines, shop_address)
+    tax_phone = ' · '.join(p for p in [
+        f"เลขผู้เสียภาษี {tax_id}" if tax_id else '',
+        f"โทร {shop_phone}" if shop_phone else ''
+    ] if p)
+    if tax_phone:
+        lines.append(center(tax_phone))
+    if welcome_message:
+        append_centered_lines(lines, welcome_message)
     branch_parts = [po.get('branch_name', ''),
                     f"สาขา{po.get('branch_code', '')}" if po.get('branch_code') else '']
     branch_str = ' · '.join(p for p in branch_parts if p)
@@ -169,18 +232,17 @@ def build_purchase_receipt(po):
     # ── Precious metal section ──
     if po.get('is_precious_metal'):
         lines.append("-" * W)
-        lines.append(center("⚠️ สินค้ามีค่า ⚠️"))
+        lines.append(center("*** สินค้ามีค่า ***"))
         lines.append(center("ข้าพเจ้านำสินค้านี้มาโดยสุจริต"))
         lines.append(center("ลายเซ็นผู้ขาย: _______________"))
         lines.append("-" * W)
 
     # ── Footer ──
     lines.append("=" * W)
-    lines.append(center("บริการดี ราคาดี ตาชั่งมาตรฐาน"))
-    phone = po.get('branch_phone', '')
-    if phone:
-        lines.append(center(f"ติดต่อ: {phone}"))
-    lines.append(center("🙏 ขอบคุณที่ใช้บริการ 🙏"))
+    if receipt_footer:
+        append_centered_lines(lines, receipt_footer)
+    if shop_phone:
+        lines.append(center(f"ติดต่อ: {shop_phone}"))
     lines.append("=" * W)
 
     return "\n".join(lines)
@@ -193,7 +255,7 @@ def build_sale_receipt(lot):
 
 # ── Printing ───────────────────────────────────────────────────────
 
-def build_escpos_raw(text, encoding='utf-8'):
+def build_escpos_raw(text, encoding='cp874'):
     """
     Wrap plain text with ESC/POS commands for thermal printing.
 
@@ -208,14 +270,13 @@ def build_escpos_raw(text, encoding='utf-8'):
       n=13: CP874 (Thai) สำหรับรุ่น Epson/มาตรฐาน POS
     ส่งทั้งสองค่าไปก่อน เผื่อรุ่นไหนไม่รองรับจะ fallback เอง
     """
-    # Thai codepage switching — ลองทั้ง 2 ค่า (10 และ 13)
-    CP874_1 = ESC + b't\x0a'   # Codepage 10: CP874 Thai (common on Chinese printers)
-    CP874_2 = ESC + b't\x0d'   # Codepage 13: CP874 Thai (Epson standard)
+    # Epson/Deli ESC/POS Thai table: TIS-620 / CP874 = code page 26.
+    # ส่งคำสั่งเดียว เพราะการส่ง 10 แล้ว 13 ทำให้เครื่องใช้ตารางสุดท้ายแทน.
+    CP874 = ESC + b't\x1a'
 
     receipt = b""
     receipt += INIT
-    receipt += CP874_1          # ลอง CP874 v1
-    receipt += CP874_2          # ลอง CP874 v2 (เผื่อ v1 ไม่ support)
+    receipt += CP874
     receipt += CHAR_SIZE_0
     receipt += ALIGN_LEFT
 
@@ -268,6 +329,448 @@ def print_via_cups(data: bytes, raw_mode=True):
     return proc.stdout.decode('utf-8', errors='replace').strip()
 
 
+def _draw_receipt_pil_image(po_data, include_stub=True):
+    """
+    วาดใบเสร็จเป็น PIL Image กลางสำหรับพิมพ์จริงและ preview
+
+    Returns:
+        PIL.Image object
+    """
+    if not HAS_PIL:
+        raise ImportError("Pillow not installed")
+
+    width = 384    # กว้าง 48mm @ 203dpi (Deli S420 max print width)
+    margin = 12    # ขอบซ้ายขวา 1.5mm
+    content_width = width - (2 * margin)
+
+    font_path = first_existing_font_path()
+    if not font_path:
+        raise ImportError("No usable Thai font found")
+    bold_path = matching_bold_font_path(font_path)
+    title_font = ImageFont.truetype(bold_path, 30)
+    heading_font = ImageFont.truetype(bold_path, 24)
+    body_font = ImageFont.truetype(font_path, 22)
+    body_bold_font = ImageFont.truetype(bold_path, 22)
+    small_font = ImageFont.truetype(font_path, 19)
+    small_bold_font = ImageFont.truetype(bold_path, 19)
+
+    measure_image = Image.new('1', (width, 1), 1)
+    measure_draw = ImageDraw.Draw(measure_image)
+
+    def text_width(text, font):
+        box = measure_draw.textbbox((0, 0), str(text), font=font)
+        return box[2] - box[0]
+
+    def safe_float(value):
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def fmt_quantity(value):
+        return f"{safe_float(value):,.2f}".rstrip('0').rstrip('.')
+
+    def wrap_text(text, font, max_width):
+        """ตัดตามช่องว่างก่อน แล้วค่อยตัดรายตัวเมื่อคำยาวเกินหน้ากระดาษ"""
+        text = '' if text is None else str(text).strip()
+        if not text:
+            return []
+
+        def split_long_word(word):
+            chunks = []
+            current = ''
+            for char in word:
+                candidate = current + char
+                if current and text_width(candidate, font) > max_width:
+                    chunks.append(current)
+                    current = char
+                else:
+                    current = candidate
+            if current:
+                chunks.append(current)
+            return chunks
+
+        lines = []
+        for raw_line in text.splitlines():
+            raw_line = raw_line.strip()
+            if not raw_line:
+                continue
+
+            current = ''
+            for word in raw_line.split():
+                candidate = f"{current} {word}".strip()
+                if text_width(candidate, font) <= max_width:
+                    current = candidate
+                    continue
+
+                if current:
+                    lines.append(current)
+                    current = ''
+
+                if text_width(word, font) <= max_width:
+                    current = word
+                else:
+                    chunks = split_long_word(word)
+                    lines.extend(chunks[:-1])
+                    current = chunks[-1]
+            if current:
+                lines.append(current)
+        return lines
+
+    def payment_label(value):
+        labels = {
+            'cash': 'เงินสด',
+            'bank': 'โอนธนาคาร',
+            'bank_transfer': 'โอนธนาคาร',
+            'transfer': 'โอนธนาคาร',
+            'qr': 'QR',
+            'promptpay': 'พร้อมเพย์',
+        }
+        return labels.get(str(value or '').lower(), str(value or '-') or '-')
+
+    def branch_label(po):
+        name = receipt_value(po, ['branch_name'])
+        code = receipt_value(po, ['branch_code'])
+        parts = [name]
+        if code:
+            parts.append(f"สาขา {code}")
+        return ' · '.join(part for part in parts if part)
+
+    def render_section(po, section, draw=None):
+        """คำนวณและวาดบิล โดยใช้ทางเดิน layout เดียวกันทั้งสองรอบ"""
+        y = 12
+
+        def draw_text(text, x, y_pos, font):
+            if draw is not None:
+                draw.text((x, y_pos), str(text), font=font, fill=0)
+
+        def draw_wrapped(text, font, y_pos, line_height, align='left', max_width=content_width):
+            lines = wrap_text(text, font, max_width)
+            for line in lines:
+                line_width = text_width(line, font)
+                if align == 'center':
+                    x = (width - line_width) // 2
+                elif align == 'right':
+                    x = width - margin - line_width
+                else:
+                    x = margin
+                draw_text(line, x, y_pos, font)
+                y_pos += line_height
+            return y_pos
+
+        def draw_rule(y_pos, line_width=1):
+            if draw is not None:
+                draw.line(
+                    [(margin, y_pos + 2), (width - margin, y_pos + 2)],
+                    fill=0,
+                    width=line_width,
+                )
+            return y_pos + 8
+
+        def draw_pair(left, right, left_font, right_font, y_pos, line_height):
+            """วาดสองฝั่งโดยลดพื้นที่ฝั่งซ้ายตามยอดเงินจริง ป้องกันข้อความชนกัน"""
+            left = str(left)
+            right = str(right)
+            right_width = text_width(right, right_font)
+            left_width = content_width - right_width - 12
+
+            if left_width < 100:
+                y_pos = draw_wrapped(left, left_font, y_pos, line_height)
+                return draw_wrapped(right, right_font, y_pos, line_height, align='right')
+
+            left_lines = wrap_text(left, left_font, left_width) or ['']
+            for index, line in enumerate(left_lines):
+                draw_text(line, margin, y_pos, left_font)
+                if index == 0:
+                    draw_text(right, width - margin - right_width, y_pos, right_font)
+                y_pos += line_height
+            return y_pos
+
+        def draw_footer(footer, y_pos):
+            """แยกคำขอบคุณ แบรนด์ และประกาศ เพื่อให้ส่วนท้ายมีลำดับชัดเจน"""
+            brand_phrase = 'มีคุณจึงมีเรา รักษ์สะอาดรีไซเคิล'
+            if brand_phrase not in footer:
+                return draw_wrapped(footer, small_font, y_pos, 25, align='center')
+
+            intro, details = footer.split(brand_phrase, 1)
+            intro = intro.strip()
+            details = details.strip()
+
+            if intro:
+                y_pos = draw_wrapped(intro, small_font, y_pos, 25, align='center')
+            y_pos += 3
+            y_pos = draw_wrapped('มีคุณจึงมีเรา', heading_font, y_pos, 30, align='center')
+            y_pos = draw_wrapped('รักษ์สะอาดรีไซเคิล', heading_font, y_pos, 30, align='center')
+
+            if details:
+                y_pos += 5
+                for paragraph in details.splitlines():
+                    paragraph = paragraph.strip()
+                    if not paragraph:
+                        continue
+                    y_pos = draw_wrapped(paragraph, small_font, y_pos, 25, align='center')
+                    y_pos += 2
+            return y_pos
+
+        shop_name = receipt_value(po, ['shop_name', 'store_name'], DEFAULT_SHOP_NAME)
+        shop_address = receipt_value(po, ['shop_address', 'store_address'])
+        shop_phone = receipt_value(po, ['shop_phone', 'store_phone', 'branch_phone'])
+        tax_id = receipt_value(po, ['tax_id'])
+        reference = receipt_value(po, ['reference_no'], '-')
+        created = fmt_date(receipt_value(po, ['created_at'], '-'))
+        seller_name = receipt_value(po, ['seller_name'], '-')
+        seller_id = receipt_value(po, ['seller_id_card'])
+        seller_phone = receipt_value(po, ['seller_phone'])
+        seller_address = receipt_value(po, ['seller_address'])
+        vehicle_type = receipt_value(po, ['vehicle_type'])
+        vehicle_plate = receipt_value(po, ['vehicle_plate'])
+        cashier = receipt_value(po, ['user_name'], '-')
+        items = po.get('items') or []
+        is_precious = bool(po.get('is_precious_metal'))
+
+        if section == 'main':
+            y = draw_wrapped(shop_name, title_font, y, 36, align='center')
+            if shop_address:
+                y = draw_wrapped(shop_address, small_font, y, 25, align='center')
+            if tax_id:
+                y = draw_wrapped(f"เลขประจำตัวผู้เสียภาษี {tax_id}", small_font, y, 25, align='center')
+            if shop_phone:
+                y = draw_wrapped(f"โทร {shop_phone}", small_font, y, 25, align='center')
+
+            welcome = receipt_value(
+                po,
+                ['receipt_welcome_message'],
+                DEFAULT_RECEIPT_WELCOME_MESSAGE,
+            )
+            if welcome:
+                y += 2
+                y = draw_wrapped(welcome, small_font, y, 25, align='center')
+
+            y += 4
+            y = draw_wrapped('ใบรับซื้อของเก่า', title_font, y, 36, align='center')
+            branch = branch_label(po)
+            if branch:
+                y = draw_wrapped(branch, body_font, y, 30, align='center')
+            y += 2
+            y = draw_rule(y, 2)
+
+            y = draw_wrapped(f"เลขที่: {reference}", body_bold_font, y, 30)
+            y = draw_wrapped(f"วันที่: {created}", body_font, y, 30)
+            y = draw_wrapped(f"ผู้ขาย: {seller_name}", body_bold_font, y, 30)
+            if seller_id:
+                y = draw_wrapped(f"บัตรประชาชน: {mask_id_card(seller_id)}", small_font, y, 25)
+            if seller_phone:
+                y = draw_wrapped(f"โทรผู้ขาย: {seller_phone}", small_font, y, 25)
+            if seller_address:
+                y = draw_wrapped(f"ที่อยู่: {seller_address}", small_font, y, 25)
+            vehicle = ' '.join(part for part in [vehicle_type, vehicle_plate] if part)
+            if vehicle:
+                y = draw_wrapped(f"รถ/ทะเบียน: {vehicle}", small_font, y, 25)
+
+            y += 2
+            y = draw_rule(y)
+            y = draw_pair('รายการ / จำนวน x ราคา', 'รวม', small_bold_font, small_bold_font, y, 25)
+            y = draw_rule(y)
+
+            if not items:
+                y = draw_wrapped('- ไม่มีรายการ -', body_font, y + 4, 30, align='center')
+
+            for index, item in enumerate(items, 1):
+                item_name = receipt_value(item, ['item_name'], '-')
+                quantity = safe_float(item.get('quantity'))
+                deduction = safe_float(item.get('weight_deduction'))
+                if item.get('net_quantity') not in (None, ''):
+                    net_quantity = safe_float(item.get('net_quantity'))
+                else:
+                    net_quantity = max(0, quantity - deduction)
+                unit = receipt_value(item, ['unit'], 'หน่วย')
+                unit_price = safe_float(item.get('unit_price'))
+                total_price = safe_float(item.get('total_price'))
+
+                y += 3
+                y = draw_wrapped(f"{index}. {item_name}", body_bold_font, y, 29)
+                if deduction > 0:
+                    weight_line = (
+                        f"ชั่ง {fmt_quantity(quantity)} {unit}  "
+                        f"หัก {fmt_quantity(deduction)} {unit}"
+                    )
+                    y = draw_wrapped(weight_line, small_font, y, 25)
+                price_line = (
+                    f"สุทธิ {fmt_quantity(net_quantity)} {unit} x "
+                    f"{fmt_money(unit_price)}"
+                )
+                y = draw_pair(
+                    price_line,
+                    fmt_money(total_price),
+                    small_font,
+                    body_bold_font,
+                    y,
+                    27,
+                )
+                y = draw_rule(y)
+
+            total = safe_float(po.get('total_amount'))
+            y += 2
+            y = draw_pair(
+                'ยอดรวมทั้งสิ้น',
+                f"{fmt_money(total)} บาท",
+                body_bold_font,
+                heading_font,
+                y,
+                32,
+            )
+            y += 2
+            y = draw_rule(y, 2)
+            y = draw_wrapped(f"ชำระ: {payment_label(po.get('payment_method'))}", body_font, y, 30)
+            y = draw_wrapped(f"แคชเชียร์: {cashier}", body_font, y, 30)
+
+            notes = receipt_value(po, ['notes'])
+            if notes:
+                y = draw_wrapped(f"หมายเหตุ: {notes}", small_font, y, 25)
+            if is_precious:
+                y += 2
+                y = draw_wrapped('เอกสารรับซื้อสินค้ามีค่า', body_bold_font, y, 30, align='center')
+
+            footer = receipt_value(po, ['receipt_footer'], DEFAULT_RECEIPT_FOOTER)
+            y += 5
+            y = draw_rule(y)
+            if footer:
+                y = draw_footer(footer, y)
+            if shop_phone:
+                y = draw_wrapped(f"ติดต่อ {shop_phone}", small_font, y, 25, align='center')
+            return y + 14
+
+        # ต้นขั้วร้านเน้นข้อมูลตรวจสอบ ไม่พิมพ์ส่วนหัวและรายละเอียดซ้ำทั้งใบ
+        y = draw_wrapped(shop_name, heading_font, y, 30, align='center')
+        y = draw_wrapped('ต้นขั้วร้าน', heading_font, y, 30, align='center')
+        y += 2
+        y = draw_rule(y, 2)
+        y = draw_wrapped(f"เลขที่: {reference}", body_bold_font, y, 30)
+        y = draw_wrapped(f"วันที่: {created}", small_font, y, 25)
+        y = draw_wrapped(f"ผู้ขาย: {seller_name}", body_font, y, 30)
+        if seller_id:
+            y = draw_wrapped(f"บัตร: {mask_id_card(seller_id)}", small_font, y, 25)
+        if vehicle_plate:
+            y = draw_wrapped(f"ทะเบียน: {vehicle_plate}", small_font, y, 25)
+        y = draw_rule(y)
+
+        for index, item in enumerate(items, 1):
+            item_name = receipt_value(item, ['item_name'], '-')
+            quantity = safe_float(item.get('quantity'))
+            deduction = safe_float(item.get('weight_deduction'))
+            if item.get('net_quantity') not in (None, ''):
+                net_quantity = safe_float(item.get('net_quantity'))
+            else:
+                net_quantity = max(0, quantity - deduction)
+            unit = receipt_value(item, ['unit'], 'หน่วย')
+            item_total = fmt_money(safe_float(item.get('total_price')))
+
+            y = draw_wrapped(f"{index}. {item_name}", small_bold_font, y, 25)
+            y = draw_pair(
+                f"สุทธิ {fmt_quantity(net_quantity)} {unit}",
+                item_total,
+                small_font,
+                small_bold_font,
+                y,
+                25,
+            )
+            y += 2
+
+        y = draw_rule(y)
+        y = draw_pair(
+            'ยอดรวม',
+            f"{fmt_money(safe_float(po.get('total_amount')))} บาท",
+            body_bold_font,
+            heading_font,
+            y,
+            31,
+        )
+        y = draw_wrapped(
+            f"ชำระ: {payment_label(po.get('payment_method'))}",
+            small_font,
+            y,
+            25,
+        )
+        y = draw_wrapped(f"แคชเชียร์: {cashier}", small_font, y, 25)
+
+        if is_precious:
+            y += 5
+            y = draw_rule(y, 2)
+            y = draw_wrapped('คำรับรองของผู้ขาย', body_bold_font, y, 30, align='center')
+            declaration = (
+                'ข้าพเจ้ายืนยันว่าได้นำสินค้าตามบิลนี้มาโดยสุจริต '
+                'และยินยอมให้ร้านบันทึกข้อมูลเพื่อเป็นหลักฐาน'
+            )
+            y = draw_wrapped(declaration, small_font, y, 25)
+            y += 6
+            y = draw_wrapped('ลายมือชื่อผู้ขาย', small_font, y, 25)
+            y += 80
+            if draw is not None:
+                draw.line(
+                    [(margin + 36, y), (width - margin - 36, y)],
+                    fill=0,
+                    width=2,
+                )
+            y += 8
+            y = draw_wrapped('หลักฐานที่แนบ', small_font, y, 25)
+            y = draw_wrapped('[ ] บัตรประชาชน   [ ] ใบขับขี่', small_font, y, 25)
+            y = draw_wrapped('[ ] เอกสารราชการ', small_font, y, 25)
+            y = draw_wrapped(
+                'ร้านไม่รับซื้อทรัพย์ที่ได้มาโดยผิดกฎหมาย',
+                small_bold_font,
+                y,
+                25,
+                align='center',
+            )
+
+        y += 3
+        y = draw_rule(y, 2)
+        return y + 14
+
+    def make_section(section):
+        section_height = render_section(po_data, section, draw=None)
+        image = Image.new('1', (width, section_height), 1)
+        render_section(po_data, section, draw=ImageDraw.Draw(image))
+        return image
+
+    main_image = make_section('main')
+    if not include_stub:
+        return main_image
+
+    stub_image = make_section('stub')
+    gap_height = 42
+    gap_image = Image.new('1', (width, gap_height), 1)
+    gap_draw = ImageDraw.Draw(gap_image)
+    dash_width = 18
+    dash_gap = 14
+    x = margin
+    while x < width - margin:
+        gap_draw.line(
+            [(x, 12), (min(x + dash_width, width - margin), 12)],
+            fill=0,
+            width=2,
+        )
+        x += dash_width + dash_gap
+    label = 'ฉีกตามเส้น'
+    label_width = text_width(label, small_bold_font)
+    gap_draw.text(
+        ((width - label_width) // 2, 17),
+        label,
+        font=small_bold_font,
+        fill=0,
+    )
+
+    combined = Image.new(
+        '1',
+        (width, main_image.height + gap_height + stub_image.height),
+        1,
+    )
+    combined.paste(main_image, (0, 0))
+    combined.paste(gap_image, (0, main_image.height))
+    combined.paste(stub_image, (0, main_image.height + gap_height))
+    return combined
+
+
 def render_receipt_image(po_data, include_stub=True):
     """
     วาดใบเสร็จเป็นรูปภาพด้วย Pillow โดยตรง (ต้นขั้ว 1:1)
@@ -283,221 +786,49 @@ def render_receipt_image(po_data, include_stub=True):
     - พื้นที่พิมพ์จริง 48mm = 384 dots
     - ใช้ image mode เสมอ (printer ไม่มีฟอนต์ไทย)
     """
-    if not HAS_PIL:
-        raise ImportError("Pillow not installed")
-
-    W = 384        # กว้าง 48mm @ 203dpi (Deli S420 max print width)
-    M = 10         # ขอบซ้ายขวา (~1.25mm)
-
-    # ── ฟอนต์ (ย่อส่วนลงเพราะแคบ) ───────────────────────
-    FONT_PATH = '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf'
-    if not os.path.exists(FONT_PATH):
-        FONT_PATH = '/usr/share/fonts/truetype/tlwg/Garuda.ttf'
-    if not os.path.exists(FONT_PATH):
-        FONT_PATH = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
-
-    f_big   = ImageFont.truetype(FONT_PATH, 20)   # หัวข้อ (28→20)
-    f_normal = ImageFont.truetype(FONT_PATH, 15)  # เนื้อหา (20→15)
-    f_small  = ImageFont.truetype(FONT_PATH, 12)  # รายละเอียด (17→12)
-    f_table = ImageFont.truetype(FONT_PATH, 13)   # ตาราง (18→13)
-    f_tiny  = ImageFont.truetype(FONT_PATH, 10)   # ส่วนท้าย (14→10)
-
-    LH = 22   # line height ปกติ (30→22)
-    LH_S = 18 # line height เล็ก (24→18)
-
-    # ── helpers ────────────────────────────────────────────
-    def tw(text, f=None):
-        b = (ImageDraw.Draw(Image.new('1', (1,1))).textbbox((0,0), str(text), font=f or f_normal))
-        return b[2] - b[0]
-
-    # สร้าง canvas ชั่วคราวเพื่อวัด
-    tmp = Image.new('1', (W, 2000), 1)
-    d = ImageDraw.Draw(tmp)
-
-    def tsize(text, f):
-        b = d.textbbox((0,0), str(text), font=f)
-        return b[2] - b[0], b[3] - b[1]
-
-    # ── ฟังก์ชันวาด ────────────────────────────────────────
-    def render_section(draw, po, is_stub=False, y_start=0):
-        """วาดใบเสร็จ 1 ส่วน (หลัก หรือ ต้นขั้ว)"""
-        y = y_start + 10
-        scale = 0.7 if is_stub else 1.0
-        lh = int(LH * scale)
-        lh_s = int(LH_S * scale)
-
-        # ฟอนต์ตาม scale
-        if is_stub:
-            f_h = f_small
-            f_n = f_tiny
-            f_t = f_tiny
-            f_tn = f_tiny
-        else:
-            f_h = f_big
-            f_n = f_normal
-            f_t = f_table
-            f_tn = f_tiny
-
-        def draw_c(text, font, y_pos):
-            w, _ = tsize(text, font)
-            x = (W - w) // 2
-            draw.text((x, y_pos), text, font=font, fill=0)
-
-        def draw_l(text, font, y_pos, x_offset=M):
-            draw.text((x_offset, y_pos), text, font=font, fill=0)
-
-        def draw_r(text, font, y_pos):
-            w, _ = tsize(text, font)
-            draw.text((W - M - w, y_pos), text, font=font, fill=0)
-
-        def draw_hr(y_pos, h=1):
-            draw.line([(M, y_pos+2), (W-M, y_pos+2)], fill=0, width=h)
-
-        # ═══ HEADER ═══
-        draw_c('รักษ์สะอาดรีไซเคิล', f_h, y); y += lh
-        branch = f"{po.get('branch_name','')} สาขา{po.get('branch_code','')}"
-        if branch.strip():
-            draw_c(branch, f_n, y); y += lh
-        draw_c('ใบรับซื้อของเก่า', f_h, y); y += lh + 4
-        draw_hr(y, 2); y += 8
-
-        # ═══ INFO ═══
-        draw_l(f"เลขที่: {po.get('reference_no','')}", f_n, y); y += lh
-        created = str(po.get('created_at',''))[:16]
-        draw_l(f"วันที่: {created}", f_n, y); y += lh
-
-        seller = po.get('seller_name','')
-        if seller:
-            draw_l(f"ผู้ขาย: {seller}", f_n, y); y += lh
-        id_card = po.get('seller_id_card','')
-        if id_card:
-            s = str(id_card)
-            masked = s[:1] + '-XXXX-XXXXX-' + s[-2:] + '-X'
-            draw_l(f"บัตร: {masked}", f_tn, y); y += lh
-
-        y += 4
-        draw_hr(y, 1); y += 6
-
-        # ═══ TABLE HEADER ═══
-        draw_l('รายการ', f_t, y, M)
-        draw_l('หัก', f_t, y, int(W*0.55))
-        draw_l('นน.', f_t, y, int(W*0.63))
-        draw_r('ราคา', f_t, y)
-        y += lh_s
-        draw_hr(y, 1); y += 4
-
-        # ═══ ITEMS ═══
-        for item in po.get('items', []):
-            name = str(item.get('item_name',''))[:20]
-            dq = float(item.get('weight_deduction', 0))
-            qty = float(item.get('quantity', 0))
-            net = max(0, qty - dq)
-            price = float(item.get('total_price', 0))
-
-            draw_l(name, f_t, y, M)
-            dq_str = f"{dq:.1f}" if dq > 0 else '-'
-            draw_l(dq_str, f_t, y, int(W*0.55))
-            draw_l(f"{net:.1f}", f_t, y, int(W*0.63))
-            draw_r(f"{price:,.2f}", f_t, y)
-            y += lh_s
-
-        y += 2
-        draw_hr(y, 1); y += 6
-
-        # ═══ TOTAL ═══
-        total = float(po.get('total_amount', 0))
-        draw_r(f"รวม ฿{total:,.2f}", f_h, y)
-        draw_l('รวมทั้งสิ้น', f_n, y)
-        y += lh + 4
-        draw_hr(y, 2); y += 8
-
-        # ═══ PAYMENT ═══
-        pay_map = {'cash': 'เงินสด', 'bank': 'โอน', 'qr': 'QR', 'promptpay': 'พร้อมเพย์'}
-        pay = pay_map.get(po.get('payment_method',''), str(po.get('payment_method','')))
-        draw_l(f"ชำระ: {pay}", f_n, y); y += lh
-        draw_l(f"แคชเชียร์: {po.get('user_name','-')}", f_tn, y); y += lh
-
-        # ═══ PRECIOUS METAL ═══
-        if po.get('is_precious_metal'):
-            y += 4
-            draw_hr(y, 1); y += 4
-            draw_c('⚠️ สินค้ามีค่า ⚠️', f_n, y); y += lh
-            draw_c('ข้าพเจ้านำสินค้านี้มาโดยสุจริต', f_tn, y); y += lh
-            draw_l('ลายเซ็นผู้ขาย: _________________', f_tn, y); y += lh
-            draw_hr(y, 1); y += 4
-
-        # ═══ FOOTER ═══
-        y += 4
-        draw_c('บริการดี ราคาดี ตาชั่งมาตรฐาน', f_tn, y); y += lh_s
-        phone = po.get('branch_phone','')
-        if phone:
-            draw_c(f"ติดต่อ: {phone}", f_tn, y); y += lh_s
-        draw_c('🙏 ขอบคุณที่ใช้บริการ 🙏', f_tn, y); y += lh_s + 6
-        draw_hr(y, 2); y += 8
-
-        return y + 10
+    img = _draw_receipt_pil_image(po_data, include_stub=include_stub)
+    W = img.width
 
     # ══════════════════════════════════════════════════════════
-    # 1. สร้างภาพแต่ละส่วนแยกกัน
+    # 2. แปลงเป็น ESC/POS 24-dot bit image (ESC *)
+    #
+    # Deli S420 ระบุรองรับ dot-plot command. สำหรับ ESC * mode 33
+    # ค่า n คือจำนวนจุดแนวนอน (384) และข้อมูลเป็นคอลัมน์ละ 3 ไบต์.
     # ══════════════════════════════════════════════════════════
-    # ส่วนหลัก (ใบให้ลูกค้า) - ใช้ canvas ใหญ่พอ
-    img_main = Image.new('1', (W, 2000), 1)
-    draw_main = ImageDraw.Draw(img_main)
-    y1 = render_section(draw_main, po_data, is_stub=False)
-    img_main = img_main.crop((0, 0, W, y1 + 10))
-
-    if include_stub:
-        # ส่วนต้นขั้ว
-        img_stub = Image.new('1', (W, 2000), 1)
-        draw_stub = ImageDraw.Draw(img_stub)
-        y_stub_end = render_section(draw_stub, po_data, is_stub=True, y_start=0)
-        img_stub = img_stub.crop((0, 0, W, y_stub_end + 10))
-
-        # สร้าง gap image (เส้นประ + label) — ปรับให้พอดี 384px
-        gap_h = 50
-        img_gap = Image.new('1', (W, gap_h), 1)
-        draw_gap = ImageDraw.Draw(img_gap)
-        dash_count = max(1, (W - 2*M) // 35)
-        for i in range(dash_count):
-            x_dash = M + (i * 35)
-            draw_gap.line([(x_dash, 6), (x_dash + 18, 6)], fill=0, width=2)
-        draw_gap.line([(M, 16), (W - M, 16)], fill=0, width=1)
-        th_label = 'ต้นขั้วร้าน'
-        lw = tsize(th_label, f_tiny)[0]
-        draw_gap.text(((W - lw) // 2, 20), th_label, font=f_tiny, fill=0)
-
-        # ต่อภาพ
-        combined = Image.new('1', (W, img_main.height + gap_h + img_stub.height), 1)
-        combined.paste(img_main, (0, 0))
-        combined.paste(img_gap, (0, img_main.height))
-        combined.paste(img_stub, (0, img_main.height + gap_h))
-        img = combined
+    if hasattr(img, 'get_flattened_data'):
+        pixels = list(img.get_flattened_data())
     else:
-        img = img_main
+        pixels = list(img.getdata())
+    chunk_height = 24
+    escpos = bytearray(INIT)
+    for top in range(0, img.height, chunk_height):
+        height = min(chunk_height, img.height - top)
+        escpos += b'\x1b\x2a\x21'
+        escpos += bytes([W & 0xFF, (W >> 8) & 0xFF])
+        for px in range(W):
+            for plane in range(3):
+                value = 0
+                for bit in range(8):
+                    row = top + plane * 8 + bit
+                    if row < top + height and pixels[row * W + px] == 0:
+                        value |= 1 << (7 - bit)
+                escpos.append(value)
+        escpos += b'\n'
 
-    # ══════════════════════════════════════════════════════════
-    # 2. แปลงเป็น ESC/POS raster
-    # ══════════════════════════════════════════════════════════
-    pixels = list(img.getdata())
-    wb = (W + 7) // 8
-    raster = bytearray()
-    for row in range(img.height):
-        for bc in range(wb):
-            bv = 0
-            for bit in range(8):
-                idx = row * W + bc * 8 + bit
-                if idx < len(pixels) and pixels[idx] == 0:
-                    bv |= (1 << (7 - bit))
-            raster.append(bv)
-
-    escpos = bytearray()
-    escpos += INIT
-    escpos += b'\x1d\x76\x30\x00'
-    escpos += bytes([W & 0xFF, (W >> 8) & 0xFF, img.height & 0xFF, (img.height >> 8) & 0xFF])
-    escpos += bytes(raster)
-    escpos += b'\n\n'
+    # เผื่อพื้นที่ว่างก่อนใบมีดตัด เพื่อไม่ให้ฉีกโดนบรรทัดสุดท้าย
+    escpos += FEED + b'\x04'
     escpos += CUT
     return bytes(escpos)
+
+
+def render_receipt_image_as_png(po_data, include_stub=True):
+    """
+    วาดใบเสร็จด้วยฟังก์ชันกลาง แล้วส่งคืนเป็น base64 PNG สำหรับ preview
+    """
+    img = _draw_receipt_pil_image(po_data, include_stub=include_stub)
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    return base64.b64encode(buffer.getvalue()).decode('ascii')
 
 
 def build_escpos_image(text, font_size=15):
@@ -522,18 +853,12 @@ def build_escpos_image(text, font_size=15):
     RIGHT_MARGIN = 10
 
     # ── ฟอนต์ ──────────────────────────────────────────────────
-    font_paths = [
-        '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',    # ตัวปกติ
-        '/usr/share/fonts/truetype/noto/NotoLoopedThai-Regular.ttf', # ตัวมีหัว
-        '/usr/share/fonts/truetype/tlwg/Garuda.ttf',                 # Garuda
-        '/usr/share/fonts/truetype/tlwg/Loma.ttf',                   # Loma
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-    ]
     font_normal = None
     font_bold = None
-    for fp in font_paths:
+    selected_font_path = None
+    for fp in THAI_FONT_PATHS:
         if os.path.exists(fp):
+            selected_font_path = fp
             font_normal = ImageFont.truetype(fp, font_size)
             try:
                 font_bold = ImageFont.truetype(fp.replace('Regular', 'Bold').replace('regular', 'bold'), font_size)
@@ -544,8 +869,8 @@ def build_escpos_image(text, font_size=15):
         font_normal = ImageFont.load_default()
         font_bold = font_normal
 
-    font_small = ImageFont.truetype(font_paths[0] if os.path.exists(font_paths[0]) else font_paths[4], max(16, font_size - 4)) \
-        if font_normal != ImageFont.load_default() else font_normal
+    font_small = ImageFont.truetype(selected_font_path, max(16, font_size - 4)) \
+        if selected_font_path else font_normal
 
     # ── จัด layout ──────────────────────────────────────────
     lines = text.split('\n')
@@ -589,12 +914,6 @@ def build_escpos_image(text, font_size=15):
     # ── วาดเนื้อหา ──────────────────────────────────────────
     y = 12
 
-    # Header
-    draw_center('รักษ์สะอาดรีไซเคิล', y, font_bold); y += line_h
-    draw_center('ใบรับซื้อของเก่า', y, font_bold); y += line_h
-    draw_line(y, '='); y += line_h - 2
-
-    # Info
     for line in lines:
         s = line.strip()
         if not s:
@@ -643,7 +962,7 @@ def build_escpos_image(text, font_size=15):
     return bytes(escpos)
 
 
-def print_direct(text: str, printer_name=None, encoding='cp874', mode='image'):
+def print_direct(text: str, printer_name=None, encoding='cp874', mode='text'):
     """
     High-level print function: format text → ESC/POS → CUPS → printer
 
@@ -651,7 +970,7 @@ def print_direct(text: str, printer_name=None, encoding='cp874', mode='image'):
         text: ข้อความที่จะพิมพ์
         printer_name: ชื่อ printer ใน CUPS
         encoding: 'cp874' (ไทย), 'utf-8', 'ascii'
-        mode: 'image' (default, พิมพ์เป็นภาพ — รองรับทุกภาษา), 'text' (encode ด้วย cp874)
+        mode: 'text' (default, encode ด้วย cp874), 'image' (พิมพ์เป็นภาพ)
     """
     name = printer_name or PRINTER_NAME
 
@@ -685,8 +1004,8 @@ def main():
                        help='Show preview only (no print)')
     parser.add_argument('--test', action='store_true',
                        help='Print test page')
-    parser.add_argument('--mode', choices=['image', 'text'], default='image',
-                       help='Print mode: image avoids Thai codepage issues (default), text uses CP874')
+    parser.add_argument('--mode', choices=['image', 'text'], default='text',
+                       help='Print mode: text uses CP874 (default), image uses bitmap raster')
 
     args = parser.parse_args()
 
@@ -698,7 +1017,7 @@ def main():
 ==========================================
           Deli S420 Thermal Printer
           Connected Successfully! ✅
-          รักษ์สะอาดรีไซเคิล
+          """ + DEFAULT_SHOP_NAME + """
 
      วันที่: """ + datetime.now().strftime("%d/%m/%Y %H:%M") + """
 

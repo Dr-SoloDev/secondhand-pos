@@ -29,48 +29,9 @@ class PrintController extends Controller
     {
         $this->requireAuth();
 
-        $input = json_decode(file_get_contents('php://input'), true);
-        $id = intval($input['id'] ?? 0);
-        if (!$id) {
-            Response::error('กรุณาระบุรหัสใบรับซื้อ', 400);
-        }
-
-        // ดึงข้อมูล PO โดยตรง (ไม่ต้องเรียก API ซ้อน)
-        $model = new PurchaseOrder();
-        $po = $model->getById($id);
-        if (!$po) {
-            Response::error('ไม่พบใบรับซื้อ', 404);
-        }
-
-        // SECURITY: non-admin ดูได้เฉพาะ PO ของสาขาตัวเอง
-        if (($this->user['role'] ?? '') !== 'admin') {
-            $userBranch = $this->user['branch_id'] ?? null;
-            if (!$userBranch || (int)$po['branch_id'] !== (int)$userBranch) {
-                Response::error('ไม่มีสิทธิ์เข้าถึงใบรับซื้อนี้', 403);
-            }
-        }
-
-        // G2-E2: detect precious metal flag
-        $isPreciousMetal = false;
-        foreach ($po['items'] as $item) {
-            if (!empty($item['requires_precious_receipt'])) {
-                $isPreciousMetal = true;
-                break;
-            }
-            if (!empty($item['category_name']) && mb_strpos($item['category_name'], 'ทองแดง') !== false) {
-                $isPreciousMetal = true;
-                break;
-            }
-        }
-        $po['is_precious_metal'] = $isPreciousMetal;
-
-        // ส่งไป Print Server (PHP fetch data → Print Server แค่พิมพ์)
-        $payload = json_encode([
-            'id' => $id,
-            'type' => 'purchase',
-            'data' => $po,  // ส่งข้อมูล PO ไปให้ Print Server เลย
-            'mode' => 'image'  // image mode = พิมพ์เป็นภาพ bitmap (กันภาษาเพี้ยน)
-        ]);
+        $id = $this->getPurchaseIdFromRequest();
+        $po = $this->getPrintablePurchaseOrder($id);
+        $payload = $this->buildThermalPurchasePayload($id, $po);
 
         $result = $this->callPrintServer('/print', $payload);
 
@@ -83,6 +44,37 @@ class PrintController extends Controller
             'id' => $id,
             'type' => 'purchase',
             'server_response' => $result['data']
+        ]);
+    }
+
+    /**
+     * POST /api/print/thermal-purchase/preview
+     * Body: { "id": 123 }
+     */
+    public function previewThermalPurchase()
+    {
+        $this->requireAuth();
+
+        $id = $this->getPurchaseIdFromRequest();
+        $po = $this->getPrintablePurchaseOrder($id);
+        $payload = $this->buildThermalPurchasePayload($id, $po, 'image');
+
+        $result = $this->callPrintServer('/preview', $payload);
+
+        if (!$result['success']) {
+            error_log("[Print Preview] #{$id} failed: {$result['error']}");
+            Response::error('สร้างตัวอย่างบิลไม่สำเร็จ: ' . $result['error'], 500);
+        }
+
+        $imageBase64 = $result['data']['image_base64'] ?? '';
+        if ($imageBase64 === '') {
+            Response::error('Print Server ไม่ส่งภาพตัวอย่างกลับมา', 500);
+        }
+
+        Response::success('สร้างตัวอย่างบิลสำเร็จ', [
+            'id' => $id,
+            'type' => 'purchase',
+            'image_base64' => $imageBase64
         ]);
     }
 
@@ -119,6 +111,75 @@ class PrintController extends Controller
         }
 
         Response::success('Print Server พร้อมทำงาน', $health['data']);
+    }
+
+    private function getPurchaseIdFromRequest()
+    {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $id = intval($input['id'] ?? 0);
+        if (!$id) {
+            Response::error('กรุณาระบุรหัสใบรับซื้อ', 400);
+        }
+        return $id;
+    }
+
+    private function getPrintablePurchaseOrder($id)
+    {
+        // ดึงข้อมูล PO โดยตรง (ไม่ต้องเรียก API ซ้อน)
+        $model = new PurchaseOrder();
+        $po = $model->getById($id);
+        if (!$po) {
+            Response::error('ไม่พบใบรับซื้อ', 404);
+        }
+
+        // SECURITY: non-admin ดูได้เฉพาะ PO ของสาขาตัวเอง
+        if (($this->user['role'] ?? '') !== 'admin') {
+            $userBranch = $this->user['branch_id'] ?? null;
+            if (!$userBranch || (int)$po['branch_id'] !== (int)$userBranch) {
+                Response::error('ไม่มีสิทธิ์เข้าถึงใบรับซื้อนี้', 403);
+            }
+        }
+
+        // G2-E2: detect precious metal flag
+        $isPreciousMetal = false;
+        foreach ($po['items'] as $item) {
+            if (!empty($item['requires_precious_receipt'])) {
+                $isPreciousMetal = true;
+                break;
+            }
+            if (!empty($item['category_name']) && mb_strpos($item['category_name'], 'ทองแดง') !== false) {
+                $isPreciousMetal = true;
+                break;
+            }
+        }
+        $po['is_precious_metal'] = $isPreciousMetal;
+
+        return $this->applyReceiptSettings($po);
+    }
+
+    private function buildThermalPurchasePayload($id, $po, $mode = 'image')
+    {
+        // ใช้ภาพจากฟอนต์ไทยสำหรับการพิมพ์จริง เพราะ Deli S420 บาง firmware
+        // เลือก code page จีนเองเมื่อรับไบต์ CP874
+        return json_encode([
+            'id' => $id,
+            'type' => 'purchase',
+            'data' => $po,
+            'mode' => $mode,
+            'encoding' => 'cp874'
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    private function applyReceiptSettings($po)
+    {
+        $settings = (new Setting())->getReceiptSettings();
+        $po['shop_name'] = $settings['store_name'];
+        $po['shop_phone'] = $settings['store_phone'] !== '' ? $settings['store_phone'] : ($po['branch_phone'] ?? '');
+        $po['shop_address'] = $settings['store_address'];
+        $po['tax_id'] = $settings['tax_id'];
+        $po['receipt_footer'] = $settings['receipt_footer'];
+        $po['receipt_welcome_message'] = $settings['receipt_welcome_message'];
+        return $po;
     }
 
     /**

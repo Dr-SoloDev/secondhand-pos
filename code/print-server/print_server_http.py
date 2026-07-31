@@ -14,7 +14,15 @@ import subprocess
 import sys
 import argparse
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from print_receipt import print_direct, print_raw, fetch_purchase_receipt, build_purchase_receipt, build_escpos_raw, render_receipt_image
+from print_receipt import (
+    print_direct,
+    print_raw,
+    fetch_purchase_receipt,
+    build_purchase_receipt,
+    build_escpos_raw,
+    render_receipt_image,
+    render_receipt_image_as_png,
+)
 
 # ── Config ──
 HOST = os.environ.get('PRINT_SERVER_HOST', '0.0.0.0')
@@ -66,9 +74,10 @@ class PrintHandler(BaseHTTPRequestHandler):
             self._send_json(404, {'status': 'error', 'message': 'Not found'})
 
     def do_POST(self):
-        """POST /print — สั่งพิมพ์ใบเสร็จ"""
-        if self.path != '/print':
-            self._send_json(404, {'status': 'error', 'message': 'Use POST /print'})
+        """POST /print — สั่งพิมพ์ใบเสร็จ, POST /preview — แสดงภาพก่อนพิมพ์"""
+        is_preview_request = self.path == '/preview'
+        if self.path not in ('/print', '/preview'):
+            self._send_json(404, {'status': 'error', 'message': 'Use POST /print or /preview'})
             return
 
         # Read body
@@ -88,13 +97,46 @@ class PrintHandler(BaseHTTPRequestHandler):
         receipt_id = data.get('id', 0)
         preview = data.get('preview', False)
         po_data = data.get('data')  # Optional: already-formatted receipt data from API
-        mode = data.get('mode', 'image')  # 'text' (cp874) or 'image' (bitmap — default)
+        mode = data.get('mode', 'text')  # 'text' (cp874) or 'image' (bitmap)
+        encoding = data.get('encoding', 'cp874')
 
         if not receipt_id:
             self._send_json(400, {'status': 'error', 'message': 'Missing id'})
             return
 
         try:
+            if is_preview_request:
+                if mode == 'image':
+                    if not po_data and receipt_type == 'purchase':
+                        api_base = os.environ.get('API_BASE', 'http://localhost:8080/api/index.php')
+                        po_data = fetch_purchase_receipt(receipt_id, api_base=api_base)
+                    if not po_data:
+                        self._send_json(400, {'status': 'error', 'message': 'Missing receipt data'})
+                        return
+
+                    image_base64 = render_receipt_image_as_png(po_data, include_stub=True)
+                    self._send_json(200, {
+                        'status': 'success',
+                        'image_base64': image_base64,
+                        'id': receipt_id,
+                        'type': receipt_type
+                    })
+                    return
+
+                if po_data:
+                    text = build_purchase_receipt(po_data)
+                    self._send_json(200, {
+                        'status': 'success',
+                        'preview': text,
+                        'lines': len(text.split('\n')),
+                        'id': receipt_id,
+                        'type': receipt_type
+                    })
+                    return
+
+                self._send_json(400, {'status': 'error', 'message': 'Missing receipt data'})
+                return
+
             if mode == 'image' and po_data:
                 # Image mode: วาดใบเสร็จเป็นรูปภาพ (รองรับทุกภาษา 100%)
                 raw_data = render_receipt_image(po_data, include_stub=True)
@@ -106,7 +148,7 @@ class PrintHandler(BaseHTTPRequestHandler):
                 if preview:
                     self._send_json(200, {'status': 'success', 'preview': text, 'lines': len(text.split('\n'))})
                     return
-                raw_data = build_escpos_raw(text)
+                raw_data = build_escpos_raw(text, encoding=encoding)
                 result = print_raw(raw_data, printer_name=PRINTER_NAME)
 
             elif receipt_type == 'purchase':
@@ -147,6 +189,7 @@ def main():
     print(f"   Printer: {PRINTER_NAME}")
     print(f"   Health:  http://localhost:{args.port}/health")
     print(f"   Print:   POST http://localhost:{args.port}/print")
+    print(f"   Preview: POST http://localhost:{args.port}/preview")
     print("   Press Ctrl+C to stop")
 
     try:

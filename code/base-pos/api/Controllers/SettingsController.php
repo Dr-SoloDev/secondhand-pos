@@ -10,9 +10,11 @@ class SettingsController extends Controller
             'store_name',
             'store_phone',
             'store_address',
+            'tax_id',
             'tax_rate',
             'currency_symbol',
-            'receipt_footer'
+            'receipt_footer',
+            'receipt_welcome_message'
         ]);
 
         Response::success('Store settings retrieved', $settings);
@@ -28,6 +30,12 @@ class SettingsController extends Controller
 
         // Sanitize input
         $data = $this->sanitizeInput($data);
+        if (!empty($data['tax_id'])) {
+            $data['tax_id'] = preg_replace('/\D+/', '', (string)$data['tax_id']);
+            if (strlen($data['tax_id']) !== 13) {
+                Response::error('เลขประจำตัวผู้เสียภาษีต้องมี 13 หลัก', 422);
+            }
+        }
 
         // Update settings
         $settingModel = new Setting();
@@ -35,9 +43,11 @@ class SettingsController extends Controller
             'store_name' => $data['store_name'] ?? null,
             'store_phone' => $data['store_phone'] ?? null,
             'store_address' => $data['store_address'] ?? null,
+            'tax_id' => $data['tax_id'] ?? null,
             'tax_rate' => $data['tax_rate'] ?? null,
             'currency_symbol' => $data['currency_symbol'] ?? null,
-            'receipt_footer' => $data['receipt_footer'] ?? null
+            'receipt_footer' => $data['receipt_footer'] ?? null,
+            'receipt_welcome_message' => $data['receipt_welcome_message'] ?? null
         ];
 
         try {
