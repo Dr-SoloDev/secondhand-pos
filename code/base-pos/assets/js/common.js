@@ -158,7 +158,7 @@ async function requireAuth() {
     const user = JSON.parse(userJson);
     // set username ใน topbar ถ้ามี
     const nameEl = document.getElementById('currentUser') || document.getElementById('userName');
-    if (nameEl) nameEl.textContent = user.username || user.full_name || '-';
+    if (nameEl) nameEl.textContent = user.full_name || user.username || '-';
     return user;
   } catch(e) {
     window.location.href = `${basePath}/index.html`;

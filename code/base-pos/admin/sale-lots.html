@@ -99,7 +99,7 @@
                 </tr>
               </thead>
               <tbody id="lotTableBody">
-                <tr><td colspan="9" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
+                <tr><td colspan="10" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
               </tbody>
             </table>
           </div>
@@ -236,6 +236,13 @@
         <div class="form-group">
           <label>วันที่ได้รับเงิน</label>
           <input type="date" id="revenueDate" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="revenuePaymentMethod">วิธีรับเงิน <span style="color:var(--color-danger)">*</span></label>
+          <select id="revenuePaymentMethod" class="form-control" style="display: block; min-height: 40px; color: var(--color-text);">
+            <option value="cash">เงินสดเข้าลิ้นชักสาขา</option>
+            <option value="bank_transfer">โอนเข้าบัญชีธนาคาร</option>
+          </select>
         </div>
         <div class="form-group">
           <label>หมายเหตุ (ไม่บังคับ)</label>

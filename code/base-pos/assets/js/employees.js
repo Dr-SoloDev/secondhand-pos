@@ -6,7 +6,7 @@ let searchTimer = null;
 document.addEventListener('DOMContentLoaded', async () => {
   currentUser = await requireAuth();
   if (!currentUser) return;
-  document.getElementById('currentUser').textContent = currentUser.username || '-';
+  document.getElementById('currentUser').textContent = currentUser.full_name || currentUser.username || '-';
   await loadBranches();
   await loadEmployees();
   setupSearch();

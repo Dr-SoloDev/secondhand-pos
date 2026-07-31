@@ -159,7 +159,7 @@ class BackupService
             return ['success' => false, 'message' => 'Restore failed']; // details logged server-side
         }
 
-        if (pathinfo($tempFile, PATHINFO_EXTENSION) === 'zip') {
+        if (pathinfo($tempFile, PATHINFO_EXTENSION) === 'zip' && isset($extractPath) && file_exists($extractPath)) {
             array_map('unlink', glob($extractPath . '/*'));
             rmdir($extractPath);
         }

@@ -2,20 +2,22 @@
 test_sale_lots_fifo() {
   test_section "Sale Lots FIFO Draft-first Flow"
 
+  ensure_all_cash_sessions_open
+
   local res branch_id seller_id cat_id po_id lot_id draft_id overstock_id
-  local suffix fifo_item low_stock_item
+  local suffix fifo_item low_stock_item deducted_item
 
   extract_id() {
-    echo "$1" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id','') if isinstance(d.get('data'),dict) else '')" 2>/dev/null
+    echo "$1" | json_get "data.id" 2>/dev/null
   }
 
   calc_float() {
-    python3 -c "import sys; print(f'{float(sys.argv[1]) + float(sys.argv[2]):.3f}')" "$1" "$2" 2>/dev/null
+    float_add "$1" "$2"
   }
 
   assert_float_eq() {
     local expected="${1:-0}" actual="${2:-0}" label="${3:-}"
-    if python3 -c "import sys; sys.exit(0 if abs(float(sys.argv[1]) - float(sys.argv[2])) < 0.0001 else 1)" "$expected" "$actual" 2>/dev/null; then
+    if float_eq "$expected" "$actual"; then
       test_pass "$label"
     else
       test_fail "$label"
@@ -25,31 +27,32 @@ test_sale_lots_fifo() {
 
   get_item_stock() {
     local item_name="$1"
-    api_get "inventory/category-items?category_id=$cat_id&branch_id=$branch_id" | python3 -c "import sys,json; d=json.load(sys.stdin); name=sys.argv[1]; items=d.get('data',{}).get('items',[]); print(next((str(it.get('stock_kg')) for it in items if it.get('item_name') == name), ''))" "$item_name" 2>/dev/null
+    api_get "inventory/category-items?category_id=$cat_id&branch_id=$branch_id" | json_find "data.items" "item_name" "$item_name" "stock_kg" 2>/dev/null
   }
 
-  branch_id=$(api_get "branches" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+  branch_id=$(api_get "branches" | json_get "data.0.id" 2>/dev/null)
   [ -z "$branch_id" ] && branch_id=1
 
-  seller_id=$(api_get "sellers" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+  seller_id=$(api_get "sellers" | json_get "data.0.id" 2>/dev/null)
   if [ -z "$seller_id" ]; then
     res=$(api_post "sellers" "{\"name\":\"Test Seller FIFO\",\"branch_id\":$branch_id}")
     seller_id=$(extract_id "$res")
   fi
   [ -z "$seller_id" ] && seller_id=1
 
-  cat_id=$(api_get "inventory/categories" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+  cat_id=$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)
   [ -z "$cat_id" ] && cat_id=1
 
   suffix="$(date +%s)"
   fifo_item="FIFO Test Item $suffix"
   low_stock_item="Low Stock Test $suffix"
+  deducted_item="Deducted FIFO Test $suffix"
 
   # 1. Create PO to have available stock
   res=$(api_post "purchase-orders" "{
     \"branch_id\":$branch_id,
     \"seller_id\":$seller_id,
-    \"payment_method\":\"cash\",
+    \"payment_method\":\"bank_transfer\",
     \"items\":[{
       \"item_name\":\"$fifo_item\",
       \"category_id\":$cat_id,
@@ -162,7 +165,7 @@ test_sale_lots_fifo() {
   res=$(api_post "purchase-orders" "{
     \"branch_id\":$branch_id,
     \"seller_id\":$seller_id,
-    \"payment_method\":\"cash\",
+    \"payment_method\":\"bank_transfer\",
     \"items\":[{
       \"item_name\":\"$low_stock_item\",
       \"category_id\":$cat_id,
@@ -217,4 +220,75 @@ test_sale_lots_fifo() {
 
   res=$(api_delete "sale-lots/sale-lot?id=$lot_id")
   assert_contains "$res" '"status":"success"' "FIFO: Delete cancelled lot"
+
+  # 8. Deducted weight must never enter FIFO availability or cost.
+  local deducted_po_a deducted_po_b deducted_lot deducted_cost deducted_stock
+  res=$(api_post "purchase-orders" "{
+    \"branch_id\":$branch_id,
+    \"seller_id\":$seller_id,
+    \"payment_method\":\"bank_transfer\",
+    \"items\":[{
+      \"item_name\":\"$deducted_item\",
+      \"category_id\":$cat_id,
+      \"quantity\":10,
+      \"weight_deduction\":4,
+      \"unit\":\"kg\",
+      \"unit_price\":10.00
+    }]
+  }")
+  deducted_po_a=$(extract_id "$res")
+  assert_contains "$res" '"status":"success"' "Net FIFO: Create first PO with deducted weight"
+
+  res=$(api_post "purchase-orders" "{
+    \"branch_id\":$branch_id,
+    \"seller_id\":$seller_id,
+    \"payment_method\":\"bank_transfer\",
+    \"items\":[{
+      \"item_name\":\"$deducted_item\",
+      \"category_id\":$cat_id,
+      \"quantity\":10,
+      \"weight_deduction\":0,
+      \"unit\":\"kg\",
+      \"unit_price\":20.00
+    }]
+  }")
+  deducted_po_b=$(extract_id "$res")
+  assert_contains "$res" '"status":"success"' "Net FIFO: Create second PO at different cost"
+
+  deducted_stock=$(get_item_stock "$deducted_item")
+  assert_float_eq "16.000" "$deducted_stock" "Net FIFO: Stock contains only net purchased weight"
+
+  res=$(api_post "sale-lots" "{
+    \"branch_id\":$branch_id,
+    \"buyer_name\":\"Net FIFO Buyer\",
+    \"sale_date\":\"$(date +%Y-%m-%d)\",
+    \"items\":[{
+      \"item_name\":\"$deducted_item\",
+      \"category_id\":$cat_id,
+      \"quantity_kg\":8,
+      \"unit_price\":30.00
+    }]
+  }")
+  deducted_lot=$(extract_id "$res")
+  assert_contains "$res" '"status":"success"' "Net FIFO: Create sale lot across two net batches"
+
+  res=$(api_post_id "sale-lots/confirm" "$deducted_lot" "{}")
+  assert_contains "$res" '"status":"success"' "Net FIFO: Confirm sale lot"
+
+  res=$(api_get "sale-lots/sale-lot?id=$deducted_lot")
+  deducted_cost=$(echo "$res" | json_get "data.total_cost" 2>/dev/null)
+  assert_float_eq "100.000" "$deducted_cost" "Net FIFO: Cost uses 6kg@10 plus 2kg@20"
+
+  res=$(api_get "purchase-orders/order?id=$deducted_po_a")
+  assert_float_eq "6.000" "$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)" "Net FIFO: First PO cannot consume discarded weight"
+
+  res=$(api_get "purchase-orders/order?id=$deducted_po_b")
+  assert_float_eq "2.000" "$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)" "Net FIFO: Remaining quantity comes from second PO"
+
+  res=$(api_post_id "sale-lots/cancel" "$deducted_lot" "{}")
+  assert_contains "$res" '"status":"success"' "Net FIFO: Cleanup sale lot"
+  res=$(api_post_id "purchase-orders/cancel" "$deducted_po_a" '{"reason":"QA cleanup"}')
+  assert_contains "$res" '"status":"success"' "Net FIFO: Cleanup first PO"
+  res=$(api_post_id "purchase-orders/cancel" "$deducted_po_b" '{"reason":"QA cleanup"}')
+  assert_contains "$res" '"status":"success"' "Net FIFO: Cleanup second PO"
 }

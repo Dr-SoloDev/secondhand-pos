@@ -6,7 +6,7 @@ async function init() {
   const user = await requireAuth();
   if (!user) return;
   const userNameEl = document.getElementById('userName') || document.getElementById('currentUser');
-  if (userNameEl) userNameEl.textContent = user.username || '-';
+  if (userNameEl) userNameEl.textContent = user.full_name || user.username || '-';
 
   if (user.role !== 'admin') {
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');

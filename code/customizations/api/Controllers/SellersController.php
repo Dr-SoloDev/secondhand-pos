@@ -172,7 +172,8 @@ class SellersController extends Controller
             $sellerModel->update($id, $data);
 
             // Audit log — tier change
-            if (isset($data['tier_level']) && (int)$data['tier_level'] !== (int)($current['tier_level'] ?? 1)) {
+            $tierChanged = isset($data['tier_level']) && (int)$data['tier_level'] !== (int)($current['tier_level'] ?? 1);
+            if ($tierChanged && isset($oldLabel, $newLabel)) {
                 Logger::logActivity(
                     $this->user['user_id'],
                     'update_seller_tier',
