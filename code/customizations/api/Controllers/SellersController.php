@@ -360,11 +360,11 @@ class SellersController extends Controller
                 'photos'           => $photosByPo[$poId] ?? [],
             ];
 
-            // total_pos นับเฉพาะ completed เท่านั้น (ตามที่ seller-history.html แสดง)
+            // Visit count and amount include only completed purchase orders.
             if ($po['status'] === 'completed') {
                 $totalPos++;
+                $totalAmount += $amount;
             }
-            $totalAmount += $amount;
             $totalItemsSold += intval($po['total_items']);
             if ($firstTransaction === null || $po['created_at'] < $firstTransaction) {
                 $firstTransaction = $po['created_at'];

@@ -131,6 +131,22 @@ test_purchase_orders() {
   res=$(api_get "purchase-orders/cancellation-requests?status=approved")
   assert_contains "$res" "\"id\":$cancel_request_id" "PO cancellation: Approved request remains auditable"
 
+  # Seller summary must retain cancelled/draft POs in transactions without counting their amounts.
+  local seller_dc summary_amount completed_amount cancelled_status
+  seller_dc=$(api_get "sellers/data-center?id=$seller_id")
+  summary_amount=$(echo "$seller_dc" | json_get "data.summary.total_amount" 2>/dev/null)
+  completed_amount=$(echo "$seller_dc" | python3 -c 'import json,sys
+data=json.load(sys.stdin).get("data", {})
+print(sum(float(po.get("total_amount", 0)) for po in data.get("transactions", []) if po.get("status") == "completed"))' 2>/dev/null)
+  cancelled_status=$(echo "$seller_dc" | json_find "data.transactions" "id" "$cancel_po_id" "status" 2>/dev/null)
+  assert_eq "cancelled" "$cancelled_status" "Seller data-center retains cancelled PO transaction"
+  if float_eq "$completed_amount" "$summary_amount"; then
+    test_pass "Seller data-center total_amount excludes non-completed POs"
+  else
+    test_fail "Seller data-center total_amount excludes non-completed POs"
+    echo "    (completed PO total: '$completed_amount', summary total: '$summary_amount')"
+  fi
+
   # 6a. Manager from another branch cannot cancel a PO
   local branch_id_2 cross_branch_po cross_branch_po_id manager_cancel
   branch_id_2=$branch_id
