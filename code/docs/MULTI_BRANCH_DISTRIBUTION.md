@@ -70,136 +70,181 @@
 
 ## Network Topology
 
-### Scenario 1: Internal Network (LAN)
+### Architecture: Central Server + 4 Remote Branches
 
-**When:** All branches connected via private company network / VPN
+**Real-World Setup for Scrap POS:**
+- Central Server at Headquarters (Surin)
+- Branch 1, 2, 3 at different locations (100+ km apart)
+- All branches have internet connectivity (WiFi, Mobile, ISP)
+- **Branches cannot access each other directly** (separate networks)
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Company VPN / Network                 │
-│                   (e.g., 192.168.0.0/24)                 │
-│                                                           │
-│  Central Server          Branch 1      Branch 2  Branch 3
-│  192.168.1.10           192.168.1.11   ...
-│  (Private IP)           (Private IP)
-└─────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│         UBUNTU SERVER (Headquarters)                   │
+│   pos.yourdomain.com (Public Domain + IP)              │
+│                                                         │
+│  Docker Compose                                         │
+│  ├─ Web (PHP/Apache) :80,:443                         │
+│  ├─ MySQL Database                                     │
+│  └─ Caddy HTTPS proxy                                  │
+└────────────────┬───────────────────────────────────────┘
+                 │
+        HTTPS Encrypted (TLS 1.2+)
+        Internet Connection (Port 443)
+                 │
+    ┌────────────┼────────────┬──────────────┐
+    │            │            │              │
+    ↓            ↓            ↓              ↓
+┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
+│  BRANCH 1  │ │  BRANCH 2  │ │  BRANCH 3  │ │ HQ OFFICE  │
+│ (Remote)   │ │ (Remote)   │ │ (Remote)   │ │ (Local)    │
+│ Internet   │ │ Internet   │ │ Internet   │ │ Internet   │
+│ ├ WiFi     │ │ ├ Mobile   │ │ ├ ISP      │ │ ├ WiFi     │
+│ └ Devices  │ │ └ Devices  │ │ └ Devices  │ │ └ Devices  │
+│            │ │            │ │            │ │            │
+│ Staff →    │ │ Staff →    │ │ Staff →    │ │ Staff →    │
+│ Browser    │ │ Browser    │ │ Browser    │ │ Browser    │
+│            │ │            │ │            │ │            │
+│ URL:       │ │ URL:       │ │ URL:       │ │ URL:       │
+│ https://   │ │ https://   │ │ https://   │ │ https://   │
+│ pos.your   │ │ pos.your   │ │ pos.your   │ │ pos.your   │
+│ domain.com │ │ domain.com │ │ domain.com │ │ domain.com │
+│ /admin/    │ │ /admin/    │ │ /admin/    │ │ /admin/    │
+└────────────┘ └────────────┘ └────────────┘ └────────────┘
 ```
 
-**Setup:**
-```bash
-# Central server: Bind to private IP (not 127.0.0.1)
-docker-compose edit  # Change ports to:
-# ports:
-#   - "192.168.1.10:80:80"
-#   - "192.168.1.10:3306:3306"  # Only if branches need direct DB access
+**Setup Steps:**
 
-# Branch client: Access via private IP
-# In browser: http://192.168.1.10/admin/
-```
+1. **Get Public IP from ISP** (required)
+   ```bash
+   # Contact your internet service provider (ISP):
+   "ฉันต้องการ public IP สำหรับเซิร์ฟเวอร์"
+   
+   # ISP will provide: 203.150.xxx.xxx (static or dynamic)
+   # If dynamic IP: Use DNS dynamic update service
+   ```
+
+2. **Register Public Domain** (required, ~200฿/year)
+   ```bash
+   # Choose registrar:
+   # - Namecheap.com
+   # - GoDaddy.com
+   # - Thai .co.th registrar
+   
+   # Register: pos.yourdomain.com (or scrapposhq.com)
+   ```
+
+3. **Point DNS to Server**
+   ```bash
+   # In domain registrar's control panel:
+   # Add A Record:
+   #   Name: pos
+   #   Type: A
+   #   Value: <your-public-ip>  (e.g., 203.150.xxx.xxx)
+   #   TTL: 3600
+   #
+   # Wait 24-48 hours for DNS propagation
+   
+   # Verify from any computer:
+   nslookup pos.yourdomain.com
+   # Should return your server's IP
+   ```
+
+4. **Configure Central Server**
+   ```bash
+   cd /opt/scrap-pos/code
+   
+   # Edit .env:
+   DOMAIN=pos.yourdomain.com
+   ACME_EMAIL=admin@yourdomain.com
+   APP_ENV=production
+   
+   # Start with Caddy (automatic HTTPS):
+   docker-compose -f docker-compose.prod.yml up -d
+   ```
+
+5. **All Branches Access**
+   ```
+   From any device with internet:
+   https://pos.yourdomain.com/admin/
+   
+   ✅ HTTPS encrypted (TLS 1.2+)
+   ✅ Certificate auto-renewed (Let's Encrypt)
+   ✅ No per-branch configuration
+   ```
+
+**Why This Works:**
+- ✅ Simple: One domain for all branches
+- ✅ Secure: HTTPS enforced, encrypted traffic
+- ✅ Scalable: Add branches anytime
+- ✅ Cheap: Domain ~200฿/year, SSL free
+- ✅ Reliable: Automatic certificate renewal
 
 **Security:**
-- Firewall restricts port 3306 to internal network only
-- UFW rule: `sudo ufw allow from 192.168.1.0/24 to any port 3306`
-
----
-
-### Scenario 2: Internet / Public Domain
-
-**When:** Branches access via internet / branches at remote locations
-
-```
-┌─────────────────────────┐
-│   Central Server        │
-│ pos.yourdomain.com      │
-│   (Public Domain)       │
-└──────────┬──────────────┘
-           │
-    ┌──────┴──────┬──────────┬──────────┐
-    │      │      │          │          │
-  Branch  Branch  Branch    Branch   (Mobile?)
-    1      2       3         4
-  (WiFi) (WiFi)  (WiFi)   (WiFi)
-```
-
-**Setup:**
-```bash
-# Domain DNS points to central server public IP
-# Let's Encrypt automatically provisions HTTPS
-# Branches access: https://pos.yourdomain.com/admin/
-
-# .env on central server:
-DOMAIN=pos.yourdomain.com
-ACME_EMAIL=admin@yourdomain.com
-APP_ENV=production
-
-# Caddy handles SSL automatically
-docker-compose up -d caddy
-```
-
-**Security:**
-- HTTPS enforced (automatic redirects)
-- Firewall allows 80, 443 from anywhere
-- MySQL port 3306 NOT exposed to internet
-
----
-
-### Scenario 3: Hybrid (Recommended for Thailand)
-
-**When:** Branches connect via company WiFi + occasional remote access
-
-```
-Central Server (Private IP 192.168.1.10)
-  + Public DNS (pos.yourdomain.com) for remote access
-  
-Branches:
-  - Usually via private network (fast, no quota)
-  - Fallback to public domain if network unavailable
-```
-
-**Setup in .env:**
-```env
-# Can access via BOTH
-# Internal:  http://192.168.1.10/
-# External:  https://pos.yourdomain.com/
-
-# Configure Caddy for both:
-DOMAIN=pos.yourdomain.com
-INTERNAL_IP=192.168.1.10
-```
+- ✅ HTTPS enforced (automatic HTTP → HTTPS redirect)
+- ✅ Firewall allows: 80 (HTTP), 443 (HTTPS)
+- ✅ Firewall blocks: 3306 (MySQL), 22 (SSH restricted)
+- ✅ Certificates auto-renewed every 90 days
+- ✅ All traffic encrypted between branch and server
+- ✅ JWT authentication validates every API call
 
 ---
 
 ## Branch Access Methods
 
-### Method 1: Web Browser (Recommended)
+### Method 1: Web Browser (Recommended) ⭐
 
 **Supported on:**
 - Desktop computers
 - Tablets (iPad, Android)
 - Smartphones (secondary)
 
-**Setup:**
+**Setup (All branches use same URL):**
+
 ```bash
-# 1. Each branch: Open browser
-# Internal:  http://192.168.1.10/admin/
-# External:  https://pos.yourdomain.com/admin/
+# 1. Each branch: Open web browser
+# URL: https://pos.yourdomain.com/admin/
+#      (same for HQ, Branch 1, 2, 3)
 
 # 2. Login with branch credentials
-username: cashier@branch1
-password: (created in user setup)
+username: cashier_branch1
+password: (set in USER_ROLES_SETUP.md)
 
 # 3. App loads → user sees only their branch data
 # (enforced server-side via JWT branch_id)
+
+# 4. Logout at end of shift
+# Session expires after 8 hours
 ```
+
+**Requirements:**
+- ✅ Internet connection (WiFi, Mobile, ISP)
+- ✅ Web browser (Chrome, Firefox, Safari)
+- ✅ No installation needed
+
+**Network Behavior:**
+```
+Branch 1 staff → (WiFi/Mobile) → Internet → HTTPS → Server
+                                   ↑
+                         Encrypted tunnel
+                         Port 443 (HTTPS)
+```
+
+**Speed:**
+- Local network: ~50-100ms response
+- Remote branch: ~200-500ms response
+- Acceptable for POS operations ✅
 
 **Pros:**
 ✅ No installation needed  
 ✅ Works on any device with browser  
-✅ Easy to update (push to server)  
+✅ Automatic updates (push to server)  
+✅ No per-branch configuration  
+✅ All branches use same URL  
 
 **Cons:**
-❌ Requires internet  
-❌ Slow on poor WiFi  
+⚠️ Requires internet (see offline fallback below)  
+⚠️ Slow on poor WiFi (rare)  
 
 ---
 
@@ -210,8 +255,8 @@ password: (created in user setup)
 **When ready:**
 ```bash
 # Users open browser, tap "Add to Home Screen"
-# App runs like native app, syncs in background
-# Can work offline temporarily (service worker)
+# App runs like native app on home screen
+# Works offline temporarily (service worker caches data)
 ```
 
 ---
@@ -222,21 +267,29 @@ password: (created in user setup)
 
 **Flow:**
 ```
-Branch 1 cashier → (HTTPS POST) → Central API
-                    ↓
-              Process & Save (MySQL)
-                    ↓
-              Return Response (JSON)
-                    ↓
-Branch 1 browser ← Show Success/Error
+Branch 1 staff enters PO
+    ↓
+(HTTPS POST encrypted)
+    ↓
+Central API (server)
+    ↓
+Process & Save to MySQL
+    ↓
+Return Response (JSON)
+    ↓
+Branch 1 browser ← Show "บันทึกสำเร็จ" (success)
 ```
 
 **Latency:**
-- Internal network: ~50-100ms
-- Public internet: ~200-500ms (acceptable)
+- HQ/Local: ~50-100ms (very fast)
+- Remote Branch 1-3: ~200-500ms (acceptable for retail)
+- Slow internet: ~500-2000ms (still usable)
 
 **Consistency:**
-- ACID transactions ensure no data loss
+- ✅ ACID transactions ensure no data loss  
+- ✅ Row-level locking prevents race conditions  
+- ✅ All branches see same data (single database)  
+- ✅ Changes visible to other branches in seconds
 - Row-level locking (InnoDB) prevents race conditions
 
 ### Dealing with Temporary Internet Outage
@@ -432,59 +485,147 @@ docker exec scrap-pos-db mysql -u pos_user -p$MYSQL_PASSWORD \
 
 ## Example Deployment for 4 Branches
 
-### Step 1: Central Server (1 machine)
+### CRITICAL: Prerequisites
+
+Before you start, **you MUST have:**
 
 ```bash
-# Ubuntu 22.04 LTS server
-# IP: 192.168.1.10 (internal) or pos.yourdomain.com (public)
+1. ✅ Ubuntu Server installed (22.04 LTS)
+   - IP from ISP (either static or use dynamic DNS)
+   - Internet connection working
+   
+2. ✅ Public Domain registered (~200 THB/year)
+   - Registrar: Namecheap, GoDaddy, or Thai .co.th registrar
+   - Example: pos.yourdomain.com, scrapposhq.com
+   
+3. ✅ DNS A Record pointing to server
+   - Type: A Record
+   - Name: pos
+   - Value: <your-public-ip> (e.g., 203.150.xxx.xxx)
+   - Wait 24-48 hours for propagation
+   
+Verify DNS:
+nslookup pos.yourdomain.com
+# Should return your server's IP
+```
+
+### Step 0: Verify Network Ready
+
+```bash
+# From Ubuntu Server:
+curl https://pos.yourdomain.com
+# Should return error (not set up yet) - that's OK
+
+# From any branch device:
+ping pos.yourdomain.com
+# Should respond (verifies DNS works)
+```
+
+### Step 1: Central Server Setup
+
+```bash
+# On Ubuntu Server at Headquarters:
 
 cd /opt/scrap-pos/code
 
-# Start application
+# Copy .env.example → .env
+cp .env.example .env
+
+# Edit .env with secrets:
+nano .env
+
+# MUST fill:
+# DOMAIN=pos.yourdomain.com
+# ACME_EMAIL=admin@yourdomain.com
+# MYSQL_PASSWORD=<strong-password>
+# JWT_SECRET=<random-generated>
+# (see DEPLOYMENT_UBUNTU_SERVER.md for details)
+
+# Start application (Caddy gets HTTPS certificate automatically)
 docker-compose -f docker-compose.prod.yml up -d
 
-# Verify
+# Verify containers running
 docker-compose ps
-curl http://localhost:80/admin/  # Should load UI
+
+# Check HTTPS working (takes 2-5 minutes for cert)
+curl -I https://pos.yourdomain.com/admin/
+# Should return: HTTP/2 200 + SSL certificate info
 ```
 
-### Step 2: Create Branch Users
+### Step 2: Create Admin Account
 
 ```bash
-# Access admin panel (see USER_ROLES_SETUP.md)
-# Create 4 users:
-# - Branch 1 Manager (role: manager, branch_id: 1)
-# - Branch 2 Manager (role: manager, branch_id: 2)
-# - Branch 3 Manager (role: manager, branch_id: 3)
-# - Branch 4 Manager (role: manager, branch_id: 4)
+# From browser (HQ office or remote):
+https://pos.yourdomain.com/admin/
 
-# Each branch can then create additional cashier accounts
+# Default login:
+username: admin
+password: admin
+
+# IMMEDIATELY change password:
+Click Settings → Users → admin → Change Password
+# Create strong password (8+ chars, uppercase, numbers, special)
 ```
 
-### Step 3: Branch 1 First Login
+### Step 3: Create Branch Users
 
 ```bash
-# Device: Tablet or Desktop at Branch 1
-# Network: Connect to company WiFi (or use public domain)
+# In admin panel:
+Settings → Users → Add New User
 
-# Open browser:
-# - Internal: http://192.168.1.10/admin/
-# - Public:  https://pos.yourdomain.com/admin/
+# Create 4 branch manager accounts:
+# - cashier_branch1 (role: Manager, branch: Branch 1)
+# - cashier_branch2 (role: Manager, branch: Branch 2)
+# - cashier_branch3 (role: Manager, branch: Branch 3)
+# - (optional) cashier_branch4 (role: Manager, branch: Branch 4)
 
-# Login as Branch 1 user
-# Should see:
-# - Only Branch 1 purchase orders
-# - Only Branch 1 cash sessions
-# - Only Branch 1 employees
-# ✅ Admin can see all branches
+# System generates temporary password for each
+# Share with branch managers (via SMS/WhatsApp, not email)
 ```
 
-### Step 4: Repeat for Branches 2, 3, 4
+### Step 4: Branch 1 First Login
 
 ```bash
-# Same process, different user credentials
-# Each branch completely isolated at UI level
-# (enforced server-side, not UI)
+# From any device at Branch 1 (Tablet, Desktop, Laptop):
+
+1. Open web browser
+2. Go to: https://pos.yourdomain.com/admin/
+3. Login with:
+   username: cashier_branch1
+   password: (temporary password from admin)
+4. Force password change (required on first login)
+5. Should see: Only Branch 1 data ✅
+   - Branch 1 purchase orders
+   - Branch 1 cash sessions
+   - Branch 1 employees
+   - NOT Branch 2/3 data
+
+6. Test: Create test PO
+   → Verify appears in admin panel as Branch 1
+```
+
+### Step 5: Repeat for Branches 2 & 3
+
+```bash
+# Same login flow as Step 4
+# Different credentials for each branch
+# Each branch completely isolated at data level
+# (enforced server-side via JWT branch_id)
+```
+
+### Step 6: Cross-Branch Test
+
+```bash
+# In admin panel (HQ):
+https://pos.yourdomain.com/admin/
+
+Login as: admin
+
+Should see:
+✅ All purchase orders from all branches
+✅ All cash sessions from all branches
+✅ All employees from all branches
+✅ Reports comparing branches
 ```
 
 ---

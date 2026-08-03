@@ -230,22 +230,53 @@ MYSQL_HOST=db
 MYSQL_PORT=3306
 MYSQL_DATABASE=pos_system
 MYSQL_USER=pos_user
-MYSQL_PASSWORD=CHANGE_ME_STRONG_PASSWORD
+MYSQL_PASSWORD=CHANGE_ME_STRONG_PASSWORD        # Generate: openssl rand -hex 16
 MYSQL_ROOT_PASSWORD=CHANGE_ME_STRONG_ROOT_PASSWORD
 
 # JWT Secret (authentication)
 # Generate: openssl rand -base64 32
 JWT_SECRET=CHANGE_ME_GENERATE_NEW_SECRET
 
-# ===== OPTIONAL - For HTTPS (Let's Encrypt) =====
+# ===== MANDATORY - For Public HTTPS (Let's Encrypt) =====
 APP_ENV=production
-DOMAIN=pos.yourdomain.com           # Your server domain
-ACME_EMAIL=admin@yourdomain.com     # For SSL cert notifications
+DOMAIN=pos.yourdomain.com           # ⚠️ REQUIRED: Your public domain (จดเอง ~200฿/ปี)
+ACME_EMAIL=admin@yourdomain.com     # ⚠️ REQUIRED: Email for SSL cert notifications
 
 # ===== OPTIONAL - For branch-specific configs =====
 SYNC_INTERVAL=300                   # 5 minutes
 BACKUP_SCHEDULE=0 2 * * *          # 2 AM daily
 LOG_RETENTION_DAYS=30
+```
+
+### Domain Registration (Important!)
+
+**Before deploying, register a domain:**
+
+```bash
+# 1. Choose domain registrar:
+#    - Namecheap.com (global, cheap)
+#    - GoDaddy.com (popular)
+#    - .co.th registrar (if Thai domain)
+#    
+# Cost: ~200 THB/year
+
+# 2. Register your domain: pos.yourdomain.com (or similar)
+
+# 3. Point DNS A record to your server's PUBLIC IP:
+#    Type: A Record
+#    Name: pos
+#    Value: <your-server-public-ip>  (e.g., 203.150.xxx.xxx)
+#    TTL: 3600
+#
+#    Changes take 24-48 hours to propagate
+
+# 4. Verify DNS resolution (from any computer):
+nslookup pos.yourdomain.com
+# Should return your server's IP
+
+# 5. Update .env:
+DOMAIN=pos.yourdomain.com
+ACME_EMAIL=admin@yourdomain.com
 ```
 
 ### Secrets Generation
