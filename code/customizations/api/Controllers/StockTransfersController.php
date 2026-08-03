@@ -6,7 +6,7 @@ class StockTransfersController extends Controller
         $this->requireAuth();
         $user = $this->user;
         $filters = [];
-        if (($user['role'] ?? '') !== 'admin') {
+        if (!in_array(($user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $branchId = (int)($user['branch_id'] ?? 0);
             if (!$branchId) {
                 Response::error('บัญชีผู้ใช้ยังไม่ได้กำหนดสาขา', 403);
@@ -16,6 +16,12 @@ class StockTransfersController extends Controller
         }
         if (!empty($_GET['status'])) {
             $filters['status'] = $this->sanitizeInput($_GET['status']);
+        }
+        if (!empty($_GET['transfer_type'])) {
+            $filters['transfer_type'] = $this->sanitizeInput($_GET['transfer_type']);
+        }
+        if (!empty($_GET['approval_status'])) {
+            $filters['approval_status'] = $this->sanitizeInput($_GET['approval_status']);
         }
         Response::success('สำเร็จ', ['items' => (new StockTransfer())->getAll($filters)]);
     }
@@ -30,7 +36,7 @@ class StockTransfersController extends Controller
         $toId = (int)($body['to_branch_id'] ?? 0);
         $userBranch = (int)($user['branch_id'] ?? 0);
 
-        if (($user['role'] ?? '') !== 'admin') {
+        if (!in_array(($user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             if (!$userBranch) {
                 Response::error('บัญชีผู้ใช้ยังไม่ได้กำหนดสาขา', 403);
                 return;
@@ -141,7 +147,12 @@ class StockTransfersController extends Controller
             return;
         }
 
-        if (($user['role'] ?? '') !== 'admin') {
+        if (($st['transfer_type'] ?? 'normal') === 'reversal') {
+            Response::error('ใบโอนย้อนกลับต้องผ่านเมนูอนุมัติของผู้ดูแลระบบ', 403);
+            return;
+        }
+
+        if (!in_array(($user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = (int)($user['branch_id'] ?? 0);
             if (!$userBranch || (int)$st['to_branch_id'] !== $userBranch) {
                 Response::error('ไม่มีสิทธิ์ตรวจรับใบโอนนี้', 403);
@@ -179,7 +190,7 @@ class StockTransfersController extends Controller
         }
 
         $transfer = new StockTransfer();
-        if (($user['role'] ?? '') !== 'admin') {
+        if (!in_array(($user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $st = $transfer->findById($id);
             if (!$st) {
                 Response::error('ไม่พบใบโอน', 404);
@@ -196,6 +207,91 @@ class StockTransfersController extends Controller
             $transfer->cancel($id);
             Logger::logActivity($user['user_id'] ?? $user['id'], 'cancel_stock_transfer', "ยกเลิกใบโอนสต็อก ID:{$id}");
             Response::success('ยกเลิกแล้ว');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    public function requestReversal()
+    {
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $user = $this->user;
+        $body = $this->getRequestData() ?? [];
+        $originalId = (int)($body['id'] ?? $body['original_transfer_id'] ?? 0);
+        $reason = substr(trim((string)($body['reason'] ?? '')), 0, 500);
+        $items = (!empty($body['items']) && is_array($body['items'])) ? array_values($body['items']) : [];
+        if (!$originalId || $reason === '') {
+            Response::error('กรุณาระบุใบโอนต้นฉบับและเหตุผล', 400);
+            return;
+        }
+
+        $transfer = new StockTransfer();
+        $original = $transfer->findById($originalId);
+        if (!$original) {
+            Response::error('ไม่พบใบโอนต้นฉบับ', 404);
+            return;
+        }
+        if (!in_array(($user['role'] ?? ''), ['admin', 'super_manager'], true)) {
+            $userBranch = (int)($user['branch_id'] ?? 0);
+            if (!$userBranch || (int)$original['to_branch_id'] !== $userBranch) {
+                Response::error('ไม่มีสิทธิ์ขอโอนย้อนกลับจากสาขานี้', 403);
+                return;
+            }
+        }
+
+        try {
+            $userId = (int)($user['user_id'] ?? $user['id']);
+            $result = $transfer->requestReversal($originalId, $items, $reason, $userId);
+            Logger::logActivity(
+                $userId,
+                'request_stock_transfer_reversal',
+                "ขอโอนย้อนกลับ original:{$originalId} reversal:{$result['id']} reason:{$reason}"
+            );
+            Response::success('ส่งคำขอโอนย้อนกลับเพื่อรอผู้ดูแลระบบอนุมัติแล้ว', $result);
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    public function approveReversal()
+    {
+        $this->requireAuth(['admin']);
+        $user = $this->user;
+        $body = $this->getRequestData() ?? [];
+        $id = (int)($body['id'] ?? 0);
+        $reviewNote = isset($body['review_note']) ? substr(trim((string)$body['review_note']), 0, 500) : null;
+        if (!$id) {
+            Response::error('ไม่พบ id', 400);
+            return;
+        }
+
+        try {
+            $userId = (int)($user['user_id'] ?? $user['id']);
+            (new StockTransfer())->approveReversal($id, $userId, $reviewNote);
+            Logger::logActivity($userId, 'approve_stock_transfer_reversal', "อนุมัติใบโอนย้อนกลับ ID:{$id}");
+            Response::success('อนุมัติและโอนสต็อกย้อนกลับแล้ว');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    public function rejectReversal()
+    {
+        $this->requireAuth(['admin']);
+        $user = $this->user;
+        $body = $this->getRequestData() ?? [];
+        $id = (int)($body['id'] ?? 0);
+        $reviewNote = substr(trim((string)($body['review_note'] ?? '')), 0, 500);
+        if (!$id || $reviewNote === '') {
+            Response::error('กรุณาระบุรายการและเหตุผลที่ปฏิเสธ', 400);
+            return;
+        }
+
+        try {
+            $userId = (int)($user['user_id'] ?? $user['id']);
+            (new StockTransfer())->rejectReversal($id, $userId, $reviewNote);
+            Logger::logActivity($userId, 'reject_stock_transfer_reversal', "ปฏิเสธใบโอนย้อนกลับ ID:{$id}");
+            Response::success('ปฏิเสธคำขอโอนย้อนกลับแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
         }

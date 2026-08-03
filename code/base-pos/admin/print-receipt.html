@@ -48,29 +48,20 @@
     /* ======== A4 Preview Sheet ======== */
     .a4-sheet {
       width: 210mm;
-      min-height: 148mm;
+      min-height: 297mm;
       background: #fff;
       margin: 0 auto;
-      padding: 8mm;
-      display: flex;
-      flex-direction: row;
-      gap: 0;
+      padding: 10mm 12mm;
+      display: block;
       border: 1px solid #ccc;
     }
 
     /* ======== Bill Copy ======== */
     .bill-copy {
-      width: 50%;
-      padding: 6px 12px;
+      width: 100%;
+      padding: 0;
       font-family: 'Sarabun', sans-serif;
-      font-size: 11px;
-    }
-    .bill-copy:first-child {
-      border-right: 2px dashed #999;
-      padding-right: 14px;
-    }
-    .bill-copy:last-child {
-      padding-left: 14px;
+      font-size: 12px;
     }
 
     /* ======== Bill Header ======== */
@@ -85,6 +76,19 @@
       font-size: 14px;
       font-weight: 800;
       letter-spacing: 0;
+      margin-top: 4px;
+    }
+    .bill-header .store-name {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+    .bill-header .store-info,
+    .bill-header .receipt-welcome {
+      font-size: 10.5px;
+      color: #555;
+      line-height: 1.5;
+      margin-top: 2px;
     }
     .bill-header .branch-name {
       font-size: 11px;
@@ -159,6 +163,7 @@
       border-top: 1px dashed #ccc;
       padding-top: 5px;
       line-height: 1.8;
+      white-space: pre-line;
     }
 
     /* ======== Precious Metal Section ======== */
@@ -219,7 +224,7 @@
 
     /* ======== @media print ======== */
     @media print {
-      @page { size: A4 landscape; margin: 6mm; }
+      @page { size: A4 portrait; margin: 8mm; }
 
       body { background: #fff; }
       #printControls { display: none !important; }
@@ -229,9 +234,15 @@
       .a4-sheet {
         border: none;
         width: 100%;
+        min-height: auto;
         padding: 0;
+        display: block;
       }
-      .bill-copy { page-break-inside: avoid; }
+      .bill-copy {
+        width: 100%;
+        padding: 0;
+        page-break-inside: avoid;
+      }
     }
   </style>
 </head>
@@ -288,9 +299,26 @@
         .replace(/"/g, '&quot;');
     }
 
+    function escLines(s) {
+      return esc(s).replace(/\r?\n/g, '<br>');
+    }
+
     function buildBillCopy(po) {
       const dt = fmtDateTime(po.created_at);
       const branchLabel = [po.branch_name, po.branch_code ? `สาขา ${po.branch_code}` : ''].filter(Boolean).join(' · ');
+      const shopName = po.shop_name || 'รักษ์สะอาดรีไซเคิล';
+      const shopAddress = po.shop_address || '';
+      const taxId = po.tax_id || '';
+      const shopPhone = po.shop_phone || po.branch_phone || '';
+      const welcomeMessage = po.receipt_welcome_message || 'บริการดี ราคาดี ตาชั่งมาตรฐาน';
+      const receiptFooter = po.receipt_footer || 'ขอบคุณที่ใช้บริการ';
+      const storeInfoRows = [
+        shopAddress,
+        [
+          taxId ? `เลขประจำตัวผู้เสียภาษี ${taxId}` : '',
+          shopPhone ? `โทร ${shopPhone}` : ''
+        ].filter(Boolean).join(' · ')
+      ].filter(Boolean).map(line => `<div class="store-info">${escLines(line)}</div>`).join('');
 
       const itemRows = (po.items || []).map((it, i) => {
         const dq = parseFloat(it.weight_deduction || 0);
@@ -326,6 +354,9 @@
 
       return `
         <div class="bill-header">
+          <div class="store-name">${esc(shopName)}</div>
+          ${storeInfoRows}
+          ${welcomeMessage ? `<div class="receipt-welcome">${escLines(welcomeMessage)}</div>` : ''}
           <div class="shop-name">ใบรับซื้อของเก่า</div>
           <div class="branch-name">${esc(branchLabel)}</div>
         </div>
@@ -356,8 +387,8 @@
           <span class="amount">฿ ${fmtCurrency(po.total_amount)}</span>
         </div>
         <div class="bill-footer">
-          ${po.branch_phone ? `${esc(po.branch_phone)}<br>` : ''}
-          <span style="font-size:9px">บริการดี ราคาดี ตาชั่งดิจิตอลมาตรฐานกระทรวง</span>
+          ${shopPhone ? `ติดต่อ ${esc(shopPhone)}<br>` : ''}
+          <span style="font-size:9px">${escLines(receiptFooter)}</span>
         </div>
         ${preciousHtml}`;
     }
@@ -393,10 +424,8 @@
 
       const copyHtml = buildBillCopy(po);
       const sheet = document.getElementById('billSheet');
-      sheet.innerHTML = `
-        <div class="bill-copy">${copyHtml}</div>
-        <div class="bill-copy">${copyHtml}</div>`;
-      sheet.style.display = 'flex';
+      sheet.innerHTML = `<div class="bill-copy">${copyHtml}</div>`;
+      sheet.style.display = 'block';
 
       // Auto-print when opened from PO detail
       if (new URLSearchParams(window.location.search).get('auto') === '1') {

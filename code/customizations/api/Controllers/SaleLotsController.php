@@ -40,7 +40,7 @@ class SaleLotsController extends Controller
     // สร้าง Sale Lot ใหม่เป็น draft เท่านั้น ยังไม่ตัดสต็อกจนกว่าจะ confirm
     public function store()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'super_manager']);
         $data = $this->getRequestData();
 
         // Idempotency check — ป้องกัน Sale Lot ซ้ำ
@@ -51,7 +51,7 @@ class SaleLotsController extends Controller
         }
 
         // SECURITY: non-admin บังคับ scope ที่ branch ของตัวเอง — ห้ามสร้าง Sale Lot ให้สาขาอื่น
-        if (($this->user['role'] ?? '') !== 'admin') {
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = $this->user['branch_id'] ?? null;
             if (!$userBranch || (int)$data['branch_id'] !== (int)$userBranch) {
                 Response::error('ไม่มีสิทธิ์สร้าง Sale Lot สำหรับสาขานี้', 403);
@@ -120,7 +120,7 @@ class SaleLotsController extends Controller
     // อัปเดต Sale Lot ได้เฉพาะ draft; confirmed ต้องยกเลิกหรือสร้าง Lot ใหม่
     public function update($id)
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -128,7 +128,7 @@ class SaleLotsController extends Controller
         if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
 
         // SECURITY: non-admin แก้ได้เฉพาะ Sale Lot ของสาขาตัวเอง
-        if (($this->user['role'] ?? '') !== 'admin') {
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = $this->user['branch_id'] ?? null;
             if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
                 Response::error('ไม่มีสิทธิ์แก้ไข Sale Lot นี้', 403);
@@ -189,7 +189,7 @@ class SaleLotsController extends Controller
     // ยืนยัน Sale Lot เปลี่ยนสถานะเป็น confirmed และตัดสต็อก
     public function confirm($id)
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -200,7 +200,7 @@ class SaleLotsController extends Controller
         }
 
         // SECURITY: non-admin ยืนยันได้เฉพาะ Sale Lot ของสาขาตัวเอง
-        if (($this->user['role'] ?? '') !== 'admin') {
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = $this->user['branch_id'] ?? null;
             if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
                 Response::error('ไม่มีสิทธิ์ยืนยัน Sale Lot นี้', 403);
@@ -224,15 +224,18 @@ class SaleLotsController extends Controller
     // ยกเลิก Sale Lot เปลี่ยนสถานะเป็น cancelled และคืนสต็อก (BUG-05 FIX)
     public function cancel($id)
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
         $lot   = $model->getById($id);
         if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
+        if ($lot['actual_revenue'] !== null) {
+            Response::error('Lot ที่บันทึกรายรับแล้วต้องแก้ไขด้วยเอกสารปรับปรุง', 400);
+        }
 
         // SECURITY: non-admin ยกเลิกได้เฉพาะ Sale Lot ของสาขาตัวเอง
-        if (($this->user['role'] ?? '') !== 'admin') {
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = $this->user['branch_id'] ?? null;
             if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
                 Response::error('ไม่มีสิทธิ์ยกเลิก Sale Lot นี้', 403);
@@ -256,7 +259,7 @@ class SaleLotsController extends Controller
     // บันทึกรายรับจริงจากบิลศูนย์รับซื้อ (เฉพาะ lot ที่ confirmed แล้ว)
     public function recordRevenue($id)
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $data = $this->getRequestData();
@@ -266,6 +269,10 @@ class SaleLotsController extends Controller
 
         $actualRevenue = floatval($data['actual_revenue']);
         if ($actualRevenue < 0) { Response::error('ยอดรายรับต้องไม่ติดลบ', 400); return; }
+        $paymentMethod = $data['payment_method'] ?? null;
+        if (!in_array($paymentMethod, ['cash', 'bank_transfer'], true)) {
+            Response::error('กรุณาระบุวิธีรับเงินสดหรือเงินโอน', 400);
+        }
 
         $model = new SaleLot();
         $lot   = $model->getById($id);
@@ -273,7 +280,7 @@ class SaleLotsController extends Controller
         if ($lot['status'] !== 'confirmed') Response::error('บันทึกรายรับได้เฉพาะ Lot ที่ยืนยันแล้ว', 400);
 
         // SECURITY: non-admin บันทึกได้เฉพาะสาขาตัวเอง
-        if (($this->user['role'] ?? '') !== 'admin') {
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = $this->user['branch_id'] ?? null;
             if (!$userBranch || (int)$lot['branch_id'] !== (int)$userBranch) {
                 Response::error('ไม่มีสิทธิ์เข้าถึง Sale Lot นี้', 403);
@@ -284,10 +291,11 @@ class SaleLotsController extends Controller
             'actual_revenue'      => $actualRevenue,
             'actual_revenue_note' => isset($data['actual_revenue_note']) ? trim((string)$data['actual_revenue_note']) : null,
             'actual_revenue_date' => isset($data['actual_revenue_date']) ? $this->sanitizeInput($data['actual_revenue_date']) : date('Y-m-d'),
+            'payment_method'      => $paymentMethod,
         ];
 
         try {
-            $model->recordRevenue($id, $cleanData);
+            $model->recordRevenue($id, $cleanData, (int)($this->user['user_id'] ?? $this->user['id']));
             Logger::logActivity(
                 $this->user['user_id'],
                 'record_revenue',
@@ -296,20 +304,20 @@ class SaleLotsController extends Controller
             Response::success('บันทึกรายรับสำเร็จ', null);
         } catch (Exception $e) {
             error_log('SaleLot recordRevenue failed: ' . $e->getMessage());
-            Response::error('บันทึกรายรับไม่สำเร็จ กรุณาลองใหม่', 500);
+            Response::error($e->getMessage() ?: 'บันทึกรายรับไม่สำเร็จ กรุณาลองใหม่', 400);
         }
     }
 
     // ลบ Sale Lot ได้เฉพาะสถานะ draft เท่านั้น
     public function destroy($id)
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
 
         // SECURITY: non-admin ลบได้เฉพาะ Sale Lot ของสาขาตัวเอง
-        if (($this->user['role'] ?? '') !== 'admin') {
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $lot = $model->getById($id);
             if (!$lot) Response::error('ไม่พบ Sale Lot', 404);
             $userBranch = $this->user['branch_id'] ?? null;

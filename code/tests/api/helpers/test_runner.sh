@@ -78,3 +78,173 @@ summary() {
   echo "=========================================="
   return "$FAIL_COUNT"
 }
+
+json_get() {
+  local path="${1:-}"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json,sys
+path=[p for p in sys.argv[1].split(".") if p]
+cur=json.load(sys.stdin)
+for part in path:
+    if isinstance(cur, list):
+        cur = cur[int(part)]
+    elif isinstance(cur, dict):
+        cur = cur.get(part, "")
+    else:
+        cur = ""
+        break
+if isinstance(cur, (dict, list)):
+    print(json.dumps(cur, ensure_ascii=False))
+else:
+    print(cur)' "$path"
+    return
+  fi
+
+  if command -v php >/dev/null 2>&1; then
+    php -r '$path = array_values(array_filter(explode(".", $argv[1]), fn($p) => $p !== "")); $cur = json_decode(stream_get_contents(STDIN), true); foreach ($path as $part) { if (is_array($cur) && array_is_list($cur)) { $cur = $cur[(int)$part] ?? ""; } elseif (is_array($cur)) { $cur = $cur[$part] ?? ""; } else { $cur = ""; break; } } if (is_array($cur)) { echo json_encode($cur, JSON_UNESCAPED_UNICODE); } else { echo $cur; }' "$path"
+    return
+  fi
+
+  return 1
+}
+
+json_find() {
+  local array_path="${1:-}" match_key="${2:-}" match_value="${3:-}" result_key="${4:-}"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json,sys
+array_path=[p for p in sys.argv[1].split(".") if p]
+match_key, match_value, result_key = sys.argv[2], sys.argv[3], sys.argv[4]
+cur=json.load(sys.stdin)
+for part in array_path:
+    if isinstance(cur, list):
+        cur = cur[int(part)]
+    elif isinstance(cur, dict):
+        cur = cur.get(part, [])
+    else:
+        cur = []
+        break
+if isinstance(cur, list):
+    for item in cur:
+        if isinstance(item, dict) and str(item.get(match_key, "")) == match_value:
+            cur = item.get(result_key, "")
+            break
+    else:
+        cur = ""
+if isinstance(cur, (dict, list)):
+    print(json.dumps(cur, ensure_ascii=False))
+else:
+    print(cur)' "$array_path" "$match_key" "$match_value" "$result_key"
+    return
+  fi
+
+  if command -v php >/dev/null 2>&1; then
+    php -r '$arrayPath = array_values(array_filter(explode(".", $argv[1]), fn($p) => $p !== "")); $matchKey = $argv[2]; $matchValue = $argv[3]; $resultKey = $argv[4]; $cur = json_decode(stream_get_contents(STDIN), true); foreach ($arrayPath as $part) { if (is_array($cur) && array_is_list($cur)) { $cur = $cur[(int)$part] ?? []; } elseif (is_array($cur)) { $cur = $cur[$part] ?? []; } else { $cur = []; break; } } if (is_array($cur)) { foreach ($cur as $item) { if (is_array($item) && isset($item[$matchKey]) && (string)$item[$matchKey] === $matchValue) { $cur = $item[$resultKey] ?? ""; break; } } } if (is_array($cur)) { echo json_encode($cur, JSON_UNESCAPED_UNICODE); } else { echo $cur; }' "$array_path" "$match_key" "$match_value" "$result_key"
+    return
+  fi
+
+  return 1
+}
+
+json_len() {
+  local path="${1:-}"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json,sys
+path=[p for p in sys.argv[1].split(".") if p]
+cur=json.load(sys.stdin)
+for part in path:
+    if isinstance(cur, list):
+        cur = cur[int(part)]
+    elif isinstance(cur, dict):
+        cur = cur.get(part, [])
+    else:
+        cur = []
+        break
+print(len(cur) if isinstance(cur, list) else 0)' "$path"
+    return
+  fi
+
+  if command -v php >/dev/null 2>&1; then
+    php -r '$path = array_values(array_filter(explode(".", $argv[1]), fn($p) => $p !== "")); $cur = json_decode(stream_get_contents(STDIN), true); foreach ($path as $part) { if (is_array($cur) && array_is_list($cur)) { $cur = $cur[(int)$part] ?? []; } elseif (is_array($cur)) { $cur = $cur[$part] ?? []; } else { $cur = []; break; } } echo is_array($cur) && array_is_list($cur) ? count($cur) : 0;' "$path"
+    return
+  fi
+
+  return 1
+}
+
+url_encode() {
+  local value="${1:-}"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$value"
+    return
+  fi
+
+  if command -v php >/dev/null 2>&1; then
+    php -r 'echo rawurlencode($argv[1]);' "$value"
+    return
+  fi
+
+  return 1
+}
+
+float_add() {
+  awk -v a="${1:-0}" -v b="${2:-0}" 'BEGIN { printf "%.3f", a + b }'
+}
+
+float_eq() {
+  awk -v expected="${1:-0}" -v actual="${2:-0}" 'BEGIN { exit((expected - actual < 0.0001 && actual - expected < 0.0001) ? 0 : 1) }'
+}
+
+ensure_cash_session_open() {
+  local branch_id="${1:-}" current status session_id actual
+  [ -z "$branch_id" ] && return 1
+  current=$(api_get "cash-sessions/current?branch_id=$branch_id")
+  status=$(echo "$current" | json_get "data.status" 2>/dev/null)
+  session_id=$(echo "$current" | json_get "data.id" 2>/dev/null)
+  case "$status" in
+    open)
+      ensure_cash_test_float "$branch_id"
+      return ;;
+    closed)
+      api_post "cash-sessions/reopen" "{\"id\":$session_id,\"reason\":\"API test setup\"}" >/dev/null
+      ensure_cash_test_float "$branch_id"
+      return ;;
+    pending_open|pending_close)
+      return 1 ;;
+  esac
+
+  actual=$(api_get "cash-sessions?branch_id=$branch_id" | python3 -c "import sys,json; d=json.load(sys.stdin); rows=d.get('data',{}).get('items',[]); print(rows[0].get('closing_actual') or 0 if rows else 0)" 2>/dev/null)
+  [ -z "$actual" ] && actual=0
+  api_post "cash-sessions/open" "{\"branch_id\":$branch_id,\"actual_cash\":$actual,\"reason\":\"API test setup\"}" >/dev/null
+  ensure_cash_test_float "$branch_id"
+}
+
+ensure_cash_test_float() {
+  local branch_id="${1:-}" expected amount username cookie login_res request request_id
+  expected=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
+  [ -z "$expected" ] && return 0
+  if awk -v n="$expected" 'BEGIN { exit(n >= 10000 ? 0 : 1) }'; then
+    return 0
+  fi
+
+  username=$(printf 'manager-br%02d' "$branch_id")
+  cookie="/tmp/cash_float_${branch_id}_$$.cookie"
+  login_res=$(curl -s -c "$cookie" "$API_BASE/auth/login" \
+    -X POST -H 'Content-Type: application/json' \
+    -d "{\"username\":\"$username\",\"password\":\"admin\"}")
+  echo "$login_res" | grep -q '"status":"success"' || return 0
+  amount=$(awk -v n="$expected" 'BEGIN { printf "%.2f", 100000 - n }')
+  request=$(curl -s -b "$cookie" "$API_BASE/cash-sessions/deposit-request" \
+    -X POST -H 'Content-Type: application/json' \
+    -d "{\"branch_id\":$branch_id,\"amount\":$amount,\"source_name\":\"API test float\",\"reason\":\"Automated test setup\"}")
+  request_id=$(echo "$request" | json_get "data.id" 2>/dev/null)
+  [ -z "$request_id" ] && return 0
+  api_post "cash-sessions/deposit-approve" "{\"id\":$request_id}" >/dev/null
+}
+
+ensure_all_cash_sessions_open() {
+  local ids branch_id
+  ids=$(api_get "branches" | python3 -c "import sys,json; d=json.load(sys.stdin); print(' '.join(str(row.get('id')) for row in d.get('data',[]) if row.get('id')))" 2>/dev/null)
+  for branch_id in $ids; do
+    ensure_cash_session_open "$branch_id" || return 1
+  done
+}

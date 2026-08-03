@@ -870,7 +870,7 @@ class ReportService
                 COALESCE(SUM(poi.weight_deduction), 0) AS total_deduction,
                 COALESCE(SUM(
                     GREATEST(
-                        COALESCE(poi.quantity, 0) - COALESCE(poi.weight_deduction, 0),
+                        COALESCE(poi.net_quantity, 0),
                         0
                     )
                 ), 0) AS net_quantity,
@@ -878,13 +878,13 @@ class ReportService
                 CASE
                     WHEN SUM(
                         GREATEST(
-                            COALESCE(poi.quantity, 0) - COALESCE(poi.weight_deduction, 0),
+                            COALESCE(poi.net_quantity, 0),
                             0
                         )
                     ) > 0
                     THEN SUM(poi.total_price) / SUM(
                         GREATEST(
-                            COALESCE(poi.quantity, 0) - COALESCE(poi.weight_deduction, 0),
+                            COALESCE(poi.net_quantity, 0),
                             0
                         )
                     )
@@ -912,7 +912,7 @@ class ReportService
                 COUNT(poi.id) AS total_rows,
                 COALESCE(SUM(
                     GREATEST(
-                        COALESCE(poi.quantity, 0) - COALESCE(poi.weight_deduction, 0),
+                        COALESCE(poi.net_quantity, 0),
                         0
                     )
                 ), 0) AS total_net_quantity,

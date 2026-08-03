@@ -171,6 +171,9 @@ class Router
         $this->routes[] = ['route' => 'purchase-orders/order', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrder', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders/print', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrderForPrint', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders/cancel', 'controller' => 'PurchaseOrdersController', 'method' => 'cancelPurchaseOrder', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'purchase-orders/cancellation-requests', 'controller' => 'PurchaseOrdersController', 'method' => 'getCancellationRequests', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-orders/cancellation-approve', 'controller' => 'PurchaseOrdersController', 'method' => 'approveCancellation', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'purchase-orders/cancellation-reject', 'controller' => 'PurchaseOrdersController', 'method' => 'rejectCancellation', 'verb' => 'POST'];
         // WF-01: Photo upload (auth via HMAC token หรือ JWT)
         $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'upload', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'list',   'verb' => 'GET'];
@@ -211,18 +214,39 @@ class Router
         $this->routes[] = ['route' => 'financial/expenses',             'controller' => 'FinancialController', 'method' => 'listExpenses',         'verb' => 'GET'];
         $this->routes[] = ['route' => 'financial/expenses',             'controller' => 'FinancialController', 'method' => 'createExpense',        'verb' => 'POST'];
         $this->routes[] = ['route' => 'financial/expenses',             'controller' => 'FinancialController', 'method' => 'deleteExpense',        'verb' => 'DELETE'];
+        $this->routes[] = ['route' => 'financial/expenses/approve',     'controller' => 'FinancialController', 'method' => 'approveExpense',       'verb' => 'POST'];
+        $this->routes[] = ['route' => 'financial/expenses/reject',      'controller' => 'FinancialController', 'method' => 'rejectExpense',        'verb' => 'POST'];
         $this->routes[] = ['route' => 'financial/export',               'controller' => 'FinancialController', 'method' => 'exportCsv',            'verb' => 'GET'];
         $this->routes[] = ['route' => 'financial/export-excel',         'controller' => 'FinancialController', 'method' => 'exportExcel',          'verb' => 'GET'];
         $this->routes[] = ['route' => 'financial/monthly-trend',        'controller' => 'FinancialController', 'method' => 'monthlyTrend',         'verb' => 'GET'];
         $this->routes[] = ['route' => 'financial/branch-comparison',    'controller' => 'FinancialController', 'method' => 'branchComparison',     'verb' => 'GET'];
         $this->routes[] = ['route' => 'financial/top-sellers',          'controller' => 'FinancialController', 'method' => 'topSellers',           'verb' => 'GET'];
         $this->routes[] = ['route' => 'financial/top-buyers',           'controller' => 'FinancialController', 'method' => 'topBuyers',            'verb' => 'GET'];
+        // Daily branch cash control
+        $this->routes[] = ['route' => 'cash-sessions',               'controller' => 'CashSessionsController', 'method' => 'index',        'verb' => 'GET'];
+        $this->routes[] = ['route' => 'cash-sessions/current',       'controller' => 'CashSessionsController', 'method' => 'current',      'verb' => 'GET'];
+        $this->routes[] = ['route' => 'cash-sessions/open',          'controller' => 'CashSessionsController', 'method' => 'open',         'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/close',         'controller' => 'CashSessionsController', 'method' => 'close',        'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/open-approve',  'controller' => 'CashSessionsController', 'method' => 'approveOpen',  'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/open-reject',   'controller' => 'CashSessionsController', 'method' => 'rejectOpen',   'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/close-approve', 'controller' => 'CashSessionsController', 'method' => 'approveClose', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/close-reject',  'controller' => 'CashSessionsController', 'method' => 'rejectClose',  'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/reopen',        'controller' => 'CashSessionsController', 'method' => 'reopen',       'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/deposits',        'controller' => 'CashSessionsController', 'method' => 'listDeposits',    'verb' => 'GET'];
+        $this->routes[] = ['route' => 'cash-sessions/deposit-request', 'controller' => 'CashSessionsController', 'method' => 'requestDeposit',  'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/deposit-approve', 'controller' => 'CashSessionsController', 'method' => 'approveDeposit',  'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/deposit-reject',  'controller' => 'CashSessionsController', 'method' => 'rejectDeposit',   'verb' => 'POST'];
+        $this->routes[] = ['route' => 'adjustment-documents', 'controller' => 'AdjustmentDocumentsController', 'method' => 'index',  'verb' => 'GET'];
+        $this->routes[] = ['route' => 'adjustment-documents', 'controller' => 'AdjustmentDocumentsController', 'method' => 'create', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'purchase-catalog/price-board',   'controller' => 'PurchaseItemCatalogController', 'method' => 'getPriceBoard', 'verb' => 'GET'];
         // Stock Transfers
         $this->routes[] = ['route' => 'stock-transfers',         'controller' => 'StockTransfersController', 'method' => 'index',   'verb' => 'GET'];
         $this->routes[] = ['route' => 'stock-transfers',         'controller' => 'StockTransfersController', 'method' => 'store',   'verb' => 'POST'];
         $this->routes[] = ['route' => 'stock-transfers/confirm', 'controller' => 'StockTransfersController', 'method' => 'confirm', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'stock-transfers/cancel',  'controller' => 'StockTransfersController', 'method' => 'cancel',  'verb' => 'POST'];
+        $this->routes[] = ['route' => 'stock-transfers/reversal-request', 'controller' => 'StockTransfersController', 'method' => 'requestReversal', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'stock-transfers/reversal-approve', 'controller' => 'StockTransfersController', 'method' => 'approveReversal', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'stock-transfers/reversal-reject',  'controller' => 'StockTransfersController', 'method' => 'rejectReversal',  'verb' => 'POST'];
 
         // Print routes
         $this->routes[] = ['route' => 'print/thermal-purchase/preview', 'controller' => 'PrintController', 'method' => 'previewThermalPurchase', 'verb' => 'POST'];

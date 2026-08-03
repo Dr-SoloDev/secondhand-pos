@@ -9,20 +9,20 @@ test_sale_lots() {
   assert_contains "$res" '"status":"success"' "List sale lots"
 
   extract_id() {
-    echo "$1" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('id','') if isinstance(d.get('data'),dict) else '')" 2>/dev/null
+    echo "$1" | json_get "data.id" 2>/dev/null
   }
 
   # 2. Create sale lot as draft; draft create must not require/consume stock
   local branch_id
-  branch_id=$(api_get "branches" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+  branch_id=$(api_get "branches" | json_get "data.0.id" 2>/dev/null)
   [ -z "$branch_id" ] && branch_id=1
 
   local cat_id
-  cat_id=$(api_get "inventory/categories" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])" 2>/dev/null)
+  cat_id=$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)
   [ -z "$cat_id" ] && cat_id=1
 
   local item_name
-  item_name=$(api_get "inventory/category-items?category_id=$cat_id&branch_id=$branch_id" | php -r '$d=json_decode(stream_get_contents(STDIN), true); echo $d["data"]["items"][0]["item_name"] ?? "";')
+  item_name=$(api_get "inventory/category-items?category_id=$cat_id&branch_id=$branch_id" | json_get "data.items.0.item_name")
   [ -z "$item_name" ] && item_name="Test Item"
 
   local lot_id

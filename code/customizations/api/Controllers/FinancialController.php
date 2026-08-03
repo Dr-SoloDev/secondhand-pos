@@ -53,7 +53,7 @@ class FinancialController extends Controller
 
         // น้ำหนักรับซื้อรวม
         $kgRow = $db->fetch(
-            "SELECT COALESCE(SUM(poi.quantity), 0) AS total_kg
+            "SELECT COALESCE(SUM(poi.net_quantity), 0) AS total_kg
              FROM purchase_order_items poi
              JOIN purchase_orders po ON po.id = poi.purchase_order_id
              WHERE po.status = 'completed'
@@ -151,7 +151,7 @@ class FinancialController extends Controller
         $items = $db->fetchAll(
             "SELECT
                COALESCE(c.name, poi.item_name, 'ไม่ระบุหมวด') AS category_name,
-               COALESCE(SUM(poi.quantity), 0) AS total_kg,
+               COALESCE(SUM(poi.net_quantity), 0) AS total_kg,
                COUNT(poi.id) AS total_items,
                COALESCE(SUM(poi.total_price), 0) AS total_amount
              FROM purchase_order_items poi
@@ -171,7 +171,7 @@ class FinancialController extends Controller
     // ดึงรายการ business expenses
     public function listExpenses()
     {
-        $this->requireReportAuth();
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $params   = $this->getPeriodParams();
         $model    = new BusinessExpense();
         $items    = $model->listByPeriod(
@@ -186,36 +186,116 @@ class FinancialController extends Controller
     // เพิ่ม business expense
     public function createExpense()
     {
-        $user = $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $branchId = intval($body['branch_id'] ?? 0);
+        $branchId = $this->resolveWriteBranchId($body['branch_id'] ?? null);
         $amount   = floatval($body['amount'] ?? 0);
-        if (!$branchId || $amount <= 0 || !is_finite($amount) || empty($body['expense_date']) || empty($body['category'])) {
+        if (!$branchId || $amount <= 0 || !is_finite($amount) || empty($body['expense_date'])
+            || empty($body['category']) || empty(trim((string)($body['beneficiary_name'] ?? '')))) {
             Response::error('ข้อมูลไม่ครบ', 400);
             return;
         }
-        $model = new BusinessExpense();
-        $id = $model->create([
-            'branch_id'    => $branchId,
-            'expense_date' => $body['expense_date'],
-            'category'     => substr(trim($body['category']), 0, 50),
-            'amount'       => $amount,
-            'note'         => isset($body['note']) ? substr(trim($body['note']), 0, 255) : null,
-            'created_by'   => $this->user['user_id'] ?? $this->user['id'] ?? null,
-        ]);
-        Logger::logActivity($this->user['user_id'] ?? null, 'create_business_expense', "เพิ่มค่าใช้จ่าย branch:{$branchId} {$body['category']} {$amount}บาท");
-        Response::success('บันทึกแล้ว', ['id' => intval($id)]);
+        try {
+            $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+            $id = (new BusinessExpense())->createRequest([
+                'branch_id' => $branchId,
+                'expense_date' => $body['expense_date'],
+                'category' => substr(trim($body['category']), 0, 50),
+                'amount' => $amount,
+                'payment_method' => $body['payment_method'] ?? 'cash',
+                'beneficiary_name' => substr(trim((string)$body['beneficiary_name']), 0, 200),
+                'note' => isset($body['note']) ? substr(trim($body['note']), 0, 255) : null,
+            ], $userId);
+            Logger::logActivity($userId, 'request_business_expense', "ขอเบิกค่าใช้จ่าย branch:{$branchId} {$body['category']} {$amount}บาท");
+            Response::success('ส่งคำขอรายจ่ายเพื่อรออนุมัติแล้ว', ['id' => $id, 'status' => 'pending']);
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
     }
 
     // ลบ business expense
     public function deleteExpense()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $id = intval($_GET['id'] ?? 0);
         if (!$id) { Response::error('ไม่พบ id', 400); return; }
-        (new BusinessExpense())->delete($id);
-        Logger::logActivity($this->user['user_id'] ?? null, 'delete_business_expense', "ลบค่าใช้จ่าย ID:{$id}");
-        Response::success('ลบแล้ว');
+        try {
+            $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+            (new BusinessExpense())->cancelRequest($id, $userId);
+            Logger::logActivity($userId, 'cancel_business_expense_request', "ยกเลิกคำขอค่าใช้จ่าย ID:{$id}");
+            Response::success('ยกเลิกคำขอแล้ว');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    public function approveExpense()
+    {
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $body = $this->getRequestData() ?? [];
+        $id = (int)($body['id'] ?? 0);
+        if (!$id) Response::error('ไม่พบ id', 400);
+        try {
+            $model = new BusinessExpense();
+            $expense = $model->findById($id);
+            if (!$expense) Response::error('ไม่พบคำขอรายจ่าย', 404);
+            $this->assertExpenseBranchAccess((int)$expense['branch_id']);
+            $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+            $model->approve(
+                $id, $userId, (string)($this->user['role'] ?? ''), $body['review_note'] ?? null
+            );
+            Logger::logActivity($userId, 'approve_business_expense', "อนุมัติค่าใช้จ่าย ID:{$id}");
+            Response::success('อนุมัติและบันทึกการจ่ายแล้ว');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    public function rejectExpense()
+    {
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $body = $this->getRequestData() ?? [];
+        $id = (int)($body['id'] ?? 0);
+        $note = trim((string)($body['review_note'] ?? ''));
+        if (!$id || $note === '') Response::error('กรุณาระบุรายการและเหตุผล', 400);
+        try {
+            $model = new BusinessExpense();
+            $expense = $model->findById($id);
+            if (!$expense) Response::error('ไม่พบคำขอรายจ่าย', 404);
+            $this->assertExpenseBranchAccess((int)$expense['branch_id']);
+            $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+            $model->reject($id, $userId, $note);
+            Logger::logActivity($userId, 'reject_business_expense', "ปฏิเสธค่าใช้จ่าย ID:{$id}");
+            Response::success('ปฏิเสธคำขอแล้ว');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    private function resolveWriteBranchId($requested): int
+    {
+        if ($this->hasMultiBranchAccess()) {
+            $branchId = (int)$requested;
+            if (!$branchId) Response::error('กรุณาระบุสาขา', 400);
+            return $branchId;
+        }
+        $branchId = (int)($this->user['branch_id'] ?? 0);
+        if (!$branchId) Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+        if ($requested !== null && (int)$requested !== $branchId) {
+            Response::error('ไม่มีสิทธิ์บันทึกรายจ่ายของสาขาอื่น', 403);
+        }
+        return $branchId;
+    }
+
+    private function assertExpenseBranchAccess(int $branchId): void
+    {
+        if ($this->hasMultiBranchAccess()) {
+            return;
+        }
+        $userBranch = (int)($this->user['branch_id'] ?? 0);
+        if (!$userBranch || $userBranch !== $branchId) {
+            Response::error('ไม่มีสิทธิ์อนุมัติรายจ่ายของสาขาอื่น', 403);
+        }
     }
 
     // สร้าง date filter params จาก GET

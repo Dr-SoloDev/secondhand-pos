@@ -39,7 +39,11 @@ class PurchaseOrder extends Model
         $items = $this->db->fetchAll(
             "SELECT po.*, s.full_name AS seller_name, s.id_card AS seller_id_card,
                     b.name AS branch_name, b.code AS branch_code,
-                    u.full_name AS user_name
+                    u.full_name AS user_name,
+                    (SELECT r.status FROM purchase_order_cancellation_requests r
+                     WHERE r.purchase_order_id = po.id ORDER BY r.id DESC LIMIT 1) AS cancellation_request_status,
+                    (SELECT r.id FROM purchase_order_cancellation_requests r
+                     WHERE r.purchase_order_id = po.id ORDER BY r.id DESC LIMIT 1) AS cancellation_request_id
              FROM {$this->table} po
              LEFT JOIN sellers s ON po.seller_id = s.id
              LEFT JOIN branches b ON po.branch_id = b.id
@@ -68,7 +72,11 @@ class PurchaseOrder extends Model
                     s.phone AS seller_phone, s.address AS seller_address,
                     b.name AS branch_name, b.code AS branch_code,
                     b.phone AS branch_phone,
-                    u.full_name AS user_name
+                    u.full_name AS user_name,
+                    (SELECT r.status FROM purchase_order_cancellation_requests r
+                     WHERE r.purchase_order_id = po.id ORDER BY r.id DESC LIMIT 1) AS cancellation_request_status,
+                    (SELECT r.id FROM purchase_order_cancellation_requests r
+                     WHERE r.purchase_order_id = po.id ORDER BY r.id DESC LIMIT 1) AS cancellation_request_id
              FROM {$this->table} po
              LEFT JOIN sellers s ON po.seller_id = s.id
              LEFT JOIN branches b ON po.branch_id = b.id
@@ -103,14 +111,131 @@ class PurchaseOrder extends Model
         return $prefix . '-' . str_pad($next, 3, '0', STR_PAD_LEFT);
     }
 
-    public function cancel($id)
+    public function cancel($id, int $actorId)
     {
-        // NOTE: cancel() is NO LONGER USED.
-        // SaleLot.restoreStock() handles stock reversal via LIFO on PO items.
-        // PO cancellation (cancelPurchaseOrder in controller) only flips status
-        // and does NOT touch stock — stock was never deducted at PO create time.
-        // This method is kept as a stub for backward compat with old callers.
-        throw new Exception('ใบรับซื้อถูกยกเลิกแล้ว — โปรดใช้ Sale Lot cancel แทน');
+        $this->db->beginTransaction();
+        try {
+            $this->cancelInCurrentTransaction($id, $actorId);
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    public function cancelInCurrentTransaction($id, int $actorId)
+    {
+            $po = $this->db->fetch(
+                "SELECT id, branch_id, status, seller_id, total_amount, payment_method, source_type, source_id
+                 FROM {$this->table}
+                 WHERE id = ? FOR UPDATE",
+                [$id]
+            );
+            if (!$po) {
+                throw new Exception('ไม่พบใบรับซื้อ');
+            }
+            if ($po['status'] === 'cancelled') {
+                throw new Exception('ใบรับซื้อถูกยกเลิกไปแล้ว');
+            }
+            if (($po['source_type'] ?? 'manual') !== 'manual') {
+                throw new Exception('ใบรับซื้อที่เกิดจากการโอนสต็อกห้ามยกเลิกโดยตรง กรุณาใช้ใบโอนย้อนกลับ');
+            }
+            $cashSession = new CashSession();
+            $cashSession->assertOpen((int)$po['branch_id']);
+
+            $items = $this->db->fetchAll(
+                "SELECT category_id,
+                        item_name,
+                        quantity,
+                        weight_deduction,
+                        consumed_qty,
+                        (quantity - COALESCE(weight_deduction, 0) - COALESCE(consumed_qty, 0)) AS net_unconsumed
+                 FROM purchase_order_items
+                 WHERE purchase_order_id = ?
+                   AND category_id IS NOT NULL
+                 FOR UPDATE",
+                [$id]
+            );
+
+            foreach ($items as $item) {
+                if ((float)($item['consumed_qty'] ?? 0) > 0) {
+                    throw new Exception('ไม่สามารถยกเลิกใบรับซื้อที่ถูกนำไปใช้ขายแล้ว');
+                }
+            }
+
+            foreach ($items as $item) {
+                $netQty = max(0, (float)$item['net_unconsumed']);
+                if ($netQty <= 0) {
+                    continue;
+                }
+
+                $currentBranchStock = (float)$this->db->fetchColumn(
+                    "SELECT stock_kg
+                     FROM branch_stock
+                     WHERE branch_id = ?
+                       AND category_id = ?
+                       AND item_name = ?
+                     FOR UPDATE",
+                    [$po['branch_id'], $item['category_id'], $item['item_name']]
+                );
+                if ($currentBranchStock + 0.000001 < $netQty) {
+                    throw new Exception("สต็อก {$item['item_name']} ไม่เพียงพอสำหรับยกเลิกใบรับซื้อ");
+                }
+
+                $currentCategoryStock = (float)$this->db->fetchColumn(
+                    "SELECT stock_kg
+                     FROM categories
+                     WHERE id = ?
+                     FOR UPDATE",
+                    [$item['category_id']]
+                );
+                if ($currentCategoryStock + 0.000001 < $netQty) {
+                    throw new Exception("สต็อกหมวดหมู่ ID {$item['category_id']} ไม่เพียงพอสำหรับยกเลิกใบรับซื้อ");
+                }
+
+                // ── Branch Stock: deduct per-branch per-item (ADD-001) ──
+                $branchStock = new BranchStock();
+                $branchStock->deduct($po['branch_id'], $item['category_id'], $item['item_name'], $netQty);
+
+                // ── Dual-write: categories.stock_kg (backward compat) ──
+                $this->db->query(
+                    "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",
+                    [$netQty, $item['category_id']]
+                );
+            }
+
+            $this->db->query(
+                "UPDATE {$this->table}
+                 SET status = 'cancelled', updated_at = NOW()
+                 WHERE id = ?",
+                [$id]
+            );
+
+            // Also revert seller stats
+            $this->db->query(
+                "UPDATE sellers
+                 SET total_transactions = GREATEST(0, COALESCE(total_transactions, 0) - 1),
+                     total_amount = GREATEST(0, COALESCE(total_amount, 0) - ?)
+                 WHERE id = ?",
+                [$po['total_amount'], $po['seller_id']]
+            );
+
+            if (($po['payment_method'] ?? 'cash') === 'cash'
+                && $cashSession->hasMovement('purchase_payment', 'purchase_order', (int)$po['id'])) {
+                $cashSession->recordMovement(
+                    (int)$po['branch_id'],
+                    'in',
+                    'purchase_cancellation',
+                    (float)$po['total_amount'],
+                    'purchase_order',
+                    (int)$po['id'],
+                    'คืนเงินสดจากการยกเลิกใบรับซื้อ ' . $po['id'],
+                    $actorId
+                );
+            }
+
+            return true;
     }
 
     public function createWithItems($data, $items, $userId)
@@ -121,11 +246,10 @@ class PurchaseOrder extends Model
 
         $this->db->beginTransaction();
         try {
+            $cashSession = new CashSession();
+            $cashSession->assertOpen((int)$data['branch_id']);
             $totalAmount = 0;
             $itemMappings = [];
-            foreach ($items as $item) {
-                $totalAmount += (float)($item['total_price'] ?? 0);
-            }
             $totalItems = count($items);
 
             $referenceNo = $this->generateReferenceNo($data['branch_id']);
@@ -148,9 +272,16 @@ class PurchaseOrder extends Model
             foreach ($items as $item) {
                 $qty = (float)($item['quantity'] ?? 1);
                 $deduct = (float)($item['weight_deduction'] ?? 0);
-                $netQty = max(0, $qty - $deduct);
+                if (!is_finite($qty) || $qty <= 0 || !is_finite($deduct) || $deduct < 0 || $deduct >= $qty) {
+                    throw new Exception('ข้อมูลน้ำหนักหรือจำนวนหักไม่ถูกต้อง');
+                }
+                $netQty = $qty - $deduct;
                 $unitPrice = (float)($item['unit_price'] ?? 0);
-                $totalPrice = (float)($item['total_price'] ?? ($netQty * $unitPrice));
+                if (!is_finite($unitPrice) || $unitPrice < 0) {
+                    throw new Exception('ราคาต่อหน่วยไม่ถูกต้อง');
+                }
+                $totalPrice = round($netQty * $unitPrice, 2);
+                $totalAmount += $totalPrice;
                 $categoryId = $item['category_id'] ?? null;
 
                 $this->db->insert('purchase_order_items', [
@@ -189,6 +320,13 @@ class PurchaseOrder extends Model
             }
 
             $this->db->query(
+                "UPDATE {$this->table}
+                 SET total_amount = ?
+                 WHERE id = ?",
+                [$totalAmount, $poId]
+            );
+
+            $this->db->query(
                 "UPDATE sellers
                  SET total_transactions = COALESCE(total_transactions, 0) + 1,
                      total_amount       = COALESCE(total_amount, 0) + ?,
@@ -196,6 +334,19 @@ class PurchaseOrder extends Model
                  WHERE id = ?",
                 [$totalAmount, $data['seller_id']]
             );
+
+            if (($data['payment_method'] ?? 'cash') === 'cash' && $totalAmount > 0) {
+                $cashSession->recordMovement(
+                    (int)$data['branch_id'],
+                    'out',
+                    'purchase_payment',
+                    $totalAmount,
+                    'purchase_order',
+                    (int)$poId,
+                    "จ่ายเงินสดใบรับซื้อ {$referenceNo}",
+                    (int)$userId
+                );
+            }
 
             $this->db->commit();
             return [

@@ -428,6 +428,11 @@
   border: 2px solid #fff;
 }
 
+.photo-fab.hidden,
+.photo-fab-badge.hidden {
+  display: none;
+}
+
 /* ==================================================================
    LAYER 8: PHOTO STRIP — pending photos preview below cart
    ================================================================== */

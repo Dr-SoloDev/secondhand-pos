@@ -4,6 +4,10 @@ let categories = [];
 let cart = [];
 let selectedSeller = null;
 let recentPOs = [];
+let currentPOUser = null;
+let cancellationRequests = [];
+let cancellationTargetPO = null;
+let cancellationReviewTarget = null;
 let globalTier = { level: 1 };
 let currentCatalogItem = null; // { id, name, unit, price, tierPrices: [] }
 
@@ -78,9 +82,12 @@ function restoreCartFromBackup() {
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', async () => {
+  currentPOUser = await requireAuth();
+  if (!currentPOUser) return;
   await loadBranches();
   await loadCategories();
   await loadRecentPOs();
+  await loadPOCancellationRequests();
   buildTierButtons([]);
   restoreCartFromBackup();
 
@@ -90,6 +97,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('addItemBtn').addEventListener('click', addItemToCart);
   document.getElementById('savePOBtn').addEventListener('click', savePurchaseOrder);
   document.getElementById('clearPOBtn').addEventListener('click', clearAll);
+  document.getElementById('btnRequestPOCancellation').addEventListener('click', () => {
+    if (cancellationTargetPO) openPOCancellationModal(cancellationTargetPO.id);
+  });
+  document.getElementById('submitPOCancellationBtn').addEventListener('click', submitPOCancellation);
+  document.getElementById('approvePOCancellationBtn').addEventListener('click', () => submitPOCancellationReview('approve'));
+  document.getElementById('rejectPOCancellationBtn').addEventListener('click', () => submitPOCancellationReview('reject'));
 
   // IMP-6: Keyboard shortcut Ctrl+Enter = บันทึกใบรับซื้อ
   document.addEventListener('keydown', function(e) {
@@ -879,15 +892,15 @@ function clearAll() {
 // ===== Recent POs =====
 async function loadRecentPOs() {
   const tbody = document.querySelector('#recentPOTable tbody');
-  showTableLoading(tbody, 6, 4);
+  showTableLoading(tbody, 8, 4);
   const res = await apiRequest('purchase-orders?limit=10');
   if (res.status !== 'success') {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888">โหลดใบรับซื้อล่าสุดไม่สำเร็จ</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888">โหลดใบรับซื้อล่าสุดไม่สำเร็จ</td></tr>';
     return;
   }
   recentPOs = res.data.items || [];
   if (recentPOs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888">ยังไม่มีใบรับซื้อ</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888">ยังไม่มีใบรับซื้อ</td></tr>';
     return;
   }
   tbody.innerHTML = recentPOs.map(po => `
@@ -897,8 +910,170 @@ async function loadRecentPOs() {
       <td>${escapeHtml(po.seller_name || '-')}</td>
       <td>${po.total_items}</td>
       <td><strong>${formatCurrency(po.total_amount)}</strong></td>
+      <td>${purchaseOrderStatusBadge(po)}</td>
       <td>${formatDateTime(po.created_at)}</td>
+      <td><div class="po-cancellation-actions">${renderPOCancellationAction(po)}</div></td>
     </tr>`).join('');
+}
+
+function purchaseOrderStatusBadge(po) {
+  if (po.status === 'cancelled') return '<span class="badge badge-danger">ยกเลิกแล้ว</span>';
+  if (po.cancellation_request_status === 'pending') return '<span class="badge badge-warning">รอยกเลิก</span>';
+  if (po.cancellation_request_status === 'rejected') return '<span class="badge badge-secondary">ไม่อนุมัติยกเลิก</span>';
+  return '<span class="badge badge-success">สำเร็จ</span>';
+}
+
+function renderPOCancellationAction(po) {
+  if (!canRequestPOCancellation(po)) return '';
+  return `<button class="btn btn-sm btn-danger" type="button" onclick="openPOCancellationModal(${Number(po.id)})">ขอยกเลิก</button>`;
+}
+
+function canRequestPOCancellation(po) {
+  return po.status !== 'cancelled'
+    && (po.source_type || 'manual') === 'manual'
+    && po.cancellation_request_status !== 'pending'
+    && String(po.created_at || '').slice(0, 10) === localDateString(new Date());
+}
+
+function openPOCancellationModal(poId) {
+  const po = recentPOs.find((item) => Number(item.id) === Number(poId))
+    || (cancellationTargetPO && Number(cancellationTargetPO.id) === Number(poId) ? cancellationTargetPO : null);
+  if (!po || !canRequestPOCancellation(po)) return;
+
+  cancellationTargetPO = po;
+  document.getElementById('poCancellationTitle').textContent = `ขอยกเลิก ${po.reference_no}`;
+  document.getElementById('poCancellationSummary').innerHTML = `
+    ใบรับซื้อ <strong>${escapeHtml(po.reference_no)}</strong><br>
+    ${escapeHtml(po.branch_name || '-')} · ${escapeHtml(po.seller_name || '-')}<br>
+    ยอด ${formatCurrency(po.total_amount)}
+  `;
+  document.getElementById('poCancellationReason').value = '';
+  document.getElementById('poCancellationError').textContent = '';
+  document.getElementById('poCancellationModal').classList.add('show');
+  document.getElementById('poCancellationReason').focus();
+}
+
+async function submitPOCancellation() {
+  if (!cancellationTargetPO) return;
+  const reason = document.getElementById('poCancellationReason').value.trim();
+  const errorElement = document.getElementById('poCancellationError');
+  if (!reason) {
+    errorElement.textContent = 'กรุณาระบุเหตุผลที่ขอยกเลิก';
+    return;
+  }
+
+  const button = document.getElementById('submitPOCancellationBtn');
+  setButtonLoading(button, true);
+  try {
+    const response = await apiRequest('purchase-orders/cancel', 'POST', {
+      id: Number(cancellationTargetPO.id),
+      reason,
+    });
+    if (response.status !== 'success') {
+      errorElement.textContent = response.message || 'ส่งคำขอยกเลิกไม่สำเร็จ';
+      return;
+    }
+
+    showNotification('ส่งคำขอยกเลิกเพื่อรออนุมัติแล้ว', 'success');
+    document.getElementById('poCancellationModal').classList.remove('show');
+    document.getElementById('viewPOModal').classList.remove('show');
+    cancellationTargetPO = null;
+    await Promise.all([loadRecentPOs(), loadPOCancellationRequests()]);
+  } finally {
+    setButtonLoading(button, false);
+  }
+}
+
+async function loadPOCancellationRequests() {
+  const queue = document.getElementById('poCancellationQueue');
+  if (!['admin', 'super_manager'].includes(currentPOUser?.role)) {
+    queue.classList.add('hidden');
+    return;
+  }
+
+  queue.classList.remove('hidden');
+  const tbody = document.querySelector('#poCancellationTable tbody');
+  showTableLoading(tbody, 7, 4);
+  const response = await apiRequest('purchase-orders/cancellation-requests?status=pending', 'GET');
+  if (response.status !== 'success') {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">โหลดคำขอไม่สำเร็จ</td></tr>';
+    return;
+  }
+
+  cancellationRequests = response.data?.items || [];
+  if (!cancellationRequests.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ไม่มีคำขอที่รอพิจารณา</td></tr>';
+    return;
+  }
+
+  const userId = Number(currentPOUser.user_id || currentPOUser.id);
+  tbody.innerHTML = cancellationRequests.map((request) => {
+    const isOwn = Number(request.requested_by) === userId || Number(request.purchase_created_by) === userId;
+    const action = isOwn
+      ? '<span class="text-muted">รอผู้มีอำนาจคนอื่น</span>'
+      : `<button class="btn btn-sm btn-primary" type="button" onclick="openPOCancellationReview(${Number(request.id)})">พิจารณา</button>`;
+    return `<tr>
+      <td>${escapeHtml(request.reference_no || '-')}</td>
+      <td>${escapeHtml(request.branch_name || '-')}</td>
+      <td class="text-right">${formatCurrency(request.total_amount)}</td>
+      <td>${escapeHtml(request.requested_by_name || '-')}</td>
+      <td>${escapeHtml(request.reason || '-')}</td>
+      <td>${formatDateTime(request.requested_at)}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+}
+
+function openPOCancellationReview(requestId) {
+  const request = cancellationRequests.find((item) => Number(item.id) === Number(requestId));
+  if (!request) return;
+  cancellationReviewTarget = request;
+  document.getElementById('poCancellationReviewSummary').innerHTML = `
+    ใบรับซื้อ <strong>${escapeHtml(request.reference_no || '-')}</strong> · ${formatCurrency(request.total_amount)}<br>
+    ขอโดย ${escapeHtml(request.requested_by_name || '-')}<br>
+    เหตุผล: ${escapeHtml(request.reason || '-')}
+  `;
+  document.getElementById('poCancellationReviewNote').value = '';
+  document.getElementById('poCancellationReviewError').textContent = '';
+  document.getElementById('poCancellationReviewModal').classList.add('show');
+  document.getElementById('poCancellationReviewNote').focus();
+}
+
+async function submitPOCancellationReview(action) {
+  if (!cancellationReviewTarget) return;
+  const note = document.getElementById('poCancellationReviewNote').value.trim();
+  const errorElement = document.getElementById('poCancellationReviewError');
+  if (action === 'reject' && !note) {
+    errorElement.textContent = 'กรุณาระบุเหตุผลที่ปฏิเสธ';
+    return;
+  }
+
+  const button = document.getElementById(action === 'approve' ? 'approvePOCancellationBtn' : 'rejectPOCancellationBtn');
+  setButtonLoading(button, true);
+  try {
+    const response = await apiRequest(`purchase-orders/cancellation-${action}`, 'POST', {
+      id: Number(cancellationReviewTarget.id),
+      review_note: note || null,
+    });
+    if (response.status !== 'success') {
+      errorElement.textContent = response.message || 'บันทึกผลการพิจารณาไม่สำเร็จ';
+      return;
+    }
+
+    showNotification(action === 'approve' ? 'อนุมัติและยกเลิกใบรับซื้อแล้ว' : 'ปฏิเสธคำขอยกเลิกแล้ว', 'success');
+    document.getElementById('poCancellationReviewModal').classList.remove('show');
+    cancellationReviewTarget = null;
+    await Promise.all([loadRecentPOs(), loadPOCancellationRequests()]);
+  } finally {
+    setButtonLoading(button, false);
+  }
+}
+
+function localDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // ===== Receipt =====
@@ -906,8 +1081,24 @@ window.showReceipt = async function(id) {
   const res = await apiRequest(`purchase-orders/order?id=${id}`);
   if (res.status !== 'success') return;
   const po = res.data;
+  cancellationTargetPO = po;
   const dt = formatDateTime(po.created_at);
   const isPrecious = po.items.some(it => it.requires_precious_receipt == 1);
+  const shopName = po.shop_name || 'รักษ์สะอาดรีไซเคิล';
+  const shopAddress = po.shop_address || '';
+  const taxId = po.tax_id || '';
+  const shopPhone = po.shop_phone || po.branch_phone || '';
+  const welcomeMessage = po.receipt_welcome_message || 'บริการดี ราคาดี ตาชั่งมาตรฐาน';
+  const receiptFooter = po.receipt_footer || 'ขอบคุณที่ใช้บริการ';
+  const storeInfoRows = [
+    shopAddress,
+    [
+      taxId ? `เลขประจำตัวผู้เสียภาษี ${taxId}` : '',
+      shopPhone ? `โทร ${shopPhone}` : ''
+    ].filter(Boolean).join(' · ')
+  ].filter(Boolean).map(line => (
+    `<div style="font-size:10.5px;color:#555;line-height:1.5;margin-top:2px">${escapeHtmlPreserveLines(line)}</div>`
+  )).join('');
 
   const itemRows = po.items.map((it, i) => {
     const dq = parseFloat(it.weight_deduction || 0);
@@ -925,7 +1116,10 @@ window.showReceipt = async function(id) {
 
   const billBody = `
     <div style="border:2px solid #222;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:8px">
-      <div style="font-size:16px;font-weight:800;letter-spacing:0">ใบรับซื้อของเก่า</div>
+      <div style="font-size:18px;font-weight:800;letter-spacing:0">${escapeHtml(shopName)}</div>
+      ${storeInfoRows}
+      ${welcomeMessage ? `<div style="font-size:10.5px;color:#555;line-height:1.5;margin-top:2px">${escapeHtmlPreserveLines(welcomeMessage)}</div>` : ''}
+      <div style="font-size:16px;font-weight:800;letter-spacing:0;margin-top:4px">ใบรับซื้อของเก่า</div>
       <div style="font-size:12px;color:#444;margin-top:2px">${escapeHtml(po.branch_name)} &nbsp;·&nbsp; สาขา ${escapeHtml(po.branch_code)}</div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:6px">
@@ -953,8 +1147,8 @@ window.showReceipt = async function(id) {
       <span style="font-size:15px;font-weight:800">฿ ${formatCurrency(po.total_amount)}</span>
     </div>
     <div style="font-size:10.5px;text-align:center;margin-top:8px;color:#666;border-top:1px dashed #ccc;padding-top:6px;line-height:1.8">
-      ปิดวันพฤหัส &nbsp;|&nbsp; 084-8233782<br>
-      <span style="font-size:10px">บริการดี ราคาดี ตาชั่งดิจิตอลมาตรฐานกระทรวง</span>
+      ${shopPhone ? `ติดต่อ ${escapeHtml(shopPhone)}<br>` : ''}
+      <span style="font-size:10px">${escapeHtmlPreserveLines(receiptFooter)}</span>
     </div>`;
 
   const preciousExtra = isPrecious ? `
@@ -979,19 +1173,18 @@ window.showReceipt = async function(id) {
       <span>แนบสำเนาบัตรประชาชน / ภาพถ่ายที่นี่</span>
     </div>` : '';
 
-  const half = `
-    <div style="width:138mm;padding:10px 14px;font-family:'Sarabun',sans-serif;font-size:11px;box-sizing:border-box;">
+  const billCopy = `
+    <div style="width:190mm;max-width:100%;padding:10px 14px;font-family:'Sarabun',sans-serif;font-size:11px;box-sizing:border-box;">
       ${billBody}${preciousExtra}
     </div>`;
 
   document.getElementById('viewPOContent').innerHTML = `
     <style>
       @media print {
-        @page { size: A4 landscape; margin: 8mm; }
+        @page { size: A4 portrait; margin: 8mm; }
         /* ซ่อน UI ที่ไม่ต้องพิมพ์ */
         #viewPOModal .modal-header,
         #viewPOModal .modal-footer,
-        #billPrintHint,
         #poQrSection,
         #poPhotoGallery { display: none !important; }
         /* ลบ border กรอบ modal */
@@ -1000,18 +1193,17 @@ window.showReceipt = async function(id) {
         #billPrintWrap > div { page-break-inside: avoid; }
       }
     </style>
-    <div id="billPrintWrap" style="display:flex;flex-direction:row;border:1px solid #ccc;width:fit-content;margin:0 auto;">
-      <div style="border-right:2px dashed #999">${half}</div>
-      <div>${half}</div>
-    </div>
-    <div id="billPrintHint" style="text-align:center;font-size:12px;color:#888;margin-top:8px">
-      ✂ พับครึ่งแนวยาวฉีกตรงเส้นปรุ — ร้านเก็บซ้าย | ลูกค้าเก็บขวา
+    <div id="billPrintWrap" style="border:1px solid #ccc;width:fit-content;max-width:100%;margin:0 auto;">
+      <div>${billCopy}</div>
     </div>
     <div id="poPhotoGallery" style="display:none;margin-top:16px;padding:12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0">
       <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">รูปภาพสินค้า</div>
       <div id="poPhotoGrid" style="display:flex;flex-wrap:wrap;gap:8px"></div>
     </div>`;
   document.getElementById('viewPOModal').classList.add('show');
+
+  const cancelButton = document.getElementById('btnRequestPOCancellation');
+  cancelButton.classList.toggle('hidden', !canRequestPOCancellation(po));
 
   // G2: Print button handler — open print-receipt.html in new tab
   const btnPrint = document.getElementById('btnOpenPrint');
@@ -1361,6 +1553,10 @@ async function saveNewSeller() {
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function escapeHtmlPreserveLines(s) {
+  return escapeHtml(s).replace(/\r?\n/g, '<br>');
 }
 
 function maskIdCard(id) {

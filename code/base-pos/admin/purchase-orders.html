@@ -260,9 +260,31 @@
                     <th>ผู้ขาย</th>
                     <th class="text-right priority-3">รายการ</th>
                     <th class="text-right">ยอด</th>
+                    <th>สถานะ</th>
                     <th class="priority-2">วันที่</th>
+                    <th>ดำเนินการ</th>
                   </tr>
                 </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="po-recent hidden" id="poCancellationQueue">
+          <div class="po-recent-header">คำขอยกเลิกที่รอพิจารณา</div>
+          <div class="table-container">
+            <table class="data-table" id="poCancellationTable">
+              <thead>
+                <tr>
+                  <th>เลขที่ใบรับซื้อ</th>
+                  <th>สาขา</th>
+                  <th class="text-right">ยอด</th>
+                  <th>ผู้ขอ</th>
+                  <th>เหตุผล</th>
+                  <th>เวลาที่ขอ</th>
+                  <th>ดำเนินการ</th>
+                </tr>
+              </thead>
               <tbody></tbody>
             </table>
           </div>
@@ -370,9 +392,53 @@
         <div id="poQrHint" style="font-size:11px;color:#888;margin-top:6px">ลิงก์ใช้ได้ 24 ชั่วโมง</div>
       </div>
       <div class="modal-footer">
+        <button class="btn btn-danger hidden" id="btnRequestPOCancellation">ขอยกเลิกใบรับซื้อ</button>
         <button class="btn btn-primary" id="btnOpenPrint">📄 พิมพ์ A4</button>
         <button class="btn btn-success" id="btnOpenPrintThermal">🖨️ พิมพ์ความร้อน</button>
         <button class="btn btn-secondary close-modal">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="poCancellationModal" role="dialog" aria-modal="true" aria-labelledby="poCancellationTitle">
+    <div class="modal-content modal-sm">
+      <div class="modal-header">
+        <h2 id="poCancellationTitle">ขอยกเลิกใบรับซื้อ</h2>
+        <button class="close-modal" type="button" aria-label="ปิด">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="poCancellationSummary" class="po-cancellation-summary"></div>
+        <div class="form-group">
+          <label for="poCancellationReason" class="required">เหตุผลที่ขอยกเลิก</label>
+          <textarea id="poCancellationReason" class="form-control" rows="4" maxlength="500" placeholder="ระบุข้อผิดพลาดหรือเหตุผลเพื่อให้ผู้มีอำนาจตรวจสอบ"></textarea>
+        </div>
+        <p class="po-cancellation-error" id="poCancellationError"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary close-modal" type="button">ปิด</button>
+        <button class="btn btn-danger" id="submitPOCancellationBtn" type="button">ส่งคำขอยกเลิก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="poCancellationReviewModal" role="dialog" aria-modal="true" aria-labelledby="poCancellationReviewTitle">
+    <div class="modal-content modal-sm">
+      <div class="modal-header">
+        <h2 id="poCancellationReviewTitle">พิจารณาคำขอยกเลิก</h2>
+        <button class="close-modal" type="button" aria-label="ปิด">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="poCancellationReviewSummary" class="po-cancellation-summary"></div>
+        <div class="form-group">
+          <label for="poCancellationReviewNote">หมายเหตุการพิจารณา</label>
+          <textarea id="poCancellationReviewNote" class="form-control" rows="4" maxlength="500" placeholder="ต้องระบุเมื่อปฏิเสธคำขอ"></textarea>
+        </div>
+        <p class="po-cancellation-error" id="poCancellationReviewError"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary close-modal" type="button">ปิด</button>
+        <button class="btn btn-danger" id="rejectPOCancellationBtn" type="button">ปฏิเสธ</button>
+        <button class="btn btn-success" id="approvePOCancellationBtn" type="button">อนุมัติและยกเลิก PO</button>
       </div>
     </div>
   </div>

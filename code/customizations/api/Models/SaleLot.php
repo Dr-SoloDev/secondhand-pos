@@ -409,15 +409,15 @@ class SaleLot extends Model
         if ($method === 'weighted') {
             $row = $this->db->fetch(
                 "SELECT
-                    COALESCE(SUM(poi.quantity - poi.consumed_qty), 0) AS total_qty,
-                    COALESCE(SUM((poi.quantity - poi.consumed_qty) * poi.unit_price), 0) AS total_value
+                    COALESCE(SUM(poi.net_quantity - poi.consumed_qty), 0) AS total_qty,
+                    COALESCE(SUM((poi.net_quantity - poi.consumed_qty) * poi.unit_price), 0) AS total_value
                  FROM purchase_order_items poi
                  INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
                  WHERE po.branch_id = ?
                    AND poi.category_id = ?
                    AND poi.item_name = ?
                    AND po.status = 'completed'
-                   AND (poi.quantity - poi.consumed_qty) > 0",
+                   AND (poi.net_quantity - poi.consumed_qty) > 0",
                 [$branch_id, $category_id, $item_name]
             );
 
@@ -430,7 +430,7 @@ class SaleLot extends Model
         }
 
         $rows = $this->db->fetchAll(
-            "SELECT poi.quantity,
+            "SELECT poi.net_quantity,
                     poi.unit_price,
                     poi.consumed_qty
              FROM purchase_order_items poi
@@ -439,7 +439,7 @@ class SaleLot extends Model
                AND poi.category_id = ?
                AND poi.item_name = ?
                AND po.status = 'completed'
-               AND (poi.quantity - poi.consumed_qty) > 0
+               AND (poi.net_quantity - poi.consumed_qty) > 0
              ORDER BY po.created_at ASC",
             [$branch_id, $category_id, $item_name]
         );
@@ -450,7 +450,7 @@ class SaleLot extends Model
         foreach ($rows as $row) {
             if ($remaining <= 0) break;
 
-            $available = (float)$row['quantity'] - (float)$row['consumed_qty'];
+            $available = (float)$row['net_quantity'] - (float)$row['consumed_qty'];
             $take = min($available, $remaining);
             $totalCost += $take * (float)$row['unit_price'];
             $remaining -= $take;
@@ -464,15 +464,15 @@ class SaleLot extends Model
     {
         $row = $this->db->fetch(
             "SELECT
-                COALESCE(SUM(poi.quantity - poi.consumed_qty), 0) AS total_qty,
-                COALESCE(SUM((poi.quantity - poi.consumed_qty) * poi.unit_price), 0) AS total_value
+                COALESCE(SUM(poi.net_quantity - poi.consumed_qty), 0) AS total_qty,
+                COALESCE(SUM((poi.net_quantity - poi.consumed_qty) * poi.unit_price), 0) AS total_value
              FROM purchase_order_items poi
              INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
              WHERE po.branch_id = ?
                AND poi.category_id = ?
                AND poi.item_name = ?
                AND po.status = 'completed'
-               AND (poi.quantity - poi.consumed_qty) > 0",
+               AND (poi.net_quantity - poi.consumed_qty) > 0",
             [$branch_id, $category_id, $item_name]
         );
 
@@ -499,7 +499,7 @@ class SaleLot extends Model
         // ดึง purchase_order_items ที่ยังมีสต็อกเหลือ เรียงตามวันเก่าสุดก่อน (FIFO)
         $rows = $this->db->fetchAll(
             "SELECT poi.id,
-                    poi.quantity,
+                    poi.net_quantity,
                     poi.unit_price,
                     poi.consumed_qty
              FROM purchase_order_items poi
@@ -508,7 +508,7 @@ class SaleLot extends Model
                AND poi.category_id = ?
                AND poi.item_name = ?
                AND po.status = 'completed'
-               AND (poi.quantity - poi.consumed_qty) > 0
+               AND (poi.net_quantity - poi.consumed_qty) > 0
              ORDER BY po.created_at ASC
              FOR UPDATE",
             [$branch_id, $category_id, $item_name]
@@ -520,7 +520,7 @@ class SaleLot extends Model
         foreach ($rows as $row) {
             if ($remaining <= 0) break;
 
-            $available = (float)$row['quantity'] - (float)$row['consumed_qty'];
+            $available = (float)$row['net_quantity'] - (float)$row['consumed_qty'];
             $take      = min($available, $remaining);
             $totalCost += $take * (float)$row['unit_price'];
             $remaining -= $take;
@@ -583,7 +583,7 @@ class SaleLot extends Model
             // PO items ที่ยังมีสต็อกเหลือสำหรับหมวดหมู่+item_name นี้
             $rows = $this->db->fetchAll(
                 "SELECT poi.id,
-                        poi.quantity,
+                        poi.net_quantity,
                         poi.consumed_qty
                  FROM purchase_order_items poi
                  INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
@@ -591,7 +591,7 @@ class SaleLot extends Model
                    AND poi.category_id = ?
                    AND poi.item_name = ?
                    AND po.status = 'completed'
-                   AND (poi.quantity - poi.consumed_qty) > 0
+                   AND (poi.net_quantity - poi.consumed_qty) > 0
                   ORDER BY po.created_at ASC
                  FOR UPDATE",
                 [$lot['branch_id'], $categoryId, $itemName]
@@ -600,14 +600,14 @@ class SaleLot extends Model
             foreach ($rows as $row) {
                 if ($remaining <= 0) break;
 
-                $available = (float)$row['quantity'] - (float)$row['consumed_qty'];
+                $available = (float)$row['net_quantity'] - (float)$row['consumed_qty'];
                 $take      = min($available, $remaining);
 
                 // Atomic update — ป้องกัน race condition
                 $stmt = $this->db->query(
                     "UPDATE purchase_order_items
                      SET consumed_qty = consumed_qty + ?
-                     WHERE id = ? AND consumed_qty + ? <= quantity",
+                     WHERE id = ? AND consumed_qty + ? <= net_quantity",
                     [$take, $row['id'], $take]
                 );
 
@@ -737,22 +737,46 @@ class SaleLot extends Model
     }
 
     // บันทึกรายรับจริงจากบิลศูนย์รับซื้อ (เฉพาะ lot ที่ confirmed แล้ว)
-    public function recordRevenue($id, $data)
+    public function recordRevenue($id, $data, int $userId)
     {
-        $this->db->query(
-            "UPDATE {$this->table}
-             SET actual_revenue      = ?,
-                 actual_revenue_note = ?,
-                 actual_revenue_date = ?,
-                 updated_at          = NOW()
-             WHERE id = ? AND status = 'confirmed'",
-            [
-                $data['actual_revenue'],
-                $data['actual_revenue_note'],
-                $data['actual_revenue_date'],
-                $id,
-            ]
-        );
-        return true;
+        $this->db->beginTransaction();
+        try {
+            $lot = $this->db->fetch(
+                "SELECT id, reference_no, branch_id, status, actual_revenue
+                 FROM {$this->table} WHERE id=? FOR UPDATE",
+                [$id]
+            );
+            if (!$lot || $lot['status'] !== 'confirmed') {
+                throw new Exception('บันทึกรายรับได้เฉพาะ Lot ที่ยืนยันแล้ว');
+            }
+            if ($lot['actual_revenue'] !== null) {
+                throw new Exception('Lot นี้บันทึกรายรับแล้ว หากข้อมูลผิดให้ใช้เอกสารปรับปรุง');
+            }
+            $paymentMethod = $data['payment_method'] ?? '';
+            if (!in_array($paymentMethod, ['cash', 'bank_transfer'], true)) {
+                throw new Exception('วิธีรับเงินไม่ถูกต้อง');
+            }
+            $cashSession = new CashSession();
+            $cashSession->assertOpen((int)$lot['branch_id']);
+
+            $this->db->query(
+                "UPDATE {$this->table}
+                 SET actual_revenue=?, actual_revenue_note=?, actual_revenue_date=?,
+                     revenue_payment_method=?, updated_at=NOW()
+                 WHERE id=?",
+                [$data['actual_revenue'], $data['actual_revenue_note'], $data['actual_revenue_date'], $paymentMethod, $id]
+            );
+            if ($paymentMethod === 'cash' && (float)$data['actual_revenue'] > 0) {
+                $cashSession->recordMovement(
+                    (int)$lot['branch_id'], 'in', 'sale_lot_revenue', (float)$data['actual_revenue'],
+                    'sale_lot', (int)$id, 'รับเงินสดจาก LOT ' . $lot['reference_no'], $userId
+                );
+            }
+            $this->db->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 }

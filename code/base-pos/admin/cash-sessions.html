@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เปิด-ปิดยอด - รักษ์สะอาดรีไซเคิล</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <link rel="stylesheet" href="../assets/css/components/cash-sessions.css">
+</head>
+<body>
+<div class="app-container">
+  <aside class="sidebar">
+    <div class="sidebar-header"><a href="index.html" class="sidebar-brand"><img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon"><span>รักษ์สะอาด</span></a></div>
+    <ul class="sidebar-menu">
+      <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+      <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+      <li><a href="catalog.html"><i class="icon-additem"></i><span>แคตตาล็อกสินค้า</span></a></li>
+      <li><a href="sellers.html"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
+      <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+      <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+      <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+      <li class="admin-only"><a href="cash-sessions.html" class="active"><i class="icon-money"></i><span>เปิด-ปิดยอด</span></a></li>
+      <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+      <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+      <li><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+      <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+    </ul>
+  </aside>
+  <main class="content-area">
+    <div class="topbar">
+      <div style="flex:1"></div>
+      <div class="user-dropdown">
+        <button class="user-dropdown-toggle"><div class="user-avatar"><i class="icon-user"></i></div><span class="user-name">-</span><i class="icon-down"></i></button>
+        <div class="user-dropdown-menu"><a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a></div>
+      </div>
+    </div>
+    <div class="cash-page">
+      <div class="cash-page-header">
+        <div><h1 class="page-title">เปิด-ปิดยอดรายสาขา</h1></div>
+        <div class="cash-page-tools">
+          <div><label for="cashBranch">สาขา</label><select id="cashBranch" class="form-control"></select></div>
+          <button type="button" class="btn btn-secondary" id="refreshCashBtn" title="รีเฟรช"><i class="icon-refresh"></i> รีเฟรช</button>
+        </div>
+      </div>
+
+      <div id="cashStatusBand" class="cash-status-band"><strong id="cashStatusText">กำลังโหลด...</strong><span id="cashBusinessDate">-</span></div>
+      <div class="cash-stats">
+        <div class="cash-stat"><div class="cash-stat-label">ยอดเปิดจริง</div><div class="cash-stat-value" id="openingActual">฿0.00</div></div>
+        <div class="cash-stat"><div class="cash-stat-label">เงินเข้า-ออกสุทธิ</div><div class="cash-stat-value" id="ledgerTotal">฿0.00</div></div>
+        <div class="cash-stat"><div class="cash-stat-label">ยอดตามระบบ</div><div class="cash-stat-value success" id="expectedCash">฿0.00</div></div>
+        <div class="cash-stat"><div class="cash-stat-label">ส่วนต่างล่าสุด</div><div class="cash-stat-value" id="latestVariance">฿0.00</div></div>
+      </div>
+
+      <div class="cash-work-grid">
+        <section class="card">
+          <div class="card-header"><h2 class="card-title" id="sessionActionTitle">รอบประจำวัน</h2></div>
+          <div class="card-body" id="sessionActionBody"></div>
+        </section>
+        <section class="card">
+          <div class="card-header"><h2 class="card-title">เติมเงินสดเข้าลิ้นชัก</h2></div>
+          <div class="card-body">
+            <div class="cash-form-grid">
+              <div><label for="depositAmount">จำนวนเงิน</label><input id="depositAmount" type="number" min="0.01" step="0.01" class="form-control" placeholder="0.00"></div>
+              <div><label for="depositSource">นำเงินมาจาก</label><input id="depositSource" type="text" maxlength="200" class="form-control"></div>
+              <div class="full"><label for="depositReason">เหตุผล</label><textarea id="depositReason" rows="2" maxlength="500" class="form-control"></textarea></div>
+            </div>
+            <div class="cash-action-row"><button type="button" class="btn btn-primary" id="requestDepositBtn">ส่งคำขอเติมเงิน</button></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="card cash-table-section">
+        <div class="card-header"><h2 class="card-title">สมุดรายการเงินสดวันนี้</h2></div>
+        <div class="card-body table-container">
+          <table class="data-table"><thead><tr><th>เวลา</th><th>ประเภท</th><th>รายละเอียด</th><th>ผู้บันทึก</th><th class="text-right">จำนวนเงิน</th></tr></thead><tbody id="movementBody"></tbody></table>
+        </div>
+      </section>
+
+      <section class="card cash-table-section">
+        <div class="card-header"><h2 class="card-title">คำขอเติมเงินสด</h2></div>
+        <div class="card-body table-container">
+          <table class="data-table"><thead><tr><th>เวลา</th><th>ผู้ขอ</th><th>แหล่งที่มา</th><th>เหตุผล</th><th class="text-right">จำนวนเงิน</th><th>สถานะ</th><th></th></tr></thead><tbody id="depositBody"></tbody></table>
+        </div>
+      </section>
+
+      <section class="card cash-table-section hidden" id="adjustmentSection">
+        <div class="card-header"><h2 class="card-title">เอกสารปรับปรุงย้อนหลัง</h2></div>
+        <div class="card-body">
+          <div class="cash-adjustment-layout">
+            <div>
+              <div class="cash-form-grid">
+                <div class="full">
+                  <label for="adjustmentType">ประเภทเอกสาร</label>
+                  <select id="adjustmentType" class="form-control">
+                    <option value="purchase_order_cancellation">ยกเลิกใบรับซื้อย้อนหลัง</option>
+                    <option value="sale_lot_revenue_correction">แก้ไขรายรับ LOT</option>
+                    <option value="historical_expense">เพิ่มรายจ่ายย้อนหลัง</option>
+                  </select>
+                </div>
+              </div>
+              <div id="adjustmentFields" class="cash-adjustment-fields"></div>
+              <div class="cash-form-grid">
+                <div class="full"><label for="adjustmentReason">เหตุผลการปรับปรุง</label><textarea id="adjustmentReason" rows="3" maxlength="500" class="form-control"></textarea></div>
+              </div>
+              <div class="cash-action-row"><button type="button" class="btn btn-danger" id="createAdjustmentBtn">บันทึกเอกสารปรับปรุง</button></div>
+            </div>
+            <div class="cash-adjustment-notice">
+              เอกสารปรับปรุงจะไม่ลบประวัติเดิม ผลต่างเงินสดจะลงในรอบวันที่บันทึกเอกสาร และรายงานย้อนหลังจะอ้างอิงวันที่มีผลของเอกสาร
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card cash-table-section hidden" id="adjustmentHistorySection">
+        <div class="card-header"><h2 class="card-title">ประวัติเอกสารปรับปรุง</h2></div>
+        <div class="card-body table-container">
+          <table class="data-table"><thead><tr><th>เลขที่</th><th>วันที่มีผล</th><th>ประเภท</th><th>รายการอ้างอิง</th><th>ก่อนปรับ</th><th>หลังปรับ</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลาบันทึก</th></tr></thead><tbody id="adjustmentBody"></tbody></table>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<div id="notification-container"></div>
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/common.js"></script>
+<script src="../assets/js/cash-sessions.js"></script>
+</body>
+</html>

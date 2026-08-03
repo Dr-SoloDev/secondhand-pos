@@ -79,10 +79,10 @@ async function loadCategories() {
 }
 
 async function loadLots() {
-  showTableLoading('lotTableBody', 9, 5);
+  showTableLoading('lotTableBody', 10, 5);
   const res = await apiRequest('sale-lots');
   if (res.status !== 'success') {
-    document.getElementById('lotTableBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:24px">โหลดข้อมูลไม่สำเร็จ</td></tr>';
+    document.getElementById('lotTableBody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#888;padding:24px">โหลดข้อมูลไม่สำเร็จ</td></tr>';
     showNotification('โหลดข้อมูลไม่สำเร็จ', 'error');
     return;
   }
@@ -100,7 +100,7 @@ function renderLots() {
     : lots;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;padding:24px">' +
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#888;padding:24px">' +
       (q ? 'ไม่พบรายการที่ค้นหา' : 'ยังไม่มีรายการขาย Lot') + '</td></tr>';
     return;
   }
@@ -119,7 +119,8 @@ function renderLots() {
       <td class="text-right" style="color:var(--color-text-light)">${formatCurrency(lot.total_cost)}</td>
       <td class="text-right">
         ${lot.actual_revenue != null
-          ? `<span style="color:var(--color-success);font-weight:600">฿${parseFloat(lot.actual_revenue).toLocaleString('th-TH',{minimumFractionDigits:2})}</span>`
+          ? `<span style="color:var(--color-success);font-weight:600">฿${parseFloat(lot.actual_revenue).toLocaleString('th-TH',{minimumFractionDigits:2})}</span>
+             <br><span style="font-size:10px;color:var(--color-text-light)">${lot.revenue_payment_method === 'cash' ? 'เงินสด' : 'โอนธนาคาร'}</span>`
           : `<span style="color:var(--color-text-lighter);font-size:12px">ยังไม่บันทึก</span>`
         }
       </td>
@@ -136,8 +137,12 @@ function renderLots() {
             <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" title="ลบ Lot (แบบร่าง)">✕</button>
           ` : ''}
           ${lot.status === 'confirmed' ? `
-            <button class="btn btn-sm btn-primary" onclick="openRevenueModal(${lot.id}, '${escapeHtml(lot.reference_no || '')}', ${lot.actual_revenue || 'null'})" title="บันทึกรายรับจากบิลโรงงาน">💰</button>
-            <button class="btn btn-sm btn-danger" onclick="cancelLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" title="ยกเลิก Lot → คืนสต็อก">✕</button>
+            ${lot.actual_revenue == null
+              ? `<button class="btn btn-sm btn-primary" onclick="openRevenueModal(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" title="บันทึกรายรับจากบิลโรงงาน">💰</button>`
+              : '<button class="btn btn-sm btn-secondary" type="button" disabled title="บันทึกรายรับแล้ว">💰</button>'}
+            ${lot.actual_revenue == null
+              ? `<button class="btn btn-sm btn-danger" onclick="cancelLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" title="ยกเลิก Lot → คืนสต็อก">✕</button>`
+              : ''}
           ` : ''}
           ${lot.status === 'cancelled' ? `
             <button class="btn btn-sm btn-danger" onclick="deleteLot(${lot.id}, '${escapeHtml(lot.reference_no || '')}')" style="padding:3px 8px" title="ลบ Lot ที่ยกเลิก">✕</button>
@@ -146,8 +151,8 @@ function renderLots() {
       </td>
       <td style="font-size:11px;color:#888;text-align:center">
         ${lot.status === 'draft' ? 'บันทึกก่อน<br>ตัดสต็อก' : ''}
-        ${lot.status === 'confirmed' && !lot.actual_revenue ? 'กรอกบิล<br>โรงงาน' : ''}
-        ${lot.status === 'confirmed' && lot.actual_revenue ? '✓ ครบ' : ''}
+        ${lot.status === 'confirmed' && lot.actual_revenue == null ? 'กรอกบิล<br>โรงงาน' : ''}
+        ${lot.status === 'confirmed' && lot.actual_revenue != null ? '✓ ครบ' : ''}
         ${lot.status === 'cancelled' ? 'ยกเลิกแล้ว' : ''}
       </td>
     </tr>`;
@@ -621,12 +626,13 @@ async function viewLot(id) {
 // ---- บันทึกรายรับจริงจากบิลศูนย์ ----
 let revenueTargetId = null;
 
-function openRevenueModal(id, refNo, currentRevenue) {
+function openRevenueModal(id, refNo) {
   revenueTargetId = id;
   document.getElementById('revenueModalTitle').textContent = `บันทึกรายรับ — ${refNo}`;
-  document.getElementById('revenueAmount').value = currentRevenue != null ? currentRevenue : '';
+  document.getElementById('revenueAmount').value = '';
+  document.getElementById('revenuePaymentMethod').value = 'bank_transfer';
   document.getElementById('revenueNote').value = '';
-  document.getElementById('revenueDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('revenueDate').value = localDateString(new Date());
   document.getElementById('revenueError').textContent = '';
   document.getElementById('revenueModal').classList.add('show');
 }
@@ -635,6 +641,7 @@ async function saveRevenue() {
   const amount = parseFloat(document.getElementById('revenueAmount').value);
   const note   = document.getElementById('revenueNote').value.trim();
   const date   = document.getElementById('revenueDate').value;
+  const paymentMethod = document.getElementById('revenuePaymentMethod').value;
   const errEl  = document.getElementById('revenueError');
 
   if (isNaN(amount) || amount < 0) {
@@ -651,6 +658,7 @@ async function saveRevenue() {
       actual_revenue:      amount,
       actual_revenue_note: note || null,
       actual_revenue_date: date,
+      payment_method: paymentMethod,
     });
     if (res.status === 'success') {
       document.getElementById('revenueModal').classList.remove('show');
@@ -665,4 +673,11 @@ async function saveRevenue() {
 
   btn.disabled = false;
   btn.textContent = 'บันทึก';
+}
+
+function localDateString(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

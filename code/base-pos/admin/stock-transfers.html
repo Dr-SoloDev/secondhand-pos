@@ -171,6 +171,48 @@
     .receive-totals strong {
       font-size: 15px;
     }
+    .reversal-summary {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid #fed7aa;
+      border-radius: 6px;
+      background: #fff7ed;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .reversal-line {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) 150px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #f8fafc;
+    }
+    .reversal-line + .reversal-line {
+      margin-top: 8px;
+    }
+    .reversal-line-title strong,
+    .reversal-line-title span {
+      display: block;
+    }
+    .reversal-line-title span {
+      color: var(--color-text-light);
+      font-size: 11px;
+    }
+    .reversal-line-weight label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 11px;
+      color: var(--color-text-light);
+    }
+    .reversal-review-error {
+      min-height: 20px;
+      margin: 8px 0 0;
+      color: var(--color-danger);
+      font-size: 13px;
+    }
     @media (max-width: 900px) {
       .transfer-fields {
         grid-template-columns: 1fr;
@@ -180,6 +222,12 @@
       }
       .transfer-remove-btn {
         justify-self: end;
+      }
+      .reversal-line {
+        grid-template-columns: 28px minmax(0, 1fr);
+      }
+      .reversal-line-weight {
+        grid-column: 2;
       }
     }
   </style>
@@ -360,6 +408,50 @@
   </div>
 </div>
 
+<div id="reversalRequestModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="reversalRequestTitle">
+  <div class="modal-content" style="max-width:680px">
+    <div class="modal-header">
+      <h2 id="reversalRequestTitle">ขอโอนสต็อกย้อนกลับ</h2>
+      <button class="close-modal" type="button" id="closeReversalRequestBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="reversalRequestSummary" class="reversal-summary"></div>
+      <div id="reversalRequestItems"></div>
+      <div class="form-group" style="margin-top:12px">
+        <label for="reversalReason" class="required">เหตุผลการโอนย้อนกลับ</label>
+        <textarea id="reversalReason" class="form-control" rows="3" maxlength="500" placeholder="ระบุเหตุผลและข้อมูลที่ผู้ดูแลระบบใช้ตรวจสอบ"></textarea>
+      </div>
+      <p id="reversalRequestError" class="reversal-review-error"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" id="cancelReversalRequestBtn">ปิด</button>
+      <button class="btn btn-danger" type="button" id="submitReversalRequestBtn">ส่งคำขอโอนย้อนกลับ</button>
+    </div>
+  </div>
+</div>
+
+<div id="reversalReviewModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="reversalReviewTitle">
+  <div class="modal-content" style="max-width:620px">
+    <div class="modal-header">
+      <h2 id="reversalReviewTitle">พิจารณาใบโอนย้อนกลับ</h2>
+      <button class="close-modal" type="button" id="closeReversalReviewBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="reversalReviewSummary" class="reversal-summary"></div>
+      <div class="form-group">
+        <label for="reversalReviewNote">หมายเหตุการพิจารณา</label>
+        <textarea id="reversalReviewNote" class="form-control" rows="3" maxlength="500" placeholder="ต้องระบุเมื่อปฏิเสธคำขอ"></textarea>
+      </div>
+      <p id="reversalReviewError" class="reversal-review-error"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" id="cancelReversalReviewBtn">ปิด</button>
+      <button class="btn btn-danger" type="button" id="rejectReversalBtn">ปฏิเสธ</button>
+      <button class="btn btn-success" type="button" id="approveReversalBtn">อนุมัติและโอนคืน</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="printTransferModal">
   <div class="modal-content" style="max-width:520px">
     <div class="modal-header">
@@ -385,6 +477,8 @@ let transferCategories = [];
 let transferLineSequence = 0;
 let transferCache = {};
 let activeReceiveTransfer = null;
+let activeReversalSource = null;
+let activeReversalReview = null;
 
 const byId = id => document.getElementById(id);
 
@@ -417,6 +511,8 @@ function normalizeTransferItems(transfer) {
       received_weight_kg: item.received_weight_kg === null || item.received_weight_kg === undefined
         ? null
         : Number(item.received_weight_kg),
+      source_transfer_item_id: Number(item.source_transfer_item_id || 0) || null,
+      reversal_reserved_weight: Number(item.reversal_reserved_weight || 0),
     }));
   }
 
@@ -430,6 +526,8 @@ function normalizeTransferItems(transfer) {
       received_weight_kg: transfer.received_weight_kg === null || transfer.received_weight_kg === undefined
         ? null
         : Number(transfer.received_weight_kg),
+      source_transfer_item_id: null,
+      reversal_reserved_weight: 0,
     }];
   }
 
@@ -472,7 +570,7 @@ async function init() {
   populateBranches();
 
   if (canManageTransfers) {
-    if (user.role !== 'admin' && !user.branch_id) {
+    if (!['admin', 'super_manager'].includes(user.role) && !user.branch_id) {
       byId('transferCreateCard').style.display = 'none';
       showNotification('บัญชีนี้ยังไม่ได้ผูกสาขา จึงไม่สามารถสร้างใบโอนได้', 'error');
     } else {
@@ -494,7 +592,7 @@ function populateBranches() {
     to.appendChild(new Option(branch.name, branch.id));
   });
 
-  if (transferUser.role !== 'admin' && transferUser.branch_id) {
+  if (!['admin', 'super_manager'].includes(transferUser.role) && transferUser.branch_id) {
     from.value = String(transferUser.branch_id);
     from.disabled = true;
     const branchName = transferBranches.find(branch => Number(branch.id) === Number(transferUser.branch_id))?.name || '-';
@@ -803,25 +901,35 @@ async function loadTransfers() {
   });
 
   tbody.innerHTML = transfers.map(transfer => {
-    const statusBadge = {
-      pending: '<span class="badge badge-warning">รอตรวจรับ</span>',
-      confirmed: '<span class="badge badge-success">รับแล้ว</span>',
-      cancelled: '<span class="badge badge-danger">ยกเลิก</span>',
-    }[transfer.status] || escapeHtml(transfer.status);
+    const isReversal = (transfer.transfer_type || 'normal') === 'reversal';
+    const statusBadge = transferStatusBadge(transfer);
 
     const totals = transferTotals(transfer);
     const isAdmin = transferUser?.role === 'admin';
+    const hasMultiBranchAccess = ['admin', 'super_manager'].includes(transferUser?.role);
     const userBranch = Number(transferUser?.branch_id || 0);
-    const canConfirm = transfer.status === 'pending'
-      && (isAdmin || Number(transfer.to_branch_id) === userBranch);
-    const canCancel = transfer.status === 'pending'
-      && (isAdmin || Number(transfer.from_branch_id) === userBranch);
+    const canConfirm = !isReversal && transfer.status === 'pending'
+      && (hasMultiBranchAccess || Number(transfer.to_branch_id) === userBranch);
+    const canCancel = !isReversal && transfer.status === 'pending'
+      && (hasMultiBranchAccess || Number(transfer.from_branch_id) === userBranch);
+    const canRequestReversal = !isReversal && transfer.status === 'confirmed'
+      && ['admin', 'super_manager', 'manager'].includes(transferUser?.role)
+      && (['admin', 'super_manager'].includes(transferUser?.role) || Number(transfer.to_branch_id) === userBranch)
+      && normalizeTransferItems(transfer).some(item => reversalRemainingWeight(item) > 0.0001);
+    const canReviewReversal = isReversal
+      && transfer.status === 'pending'
+      && transfer.approval_status === 'pending'
+      && isAdmin;
     const receivedText = totals.received === null ? '-' : formatKg(totals.received);
     const receivedDiff = totals.received === null ? 0 : Math.abs(totals.received - totals.ordered);
 
     const actions = [
       canConfirm ? `<button class="btn btn-sm btn-success" onclick="openReceiveModal(${transfer.id})">ตรวจรับ</button>` : '',
       canCancel ? `<button class="btn btn-sm btn-danger" onclick="cancelTransfer(${transfer.id})">ยกเลิก</button>` : '',
+      canRequestReversal ? `<button class="btn btn-sm btn-danger" onclick="openReversalRequest(${transfer.id})">โอนย้อนกลับ</button>` : '',
+      canReviewReversal ? (Number(transfer.created_by) === Number(transferUser?.user_id || transferUser?.id)
+        ? '<span class="text-muted">รอ admin คนอื่น</span>'
+        : `<button class="btn btn-sm btn-primary" onclick="openReversalReview(${transfer.id})">พิจารณา</button>`) : '',
       `<button class="btn btn-sm btn-secondary" onclick="printTransferById(${transfer.id})">พิมพ์</button>`,
     ].filter(Boolean).join(' ');
 
@@ -832,7 +940,10 @@ async function loadTransfers() {
 
     return `
       <tr>
-        <td style="font-family:monospace;font-size:12px">${escapeHtml(transfer.reference_no)}</td>
+        <td style="font-family:monospace;font-size:12px">
+          ${escapeHtml(transfer.reference_no)}
+          ${isReversal ? '<div><span class="badge badge-secondary">โอนย้อนกลับ</span></div>' : ''}
+        </td>
         <td style="font-size:12px">${escapeHtml((transfer.created_at || '').slice(0, 10))}</td>
         <td>
           <strong style="font-size:12px">${escapeHtml(transfer.from_branch_name || '-')}</strong>
@@ -845,11 +956,164 @@ async function loadTransfers() {
         <td style="font-size:12px">${escapeHtml(transfer.created_by_name || '-')}</td>
         <td style="font-size:12px">${escapeHtml(transfer.confirmed_by_name || '-')}</td>
         <td>${statusBadge}</td>
-        <td style="font-size:12px;color:#64748b">${escapeHtml(transfer.receive_note || transfer.note || '-')}</td>
+        <td style="font-size:12px;color:#64748b">${escapeHtml(transfer.reversal_reason || transfer.review_note || transfer.receive_note || transfer.note || '-')}</td>
         <td style="white-space:nowrap">${actions}</td>
       </tr>
     `;
   }).join('');
+}
+
+function transferStatusBadge(transfer) {
+  if ((transfer.transfer_type || 'normal') === 'reversal') {
+    if (transfer.approval_status === 'pending') return '<span class="badge badge-warning">รอ admin อนุมัติ</span>';
+    if (transfer.approval_status === 'approved') return '<span class="badge badge-success">โอนคืนแล้ว</span>';
+    if (transfer.approval_status === 'rejected') return '<span class="badge badge-danger">ไม่อนุมัติ</span>';
+  }
+  return {
+    pending: '<span class="badge badge-warning">รอตรวจรับ</span>',
+    confirmed: '<span class="badge badge-success">รับแล้ว</span>',
+    cancelled: '<span class="badge badge-danger">ยกเลิก</span>',
+  }[transfer.status] || escapeHtml(transfer.status);
+}
+
+function reversalRemainingWeight(item) {
+  const received = item.received_weight_kg === null ? item.weight_kg : item.received_weight_kg;
+  return Math.max(0, Number(received || 0) - Number(item.reversal_reserved_weight || 0));
+}
+
+function openReversalRequest(id) {
+  const transfer = transferCache[String(id)];
+  if (!transfer || transfer.status !== 'confirmed' || (transfer.transfer_type || 'normal') !== 'normal') return;
+  activeReversalSource = transfer;
+  byId('reversalRequestTitle').textContent = `ขอโอนย้อนกลับ ${transfer.reference_no}`;
+  byId('reversalRequestSummary').innerHTML = `
+    <strong>${escapeHtml(transfer.to_branch_name || '-')}</strong> ส่งคืนไป
+    <strong>${escapeHtml(transfer.from_branch_name || '-')}</strong><br>
+    เลือกรายการและระบุน้ำหนักที่ต้องการโอนคืน
+  `;
+  byId('reversalRequestItems').innerHTML = normalizeTransferItems(transfer).map((item, index) => {
+    const remaining = reversalRemainingWeight(item);
+    const disabled = remaining <= 0.0001;
+    return `<div class="reversal-line" data-source-item-id="${Number(item.id || 0)}">
+      <input type="checkbox" class="reversal-item-check" ${disabled ? 'disabled' : 'checked'} aria-label="เลือกรายการ ${escapeHtml(item.item_name)}">
+      <div class="reversal-line-title">
+        <strong>${index + 1}. ${escapeHtml(item.item_name)}</strong>
+        <span>${escapeHtml(item.category_name || 'ไม่ระบุหมวด')} · คืนได้ ${formatKg(remaining)}</span>
+      </div>
+      <div class="reversal-line-weight">
+        <label>น้ำหนักคืน (กก.)</label>
+        <input type="number" class="form-control reversal-item-weight" min="0.001" max="${remaining.toFixed(3)}" step="0.001" value="${remaining.toFixed(3)}" ${disabled ? 'disabled' : ''}>
+      </div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.reversal-item-check').forEach(check => {
+    check.addEventListener('change', () => {
+      check.closest('.reversal-line').querySelector('.reversal-item-weight').disabled = !check.checked;
+    });
+  });
+  byId('reversalReason').value = '';
+  byId('reversalRequestError').textContent = '';
+  byId('reversalRequestModal').classList.add('show');
+  byId('reversalReason').focus();
+}
+
+function closeReversalRequest() {
+  byId('reversalRequestModal').classList.remove('show');
+  activeReversalSource = null;
+}
+
+async function submitReversalRequest() {
+  if (!activeReversalSource) return;
+  const errorElement = byId('reversalRequestError');
+  const reason = byId('reversalReason').value.trim();
+  const items = [];
+  for (const row of document.querySelectorAll('.reversal-line')) {
+    const checked = row.querySelector('.reversal-item-check').checked;
+    if (!checked) continue;
+    const input = row.querySelector('.reversal-item-weight');
+    const weight = Number(input.value);
+    const maximum = Number(input.max);
+    if (!(weight > 0) || weight - maximum > 0.0001) {
+      errorElement.textContent = 'น้ำหนักโอนคืนต้องมากกว่า 0 และไม่เกินยอดคงเหลือ';
+      return;
+    }
+    items.push({ source_transfer_item_id: Number(row.dataset.sourceItemId), weight_kg: weight });
+  }
+  if (!items.length || !reason) {
+    errorElement.textContent = !items.length ? 'กรุณาเลือกรายการอย่างน้อย 1 รายการ' : 'กรุณาระบุเหตุผลการโอนย้อนกลับ';
+    return;
+  }
+
+  const button = byId('submitReversalRequestBtn');
+  setButtonLoading(button, true);
+  try {
+    const response = await apiRequest('stock-transfers/reversal-request', 'POST', {
+      original_transfer_id: Number(activeReversalSource.id),
+      reason,
+      items,
+    });
+    if (response.status !== 'success') {
+      errorElement.textContent = response.message || 'ส่งคำขอโอนย้อนกลับไม่สำเร็จ';
+      return;
+    }
+    showNotification('ส่งคำขอโอนย้อนกลับเพื่อรอ admin อนุมัติแล้ว', 'success');
+    closeReversalRequest();
+    await loadTransfers();
+  } finally {
+    setButtonLoading(button, false);
+  }
+}
+
+function openReversalReview(id) {
+  const transfer = transferCache[String(id)];
+  if (!transfer || transfer.approval_status !== 'pending') return;
+  activeReversalReview = transfer;
+  const lines = normalizeTransferItems(transfer).map(item => (
+    `${escapeHtml(item.item_name)} ${formatKg(item.weight_kg)}`
+  )).join('<br>');
+  byId('reversalReviewTitle').textContent = `พิจารณา ${transfer.reference_no}`;
+  byId('reversalReviewSummary').innerHTML = `
+    จาก <strong>${escapeHtml(transfer.from_branch_name || '-')}</strong> ไป
+    <strong>${escapeHtml(transfer.to_branch_name || '-')}</strong><br>
+    เหตุผล: ${escapeHtml(transfer.reversal_reason || '-')}<br>
+    ${lines}
+  `;
+  byId('reversalReviewNote').value = '';
+  byId('reversalReviewError').textContent = '';
+  byId('reversalReviewModal').classList.add('show');
+  byId('reversalReviewNote').focus();
+}
+
+function closeReversalReview() {
+  byId('reversalReviewModal').classList.remove('show');
+  activeReversalReview = null;
+}
+
+async function submitReversalReview(action) {
+  if (!activeReversalReview) return;
+  const note = byId('reversalReviewNote').value.trim();
+  const errorElement = byId('reversalReviewError');
+  if (action === 'reject' && !note) {
+    errorElement.textContent = 'กรุณาระบุเหตุผลที่ปฏิเสธ';
+    return;
+  }
+  const button = byId(action === 'approve' ? 'approveReversalBtn' : 'rejectReversalBtn');
+  setButtonLoading(button, true);
+  try {
+    const response = await apiRequest(`stock-transfers/reversal-${action}`, 'POST', {
+      id: Number(activeReversalReview.id),
+      review_note: note || null,
+    });
+    if (response.status !== 'success') {
+      errorElement.textContent = response.message || 'บันทึกผลการพิจารณาไม่สำเร็จ';
+      return;
+    }
+    showNotification(action === 'approve' ? 'อนุมัติและโอนสต็อกคืนแล้ว' : 'ปฏิเสธคำขอโอนย้อนกลับแล้ว', 'success');
+    closeReversalReview();
+    await loadTransfers();
+  } finally {
+    setButtonLoading(button, false);
+  }
 }
 
 function openReceiveModal(id) {
@@ -1077,6 +1341,13 @@ byId('statusFilter').addEventListener('change', loadTransfers);
 byId('closeReceiveModalBtn').addEventListener('click', closeReceiveModal);
 byId('cancelReceiveBtn').addEventListener('click', closeReceiveModal);
 byId('submitReceiveBtn').addEventListener('click', submitReceive);
+byId('closeReversalRequestBtn').addEventListener('click', closeReversalRequest);
+byId('cancelReversalRequestBtn').addEventListener('click', closeReversalRequest);
+byId('submitReversalRequestBtn').addEventListener('click', submitReversalRequest);
+byId('closeReversalReviewBtn').addEventListener('click', closeReversalReview);
+byId('cancelReversalReviewBtn').addEventListener('click', closeReversalReview);
+byId('approveReversalBtn').addEventListener('click', () => submitReversalReview('approve'));
+byId('rejectReversalBtn').addEventListener('click', () => submitReversalReview('reject'));
 byId('closePrintTransferBtn').addEventListener('click', () => byId('printTransferModal').classList.remove('show'));
 byId('cancelPrintTransferBtn').addEventListener('click', () => byId('printTransferModal').classList.remove('show'));
 byId('logoutBtn').addEventListener('click', async event => {

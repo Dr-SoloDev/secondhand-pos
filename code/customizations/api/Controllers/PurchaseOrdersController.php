@@ -33,40 +33,109 @@ class PurchaseOrdersController extends Controller
 
         $this->assertReadBranchAccess($po['branch_id'] ?? null, 'ไม่มีสิทธิ์เข้าถึงใบรับซื้อนี้');
 
-        Response::success('Purchase order retrieved', $po);
+        Response::success('Purchase order retrieved', $this->applyReceiptSettings($po));
     }
 
     public function cancelPurchaseOrder($id = null)
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
+        $data = $this->getRequestData();
+        if (!is_array($data)) {
+            $data = [];
+        }
         if (!$id) {
-            $data = $this->getRequestData();
             $id = isset($data['id']) ? intval($data['id']) : 0;
         }
         if (!$id) Response::error('ต้องระบุรหัสใบรับซื้อ', 400);
+        $reason = substr(trim((string)($data['reason'] ?? '')), 0, 500);
+        if ($reason === '') Response::error('กรุณาระบุเหตุผลที่ขอยกเลิกใบรับซื้อ', 400);
 
         $model = new PurchaseOrder();
         $po = $model->getById($id);
         if (!$po) Response::error('ไม่พบใบรับซื้อ', 404);
         if ($po['status'] === 'cancelled') Response::error('ใบรับซื้อยกเลิกไปแล้ว', 400);
+        $this->assertReadBranchAccess($po['branch_id'] ?? null, 'ไม่มีสิทธิ์ยกเลิกใบรับซื้อนี้');
 
         try {
-            $model->cancel($id);
-            Logger::logActivity(
-                $this->user['user_id'],
-                'cancel_purchase_order',
-                "Cancelled PO: {$po['reference_no']} (ID: {$id})"
+            $result = (new PurchaseOrderCancellation())->request(
+                (int)$id,
+                $reason,
+                (int)($this->user['user_id'] ?? $this->user['id'])
             );
-            Response::success('ยกเลิกใบรับซื้อสำเร็จ');
+            Logger::logActivity(
+                $this->user['user_id'] ?? $this->user['id'],
+                'request_purchase_order_cancellation',
+                "Requested PO cancellation: {$po['reference_no']} (ID: {$id}) reason: {$reason}"
+            );
+            Response::success('ส่งคำขอยกเลิกเพื่อรอผู้มีอำนาจอนุมัติแล้ว', $result);
         } catch (Exception $e) {
-            error_log('PurchaseOrder cancel failed: ' . $e->getMessage());
-            Response::error('ยกเลิกใบรับซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
+            error_log('PurchaseOrder cancellation request failed: ' . $e->getMessage());
+            Response::error($e->getMessage() ?: 'ส่งคำขอยกเลิกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 400);
+        }
+    }
+
+    public function getCancellationRequests()
+    {
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
+        $filters = [];
+        if (!empty($_GET['status'])) {
+            $filters['status'] = $this->sanitizeInput($_GET['status']);
+        }
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
+            $branchId = (int)($this->user['branch_id'] ?? 0);
+            if (!$branchId) Response::error('ไม่มีสาขาที่ผูกกับผู้ใช้นี้', 403);
+            $filters['branch_id'] = $branchId;
+        } elseif (!empty($_GET['branch_id'])) {
+            $filters['branch_id'] = (int)$_GET['branch_id'];
+        }
+
+        Response::success('สำเร็จ', [
+            'items' => (new PurchaseOrderCancellation())->getAll($filters),
+        ]);
+    }
+
+    public function approveCancellation()
+    {
+        $this->requireAuth(['admin', 'super_manager']);
+        $data = $this->getRequestData() ?? [];
+        $requestId = (int)($data['id'] ?? $data['request_id'] ?? 0);
+        if (!$requestId) Response::error('ไม่พบรหัสคำขอ', 400);
+
+        try {
+            $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+            (new PurchaseOrderCancellation())->approve(
+                $requestId,
+                $userId,
+                isset($data['review_note']) ? (string)$data['review_note'] : null
+            );
+            Logger::logActivity($userId, 'approve_purchase_order_cancellation', "Approved PO cancellation request ID: {$requestId}");
+            Response::success('อนุมัติและยกเลิกใบรับซื้อแล้ว');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
+    public function rejectCancellation()
+    {
+        $this->requireAuth(['admin', 'super_manager']);
+        $data = $this->getRequestData() ?? [];
+        $requestId = (int)($data['id'] ?? $data['request_id'] ?? 0);
+        $reviewNote = substr(trim((string)($data['review_note'] ?? '')), 0, 500);
+        if (!$requestId || $reviewNote === '') Response::error('กรุณาระบุคำขอและเหตุผลที่ปฏิเสธ', 400);
+
+        try {
+            $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+            (new PurchaseOrderCancellation())->reject($requestId, $userId, $reviewNote);
+            Logger::logActivity($userId, 'reject_purchase_order_cancellation', "Rejected PO cancellation request ID: {$requestId}");
+            Response::success('ปฏิเสธคำขอยกเลิกแล้ว');
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
         }
     }
 
     public function createPurchaseOrder()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $data = $this->getRequestData();
 
         // Idempotency check — ป้องกัน PO ซ้ำ
@@ -80,7 +149,7 @@ class PurchaseOrdersController extends Controller
 
         // SECURITY: non-admin สร้างได้เฉพาะสาขาตัวเอง
         $branchId = intval($data['branch_id']);
-        if (($this->user['role'] ?? '') !== 'admin') {
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = $this->user['branch_id'] ?? null;
             if (!$userBranch || $branchId !== (int)$userBranch) {
                 Response::error('ไม่มีสิทธิ์สร้างใบรับซื้อในสาขานี้', 403);
@@ -108,19 +177,31 @@ class PurchaseOrdersController extends Controller
                 Response::error('แต่ละรายการต้องมีชื่อของ', 400);
             }
             $qty = floatval($item['quantity'] ?? 1);
-            if ($qty <= 0) {
+            $deduct = floatval($item['weight_deduction'] ?? 0);
+            $unitPrice = floatval($item['unit_price'] ?? 0);
+            if (!is_finite($qty) || $qty <= 0) {
                 Response::error('น้ำหนัก/จำนวนต้องมากกว่า 0', 400);
                 return;
             }
+            if (!is_finite($deduct) || $deduct < 0 || $deduct >= $qty) {
+                Response::error('น้ำหนักหักต้องไม่น้อยกว่า 0 และต้องน้อยกว่าน้ำหนักชั่ง', 422);
+                return;
+            }
+            if (!is_finite($unitPrice) || $unitPrice < 0) {
+                Response::error('ราคาต่อหน่วยไม่ถูกต้อง', 422);
+                return;
+            }
+            $netQty = $qty - $deduct;
             $cleanItems[] = [
                 'item_name' => trim((string)$item['item_name']),
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 // DEPRECATED — condition_id ไม่ใช้แล้ว ใช้ weight_deduction แทน
-                'weight_deduction' => floatval($item['weight_deduction'] ?? 0),
+                'weight_deduction' => $deduct,
                 'quantity' => $qty,
                 'unit' => $item['unit'] ?? 'ชิ้น',
-                'unit_price' => floatval($item['unit_price'] ?? 0),
-                'total_price' => floatval($item['total_price'] ?? (floatval($item['quantity'] ?? 1) * floatval($item['unit_price'] ?? 0))),
+                'unit_price' => $unitPrice,
+                // Server is authoritative: deducted weight has no stock and no cost.
+                'total_price' => round($netQty * $unitPrice, 2),
                 'price_tier' => !empty($item['price_tier']) ? intval($item['price_tier']) : null,
                 'notes' => isset($item['notes']) ? trim((string)$item['notes']) : null,
                 'client_key' => $item['client_key'] ?? null,
@@ -176,6 +257,10 @@ class PurchaseOrdersController extends Controller
             Response::success('สร้างใบรับซื้อสำเร็จ', $result);
         } catch (Exception $e) {
             error_log('PurchaseOrder create failed: ' . $e->getMessage());
+            $businessMessage = $this->safeBusinessMessage($e);
+            if ($businessMessage !== null) {
+                Response::error($businessMessage, 400);
+            }
             Response::error('สร้างใบรับซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 500);
         }
     }
@@ -210,6 +295,7 @@ class PurchaseOrdersController extends Controller
         }
 
         $po['is_precious_metal'] = $isPreciousMetal;
+        $po = $this->applyReceiptSettings($po);
         Response::success('สำเร็จ', $po);
     }
 
@@ -331,6 +417,7 @@ class PurchaseOrdersController extends Controller
         // Generate Excel-compatible HTML
         $formattedDate = date('d/m/Y', strtotime($exportDate));
         $branchLabel = $branchId ? ('สาขา ' . $branchId) : 'ทุกสาขา';
+        $receiptSettings = (new Setting())->getReceiptSettings();
 
         $html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
         $html .= '<head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>รายงานรับซื้อ</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>';
@@ -338,8 +425,10 @@ class PurchaseOrdersController extends Controller
 
         // Header
         $html .= '<div style="text-align:center;margin-bottom:20px;">';
-        $html .= '<h2>รักษ์สะอาดรีไซเคิล</h2>';
-        $html .= '<p>ศูนย์รับซื้อขยะเพื่อการรีไซเคิล</p>';
+        $html .= '<h2>' . $this->escapeHtml($receiptSettings['store_name']) . '</h2>';
+        if (!empty($receiptSettings['receipt_welcome_message'])) {
+            $html .= '<p>' . $this->escapeHtml($receiptSettings['receipt_welcome_message']) . '</p>';
+        }
         $html .= '<h3>รายงานรับซื้อประจำวัน — ' . $this->escapeHtml($formattedDate) . '</h3>';
         $html .= '<p>สาขา: ' . $this->escapeHtml($branchLabel) . '</p>';
         $html .= '</div>';
@@ -462,6 +551,18 @@ class PurchaseOrdersController extends Controller
         }
     }
 
+    private function applyReceiptSettings($po)
+    {
+        $settings = (new Setting())->getReceiptSettings();
+        $po['shop_name'] = $settings['store_name'];
+        $po['shop_phone'] = $settings['store_phone'] !== '' ? $settings['store_phone'] : ($po['branch_phone'] ?? '');
+        $po['shop_address'] = $settings['store_address'];
+        $po['tax_id'] = $settings['tax_id'];
+        $po['receipt_footer'] = $settings['receipt_footer'];
+        $po['receipt_welcome_message'] = $settings['receipt_welcome_message'];
+        return $po;
+    }
+
     private function escapeHtml($value)
     {
         if ($value === null || $value === '') {
@@ -473,6 +574,15 @@ class PurchaseOrdersController extends Controller
     private function formatPaymentMethod($value)
     {
         return $this->getStatusLabel($value);
+    }
+
+    private function safeBusinessMessage(Exception $exception): ?string
+    {
+        $message = trim($exception->getMessage());
+        if ($message === '' || stripos($message, 'SQLSTATE') !== false) {
+            return null;
+        }
+        return preg_match('/[\x{0E00}-\x{0E7F}]/u', $message) ? substr($message, 0, 500) : null;
     }
 
     private function getStatusLabel($status)
