@@ -105,9 +105,11 @@ test_cash_sessions() {
   assert_contains "$res" '"status":"error"' "Sale LOT cash: Duplicate revenue recording is rejected"
 
   expected=$after
+  local approved_actual
+  approved_actual=$(awk -v n="$expected" 'BEGIN { print n + 150 }')
   res=$(curl -s -b "$manager_cookie" "$API_BASE/cash-sessions/close" \
     -X POST -H 'Content-Type: application/json' \
-    -d "{\"branch_id\":$branch_id,\"actual_cash\":$(awk -v n="$expected" 'BEGIN { print n + 150 }'),\"reason\":\"QA variance approval\"}")
+    -d "{\"branch_id\":$branch_id,\"actual_cash\":$approved_actual,\"reason\":\"QA variance approval\"}")
   session_id=$(echo "$res" | json_get "data.id" 2>/dev/null)
   assert_contains "$res" '"status":"success"' "Cash close: Submit variance above 100"
   assert_contains "$res" 'pending_close' "Cash close: Large variance waits for approval"
@@ -123,6 +125,12 @@ test_cash_sessions() {
   assert_contains "$res" '"status":"success"' "Cash close: Admin reopens same-day session with reason"
 
   expected=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
+  if float_eq "$approved_actual" "$expected"; then
+    test_pass "Cash reopen: Expected cash rebases to approved closing actual"
+  else
+    test_fail "Cash reopen: Expected cash rebases to approved closing actual"
+    echo "    (approved closing: '$approved_actual', reopened expected: '$expected')"
+  fi
   res=$(curl -s -b "$manager_cookie" "$API_BASE/cash-sessions/close" \
     -X POST -H 'Content-Type: application/json' -d "{\"branch_id\":$branch_id,\"actual_cash\":$expected}")
   assert_contains "$res" '"status":"success"' "Cash close: Exact count closes immediately"

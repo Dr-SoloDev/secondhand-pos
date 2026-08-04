@@ -117,6 +117,9 @@ class SaleLot extends Model
             throw new Exception('ต้องระบุรายการสินค้าอย่างน้อย 1 รายการ');
         }
 
+        $transportCost = $this->requireNonNegativeAmount($data['transport_cost'] ?? 0, 'ค่าขนส่ง');
+        $expenses = $this->normalizeExpenses($data['expenses'] ?? null);
+
         $this->db->beginTransaction();
         try {
             $branchId    = intval($data['branch_id']);
@@ -132,8 +135,11 @@ class SaleLot extends Model
                 $itemName  = trim((string)($item['item_name'] ?? ''));
                 $catalogId = intval($item['catalog_id'] ?? 0) ?: null;
 
-                if ($qty <= 0 || empty($itemName)) {
+                if (!is_finite($qty) || $qty <= 0 || empty($itemName)) {
                     throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
+                }
+                if (!is_finite($unitPrice) || $unitPrice < 0) {
+                    throw new Exception('ราคาขายต่อหน่วยต้องไม่น้อยกว่า 0');
                 }
                 if ($catId <= 0) {
                     throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
@@ -168,10 +174,10 @@ class SaleLot extends Model
                 'sale_date'     => $data['sale_date'],
                 'total_amount'  => $totalAmount,
                 'total_cost'    => $totalCost,
-                'transport_cost' => (float)($data['transport_cost'] ?? 0),
+                'transport_cost' => $transportCost,
                 'status'        => 'draft',
                 'notes'         => isset($data['notes']) ? trim((string)$data['notes']) : null,
-                'expenses'      => isset($data['expenses']) ? json_encode($data['expenses']) : null,
+                'expenses'      => $expenses !== null ? json_encode($expenses) : null,
                 'created_by'    => $data['created_by'] ?? null,
             ]);
 
@@ -209,6 +215,9 @@ class SaleLot extends Model
             throw new Exception('แก้ไขได้เฉพาะ Sale Lot ที่มีสถานะ draft เท่านั้น');
         }
 
+        $transportCost = $this->requireNonNegativeAmount($data['transport_cost'] ?? 0, 'ค่าขนส่ง');
+        $expenses = $this->normalizeExpenses($data['expenses'] ?? null);
+
         $this->db->beginTransaction();
         try {
             $branchId    = intval($lot['branch_id']);
@@ -226,8 +235,11 @@ class SaleLot extends Model
                 $itemName  = trim((string)($item['item_name'] ?? ''));
                 $catalogId = intval($item['catalog_id'] ?? 0) ?: null;
 
-                if ($qty <= 0 || empty($itemName)) {
+                if (!is_finite($qty) || $qty <= 0 || empty($itemName)) {
                     throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
+                }
+                if (!is_finite($unitPrice) || $unitPrice < 0) {
+                    throw new Exception('ราคาขายต่อหน่วยต้องไม่น้อยกว่า 0');
                 }
                 if ($catId <= 0) {
                     throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
@@ -264,9 +276,9 @@ class SaleLot extends Model
                     $data['sale_date'],
                     $totalAmount,
                     $totalCost,
-                    (float)($data['transport_cost'] ?? 0),
+                    $transportCost,
                     isset($data['notes']) ? trim((string)$data['notes']) : null,
-                    isset($data['expenses']) ? json_encode($data['expenses']) : null,
+                    $expenses !== null ? json_encode($expenses) : null,
                     $id,
                 ]
             );
@@ -320,22 +332,16 @@ class SaleLot extends Model
             if (!isset($allowed[$lot['status']]) || !in_array($status, $allowed[$lot['status']])) {
                 throw new Exception("ไม่สามารถเปลี่ยนสถานะจาก {$lot['status']} เป็น {$status} ได้");
             }
-            // draft→confirmed ต้องคำนวณ cost ใหม่จากสต็อกปัจจุบัน
-            // (update() อาจบันทึก cost=0 ถ้าสต็อกไม่พอตอนเป็น draft)
-            if ($status === 'confirmed' && $lot['status'] === 'draft') {
-                $this->recomputeCost($id);
+            if ($status === 'confirmed') {
+                $this->deductStock($id);
+            } elseif ($status === 'cancelled') {
+                $this->restoreStock($id);
             }
 
             $this->db->query(
                 "UPDATE {$this->table} SET status = ?, updated_at = NOW() WHERE id = ?",
                 [$status, $id]
             );
-
-            if ($status === 'confirmed') {
-                $this->deductStock($id);
-            } elseif ($status === 'cancelled') {
-                $this->restoreStock($id);
-            }
 
             $this->db->commit();
             return true;
@@ -538,7 +544,7 @@ class SaleLot extends Model
     public function deductStock($sale_lot_id)
     {
         $items = $this->db->fetchAll(
-            "SELECT category_id, item_name, quantity_kg
+            "SELECT id, category_id, item_name, quantity_kg
              FROM sale_lot_items
              WHERE sale_lot_id = ? FOR UPDATE",
             [$sale_lot_id]
@@ -549,10 +555,22 @@ class SaleLot extends Model
             [$sale_lot_id]
         );
 
+        $costMethod = $this->getCostMethod((int)$lot['branch_id']);
+        $totalLotCost = 0.0;
+
         foreach ($items as $item) {
-            $remaining = (float)$item['quantity_kg'];
+            $requestedQty = (float)$item['quantity_kg'];
             $categoryId = (int)$item['category_id'];
             $itemName = $item['item_name'] ?? '';
+
+            $existingAllocation = $this->db->fetchColumn(
+                "SELECT 1 FROM sale_lot_stock_allocations
+                 WHERE sale_lot_item_id = ? AND restored_at IS NULL LIMIT 1",
+                [(int)$item['id']]
+            );
+            if ($existingAllocation) {
+                throw new Exception('Sale Lot นี้ตัดสต็อกไปแล้ว');
+            }
 
             // ── Branch Stock: deduct per-branch per-item (ADD-001) ──
             if ($categoryId && $itemName) {
@@ -565,26 +583,18 @@ class SaleLot extends Model
                      FOR UPDATE",
                     [$lot['branch_id'], $categoryId, $itemName]
                 );
-                if ($availableBranchStock < $remaining) {
-                    $short = $remaining - $availableBranchStock;
+                if ($availableBranchStock + 0.000001 < $requestedQty) {
+                    $short = $requestedQty - $availableBranchStock;
                     throw new Exception("สต็อก {$itemName} ไม่เพียงพอ (ขาด {$short} กก.)");
                 }
-
-                $branchStock = new BranchStock();
-                $branchStock->deduct($lot['branch_id'], $categoryId, $itemName, $remaining);
             }
-
-            // STOCK FIX: Deduct from category stock (dual-write backward compat)
-            $this->db->query(
-                "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",
-                [$remaining, $categoryId]
-            );
 
             // PO items ที่ยังมีสต็อกเหลือสำหรับหมวดหมู่+item_name นี้
             $rows = $this->db->fetchAll(
                 "SELECT poi.id,
                         poi.net_quantity,
-                        poi.consumed_qty
+                        poi.consumed_qty,
+                        poi.unit_price
                  FROM purchase_order_items poi
                  INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
                  WHERE po.branch_id = ?
@@ -592,16 +602,45 @@ class SaleLot extends Model
                    AND poi.item_name = ?
                    AND po.status = 'completed'
                    AND (poi.net_quantity - poi.consumed_qty) > 0
-                  ORDER BY po.created_at ASC
+                  ORDER BY po.created_at ASC, poi.id ASC
                  FOR UPDATE",
                 [$lot['branch_id'], $categoryId, $itemName]
             );
 
+            $totalAvailable = 0.0;
+            $totalAvailableValue = 0.0;
             foreach ($rows as $row) {
-                if ($remaining <= 0) break;
+                $available = (float)$row['net_quantity'] - (float)$row['consumed_qty'];
+                $totalAvailable += $available;
+                $totalAvailableValue += $available * (float)$row['unit_price'];
+            }
+            if ($totalAvailable + 0.000001 < $requestedQty) {
+                $short = $requestedQty - $totalAvailable;
+                throw new Exception("สต็อก {$itemName} ไม่เพียงพอ (ขาด {$short} กก.)");
+            }
+
+            $weightedUnitCost = $totalAvailable > 0 ? $totalAvailableValue / $totalAvailable : 0.0;
+            $remaining = $requestedQty;
+            $allocatedQty = 0.0;
+            $cumulativeAvailable = 0.0;
+            $itemCost = 0.0;
+            $lastIndex = count($rows) - 1;
+
+            foreach ($rows as $index => $row) {
+                if ($remaining <= 0.000001) break;
 
                 $available = (float)$row['net_quantity'] - (float)$row['consumed_qty'];
-                $take      = min($available, $remaining);
+                if ($costMethod === 'weighted') {
+                    $cumulativeAvailable += $available;
+                    $targetAllocated = $index === $lastIndex
+                        ? $requestedQty
+                        : round(($cumulativeAvailable / $totalAvailable) * $requestedQty, 3);
+                    $take = min($available, max(0.0, $targetAllocated - $allocatedQty));
+                } else {
+                    $take = min($available, $remaining);
+                }
+                $take = round($take, 3);
+                if ($take <= 0) continue;
 
                 // Atomic update — ป้องกัน race condition
                 $stmt = $this->db->query(
@@ -615,20 +654,51 @@ class SaleLot extends Model
                     throw new Exception("สต็อกถูกตัดโดยรายการอื่นแล้ว กรุณาลองใหม่");
                 }
 
+                $unitCost = $costMethod === 'weighted' ? $weightedUnitCost : (float)$row['unit_price'];
+                $allocatedCost = $take * $unitCost;
+                $this->db->insert('sale_lot_stock_allocations', [
+                    'sale_lot_id' => (int)$sale_lot_id,
+                    'sale_lot_item_id' => (int)$item['id'],
+                    'purchase_order_item_id' => (int)$row['id'],
+                    'quantity_kg' => $take,
+                    'unit_cost' => $unitCost,
+                    'allocated_cost' => $allocatedCost,
+                    'cost_method' => $costMethod,
+                ]);
+
                 $remaining -= $take;
+                $allocatedQty += $take;
+                $itemCost += $allocatedCost;
             }
 
-            if ($remaining > 0) {
+            if ($remaining > 0.000001) {
                 throw new Exception("สต็อก {$itemName} ไม่เพียงพอ (ขาด {$remaining} กก.)");
             }
+
+            $branchStock = new BranchStock();
+            $branchStock->deduct($lot['branch_id'], $categoryId, $itemName, $requestedQty);
+            $this->db->query(
+                "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",
+                [$requestedQty, $categoryId]
+            );
+            $this->db->query(
+                "UPDATE sale_lot_items SET fifo_cost = ? WHERE id = ?",
+                [$itemCost, (int)$item['id']]
+            );
+            $totalLotCost += $itemCost;
         }
+
+        $this->db->query(
+            "UPDATE {$this->table} SET total_cost = ? WHERE id = ?",
+            [$totalLotCost, $sale_lot_id]
+        );
     }
 
     // คืนสต็อกเมื่อยกเลิก Sale Lot
     public function restoreStock($sale_lot_id)
     {
         $items = $this->db->fetchAll(
-            "SELECT category_id, item_name, quantity_kg
+            "SELECT id, category_id, item_name, quantity_kg
              FROM sale_lot_items
              WHERE sale_lot_id = ? FOR UPDATE",
             [$sale_lot_id]
@@ -638,6 +708,25 @@ class SaleLot extends Model
             "SELECT branch_id FROM {$this->table} WHERE id = ? FOR UPDATE",
             [$sale_lot_id]
         );
+
+        foreach ($items as $item) {
+            $allocations = $this->db->fetchAll(
+                "SELECT a.id, a.purchase_order_item_id, a.quantity_kg, poi.consumed_qty
+                 FROM sale_lot_stock_allocations a
+                 INNER JOIN purchase_order_items poi ON poi.id = a.purchase_order_item_id
+                 WHERE a.sale_lot_item_id = ? AND a.restored_at IS NULL
+                 ORDER BY a.id ASC
+                 FOR UPDATE",
+                [(int)$item['id']]
+            );
+            $allocatedQty = array_sum(array_map(static function ($allocation) {
+                return (float)$allocation['quantity_kg'];
+            }, $allocations));
+            $itemQty = (float)$item['quantity_kg'];
+            if (!$allocations || abs($allocatedQty - $itemQty) > 0.001) {
+                throw new Exception('Lot นี้ไม่มีข้อมูล allocation ที่ครบถ้วน กรุณาใช้เอกสารปรับปรุงแทนการยกเลิก');
+            }
+        }
 
         foreach ($items as $item) {
             $toRestore = (float)$item['quantity_kg'];
@@ -656,39 +745,33 @@ class SaleLot extends Model
                 [$toRestore, $categoryId]
             );
 
-            // คืนสต็อกย้อนกลับจากล็อตล่าสุดก่อน (LIFO สำหรับการคืน)
-            $rows = $this->db->fetchAll(
-                "SELECT poi.id,
-                        poi.consumed_qty
-                 FROM purchase_order_items poi
-                 INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
-                 WHERE po.branch_id = ?
-                   AND poi.category_id = ?
-                   AND poi.item_name = ?
-                   AND po.status = 'completed'
-                   AND poi.consumed_qty > 0
-                  ORDER BY po.created_at DESC
-                 FOR UPDATE",
-                [$lot['branch_id'], $categoryId, $itemName]
+            $allocations = $this->db->fetchAll(
+                "SELECT a.id, a.purchase_order_item_id, a.quantity_kg
+                 FROM sale_lot_stock_allocations a
+                 WHERE a.sale_lot_item_id = ? AND a.restored_at IS NULL
+                 ORDER BY a.id ASC FOR UPDATE",
+                [(int)$item['id']]
             );
-
-            foreach ($rows as $row) {
-                if ($toRestore <= 0) break;
-
-                $canRestore = min((float)$row['consumed_qty'], $toRestore);
-
+            foreach ($allocations as $allocation) {
+                $quantity = (float)$allocation['quantity_kg'];
                 $stmt = $this->db->query(
                      "UPDATE purchase_order_items
                       SET consumed_qty = consumed_qty - ?
                       WHERE id = ? AND consumed_qty >= ?",
-                    [$canRestore, $row['id'], $canRestore]
+                    [$quantity, (int)$allocation['purchase_order_item_id'], $quantity]
                 );
 
                 if (!$stmt->rowCount()) {
                     throw new Exception("ข้อมูล consumed_qty ไม่ตรงกัน กรุณาลองใหม่");
                 }
-
-                $toRestore -= $canRestore;
+                $this->db->query(
+                    "UPDATE sale_lot_stock_allocations SET restored_at = NOW() WHERE id = ?",
+                    [(int)$allocation['id']]
+                );
+                $toRestore -= $quantity;
+            }
+            if (abs($toRestore) > 0.001) {
+                throw new Exception('คืนสต็อกไม่ครบตาม allocation');
             }
         }
     }
@@ -708,6 +791,41 @@ class SaleLot extends Model
         );
         $next = ($last ?? 0) + 1;
         return $prefix . '-' . str_pad($next, 3, '0', STR_PAD_LEFT);
+    }
+
+    private function requireNonNegativeAmount($value, $label)
+    {
+        $amount = (float)$value;
+        if (!is_finite($amount) || $amount < 0) {
+            throw new Exception("{$label}ต้องไม่น้อยกว่า 0");
+        }
+        return $amount;
+    }
+
+    private function normalizeExpenses($expenses)
+    {
+        if ($expenses === null || $expenses === '') {
+            return null;
+        }
+        if (!is_array($expenses)) {
+            throw new Exception('รูปแบบค่าใช้จ่ายไม่ถูกต้อง');
+        }
+
+        $clean = [];
+        foreach ($expenses as $expense) {
+            if (!is_array($expense)) {
+                throw new Exception('รูปแบบค่าใช้จ่ายไม่ถูกต้อง');
+            }
+            $description = trim((string)($expense['description'] ?? ''));
+            if ($description === '') {
+                throw new Exception('กรุณาระบุรายละเอียดค่าใช้จ่าย');
+            }
+            $clean[] = [
+                'description' => mb_substr(strip_tags($description), 0, 255),
+                'amount' => $this->requireNonNegativeAmount($expense['amount'] ?? 0, 'ค่าใช้จ่าย'),
+            ];
+        }
+        return $clean ?: null;
     }
 
     // ลบ Sale Lot ได้เฉพาะสถานะ draft เท่านั้น

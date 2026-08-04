@@ -291,4 +291,90 @@ test_sale_lots_fifo() {
   assert_contains "$res" '"status":"success"' "Net FIFO: Cleanup first PO"
   res=$(api_post_id "purchase-orders/cancel" "$deducted_po_b" '{"reason":"QA cleanup"}')
   assert_contains "$res" '"status":"success"' "Net FIFO: Cleanup second PO"
+
+  # 9. Cancelling an older lot must restore only the PO batches allocated to that lot.
+  local allocation_item allocation_po_a allocation_po_b allocation_lot_a allocation_lot_b
+  allocation_item="Allocation Restore Test $suffix"
+  res=$(api_post "purchase-orders" "{
+    \"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",
+    \"items\":[{\"item_name\":\"$allocation_item\",\"category_id\":$cat_id,\"quantity\":10,\"unit\":\"kg\",\"unit_price\":10}]
+  }")
+  allocation_po_a=$(extract_id "$res")
+  assert_contains "$res" '"status":"success"' "Allocation: Create first PO batch"
+
+  res=$(api_post "purchase-orders" "{
+    \"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",
+    \"items\":[{\"item_name\":\"$allocation_item\",\"category_id\":$cat_id,\"quantity\":10,\"unit\":\"kg\",\"unit_price\":20}]
+  }")
+  allocation_po_b=$(extract_id "$res")
+  assert_contains "$res" '"status":"success"' "Allocation: Create second PO batch"
+
+  res=$(api_post "sale-lots" "{
+    \"branch_id\":$branch_id,\"buyer_name\":\"Allocation Buyer A\",\"sale_date\":\"$(date +%Y-%m-%d)\",
+    \"items\":[{\"item_name\":\"$allocation_item\",\"category_id\":$cat_id,\"quantity_kg\":6,\"unit_price\":30}]
+  }")
+  allocation_lot_a=$(extract_id "$res")
+  res=$(api_post_id "sale-lots/confirm" "$allocation_lot_a" "{}")
+  assert_contains "$res" '"status":"success"' "Allocation: Confirm older lot"
+
+  res=$(api_post "sale-lots" "{
+    \"branch_id\":$branch_id,\"buyer_name\":\"Allocation Buyer B\",\"sale_date\":\"$(date +%Y-%m-%d)\",
+    \"items\":[{\"item_name\":\"$allocation_item\",\"category_id\":$cat_id,\"quantity_kg\":6,\"unit_price\":30}]
+  }")
+  allocation_lot_b=$(extract_id "$res")
+  res=$(api_post_id "sale-lots/confirm" "$allocation_lot_b" "{}")
+  assert_contains "$res" '"status":"success"' "Allocation: Confirm newer lot"
+
+  res=$(api_post_id "sale-lots/cancel" "$allocation_lot_a" "{}")
+  assert_contains "$res" '"status":"success"' "Allocation: Cancel older lot first"
+  res=$(api_get "purchase-orders/order?id=$allocation_po_a")
+  assert_float_eq "4.000" "$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)" "Allocation: Older cancellation preserves newer PO1 consumption"
+  res=$(api_get "purchase-orders/order?id=$allocation_po_b")
+  assert_float_eq "2.000" "$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)" "Allocation: Older cancellation preserves newer PO2 consumption"
+
+  res=$(api_post_id "sale-lots/cancel" "$allocation_lot_b" "{}")
+  assert_contains "$res" '"status":"success"' "Allocation: Cancel newer lot"
+  res=$(api_get "purchase-orders/order?id=$allocation_po_a")
+  assert_float_eq "0.000" "$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)" "Allocation: PO1 fully restored"
+  res=$(api_get "purchase-orders/order?id=$allocation_po_b")
+  assert_float_eq "0.000" "$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)" "Allocation: PO2 fully restored"
+
+  # 10. Weighted costing must consume every remaining batch proportionally.
+  local original_cost_method weighted_item weighted_po_a weighted_po_b weighted_lot weighted_cost
+  original_cost_method=$(api_get "branches/branch?id=$branch_id" | json_get "data.cost_method" 2>/dev/null)
+  [ -z "$original_cost_method" ] && original_cost_method="fifo"
+  res=$(api_put "branches/branch?id=$branch_id" '{"cost_method":"weighted"}')
+  assert_contains "$res" '"status":"success"' "Weighted: Enable weighted cost method"
+
+  weighted_item="Weighted Allocation Test $suffix"
+  res=$(api_post "purchase-orders" "{
+    \"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",
+    \"items\":[{\"item_name\":\"$weighted_item\",\"category_id\":$cat_id,\"quantity\":10,\"unit\":\"kg\",\"unit_price\":10}]
+  }")
+  weighted_po_a=$(extract_id "$res")
+  res=$(api_post "purchase-orders" "{
+    \"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",
+    \"items\":[{\"item_name\":\"$weighted_item\",\"category_id\":$cat_id,\"quantity\":10,\"unit\":\"kg\",\"unit_price\":20}]
+  }")
+  weighted_po_b=$(extract_id "$res")
+
+  res=$(api_post "sale-lots" "{
+    \"branch_id\":$branch_id,\"buyer_name\":\"Weighted Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",
+    \"items\":[{\"item_name\":\"$weighted_item\",\"category_id\":$cat_id,\"quantity_kg\":10,\"unit_price\":30}]
+  }")
+  weighted_lot=$(extract_id "$res")
+  res=$(api_post_id "sale-lots/confirm" "$weighted_lot" "{}")
+  assert_contains "$res" '"status":"success"' "Weighted: Confirm proportional lot"
+  res=$(api_get "sale-lots/sale-lot?id=$weighted_lot")
+  weighted_cost=$(echo "$res" | json_get "data.total_cost" 2>/dev/null)
+  assert_float_eq "150.000" "$weighted_cost" "Weighted: Cost is 10kg at average 15"
+  res=$(api_get "purchase-orders/order?id=$weighted_po_a")
+  assert_float_eq "5.000" "$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)" "Weighted: First batch consumed proportionally"
+  res=$(api_get "purchase-orders/order?id=$weighted_po_b")
+  assert_float_eq "5.000" "$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)" "Weighted: Second batch consumed proportionally"
+
+  res=$(api_post_id "sale-lots/cancel" "$weighted_lot" "{}")
+  assert_contains "$res" '"status":"success"' "Weighted: Cancel restores exact allocations"
+  res=$(api_put "branches/branch?id=$branch_id" "{\"cost_method\":\"$original_cost_method\"}")
+  assert_contains "$res" '"status":"success"' "Weighted: Restore branch cost method"
 }

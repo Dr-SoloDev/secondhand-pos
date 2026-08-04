@@ -20,14 +20,32 @@ class UsersController extends Controller
         // Get and validate request data
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['username', 'password', 'phone', 'full_name', 'role']);
+        foreach (['username', 'password', 'phone', 'full_name', 'role'] as $field) {
+            if (!is_string($data[$field])) {
+                Response::error("Field '{$field}' must be a string", 400);
+            }
+        }
 
         // Sanitize input
+        $password = $data['password'];
         $data = $this->sanitizeInput($data);
+        $data['password'] = $password;
 
         // Validate role
         $validRoles = ['admin', 'manager', 'cashier', 'super_manager'];
         if (!in_array($data['role'], $validRoles)) {
             Response::error('Invalid role', 400);
+        }
+        if (isset($data['status']) && !in_array($data['status'], ['active', 'inactive'], true)) {
+            Response::error('Invalid status', 400);
+        }
+        $this->validatePassword($data['password']);
+        $branchId = isset($data['branch_id']) && $data['branch_id'] !== '' ? intval($data['branch_id']) : null;
+        if (in_array($data['role'], ['manager', 'cashier'], true) && !$branchId) {
+            Response::error('ผู้จัดการและพนักงานขายต้องผูกกับสาขา', 422);
+        }
+        if ($branchId && !$this->db->fetchColumn("SELECT 1 FROM branches WHERE id = ? AND status = 'active'", [$branchId])) {
+            Response::error('ไม่พบสาขาที่เปิดใช้งาน', 422);
         }
 
         // Create user
@@ -40,7 +58,8 @@ class UsersController extends Controller
                 'phone' => $data['phone'],
                 'full_name' => $data['full_name'],
                 'role' => $data['role'],
-                'status' => isset($data['status']) ? $data['status'] : 'active'
+                'status' => isset($data['status']) ? $data['status'] : 'active',
+                'branch_id' => $branchId,
             ]);
 
             // Log activity
@@ -107,6 +126,18 @@ class UsersController extends Controller
                 Response::error('Invalid role', 400);
             }
         }
+        if (isset($data['status']) && !in_array($data['status'], ['active', 'inactive'], true)) {
+            Response::error('Invalid status', 400);
+        }
+
+        $role = $data['role'] ?? null;
+        $branchId = isset($data['branch_id']) && $data['branch_id'] !== '' ? intval($data['branch_id']) : null;
+        if (in_array($role, ['manager', 'cashier'], true) && !$branchId) {
+            Response::error('ผู้จัดการและพนักงานขายต้องผูกกับสาขา', 422);
+        }
+        if ($branchId && !$this->db->fetchColumn("SELECT 1 FROM branches WHERE id = ? AND status = 'active'", [$branchId])) {
+            Response::error('ไม่พบสาขาที่เปิดใช้งาน', 422);
+        }
 
         // Get existing user
         $userModel = new User();
@@ -116,10 +147,17 @@ class UsersController extends Controller
             Response::error('User not found', 404);
         }
 
+        $effectiveRole = $data['role'] ?? $user['role'];
+        $effectiveBranchId = array_key_exists('branch_id', $data) ? $branchId : ($user['branch_id'] ?? null);
+        if (in_array($effectiveRole, ['manager', 'cashier'], true) && !$effectiveBranchId) {
+            Response::error('ผู้จัดการและพนักงานขายต้องผูกกับสาขา', 422);
+        }
+
         // Prevent updating own role or status (admin cannot demote themselves)
         if ((int)$id === (int)$this->user['user_id']) {
             unset($data['role']);
             unset($data['status']);
+            unset($data['branch_id']);
         }
 
         // Check phone uniqueness
@@ -135,6 +173,12 @@ class UsersController extends Controller
 
         // Remove password from update data (use separate endpoint for this)
         unset($data['password']);
+
+        $allowedFields = ['phone', 'full_name', 'role', 'status', 'branch_id'];
+        $data = array_intersect_key($data, array_flip($allowedFields));
+        if (isset($data['branch_id'])) {
+            $data['branch_id'] = $branchId;
+        }
 
         try {
             $userModel->update($id, $data);
@@ -207,10 +251,7 @@ class UsersController extends Controller
         $userId = intval($data['user_id']);
         $newPassword = $data['new_password'];
 
-        // Validate password length
-        if (strlen($newPassword) < 12) {
-            Response::error('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 400);
-        }
+        $this->validatePassword($newPassword);
 
         // Update password
         $userModel = new User();
@@ -337,10 +378,10 @@ class UsersController extends Controller
         $currentPassword = $data['current_password'];
         $newPassword = $data['new_password'];
 
-        // Validate password length
-        if (strlen($newPassword) < 12) {
-            Response::error('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 400);
+        if (!is_string($currentPassword)) {
+            Response::error('Current password must be a string', 400);
         }
+        $this->validatePassword($newPassword);
 
         // Check current password
         $userModel = new User();
@@ -410,6 +451,16 @@ class UsersController extends Controller
         } catch (Exception $e) {
             error_log('Password generation failed: ' . $e->getMessage());
             Response::error('Failed to generate temporary password', 500);
+        }
+    }
+
+    private function validatePassword($password): void
+    {
+        if (!is_string($password)) {
+            Response::error('Password must be a string', 400);
+        }
+        if (mb_strlen($password, 'UTF-8') < 12) {
+            Response::error('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 400);
         }
     }
 }

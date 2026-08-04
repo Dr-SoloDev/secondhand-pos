@@ -58,6 +58,13 @@ class BackupService
                 'message' => 'Upload failed'
             ];
         }
+        if (($uploadedFile['size'] ?? 0) <= 0 || $uploadedFile['size'] > 500 * 1024 * 1024) {
+            return ['success' => false, 'message' => 'Backup file size is invalid'];
+        }
+        $extension = strtolower(pathinfo($uploadedFile['name'], PATHINFO_EXTENSION));
+        if (!in_array($extension, ['sql', 'zip'], true)) {
+            return ['success' => false, 'message' => 'Only SQL or ZIP backups are accepted'];
+        }
 
         if (!file_exists(TEMP_DIR)) {
             mkdir(TEMP_DIR, 0750, true);
@@ -116,11 +123,11 @@ class BackupService
                 $zip->close();
 
                 $sqlFiles = glob($extractPath . '/*.sql');
-                if (empty($sqlFiles)) {
+                if (count($sqlFiles) !== 1) {
                     array_map('unlink', glob($extractPath . '/*'));
                     rmdir($extractPath);
                     unlink($tempFile);
-                    return ['success' => false, 'message' => 'No SQL files found in archive'];
+                    return ['success' => false, 'message' => 'Archive must contain exactly one SQL file'];
                 }
                 // SECURITY: verify extracted SQL file is within expected directory
                 $filePath = $sqlFiles[0];
@@ -144,28 +151,144 @@ class BackupService
             return ['success' => false, 'message' => 'Invalid SQL file'];
         }
 
+        $statements = self::splitSqlStatements($sql);
+        if (empty($statements)) {
+            self::cleanupRestoreFiles($tempFile, $extractPath ?? null);
+            return ['success' => false, 'message' => 'No SQL statements found'];
+        }
+
+        $safetyBackup = self::createBackup();
+        if (empty($safetyBackup['success'])) {
+            self::cleanupRestoreFiles($tempFile, $extractPath ?? null);
+            return ['success' => false, 'message' => 'Safety backup failed; restore aborted'];
+        }
+
         try {
             $db = Database::getInstance();
-            $statements = explode(';', $sql);
             foreach ($statements as $statement) {
-                $statement = trim($statement);
-                if (!empty($statement)) {
-                    $db->getConnection()->exec($statement);
-                }
+                $db->getConnection()->exec($statement);
             }
         } catch (Exception $e) {
             error_log('Backup restore failed: ' . $e->getMessage());
-            unlink($tempFile);
-            return ['success' => false, 'message' => 'Restore failed']; // details logged server-side
+            self::cleanupRestoreFiles($tempFile, $extractPath ?? null);
+            return [
+                'success' => false,
+                'message' => 'Restore failed; safety backup: ' . ($safetyBackup['filename'] ?? 'created'),
+            ];
         }
 
-        if (pathinfo($tempFile, PATHINFO_EXTENSION) === 'zip' && isset($extractPath) && file_exists($extractPath)) {
+        self::cleanupRestoreFiles($tempFile, $extractPath ?? null);
+
+        return ['success' => true, 'safety_backup' => $safetyBackup['filename'] ?? null];
+    }
+
+    private static function splitSqlStatements(string $sql): array
+    {
+        $statements = [];
+        $buffer = '';
+        $delimiter = ';';
+        $quote = null;
+        $lineComment = false;
+        $blockComment = false;
+        $lineStart = true;
+        $length = strlen($sql);
+
+        for ($i = 0; $i < $length; $i++) {
+            if ($lineStart && $quote === null && !$blockComment) {
+                $lineEnd = strpos($sql, "\n", $i);
+                if ($lineEnd === false) $lineEnd = $length;
+                $line = substr($sql, $i, $lineEnd - $i);
+                if (preg_match('/^\s*DELIMITER\s+(\S+)\s*$/i', $line, $match)) {
+                    $delimiter = $match[1];
+                    $i = $lineEnd;
+                    $lineStart = true;
+                    continue;
+                }
+            }
+
+            $char = $sql[$i];
+            $next = $i + 1 < $length ? $sql[$i + 1] : '';
+
+            if ($lineComment) {
+                $buffer .= $char;
+                if ($char === "\n") {
+                    $lineComment = false;
+                    $lineStart = true;
+                }
+                continue;
+            }
+            if ($blockComment) {
+                $buffer .= $char;
+                if ($char === '*' && $next === '/') {
+                    $buffer .= '/';
+                    $i++;
+                    $blockComment = false;
+                }
+                $lineStart = $char === "\n";
+                continue;
+            }
+            if ($quote !== null) {
+                $buffer .= $char;
+                if ($char === '\\' && $i + 1 < $length) {
+                    $buffer .= $sql[++$i];
+                    continue;
+                }
+                if ($char === $quote) {
+                    if ($next === $quote) {
+                        $buffer .= $next;
+                        $i++;
+                    } else {
+                        $quote = null;
+                    }
+                }
+                $lineStart = $char === "\n";
+                continue;
+            }
+
+            if (($char === '-' && $next === '-' && ($i + 2 >= $length || ctype_space($sql[$i + 2]))) || $char === '#') {
+                $lineComment = true;
+                $buffer .= $char;
+                continue;
+            }
+            if ($char === '/' && $next === '*') {
+                $blockComment = true;
+                $buffer .= '/*';
+                $i++;
+                continue;
+            }
+            if ($char === "'" || $char === '"' || $char === '`') {
+                $quote = $char;
+                $buffer .= $char;
+                $lineStart = false;
+                continue;
+            }
+            if (substr($sql, $i, strlen($delimiter)) === $delimiter) {
+                $statement = trim($buffer);
+                if ($statement !== '') $statements[] = $statement;
+                $buffer = '';
+                $i += strlen($delimiter) - 1;
+                $lineStart = false;
+                continue;
+            }
+
+            $buffer .= $char;
+            $lineStart = $char === "\n";
+        }
+
+        $statement = trim($buffer);
+        if ($statement !== '') $statements[] = $statement;
+        return $statements;
+    }
+
+    private static function cleanupRestoreFiles(string $tempFile, ?string $extractPath): void
+    {
+        if ($extractPath && is_dir($extractPath)) {
             array_map('unlink', glob($extractPath . '/*'));
-            rmdir($extractPath);
+            @rmdir($extractPath);
         }
-        unlink($tempFile);
-
-        return ['success' => true];
+        if (is_file($tempFile)) {
+            @unlink($tempFile);
+        }
     }
 
     /**

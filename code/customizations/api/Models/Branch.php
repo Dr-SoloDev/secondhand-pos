@@ -42,21 +42,27 @@ class Branch extends Model
         ]);
     }
 
-    public function getSummary()
+    public function getSummary($branchId = null)
     {
         $sql = "SELECT
                 b.id, b.code, b.name, b.status, b.address, b.phone, b.manager_name,
-                (SELECT COALESCE(SUM(po.total_amount), 0) FROM purchase_orders po WHERE po.branch_id = b.id AND DATE(po.created_at) = CURDATE() AND po.status = 'completed') AS today_purchase_amount,
-                (SELECT COUNT(*) FROM purchase_orders po WHERE po.branch_id = b.id AND DATE(po.created_at) = CURDATE() AND po.status = 'completed') AS today_purchase_count,
-                (SELECT COALESCE(SUM(po.total_amount), 0) FROM purchase_orders po WHERE po.branch_id = b.id AND MONTH(po.created_at) = MONTH(CURDATE()) AND YEAR(po.created_at) = YEAR(CURDATE()) AND po.status = 'completed') AS month_purchase_amount,
-                (SELECT COUNT(*) FROM purchase_orders po WHERE po.branch_id = b.id AND po.status = 'draft') AS pending_po_count,
+                (SELECT COALESCE(SUM(po.total_amount), 0) FROM purchase_orders po WHERE po.branch_id = b.id AND DATE(po.created_at) = CURDATE() AND po.status = 'completed' AND po.source_type = 'manual') AS today_purchase_amount,
+                (SELECT COUNT(*) FROM purchase_orders po WHERE po.branch_id = b.id AND DATE(po.created_at) = CURDATE() AND po.status = 'completed' AND po.source_type = 'manual') AS today_purchase_count,
+                (SELECT COALESCE(SUM(po.total_amount), 0) FROM purchase_orders po WHERE po.branch_id = b.id AND MONTH(po.created_at) = MONTH(CURDATE()) AND YEAR(po.created_at) = YEAR(CURDATE()) AND po.status = 'completed' AND po.source_type = 'manual') AS month_purchase_amount,
+                (SELECT COUNT(*) FROM purchase_orders po WHERE po.branch_id = b.id AND po.status = 'draft' AND po.source_type = 'manual') AS pending_po_count,
                 (SELECT COUNT(*) FROM sale_lots sl WHERE sl.branch_id = b.id AND sl.status = 'draft') AS pending_salelot_count,
                 (SELECT COALESCE(SUM(sl.total_amount), 0) FROM sale_lots sl WHERE sl.branch_id = b.id AND DATE(sl.sale_date) = CURDATE() AND sl.status = 'confirmed') AS today_salelot_amount,
                 (SELECT COALESCE(SUM(sl.total_amount), 0) FROM sale_lots sl WHERE sl.branch_id = b.id AND MONTH(sl.sale_date) = MONTH(CURDATE()) AND YEAR(sl.sale_date) = YEAR(CURDATE()) AND sl.status = 'confirmed') AS month_salelot_amount,
-                (SELECT COALESCE(SUM(c.stock_kg), 0) FROM categories c WHERE c.status = 'active') AS total_stock_kg
+                (SELECT COALESCE(SUM(bs.stock_kg), 0) FROM branch_stock bs WHERE bs.branch_id = b.id) AS total_stock_kg
             FROM {$this->table} b
-            WHERE b.status = 'active'
+            WHERE b.status = 'active'";
+        $params = [];
+        if ($branchId) {
+            $sql .= " AND b.id = ?";
+            $params[] = (int)$branchId;
+        }
+        $sql .= "
             ORDER BY b.code ASC";
-        return $this->db->fetchAll($sql);
+        return $this->db->fetchAll($sql, $params);
     }
 }

@@ -27,6 +27,8 @@ class Router
             'auth/login'             => true,
             'auth/verify'            => true,
             'purchase-orders/photos' => true,  // WF-01: HMAC token auth (no Bearer needed)
+            'purchase-orders/photo-file' => true,
+            'purchase-orders/item-photo-file' => true,
         ];
 
         // Get request URI and method
@@ -62,8 +64,25 @@ class Router
                 Response::error('Invalid or expired token', 401);
             }
 
-            // Store user data
-            $this->user = $decoded;
+            $currentUser = Database::getInstance()->fetch(
+                "SELECT id, username, role, branch_id, status, auth_version
+                 FROM users WHERE id = ?",
+                [(int)($decoded['user_id'] ?? 0)]
+            );
+            if (!$currentUser || $currentUser['status'] !== 'active') {
+                Response::error('User not found or inactive', 401);
+            }
+            if ((int)($decoded['auth_version'] ?? 1) !== (int)($currentUser['auth_version'] ?? 1)) {
+                Response::error('Token has been invalidated', 401);
+            }
+
+            // Authorization is always sourced from the current user record.
+            $this->user = array_merge($decoded, [
+                'user_id' => (int)$currentUser['id'],
+                'username' => $currentUser['username'],
+                'role' => $currentUser['role'],
+                'branch_id' => $currentUser['branch_id'] !== null ? (int)$currentUser['branch_id'] : null,
+            ]);
         }
     }
 
@@ -164,6 +183,7 @@ class Router
         $this->routes[] = ['route' => 'sellers/history', 'controller' => 'SellersController', 'method' => 'getSellerHistory', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'sellers/data-center', 'controller' => 'SellersController', 'method' => 'getSellerDataCenter', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'sellers/photo', 'controller' => 'SellersController', 'method' => 'uploadPhoto', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sellers/photo-view', 'controller' => 'SellersController', 'method' => 'viewPhoto', 'verb' => 'GET'];
 
         // Purchase Orders routes
         $this->routes[] = ['route' => 'purchase-orders', 'controller' => 'PurchaseOrdersController', 'method' => 'getPurchaseOrders', 'verb' => 'GET'];
@@ -178,6 +198,8 @@ class Router
         $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'upload', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'purchase-orders/photos', 'controller' => 'PhotoUploadController', 'method' => 'list',   'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders/photo-token', 'controller' => 'PhotoUploadController', 'method' => 'photoToken', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-orders/photo-file', 'controller' => 'PhotoUploadController', 'method' => 'view', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'purchase-orders/item-photo-file', 'controller' => 'PhotoUploadController', 'method' => 'viewItemPhoto', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'purchase-orders/daily-export', 'controller' => 'PurchaseOrdersController', 'method' => 'exportDaily', 'verb' => 'POST'];
 
         // Item Conditions routes

@@ -16,7 +16,7 @@ class TokenService
      * @param $username
      * @param $role
      */
-    public static function generate($userId, $username, $role, $branchId = null)
+    public static function generate($userId, $username, $role, $branchId = null, $authVersion = 1)
     {
         $issuedAt = time();
         $expiryTime = $issuedAt + JWT_EXPIRY;
@@ -32,6 +32,7 @@ class TokenService
             'username' => $username,
             'role' => $role,
             'branch_id' => $branchId !== null ? (int)$branchId : null,
+            'auth_version' => (int)$authVersion,
         ];
         $payloadEncoded = self::base64urlEncode(json_encode($payload));
 

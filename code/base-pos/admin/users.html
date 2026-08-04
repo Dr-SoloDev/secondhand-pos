@@ -90,6 +90,7 @@
                   <th>ชื่อ-นามสกุล</th>
                   <th>เบอร์โทร</th>
                   <th>บทบาท</th>
+                  <th>สาขา</th>
                   <th>สถานะ</th>
                   <th>เข้าใช้ล่าสุด</th>
                   <th>จัดการ</th>
@@ -178,12 +179,12 @@
           <div class="form-row password-fields">
             <div class="form-col">
               <label for="password">รหัสผ่าน*</label>
-              <input type="password" id="password" class="form-control">
+              <input type="password" id="password" class="form-control" minlength="12">
               <div class="form-hint">เว้นว่างไว้หากไม่ต้องการเปลี่ยน</div>
             </div>
             <div class="form-col">
               <label for="confirmPassword">ยืนยันรหัสผ่าน*</label>
-              <input type="password" id="confirmPassword" class="form-control">
+              <input type="password" id="confirmPassword" class="form-control" minlength="12">
             </div>
           </div>
           <div class="form-row">
@@ -192,6 +193,12 @@
               <select id="status" class="form-control">
                 <option value="active">เปิดใช้งาน</option>
                 <option value="inactive">ปิดใช้งาน</option>
+              </select>
+            </div>
+            <div class="form-col">
+              <label for="branchId">สาขา</label>
+              <select id="branchId" class="form-control">
+                <option value="">ทุกสาขา / ไม่ผูกสาขา</option>
               </select>
             </div>
           </div>
@@ -216,11 +223,11 @@
           <input type="hidden" id="passwordUserId">
           <div class="form-group">
             <label for="newPassword">รหัสผ่านใหม่*</label>
-            <input type="password" id="newPassword" class="form-control" required>
+            <input type="password" id="newPassword" class="form-control" minlength="12" required>
           </div>
           <div class="form-group">
             <label for="confirmNewPassword">ยืนยันรหัสผ่านใหม่*</label>
-            <input type="password" id="confirmNewPassword" class="form-control" required>
+            <input type="password" id="confirmNewPassword" class="form-control" minlength="12" required>
           </div>
         </form>
       </div>

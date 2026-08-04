@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('cancelPassword').addEventListener('click', hidePasswordModal);
   document.getElementById('closeResetPassword').addEventListener('click', hideResetPasswordModal);
   document.getElementById('copyPasswordBtn').addEventListener('click', copyPassword);
+  document.getElementById('role').addEventListener('change', updateBranchRequirement);
 
   // Close modals when clicking on X
   document.querySelectorAll('.close-modal').forEach(button => {
@@ -28,6 +29,7 @@ let users = [];
 let currentPage = 1;
 let totalPages = 1;
 let itemsPerPage = 10;
+let branches = [];
 
 // Initialize user management
 async function initUserManagement() {
@@ -43,8 +45,7 @@ async function initUserManagement() {
       }
     }
 
-    // Load users
-    await loadUsers();
+    await Promise.all([loadBranches(), loadUsers()]);
 
     // Load initial activity log
     loadActivityLog();
@@ -54,10 +55,23 @@ async function initUserManagement() {
   }
 }
 
+async function loadBranches() {
+  const response = await apiRequest('branches/active');
+  if (response.status !== 'success') return;
+  branches = response.data || [];
+  const select = document.getElementById('branchId');
+  branches.forEach(branch => {
+    const option = document.createElement('option');
+    option.value = branch.id;
+    option.textContent = `${branch.code} - ${branch.name}`;
+    select.appendChild(option);
+  });
+}
+
 // Load users from API
 async function loadUsers() {
   try {
-    showTableLoading(document.querySelector('#usersTable tbody'), 7, 5);
+    showTableLoading(document.querySelector('#usersTable tbody'), 8, 5);
     const response = await apiRequest('users/all');
 
     if (response.status === 'success') {
@@ -80,7 +94,7 @@ function renderUsers(usersToRender) {
 
   if (usersToRender.length === 0) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="7" class="text-center">ไม่พบผู้ใช้</td>';
+    row.innerHTML = '<td colspan="8" class="text-center">ไม่พบผู้ใช้</td>';
     tableBody.appendChild(row);
     return;
   }
@@ -92,10 +106,11 @@ function renderUsers(usersToRender) {
     const lastLogin = user.last_login ? new Date(user.last_login.replace(' ', 'T')).toLocaleString() : '-';
 
     row.innerHTML = `
-      <td>${user.username}</td>
-      <td>${user.full_name}</td>
-      <td>${user.phone || '-'}</td>
-      <td><span class="badge badge-info">${user.role}</span></td>
+      <td>${escapeHtml(user.username)}</td>
+      <td>${escapeHtml(user.full_name)}</td>
+      <td>${escapeHtml(user.phone || '-')}</td>
+      <td><span class="badge badge-info">${escapeHtml(user.role)}</span></td>
+      <td>${escapeHtml(user.branch_name || '-')}</td>
       <td>
         <span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-danger'}">
           ${user.status}
@@ -220,6 +235,7 @@ function showAddUserModal() {
 
   // Set default status to active
   document.getElementById('status').value = 'active';
+  updateBranchRequirement();
 
   // Show modal
   document.getElementById('userModal').classList.add('show');
@@ -240,7 +256,9 @@ async function editUser(userId) {
       document.getElementById('phone').value = user.phone || '';
       document.getElementById('fullName').value = user.full_name;
       document.getElementById('role').value = user.role;
+      document.getElementById('branchId').value = user.branch_id || '';
       document.getElementById('status').value = user.status;
+      updateBranchRequirement();
 
       // Hide password fields
       document.querySelector('.password-fields').style.display = 'none';
@@ -291,6 +309,10 @@ async function saveUser() {
         showNotification('รหัสผ่านไม่ตรงกัน', 'error');
         return;
       }
+      if (password.length < 12) {
+        showNotification('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 'error');
+        return;
+      }
     }
 
     // Gather form data
@@ -299,7 +321,8 @@ async function saveUser() {
       phone: document.getElementById('phone').value,
       full_name: document.getElementById('fullName').value,
       role: document.getElementById('role').value,
-      status: document.getElementById('status').value
+      status: document.getElementById('status').value,
+      branch_id: document.getElementById('branchId').value || null
     };
 
     // Add password for new users
@@ -328,6 +351,11 @@ async function saveUser() {
     console.error('Error saving user:', error);
     showNotification('บันทึกผู้ใช้ไม่สำเร็จ', 'error');
   }
+}
+
+function updateBranchRequirement() {
+  const role = document.getElementById('role').value;
+  document.getElementById('branchId').required = role === 'manager' || role === 'cashier';
 }
 
 // Delete user
@@ -495,13 +523,17 @@ function renderActivityLog(logs) {
     // Format date
     const date = new Date(log.created_at.replace(' ', 'T')).toLocaleString();
 
-    row.innerHTML = `
-      <td>${log.username}</td>
-      <td>${log.action}</td>
-      <td>${log.description || '-'}</td>
-      <td>${log.ip_address}</td>
-      <td>${date}</td>
-    `;
+    [
+      log.username,
+      log.action,
+      log.description || '-',
+      log.ip_address,
+      date
+    ].forEach(value => {
+      const cell = document.createElement('td');
+      cell.textContent = value == null ? '' : String(value);
+      row.appendChild(cell);
+    });
 
     tableBody.appendChild(row);
   });

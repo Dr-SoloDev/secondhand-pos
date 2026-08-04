@@ -2,6 +2,7 @@
 class Idempotency
 {
     private $db;
+    private $lockName;
 
     public function __construct()
     {
@@ -23,6 +24,19 @@ class Idempotency
         }
     }
 
+    public function acquire($key, $endpoint)
+    {
+        $key = trim((string)$key);
+        if ($key === '' || strlen($key) > 64) {
+            throw new Exception('Invalid idempotency key');
+        }
+        $this->lockName = hash('sha256', $endpoint . ':' . $key);
+        $acquired = (int)$this->db->fetchColumn('SELECT GET_LOCK(?, 10)', [$this->lockName]);
+        if ($acquired !== 1) {
+            throw new Exception('คำขอเดิมกำลังประมวลผล กรุณาลองใหม่');
+        }
+    }
+
     public function save($key, $endpoint, $responseData)
     {
         $this->db->insert('idempotency_keys', [
@@ -30,6 +44,14 @@ class Idempotency
             'endpoint' => $endpoint,
             'response_json' => json_encode($responseData),
         ]);
+    }
+
+    public function release()
+    {
+        if ($this->lockName !== null) {
+            $this->db->fetchColumn('SELECT RELEASE_LOCK(?)', [$this->lockName]);
+            $this->lockName = null;
+        }
     }
 
     public function cleanup()

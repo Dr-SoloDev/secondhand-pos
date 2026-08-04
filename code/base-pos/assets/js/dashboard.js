@@ -42,7 +42,7 @@ async function fetchDashboardData(branchId = null) {
     apiRequest('branches/summary'),
     apiRequest(`reports/recent-purchases${branchId ? '?branch_id=' + branchId : ''}`),
     apiRequest(`reports/recent-sale-lots${branchId ? '?branch_id=' + branchId : ''}`),
-    apiRequest(`inventory/low-stock${branchId ? '?branch_id=' + branchId : ''}`),
+    apiRequest(`inventory/stock-alerts${branchId ? '?branch_id=' + branchId : ''}`),
   ]);
 
   // Remove loading skeletons
@@ -53,14 +53,17 @@ async function fetchDashboardData(branchId = null) {
   if (branchRes.status === 'success') {
     allBranches = branchRes.data || [];
     buildBranchSingleButtons(allBranches);
-    renderBranchSummary(allBranches, currentBranchMode === 'side' ? 'side' : 'all');
+    const visibleBranches = currentBranchId
+      ? allBranches.filter(branch => Number(branch.id) === Number(currentBranchId))
+      : allBranches;
+    renderBranchSummary(visibleBranches, currentBranchMode === 'side' ? 'side' : 'all');
   }
   else if (branchRes.message) showNotification('โหลดข้อมูลสาขาไม่สำเร็จ', 'error');
   if (purchaseRes.status === 'success') renderRecentPurchases(purchaseRes.data);
   else if (purchaseRes.message) showNotification('โหลดรายการรับซื้อไม่สำเร็จ', 'error');
   if (salelotRes.status === 'success') renderRecentSaleLots(salelotRes.data);
   else if (salelotRes.message) showNotification('โหลดรายการขาย Lot ไม่สำเร็จ', 'error');
-  if (stockRes.status === 'success') renderLowStockItems(stockRes.data);
+  if (stockRes.status === 'success') renderLowStockItems(stockRes.data?.items || []);
   else if (stockRes.message) showNotification('โหลดสต็อกไม่สำเร็จ', 'error');
 
   // อัปเดตเวลาที่ดึงข้อมูลล่าสุด
@@ -188,7 +191,8 @@ function renderBranchSummary(branches, mode) {
 }
 
 async function fetchPurchaseChartData(period) {
-  const res = await apiRequest(`reports/purchase-chart?period=${period}`);
+  const branchParam = currentBranchId ? `&branch_id=${currentBranchId}` : '';
+  const res = await apiRequest(`reports/purchase-chart?period=${period}${branchParam}`);
   if (res.status === 'success') renderPurchaseChart(res.data, period);
   else document.getElementById('purchaseChart').innerHTML = '<div class="chart-placeholder" style="color:#ef4444">โหลดกราฟไม่สำเร็จ</div>';
 }
@@ -218,7 +222,8 @@ function renderPurchaseChart(data, period) {
 }
 
 async function fetchSalelotChartData(period) {
-  const res = await apiRequest(`reports/sale-lot-chart?period=${period}`);
+  const branchParam = currentBranchId ? `&branch_id=${currentBranchId}` : '';
+  const res = await apiRequest(`reports/sale-lot-chart?period=${period}${branchParam}`);
   if (res.status === 'success') renderSalelotDashboardChart(res.data, period);
   else document.getElementById('salelotDashboardChart').innerHTML = '<div class="chart-placeholder" style="color:#ef4444">โหลดกราฟไม่สำเร็จ</div>';
 }
@@ -290,11 +295,11 @@ function renderLowStockItems(items) {
   const tbody = document.querySelector('#lowStockTable tbody');
   if (!items.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center">ไม่มีสินค้าใกล้หมด</td></tr>'; return; }
   tbody.innerHTML = items.map(item => `<tr>
-    <td>${escapeHtml(item.sku)}</td>
-    <td>${escapeHtml(item.name)}</td>
+    <td>${escapeHtml(item.branch_name || '-')}</td>
+    <td>${escapeHtml(item.item_name)}</td>
     <td>${escapeHtml(item.category_name)}</td>
-    <td class="${item.quantity <= 0 ? 'text-danger' : 'text-warning'}">${item.quantity}</td>
-    <td>${item.low_stock_threshold}</td>
+    <td class="${Number(item.stock_kg) <= 0 ? 'text-danger' : 'text-warning'}">${formatNumber(item.stock_kg)} กก.</td>
+    <td>${item.alert_threshold == null ? '0' : formatNumber(item.alert_threshold)} กก.</td>
     <td><a href="inventory.html" class="btn btn-sm btn-info">ดูสต็อก</a></td>
   </tr>`).join('');
 }

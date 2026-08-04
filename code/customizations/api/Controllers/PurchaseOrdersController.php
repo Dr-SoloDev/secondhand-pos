@@ -142,7 +142,12 @@ class PurchaseOrdersController extends Controller
         $idempotencyKey = $data['idempotency_key'] ?? null;
         if ($idempotencyKey) {
             $idemp = new Idempotency();
-            $idemp->check($idempotencyKey, 'purchase-orders');
+            try {
+                $idemp->acquire($idempotencyKey, 'purchase-orders');
+                $idemp->check($idempotencyKey, 'purchase-orders');
+            } catch (Exception $e) {
+                Response::error($e->getMessage(), 409);
+            }
         }
 
         $this->validateRequiredFields($data, ['branch_id', 'seller_id', 'items']);
@@ -160,12 +165,24 @@ class PurchaseOrdersController extends Controller
             Response::error('ต้องระบุรายการสินค้าอย่างน้อย 1 รายการ', 400);
         }
 
+        if (isset($data['status']) && $data['status'] !== 'completed') {
+            Response::error('สถานะใบรับซื้อถูกกำหนดโดยระบบเท่านั้น', 422);
+        }
+        if (isset($data['payment_status']) && $data['payment_status'] !== 'paid') {
+            Response::error('สถานะการชำระเงินถูกกำหนดโดยระบบเท่านั้น', 422);
+        }
+
+        $paymentMethod = $data['payment_method'] ?? 'cash';
+        if (!in_array($paymentMethod, ['cash', 'bank_transfer'], true)) {
+            Response::error('วิธีชำระเงินไม่ถูกต้อง', 422);
+        }
+
         $cleanData = [
             'branch_id' => intval($data['branch_id']),
             'seller_id' => intval($data['seller_id']),
-            'payment_method' => $data['payment_method'] ?? 'cash',
-            'payment_status' => $data['payment_status'] ?? 'paid',
-            'status' => $data['status'] ?? 'completed',
+            'payment_method' => $paymentMethod,
+            'payment_status' => 'paid',
+            'status' => 'completed',
             'notes' => isset($data['notes']) ? trim((string)$data['notes']) : null,
             'vehicle_type' => !empty($data['vehicle_type']) ? trim((string)$data['vehicle_type']) : null,
             'vehicle_plate' => !empty($data['vehicle_plate']) ? trim((string)$data['vehicle_plate']) : null,
@@ -247,6 +264,7 @@ class PurchaseOrdersController extends Controller
             $result = $model->createWithItems($cleanData, $cleanItems, $this->user['user_id']);
             if ($idempotencyKey) {
                 $idemp->save($idempotencyKey, 'purchase-orders', ['id' => $result['id'], 'reference_no' => $result['reference_no']]);
+                $idemp->release();
             }
 
             Logger::logActivity(
@@ -256,6 +274,9 @@ class PurchaseOrdersController extends Controller
             );
             Response::success('สร้างใบรับซื้อสำเร็จ', $result);
         } catch (Exception $e) {
+            if ($idempotencyKey && isset($idemp)) {
+                $idemp->release();
+            }
             error_log('PurchaseOrder create failed: ' . $e->getMessage());
             $businessMessage = $this->safeBusinessMessage($e);
             if ($businessMessage !== null) {
@@ -350,7 +371,7 @@ class PurchaseOrdersController extends Controller
             LEFT JOIN sellers s ON po.seller_id = s.id
             LEFT JOIN users u ON po.user_id = u.id
             LEFT JOIN branches b ON po.branch_id = b.id
-            WHERE DATE(po.created_at) = ? AND po.status != 'cancelled' $bWhere
+            WHERE DATE(po.created_at) = ? AND po.status = 'completed' AND po.source_type = 'manual' $bWhere
             ORDER BY po.created_at ASC",
             $params
         );
@@ -368,7 +389,7 @@ class PurchaseOrdersController extends Controller
                 pi.price_tier
             FROM purchase_order_items pi
             JOIN purchase_orders po ON pi.purchase_order_id = po.id
-            WHERE DATE(po.created_at) = ? AND po.status != 'cancelled' $bWhere
+            WHERE DATE(po.created_at) = ? AND po.status = 'completed' AND po.source_type = 'manual' $bWhere
             ORDER BY po.created_at ASC, po.reference_no ASC, pi.id ASC",
             $params
         );

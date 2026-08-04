@@ -22,7 +22,8 @@ class ReportService
             "SELECT COALESCE(SUM(total_amount), 0) as total
               FROM purchase_orders
               WHERE DATE(created_at) = CURDATE()
-              AND status != 'cancelled'" . $bWhere,
+              AND status = 'completed'
+              AND source_type = 'manual'" . $bWhere,
             $branchId ? [$branchId] : []
         );
 
@@ -31,7 +32,8 @@ class ReportService
             "SELECT COUNT(*)
               FROM purchase_orders
               WHERE DATE(created_at) = CURDATE()
-              AND status != 'cancelled'" . $bWhere,
+              AND status = 'completed'
+              AND source_type = 'manual'" . $bWhere,
             $branchId ? [$branchId] : []
         );
 
@@ -44,7 +46,7 @@ class ReportService
         $pendingPO = $this->db->fetchColumn(
             "SELECT COUNT(*)
               FROM purchase_orders
-              WHERE status = 'draft'" . $bWhere,
+              WHERE status = 'draft' AND source_type = 'manual'" . $bWhere,
             $branchId ? [$branchId] : []
         );
 
@@ -57,12 +59,14 @@ class ReportService
             $branchId ? [$branchId] : []
         );
 
-        // Low stock count (retail products)
+        // Low stock count from branch_stock, the scrap inventory source of truth.
+        $lowStockBranch = $branchId ? ' AND bs.branch_id = ?' : '';
         $lowStockCount = $this->db->fetchColumn(
             "SELECT COUNT(*)
-              FROM products
-              WHERE quantity <= low_stock_threshold
-              AND status = 'active'" . $bWhere,
+              FROM branch_stock bs
+              INNER JOIN categories c ON c.id = bs.category_id
+              WHERE ((c.alert_threshold IS NOT NULL AND bs.stock_kg <= c.alert_threshold)
+                 OR (c.alert_threshold IS NULL AND bs.stock_kg <= 0))" . $lowStockBranch,
             $branchId ? [$branchId] : []
         );
 
@@ -142,7 +146,7 @@ class ReportService
             LEFT JOIN sellers s ON po.seller_id = s.id
             LEFT JOIN users u ON po.user_id = u.id
             LEFT JOIN branches b ON po.branch_id = b.id
-            WHERE 1=1 $branchFilter
+            WHERE po.status = 'completed' AND po.source_type = 'manual' $branchFilter
             ORDER BY po.created_at DESC
             LIMIT ?",
             $params
@@ -165,7 +169,8 @@ class ReportService
                     FROM purchase_orders
                     WHERE
                         created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-                        AND status != 'cancelled'
+                        AND status = 'completed'
+                        AND source_type = 'manual'
                         $branchFilter
                     GROUP BY DATE(created_at)
                     ORDER BY po_date ASC",
@@ -195,7 +200,8 @@ class ReportService
                     WHERE
                         MONTH(created_at) = MONTH(CURDATE())
                         AND YEAR(created_at) = YEAR(CURDATE())
-                        AND status != 'cancelled'
+                        AND status = 'completed'
+                        AND source_type = 'manual'
                         $branchFilter
                     GROUP BY DATE(created_at)
                     ORDER BY po_date ASC",
@@ -225,7 +231,8 @@ class ReportService
                     FROM purchase_orders
                     WHERE
                         YEAR(created_at) = YEAR(CURDATE())
-                        AND status != 'cancelled'
+                        AND status = 'completed'
+                        AND source_type = 'manual'
                         $branchFilter
                     GROUP BY po_month
                     ORDER BY po_month ASC",
@@ -819,7 +826,8 @@ class ReportService
             FROM purchase_orders po
             WHERE
                 DATE(po.created_at) BETWEEN ? AND ?
-                AND po.status != 'cancelled'
+                AND po.status = 'completed'
+                AND po.source_type = 'manual'
                 $branchFilter
             GROUP BY {$groupFormat}
             ORDER BY {$labelFormat} ASC",
@@ -894,6 +902,7 @@ class ReportService
              JOIN purchase_orders po ON po.id = poi.purchase_order_id
              LEFT JOIN categories c ON c.id = poi.category_id
              WHERE po.status = 'completed'
+               AND po.source_type = 'manual'
                AND DATE(po.created_at) BETWEEN ? AND ?
                $branchFilter
              GROUP BY
@@ -920,6 +929,7 @@ class ReportService
              FROM purchase_order_items poi
              JOIN purchase_orders po ON po.id = poi.purchase_order_id
              WHERE po.status = 'completed'
+               AND po.source_type = 'manual'
                AND DATE(po.created_at) BETWEEN ? AND ?
                $branchFilter",
             $params

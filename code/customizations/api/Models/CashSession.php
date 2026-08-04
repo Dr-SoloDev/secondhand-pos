@@ -52,6 +52,22 @@ class CashSession extends Model
             [$branchId]
         );
         if (!$row) {
+            $row = $this->db->fetch(
+                "SELECT cs.*, b.name AS branch_name
+                 FROM cash_sessions cs JOIN branches b ON b.id = cs.branch_id
+                 WHERE cs.branch_id = ?
+                   AND cs.status IN ('pending_open','open','pending_close')
+                 ORDER BY cs.business_date DESC LIMIT 1",
+                [$branchId]
+            );
+            if ($row) {
+                $row['ledger_total'] = $this->movementTotal((int)$row['id']);
+                $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
+                $row['movements'] = $this->getMovements((int)$row['id']);
+                $row['is_stale'] = true;
+                return $row;
+            }
+
             // No session yet today — still return expected carry-forward so the open form can show it.
             $branchName = $this->db->fetchColumn(
                 "SELECT name FROM branches WHERE id = ?",
@@ -213,7 +229,8 @@ class CashSession extends Model
         try {
             $session = $this->db->fetch(
                 "SELECT * FROM cash_sessions
-                 WHERE branch_id=? AND business_date=CURDATE() FOR UPDATE",
+                 WHERE branch_id=? AND status='open'
+                 ORDER BY business_date DESC LIMIT 1 FOR UPDATE",
                 [$branchId]
             );
             if (!$session || $session['status'] !== 'open') {
@@ -292,10 +309,36 @@ class CashSession extends Model
             if ($session['business_date'] !== date('Y-m-d')) {
                 throw new Exception('เปิดยอดใหม่ได้เฉพาะวันเดียวกัน หลังเปลี่ยนวันให้ใช้เอกสารปรับปรุง');
             }
+            $currentExpected = round(
+                (float)$session['opening_actual'] + $this->movementTotal($sessionId),
+                2
+            );
+            $closingActual = round((float)$session['closing_actual'], 2);
+            $rebaseAmount = round($closingActual - $currentExpected, 2);
             $this->db->query(
-                "UPDATE cash_sessions SET status='open', last_reviewed_by=?, last_reviewed_at=NOW(), last_review_note=? WHERE id=?",
+                "UPDATE cash_sessions
+                 SET status='open', closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
+                     closing_requested_by=NULL, closed_by=NULL, closed_at=NULL,
+                     last_reviewed_by=?, last_reviewed_at=NOW(), last_review_note=?
+                 WHERE id=?",
                 [$adminId, $reason, $sessionId]
             );
+            if (abs($rebaseAmount) > 0.009) {
+                $this->db->query(
+                    "INSERT INTO cash_movements
+                       (cash_session_id,branch_id,direction,movement_type,amount,reference_type,reference_id,description,recorded_by)
+                     VALUES (?,?,?,?,?,'cash_session_reopen',NULL,?,?)",
+                    [
+                        $sessionId,
+                        (int)$session['branch_id'],
+                        $rebaseAmount > 0 ? 'in' : 'out',
+                        'session_reopen_rebase',
+                        abs($rebaseAmount),
+                        'ปรับฐานยอดหลังเปิดรอบใหม่จากยอดปิดที่อนุมัติ',
+                        $adminId,
+                    ]
+                );
+            }
             $this->addEvent($sessionId, 'reopened', (float)$session['closing_expected'],
                 (float)$session['closing_actual'], (float)$session['closing_variance'], $reason, $adminId, $adminId);
             $this->db->commit();

@@ -1,7 +1,7 @@
 <?php
 class AuthController extends Controller
 {
-    private const DEFAULT_LOGIN_MAX_ATTEMPTS = 0;
+    private const DEFAULT_LOGIN_MAX_ATTEMPTS = 5;
     private const DEFAULT_LOGIN_LOCKOUT_SECONDS = 120;
 
     private function getLoginMaxAttempts()
@@ -34,11 +34,31 @@ class AuthController extends Controller
         return ceil($seconds / 60) . ' นาที';
     }
 
-    private function checkRateLimit()
+    private function clientIp()
     {
-        $ip = ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown';
+        $remote = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        if (getenv('TRUST_PROXY') !== 'true') {
+            return $remote;
+        }
+        $forwarded = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '');
+        $candidate = trim($forwarded[0] ?? '');
+        return filter_var($candidate, FILTER_VALIDATE_IP) ? $candidate : $remote;
+    }
+
+    private function normalizeRateLimitUsername($username)
+    {
+        return mb_strtolower(trim($username), 'UTF-8');
+    }
+
+    private function checkRateLimit($username)
+    {
+        $ip = $this->clientIp();
+        $rateLimitUsername = $this->normalizeRateLimitUsername($username);
         $db = Database::getInstance();
-        $row = $db->fetch("SELECT attempts, window_start FROM login_attempts WHERE ip = ?", [$ip]);
+        $row = $db->fetch(
+            "SELECT attempts, window_start FROM login_attempts WHERE ip = ? AND username = ?",
+            [$ip, $rateLimitUsername]
+        );
         $maxAttempts = $this->getLoginMaxAttempts();
         if ($maxAttempts <= 0) {
             return;
@@ -55,28 +75,33 @@ class AuthController extends Controller
         }
     }
 
-    private function recordFailedAttempt()
+    private function recordFailedAttempt($username)
     {
         if ($this->getLoginMaxAttempts() <= 0) {
             return;
         }
 
-        $ip = ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown';
+        $ip = $this->clientIp();
+        $rateLimitUsername = $this->normalizeRateLimitUsername($username);
         $db = Database::getInstance();
         $lockoutSeconds = $this->getLoginLockoutSeconds();
         $db->query(
-            "INSERT INTO login_attempts (ip, attempts, window_start) VALUES (?, 1, NOW())
+            "INSERT INTO login_attempts (ip, username, attempts, window_start) VALUES (?, ?, 1, NOW())
              ON DUPLICATE KEY UPDATE
                attempts = IF(window_start < NOW() - INTERVAL {$lockoutSeconds} SECOND, 1, attempts + 1),
                window_start = IF(window_start < NOW() - INTERVAL {$lockoutSeconds} SECOND, NOW(), window_start)",
-            [$ip]
+            [$ip, $rateLimitUsername]
         );
     }
 
-    private function clearRateLimit()
+    private function clearRateLimit($username)
     {
-        $ip = ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown';
-        Database::getInstance()->query("DELETE FROM login_attempts WHERE ip = ?", [$ip]);
+        $ip = $this->clientIp();
+        $rateLimitUsername = $this->normalizeRateLimitUsername($username);
+        Database::getInstance()->query(
+            "DELETE FROM login_attempts WHERE ip = ? AND username = ?",
+            [$ip, $rateLimitUsername]
+        );
     }
 
     public function login()
@@ -86,37 +111,47 @@ class AuthController extends Controller
 
         // Validate input
         $this->validateRequiredFields($data, ['username', 'password']);
+        if (!is_string($data['username']) || !is_string($data['password'])) {
+            Response::error('Username and password must be strings', 400);
+            exit;
+        }
 
-        $username = $this->sanitizeInput($data['username']);
+        $username = $this->sanitizeInput($data['username'], 50);
         $password = $data['password'];
 
         // Check rate limit
-        $this->checkRateLimit();
+        $this->checkRateLimit($username);
 
         // Check user
         $userModel = new User();
         $user = $userModel->findByUsername($username);
 
         if (!$user || !password_verify($password, $user['password'])) {
-            $this->recordFailedAttempt();
-            error_log("Failed login attempt for username: {$username} from IP: " . (($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown'));
+            $this->recordFailedAttempt($username);
+            error_log("Failed login attempt for username: {$username} from IP: " . $this->clientIp());
             Response::error('Invalid username or password', 401);
             exit;
         }
 
         if ($user['status'] !== 'active') {
-            $this->recordFailedAttempt();
-            error_log("Inactive account login attempt for username: {$username} from IP: " . (($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR']) ?? 'unknown'));
+            $this->recordFailedAttempt($username);
+            error_log("Inactive account login attempt for username: {$username} from IP: " . $this->clientIp());
             Response::error('Account is inactive', 403);
             exit;
         }
 
         // Clear rate limit on success
-        $this->clearRateLimit();
+        $this->clearRateLimit($username);
         TokenService::pruneExpired();
 
         // Generate token
-        $token = TokenService::generate($user['id'], $user['username'], $user['role'], $user['branch_id'] ?? null);
+        $token = TokenService::generate(
+            $user['id'],
+            $user['username'],
+            $user['role'],
+            $user['branch_id'] ?? null,
+            $user['auth_version'] ?? 1
+        );
 
         // Log activity
         Logger::logActivity($user['id'], 'login', 'User logged in successfully');
@@ -173,6 +208,10 @@ class AuthController extends Controller
 
         if (!$user || $user['status'] !== 'active') {
             Response::error('User not found or inactive', 401);
+            exit;
+        }
+        if ((int)($decoded['auth_version'] ?? 1) !== (int)($user['auth_version'] ?? 1)) {
+            Response::error('Token has been invalidated', 401);
             exit;
         }
 

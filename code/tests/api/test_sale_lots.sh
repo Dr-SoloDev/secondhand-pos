@@ -62,4 +62,24 @@ test_sale_lots() {
     }]
   }")
   assert_contains "$fail_res" '"status":"error"' "Create sale lot without category rejected"
+
+  local negative_price negative_transport negative_expense
+  negative_price=$(api_post "sale-lots" "{
+    \"branch_id\":$branch_id,\"buyer_name\":\"Negative Price\",\"sale_date\":\"$(date +%Y-%m-%d)\",
+    \"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":-1}]
+  }")
+  assert_contains "$negative_price" '"status":"error"' "Sale lot rejects negative unit price"
+
+  negative_transport=$(api_post "sale-lots" "{
+    \"branch_id\":$branch_id,\"buyer_name\":\"Negative Transport\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"transport_cost\":-1,
+    \"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":1}]
+  }")
+  assert_contains "$negative_transport" '"status":"error"' "Sale lot rejects negative transport cost"
+
+  negative_expense=$(api_post "sale-lots" "{
+    \"branch_id\":$branch_id,\"buyer_name\":\"Negative Expense\",\"sale_date\":\"$(date +%Y-%m-%d)\",
+    \"expenses\":[{\"description\":\"invalid\",\"amount\":-1}],
+    \"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":1}]
+  }")
+  assert_contains "$negative_expense" '"status":"error"' "Sale lot rejects negative expense"
 }

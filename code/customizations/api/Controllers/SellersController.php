@@ -11,6 +11,10 @@ class SellersController extends Controller
         $includeBlacklisted = isset($_GET['include_blacklisted']) && $_GET['include_blacklisted'] === 'true';
         
         $sellers = $sellerModel->getAll($includeBlacklisted);
+        foreach ($sellers as &$seller) {
+            $seller = $this->withProtectedSellerPhoto($seller);
+        }
+        unset($seller);
         Response::success('ดึงข้อมูลผู้ขายสำเร็จ', $sellers);
     }
 
@@ -33,7 +37,7 @@ class SellersController extends Controller
             Response::error('ไม่พบผู้ขายนี้', 404);
         }
 
-        Response::success('ดึงข้อมูลผู้ขายสำเร็จ', $seller);
+        Response::success('ดึงข้อมูลผู้ขายสำเร็จ', $this->withProtectedSellerPhoto($seller));
     }
 
     /**
@@ -53,6 +57,10 @@ class SellersController extends Controller
 
         $sellerModel = new Seller();
         $results = $sellerModel->search($keyword, $includeBlacklisted);
+        foreach ($results as &$seller) {
+            $seller = $this->withProtectedSellerPhoto($seller);
+        }
+        unset($seller);
 
         Response::success('ค้นหาสำเร็จ', $results);
     }
@@ -70,6 +78,7 @@ class SellersController extends Controller
         if (empty($data['full_name'])) {
             Response::error('กรุณาระบุชื่อ-นามสกุล', 400);
         }
+        $data['full_name'] = $this->sanitizeInput($data['full_name'], 150);
 
         // Validate เลขบัตรประชาชน (ถ้ามี)
         if (!empty($data['id_card'])) {
@@ -290,7 +299,9 @@ class SellersController extends Controller
                 'unit_price'      => $item['unit_price'],
                 'total_price'     => $item['total_price'],
                 'category_name'   => $item['category_name'] ?? '',
-                'photo_path'      => $item['photo_path'] ?? null,
+                'photo_path'      => !empty($item['photo_path'])
+                    ? $this->protectedItemPhotoUrl((int)$item['id'])
+                    : null,
                 'notes'           => $item['notes'] ?? '',
             ];
         }
@@ -305,7 +316,7 @@ class SellersController extends Controller
             if (!isset($photosByPo[$poId])) $photosByPo[$poId] = [];
             $photosByPo[$poId][] = [
                 'id'         => $photo['id'],
-                'photo_path' => $photo['photo_path'],
+                'photo_path' => $this->protectedPurchasePhotoUrl((int)$photo['id']),
                 'is_primary' => $photo['is_primary'],
                 'item_id'    => $itemId,
             ];
@@ -315,7 +326,7 @@ class SellersController extends Controller
                 if (!isset($photosByItem[$itemId])) $photosByItem[$itemId] = [];
                 $photosByItem[$itemId][] = [
                     'id'         => $photo['id'],
-                    'photo_path' => $photo['photo_path'],
+                    'photo_path' => $this->protectedPurchasePhotoUrl((int)$photo['id']),
                     'is_primary' => $photo['is_primary'],
                 ];
             }
@@ -364,13 +375,13 @@ class SellersController extends Controller
             if ($po['status'] === 'completed') {
                 $totalPos++;
                 $totalAmount += $amount;
-            }
-            $totalItemsSold += intval($po['total_items']);
-            if ($firstTransaction === null || $po['created_at'] < $firstTransaction) {
-                $firstTransaction = $po['created_at'];
-            }
-            if ($lastTransaction === null || $po['created_at'] > $lastTransaction) {
-                $lastTransaction = $po['created_at'];
+                $totalItemsSold += intval($po['total_items']);
+                if ($firstTransaction === null || $po['created_at'] < $firstTransaction) {
+                    $firstTransaction = $po['created_at'];
+                }
+                if ($lastTransaction === null || $po['created_at'] > $lastTransaction) {
+                    $lastTransaction = $po['created_at'];
+                }
             }
         }
 
@@ -384,7 +395,9 @@ class SellersController extends Controller
                 'address'            => $seller['address'] ?? '',
                 'vehicle_plate'      => $seller['vehicle_plate'] ?? '',
                 'vehicle_type'       => $seller['vehicle_type'] ?? '',
-                'id_card_photo'      => $seller['id_card_photo'] ?? '',
+                'id_card_photo'      => !empty($seller['id_card_photo'])
+                    ? $this->protectedSellerPhotoUrl((int)$seller['id'])
+                    : '',
                 'pdpa_consented_at'  => $seller['pdpa_consented_at'] ?? null,
                 'is_blacklisted'     => $seller['is_blacklisted'] ?? 0,
                 'blacklist_reason'   => $seller['blacklist_reason'] ?? '',
@@ -564,9 +577,37 @@ class SellersController extends Controller
         );
 
         Response::success('อัปโหลดรูปบัตรสำเร็จ', [
-            'photo_url' => $urlPath,
+            'photo_url' => $this->protectedSellerPhotoUrl($id),
             'seller_id' => $id,
         ]);
+    }
+
+    public function viewPhoto($id = null)
+    {
+        $this->requireAuth(['admin', 'manager', 'super_manager', 'cashier']);
+        $id = intval($id ?? ($_GET['id'] ?? 0));
+        $seller = (new Seller())->getById($id);
+        if (!$seller || empty($seller['id_card_photo'])) {
+            Response::error('ไม่พบรูปบัตรผู้ขาย', 404);
+        }
+
+        $storedPath = (string)$seller['id_card_photo'];
+        $prefix = '/uploads/sellers/';
+        if (strpos($storedPath, $prefix) !== 0) {
+            Response::error('Invalid image path', 404);
+        }
+        $baseDir = realpath(UPLOAD_DIR . '/sellers');
+        $filePath = realpath(UPLOAD_DIR . substr($storedPath, strlen('/uploads')));
+        if (!$baseDir || !$filePath || strpos($filePath, $baseDir . DIRECTORY_SEPARATOR) !== 0 || !is_file($filePath)) {
+            Response::error('ไม่พบไฟล์รูปบัตรผู้ขาย', 404);
+        }
+
+        header('Content-Type: image/jpeg');
+        header('Content-Length: ' . filesize($filePath));
+        header('Cache-Control: private, no-store, max-age=0');
+        header('X-Content-Type-Options: nosniff');
+        readfile($filePath);
+        exit;
     }
 
     /**
@@ -613,5 +654,28 @@ class SellersController extends Controller
         $ok = imagejpeg($src, $destPath, 85);
         imagedestroy($src);
         return $ok;
+    }
+
+    private function withProtectedSellerPhoto(array $seller): array
+    {
+        if (!empty($seller['id_card_photo']) && !empty($seller['id'])) {
+            $seller['id_card_photo'] = $this->protectedSellerPhotoUrl((int)$seller['id']);
+        }
+        return $seller;
+    }
+
+    private function protectedSellerPhotoUrl(int $sellerId): string
+    {
+        return rtrim(BASE_PATH, '/') . '/index.php/sellers/photo-view?id=' . $sellerId;
+    }
+
+    private function protectedPurchasePhotoUrl(int $photoId): string
+    {
+        return rtrim(BASE_PATH, '/') . '/index.php/purchase-orders/photo-file?id=' . $photoId;
+    }
+
+    private function protectedItemPhotoUrl(int $itemId): string
+    {
+        return rtrim(BASE_PATH, '/') . '/index.php/purchase-orders/item-photo-file?id=' . $itemId;
     }
 }

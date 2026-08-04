@@ -60,9 +60,12 @@ class User extends Model
     {
         $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
 
-        return $this->update($userId, [
-            'password' => $hashedPassword
-        ]);
+        return $this->db->query(
+            "UPDATE {$this->table}
+             SET password = ?, auth_version = auth_version + 1
+             WHERE id = ?",
+            [$hashedPassword, $userId]
+        );
     }
 
     /**
@@ -71,9 +74,11 @@ class User extends Model
     public function getAllWithLastLogin()
     {
         return $this->db->fetchAll(
-            "SELECT u.id, u.username, u.full_name, u.phone, u.role, u.status,
+            "SELECT u.id, u.username, u.full_name, u.phone, u.role, u.status, u.branch_id,
+                    b.name AS branch_name,
              (SELECT MAX(created_at) FROM activity_log WHERE user_id = u.id) as last_login
              FROM {$this->table} u
+             LEFT JOIN branches b ON b.id = u.branch_id
              ORDER BY u.username ASC"
         );
     }

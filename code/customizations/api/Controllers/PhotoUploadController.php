@@ -37,10 +37,13 @@ class PhotoUploadController extends Controller
 
         // ตรวจว่า PO มีอยู่จริง
         $db = Database::getInstance();
-        $po = $db->fetch('SELECT id, status FROM purchase_orders WHERE id = ?', [$poId]);
+        $po = $db->fetch('SELECT id, branch_id, status FROM purchase_orders WHERE id = ?', [$poId]);
         if (!$po) {
             Response::error('ไม่พบ Purchase Order', 404);
             return;
+        }
+        if ($this->user !== null) {
+            $this->assertBranchAccess((int)$po['branch_id']);
         }
 
         // ตรวจ file upload
@@ -85,6 +88,17 @@ class PhotoUploadController extends Controller
 
         // บันทึก DB
         $itemId = isset($_POST['item_id']) ? intval($_POST['item_id']) : null;
+        if ($itemId) {
+            $validItem = $db->fetchColumn(
+                'SELECT 1 FROM purchase_order_items WHERE id = ? AND purchase_order_id = ?',
+                [$itemId, $poId]
+            );
+            if (!$validItem) {
+                @unlink($destPath);
+                Response::error('รายการสินค้าไม่อยู่ใน Purchase Order นี้', 422);
+                return;
+            }
+        }
         $db->query(
             'INSERT INTO purchase_order_photos (purchase_order_id, purchase_order_item_id, photo_path, is_primary)
              VALUES (?, ?, ?, ?)',
@@ -94,7 +108,7 @@ class PhotoUploadController extends Controller
 
         Response::success('อัพโหลดสำเร็จ', [
             'photo_id'  => $photoId,
-            'photo_url' => $urlPath,
+            'photo_url' => $this->protectedPhotoUrl((int)$photoId),
         ]);
     }
 
@@ -110,6 +124,15 @@ class PhotoUploadController extends Controller
             Response::error('Invalid purchase order ID', 400);
             return;
         }
+        $po = Database::getInstance()->fetch(
+            'SELECT id, branch_id FROM purchase_orders WHERE id = ?',
+            [$poId]
+        );
+        if (!$po) {
+            Response::error('ไม่พบ Purchase Order', 404);
+            return;
+        }
+        $this->assertBranchAccess((int)$po['branch_id']);
         $t = self::makeToken($poId);
         Response::success('Token created', $t);
     }
@@ -127,7 +150,15 @@ class PhotoUploadController extends Controller
             return;
         }
 
-        $db     = Database::getInstance();
+        $db = Database::getInstance();
+        $po = $db->fetch('SELECT id, branch_id FROM purchase_orders WHERE id = ?', [$poId]);
+        if (!$po) {
+            Response::error('ไม่พบ Purchase Order', 404);
+            return;
+        }
+        if ($this->user !== null) {
+            $this->assertBranchAccess((int)$po['branch_id']);
+        }
         $photos = $db->fetchAll(
             'SELECT id, purchase_order_item_id, photo_path, is_primary, created_at
              FROM purchase_order_photos
@@ -136,7 +167,48 @@ class PhotoUploadController extends Controller
             [$poId]
         );
 
+        foreach ($photos as &$photo) {
+            $photo['photo_path'] = $this->protectedPhotoUrl((int)$photo['id']);
+        }
+        unset($photo);
+
         Response::success('Photos retrieved', ['photos' => $photos]);
+    }
+
+    public function view($photoId)
+    {
+        $photoId = intval($photoId);
+        $photo = Database::getInstance()->fetch(
+            "SELECT pop.photo_path, po.id AS purchase_order_id, po.branch_id
+             FROM purchase_order_photos pop
+             INNER JOIN purchase_orders po ON po.id = pop.purchase_order_id
+             WHERE pop.id = ?",
+            [$photoId]
+        );
+        if (!$photo) {
+            Response::error('ไม่พบรูปภาพ', 404);
+            return;
+        }
+        $this->authorizeFileAccess((int)$photo['purchase_order_id'], (int)$photo['branch_id']);
+        $this->sendImage($photo['photo_path']);
+    }
+
+    public function viewItemPhoto($itemId)
+    {
+        $itemId = intval($itemId);
+        $item = Database::getInstance()->fetch(
+            "SELECT poi.photo_path, po.id AS purchase_order_id, po.branch_id
+             FROM purchase_order_items poi
+             INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id
+             WHERE poi.id = ?",
+            [$itemId]
+        );
+        if (!$item || empty($item['photo_path'])) {
+            Response::error('ไม่พบรูปภาพ', 404);
+            return;
+        }
+        $this->authorizeFileAccess((int)$item['purchase_order_id'], (int)$item['branch_id']);
+        $this->sendImage($item['photo_path']);
     }
 
     // -------------------------------------------------------
@@ -148,13 +220,37 @@ class PhotoUploadController extends Controller
     {
         if ($this->user !== null) return true;
         $token = $_COOKIE['posToken'] ?? '';
+        if (empty($token)) {
+            $headers = getallheaders();
+            $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+            if (strpos($authHeader, 'Bearer ') === 0) {
+                $token = substr($authHeader, 7);
+            }
+        }
         if (empty($token)) return false;
         $decoded = TokenService::validate($token);
-        if ($decoded) {
-            $this->user = $decoded;
-            return true;
+        if (!$decoded) {
+            return false;
         }
-        return false;
+
+        $currentUser = Database::getInstance()->fetch(
+            'SELECT id, username, role, branch_id, status, auth_version FROM users WHERE id = ?',
+            [(int)($decoded['user_id'] ?? 0)]
+        );
+        if (!$currentUser || $currentUser['status'] !== 'active') {
+            return false;
+        }
+        if ((int)($decoded['auth_version'] ?? 1) !== (int)($currentUser['auth_version'] ?? 1)) {
+            return false;
+        }
+
+        $this->user = array_merge($decoded, [
+            'user_id' => (int)$currentUser['id'],
+            'username' => $currentUser['username'],
+            'role' => $currentUser['role'],
+            'branch_id' => $currentUser['branch_id'] !== null ? (int)$currentUser['branch_id'] : null,
+        ]);
+        return true;
     }
 
     /** ลอง authenticate ด้วย HMAC token ใน query string */
@@ -183,6 +279,59 @@ class PhotoUploadController extends Controller
         $secret  = $_ENV['JWT_SECRET'] ?? getenv('JWT_SECRET') ?? '';
         $token   = hash_hmac('sha256', "po:{$poId}:upload:{$expires}", $secret);
         return ['token' => $token, 'expires' => $expires];
+    }
+
+    private function authorizeFileAccess(int $poId, int $branchId): void
+    {
+        if ($this->tryJwtAuth()) {
+            $this->assertBranchAccess($branchId);
+            return;
+        }
+        if (!$this->tryHmacToken($poId)) {
+            Response::error('Unauthorized', 401);
+        }
+    }
+
+    private function assertBranchAccess(int $branchId): void
+    {
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return;
+        }
+        if (empty($this->user['branch_id']) || (int)$this->user['branch_id'] !== $branchId) {
+            Response::error('ไม่มีสิทธิ์เข้าถึงรูปของสาขานี้', 403);
+        }
+    }
+
+    private function protectedPhotoUrl(int $photoId): string
+    {
+        $base = rtrim(BASE_PATH, '/') . '/index.php/purchase-orders/photo-file?id=' . $photoId;
+        if (!empty($_GET['token']) && !empty($_GET['expires'])) {
+            $base .= '&token=' . rawurlencode((string)$_GET['token'])
+                  . '&expires=' . rawurlencode((string)$_GET['expires']);
+        }
+        return $base;
+    }
+
+    private function sendImage(string $storedPath): void
+    {
+        $prefix = '/uploads/purchase-orders/';
+        if (strpos($storedPath, $prefix) !== 0) {
+            Response::error('Invalid image path', 404);
+        }
+
+        $baseDir = realpath(self::UPLOAD_BASE);
+        $filePath = realpath(UPLOAD_DIR . substr($storedPath, strlen('/uploads')));
+        if (!$baseDir || !$filePath || strpos($filePath, $baseDir . DIRECTORY_SEPARATOR) !== 0 || !is_file($filePath)) {
+            Response::error('ไม่พบไฟล์รูปภาพ', 404);
+        }
+
+        header('Content-Type: image/jpeg');
+        header('Content-Length: ' . filesize($filePath));
+        header('Cache-Control: private, no-store, max-age=0');
+        header('X-Content-Type-Options: nosniff');
+        readfile($filePath);
+        exit;
     }
 
     /** validate ไฟล์ — คืน error string หรือ null ถ้าผ่าน */

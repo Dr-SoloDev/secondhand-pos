@@ -47,7 +47,12 @@ class SaleLotsController extends Controller
         $idempotencyKey = $data['idempotency_key'] ?? null;
         if ($idempotencyKey) {
             $idemp = new Idempotency();
-            $idemp->check($idempotencyKey, 'sale-lots');
+            try {
+                $idemp->acquire($idempotencyKey, 'sale-lots');
+                $idemp->check($idempotencyKey, 'sale-lots');
+            } catch (Exception $e) {
+                Response::error($e->getMessage(), 409);
+            }
         }
 
         // SECURITY: non-admin บังคับ scope ที่ branch ของตัวเอง — ห้ามสร้าง Sale Lot ให้สาขาอื่น
@@ -64,14 +69,17 @@ class SaleLotsController extends Controller
             Response::error('ต้องระบุรายการสินค้าอย่างน้อย 1 รายการ', 400);
         }
 
+        $transportCost = $this->nonNegativeAmount($data['transport_cost'] ?? 0, 'ค่าขนส่ง');
+        $expenses = $this->normalizeExpenses($data['expenses'] ?? null);
+
         $cleanData = [
             'branch_id'      => intval($data['branch_id']),
             'buyer_name'     => trim((string)$data['buyer_name']),
             'sale_date'      => $this->sanitizeInput($data['sale_date']),
             'status'         => 'draft',
             'notes'          => isset($data['notes']) ? trim((string)$data['notes']) : null,
-            'transport_cost' => (float)($data['transport_cost'] ?? 0),
-            'expenses'       => $data['expenses'] ?? null,
+            'transport_cost' => $transportCost,
+            'expenses'       => $expenses,
             'created_by'     => $this->user['user_id'] ?? null,
         ];
 
@@ -87,12 +95,20 @@ class SaleLotsController extends Controller
             if ($itemName === '') {
                 Response::error('แต่ละรายการต้องมีชื่อสินค้า', 400);
             }
+            $quantity = (float)$item['quantity_kg'];
+            $unitPrice = (float)($item['unit_price'] ?? 0);
+            if (!is_finite($quantity) || $quantity <= 0) {
+                Response::error('น้ำหนักขายต้องมากกว่า 0', 422);
+            }
+            if (!is_finite($unitPrice) || $unitPrice < 0) {
+                Response::error('ราคาขายต่อหน่วยต้องไม่น้อยกว่า 0', 422);
+            }
             $cleanItems[] = [
                 'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
                 'item_name'   => $itemName,
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
-                'quantity_kg' => floatval($item['quantity_kg']),
-                'unit_price'  => floatval($item['unit_price'] ?? 0),
+                'quantity_kg' => $quantity,
+                'unit_price'  => $unitPrice,
             ];
         }
 
@@ -103,6 +119,7 @@ class SaleLotsController extends Controller
             $result = $model->create($cleanData);
             if ($idempotencyKey) {
                 $idemp->save($idempotencyKey, 'sale-lots', ['id' => $result['id'], 'reference_no' => $result['reference_no']]);
+                $idemp->release();
             }
 
             Logger::logActivity(
@@ -112,6 +129,9 @@ class SaleLotsController extends Controller
             );
             Response::success('บันทึก Sale Lot แบบร่างสำเร็จ', $result);
         } catch (Exception $e) {
+            if ($idempotencyKey && isset($idemp)) {
+                $idemp->release();
+            }
             error_log('SaleLot store failed: ' . $e->getMessage());
             Response::error($e->getMessage() ?: 'สร้าง Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 400);
         }
@@ -142,18 +162,25 @@ class SaleLotsController extends Controller
             Response::error('ต้องระบุรายการสินค้าอย่างน้อย 1 รายการ', 400);
         }
 
+        $transportCost = $this->nonNegativeAmount($data['transport_cost'] ?? 0, 'ค่าขนส่ง');
+        $expenses = $this->normalizeExpenses($data['expenses'] ?? null);
+
         $cleanItems = [];
         foreach ($data['items'] as $item) {
             if (empty($item['quantity_kg'])) Response::error('แต่ละรายการต้องมีน้ำหนัก', 400);
             if (empty($item['category_id'])) Response::error('แต่ละรายการต้องเลือกหมวดหมู่', 400);
             $itemName = trim((string)($item['item_name'] ?? ''));
             if ($itemName === '') Response::error('แต่ละรายการต้องมีชื่อสินค้า', 400);
+            $quantity = (float)$item['quantity_kg'];
+            $unitPrice = (float)($item['unit_price'] ?? 0);
+            if (!is_finite($quantity) || $quantity <= 0) Response::error('น้ำหนักขายต้องมากกว่า 0', 422);
+            if (!is_finite($unitPrice) || $unitPrice < 0) Response::error('ราคาขายต่อหน่วยต้องไม่น้อยกว่า 0', 422);
             $cleanItems[] = [
                 'catalog_id'  => !empty($item['catalog_id']) ? intval($item['catalog_id']) : null,
                 'item_name'   => $itemName,
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
-                'quantity_kg' => floatval($item['quantity_kg']),
-                'unit_price'  => floatval($item['unit_price'] ?? 0),
+                'quantity_kg' => $quantity,
+                'unit_price'  => $unitPrice,
             ];
         }
 
@@ -161,8 +188,8 @@ class SaleLotsController extends Controller
             'buyer_name'     => trim((string)$data['buyer_name']),
             'sale_date'      => $this->sanitizeInput($data['sale_date']),
             'notes'          => isset($data['notes']) ? trim((string)$data['notes']) : null,
-            'transport_cost' => (float)($data['transport_cost'] ?? 0),
-            'expenses'       => $data['expenses'] ?? null,
+            'transport_cost' => $transportCost,
+            'expenses'       => $expenses,
             'items'          => $cleanItems,
             'updated_by'     => $this->user['user_id'] ?? null,
         ];
@@ -379,5 +406,40 @@ class SaleLotsController extends Controller
         if (!$userBranch || (int)$branchId !== $userBranch) {
             Response::error($message, 403);
         }
+    }
+
+    private function nonNegativeAmount($value, $label)
+    {
+        $amount = (float)$value;
+        if (!is_finite($amount) || $amount < 0) {
+            Response::error("{$label}ต้องไม่น้อยกว่า 0", 422);
+        }
+        return $amount;
+    }
+
+    private function normalizeExpenses($expenses)
+    {
+        if ($expenses === null || $expenses === '') {
+            return null;
+        }
+        if (!is_array($expenses)) {
+            Response::error('รูปแบบค่าใช้จ่ายไม่ถูกต้อง', 422);
+        }
+
+        $clean = [];
+        foreach ($expenses as $expense) {
+            if (!is_array($expense)) {
+                Response::error('รูปแบบค่าใช้จ่ายไม่ถูกต้อง', 422);
+            }
+            $description = trim((string)($expense['description'] ?? ''));
+            if ($description === '') {
+                Response::error('กรุณาระบุรายละเอียดค่าใช้จ่าย', 422);
+            }
+            $clean[] = [
+                'description' => $this->sanitizeInput($description, 255),
+                'amount' => $this->nonNegativeAmount($expense['amount'] ?? 0, 'ค่าใช้จ่าย'),
+            ];
+        }
+        return $clean ?: null;
     }
 }

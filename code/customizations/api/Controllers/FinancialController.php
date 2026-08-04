@@ -46,6 +46,7 @@ class FinancialController extends Controller
             "SELECT COALESCE(SUM(po.total_amount), 0) AS total_purchase
              FROM purchase_orders po
              WHERE po.status = 'completed'
+               AND po.source_type = 'manual'
                AND {$params['date_filter_po']}
                {$params['branch_filter']}",
             $params['bindings_po']
@@ -57,6 +58,7 @@ class FinancialController extends Controller
              FROM purchase_order_items poi
              JOIN purchase_orders po ON po.id = poi.purchase_order_id
              WHERE po.status = 'completed'
+               AND po.source_type = 'manual'
                AND {$params['date_filter_po']}
                {$params['branch_filter']}",
             $params['bindings_po']
@@ -158,6 +160,7 @@ class FinancialController extends Controller
              JOIN purchase_orders po ON po.id = poi.purchase_order_id
              LEFT JOIN categories c ON c.id = poi.category_id
              WHERE po.status = 'completed'
+               AND po.source_type = 'manual'
                AND {$params['date_filter_po']}
                {$params['branch_filter']}
              GROUP BY poi.category_id, c.name, poi.item_name
@@ -360,6 +363,7 @@ class FinancialController extends Controller
                     LEFT JOIN branches b ON b.id = po.branch_id
                     LEFT JOIN sellers s ON s.id = po.seller_id
                     WHERE po.status = 'completed'
+                      AND po.source_type = 'manual'
                       AND {$params['date_filter_po']}
                       {$params['branch_filter']}
                     ORDER BY po.created_at DESC";
@@ -408,7 +412,7 @@ class FinancialController extends Controller
                 ? "YEAR(sale_date)=? AND MONTH(sale_date)=?" : "YEAR(sale_date)=?";
             $slBind = $pPeriod === 'month' ? [$pYear, $pMonth] : [$pYear];
             if ($pBranch) { $slWhere .= " AND branch_id=?"; $slBind[] = $pBranch; }
-            $po = $db->fetch("SELECT COALESCE(SUM(total_amount),0) AS v FROM purchase_orders WHERE status='completed' AND $poWhere", $poBind);
+            $po = $db->fetch("SELECT COALESCE(SUM(total_amount),0) AS v FROM purchase_orders WHERE status='completed' AND source_type='manual' AND $poWhere", $poBind);
             $sl = $db->fetch("SELECT COALESCE(SUM(actual_revenue),0) AS v FROM sale_lots WHERE status='confirmed' AND actual_revenue IS NOT NULL AND $slWhere", $slBind);
             $biz = (new BusinessExpense())->sumByPeriod($pBranch, $pPeriod, $pYear, $pMonth);
 
@@ -450,7 +454,7 @@ class FinancialController extends Controller
         echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
         $out = fopen('php://output', 'w');
         fputcsv($out, $headers);
-        foreach ($rows as $row) fputcsv($out, $row);
+        foreach ($rows as $row) fputcsv($out, $this->spreadsheetSafeRow($row));
         fclose($out);
         exit;
     }
@@ -486,6 +490,7 @@ class FinancialController extends Controller
             COALESCE(SUM(po.total_amount), 0) AS total_purchase
         FROM purchase_orders po
         WHERE po.status = 'completed'
+          AND po.source_type = 'manual'
           AND YEAR(po.created_at) = ?
           " . ($branchId ? "AND po.branch_id = ?" : "") . "
         GROUP BY MONTH(po.created_at)
@@ -498,6 +503,7 @@ class FinancialController extends Controller
             COALESCE(SUM(amount), 0) AS total_expense
         FROM business_expenses
         WHERE YEAR(expense_date) = ?
+          AND status = 'approved'
           " . ($branchId ? "AND branch_id = ?" : "") . "
         GROUP BY MONTH(expense_date)
         ORDER BY month ASC";
@@ -569,6 +575,7 @@ class FinancialController extends Controller
                 SELECT po.branch_id, COALESCE(SUM(po.total_amount), 0) AS total_purchase
                 FROM purchase_orders po
                 WHERE po.status = 'completed'
+                  AND po.source_type = 'manual'
                   AND {$params['date_filter_po']}
                   {$params['branch_filter']}
                 GROUP BY po.branch_id
@@ -613,6 +620,7 @@ class FinancialController extends Controller
             FROM sellers s
             JOIN purchase_orders po ON po.seller_id = s.id
             WHERE po.status = 'completed'
+              AND po.source_type = 'manual'
               AND {$params['date_filter_po']}
               {$params['branch_filter']}
             GROUP BY s.id, s.full_name
@@ -676,6 +684,7 @@ class FinancialController extends Controller
                     LEFT JOIN branches b ON b.id = po.branch_id
                     LEFT JOIN sellers s ON s.id = po.seller_id
                     WHERE po.status = 'completed'
+                      AND po.source_type = 'manual'
                       AND {$params['date_filter_po']}
                       {$params['branch_filter']}
                     ORDER BY po.created_at DESC";
@@ -724,7 +733,7 @@ class FinancialController extends Controller
                 ? "YEAR(sale_date)=? AND MONTH(sale_date)=?" : "YEAR(sale_date)=?";
             $slBind = $pPeriod === 'month' ? [$pYear, $pMonth] : [$pYear];
             if ($pBranch) { $slWhere .= " AND branch_id=?"; $slBind[] = $pBranch; }
-            $po = $db->fetch("SELECT COALESCE(SUM(total_amount),0) AS v FROM purchase_orders WHERE status='completed' AND $poWhere", $poBind);
+            $po = $db->fetch("SELECT COALESCE(SUM(total_amount),0) AS v FROM purchase_orders WHERE status='completed' AND source_type='manual' AND $poWhere", $poBind);
             $sl = $db->fetch("SELECT COALESCE(SUM(actual_revenue),0) AS v FROM sale_lots WHERE status='confirmed' AND actual_revenue IS NOT NULL AND $slWhere", $slBind);
             $biz = (new BusinessExpense())->sumByPeriod($pBranch, $pPeriod, $pYear, $pMonth);
 
@@ -768,7 +777,9 @@ class FinancialController extends Controller
         $html .= '</tr></thead><tbody>';
         foreach ($rows as $row) {
             $html .= '<tr>';
-            foreach ($row as $cell) $html .= "<td>" . htmlspecialchars($cell) . '</td>';
+            foreach ($this->spreadsheetSafeRow($row) as $cell) {
+                $html .= '<td>' . htmlspecialchars((string)$cell, ENT_QUOTES, 'UTF-8') . '</td>';
+            }
             $html .= '</tr>';
         }
         $html .= '</tbody></table></body></html>';
@@ -779,5 +790,18 @@ class FinancialController extends Controller
         header('Cache-Control: must-revalidate');
         echo $html;
         exit;
+    }
+
+    private function spreadsheetSafeRow(array $row)
+    {
+        return array_map(function ($cell) {
+            if (!is_string($cell)) {
+                return $cell;
+            }
+            if (preg_match('/^[\s\x{FEFF}]*[=+\-@]/u', $cell)) {
+                return "'" . $cell;
+            }
+            return $cell;
+        }, $row);
     }
 }

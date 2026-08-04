@@ -86,6 +86,26 @@ test_purchase_orders() {
   }")
   assert_contains "$bad_branch" '"status":"error"' "PO with invalid branch rejected"
 
+  local forged_status forged_payment_status
+  forged_status=$(api_post "purchase-orders" "{
+    \"branch_id\":$branch_id,
+    \"seller_id\":$seller_id,
+    \"payment_method\":\"bank_transfer\",
+    \"status\":\"cancelled\",
+    \"items\":[{\"item_name\":\"Forged Status\",\"category_id\":$cat_id,\"quantity\":1,\"unit_price\":10}]
+  }")
+  assert_contains "$forged_status" '"status":"error"' "PO rejects client-controlled status"
+  assert_contains "$forged_status" 'สถานะใบรับซื้อถูกกำหนดโดยระบบ' "PO status rejection is explicit"
+
+  forged_payment_status=$(api_post "purchase-orders" "{
+    \"branch_id\":$branch_id,
+    \"seller_id\":$seller_id,
+    \"payment_method\":\"bank_transfer\",
+    \"payment_status\":\"pending\",
+    \"items\":[{\"item_name\":\"Forged Payment Status\",\"category_id\":$cat_id,\"quantity\":1,\"unit_price\":10}]
+  }")
+  assert_contains "$forged_payment_status" '"status":"error"' "PO rejects client-controlled payment status"
+
   # 6. Cancellation now requires a reason and a separate approver.
   local po_id manager_cookie cancel_po cancel_po_id cancel_request cancel_request_id
   po_id=$(api_get "purchase-orders" | json_get "data.items.0.id" 2>/dev/null)
@@ -132,12 +152,16 @@ test_purchase_orders() {
   assert_contains "$res" "\"id\":$cancel_request_id" "PO cancellation: Approved request remains auditable"
 
   # Seller summary must retain cancelled/draft POs in transactions without counting their amounts.
-  local seller_dc summary_amount completed_amount cancelled_status
+  local seller_dc summary_amount completed_amount summary_items completed_items cancelled_status
   seller_dc=$(api_get "sellers/data-center?id=$seller_id")
   summary_amount=$(echo "$seller_dc" | json_get "data.summary.total_amount" 2>/dev/null)
   completed_amount=$(echo "$seller_dc" | python3 -c 'import json,sys
 data=json.load(sys.stdin).get("data", {})
 print(sum(float(po.get("total_amount", 0)) for po in data.get("transactions", []) if po.get("status") == "completed"))' 2>/dev/null)
+  summary_items=$(echo "$seller_dc" | json_get "data.summary.total_items_sold" 2>/dev/null)
+  completed_items=$(echo "$seller_dc" | python3 -c 'import json,sys
+data=json.load(sys.stdin).get("data", {})
+print(sum(int(po.get("total_items", 0)) for po in data.get("transactions", []) if po.get("status") == "completed"))' 2>/dev/null)
   cancelled_status=$(echo "$seller_dc" | json_find "data.transactions" "id" "$cancel_po_id" "status" 2>/dev/null)
   assert_eq "cancelled" "$cancelled_status" "Seller data-center retains cancelled PO transaction"
   if float_eq "$completed_amount" "$summary_amount"; then
@@ -146,6 +170,7 @@ print(sum(float(po.get("total_amount", 0)) for po in data.get("transactions", []
     test_fail "Seller data-center total_amount excludes non-completed POs"
     echo "    (completed PO total: '$completed_amount', summary total: '$summary_amount')"
   fi
+  assert_eq "$completed_items" "$summary_items" "Seller data-center item count excludes non-completed POs"
 
   # 6a. Manager from another branch cannot cancel a PO
   local branch_id_2 cross_branch_po cross_branch_po_id manager_cancel

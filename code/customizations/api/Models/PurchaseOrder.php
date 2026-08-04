@@ -216,9 +216,13 @@ class PurchaseOrder extends Model
             $this->db->query(
                 "UPDATE sellers
                  SET total_transactions = GREATEST(0, COALESCE(total_transactions, 0) - 1),
-                     total_amount = GREATEST(0, COALESCE(total_amount, 0) - ?)
+                     total_amount = GREATEST(0, COALESCE(total_amount, 0) - ?),
+                     last_transaction_at = (
+                         SELECT MAX(po2.created_at) FROM purchase_orders po2
+                         WHERE po2.seller_id = ? AND po2.status = 'completed'
+                     )
                  WHERE id = ?",
-                [$po['total_amount'], $po['seller_id']]
+                [$po['total_amount'], $po['seller_id'], $po['seller_id']]
             );
 
             if (($po['payment_method'] ?? 'cash') === 'cash'
@@ -262,8 +266,8 @@ class PurchaseOrder extends Model
                 'total_items' => $totalItems,
                 'total_amount' => $totalAmount,
                 'payment_method' => $data['payment_method'] ?? 'cash',
-                'payment_status' => $data['payment_status'] ?? 'paid',
-                'status' => $data['status'] ?? 'completed',
+                'payment_status' => 'paid',
+                'status' => 'completed',
                 'notes' => $data['notes'] ?? null,
                 'vehicle_type' => $data['vehicle_type'] ?? null,
                 'vehicle_plate' => $data['vehicle_plate'] ?? null,
