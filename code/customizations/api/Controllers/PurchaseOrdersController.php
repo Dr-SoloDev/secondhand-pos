@@ -96,10 +96,13 @@ class PurchaseOrdersController extends Controller
 
     public function approveCancellation()
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $requestId = (int)($data['id'] ?? $data['request_id'] ?? 0);
         if (!$requestId) Response::error('ไม่พบรหัสคำขอ', 400);
+
+        // P0-1: manager อนุมัติได้เฉพาะคำขอในสาขาตัวเอง
+        $this->assertCancellationBranchAccess($requestId);
 
         try {
             $userId = (int)($this->user['user_id'] ?? $this->user['id']);
@@ -117,11 +120,14 @@ class PurchaseOrdersController extends Controller
 
     public function rejectCancellation()
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $requestId = (int)($data['id'] ?? $data['request_id'] ?? 0);
         $reviewNote = substr(trim((string)($data['review_note'] ?? '')), 0, 500);
         if (!$requestId || $reviewNote === '') Response::error('กรุณาระบุคำขอและเหตุผลที่ปฏิเสธ', 400);
+
+        // P0-1: manager ปฏิเสธได้เฉพาะคำขอในสาขาตัวเอง
+        $this->assertCancellationBranchAccess($requestId);
 
         try {
             $userId = (int)($this->user['user_id'] ?? $this->user['id']);
@@ -130,6 +136,22 @@ class PurchaseOrdersController extends Controller
             Response::success('ปฏิเสธคำขอยกเลิกแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
+        }
+    }
+
+    /**
+     * P0-1: admin/super_manager ผ่านทุกสาขา — manager ต้องตรงสาขาตัวเอง
+     */
+    private function assertCancellationBranchAccess(int $requestId): void
+    {
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return;
+        }
+        $branchId = (new PurchaseOrderCancellation())->getRequestBranch($requestId);
+        $userBranch = (int)($this->user['branch_id'] ?? 0);
+        if (!$branchId || !$userBranch || $branchId !== $userBranch) {
+            Response::error('ไม่มีสิทธิ์พิจารณาคำขอยกเลิกของสาขาอื่น', 403);
         }
     }
 

@@ -100,6 +100,18 @@ class CashSession extends Model
         return $row;
     }
 
+    /**
+     * P0-5: คืน branch_id ของ session เพื่อใช้ตรวจ branch scope ในการอนุมัติ
+     */
+    public function getBranch(int $sessionId): ?int
+    {
+        $branchId = $this->db->fetchColumn(
+            "SELECT branch_id FROM cash_sessions WHERE id = ?",
+            [$sessionId]
+        );
+        return $branchId !== null && $branchId !== false ? (int)$branchId : null;
+    }
+
     public function openDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
         if (!is_finite($actualCash) || $actualCash < 0) {

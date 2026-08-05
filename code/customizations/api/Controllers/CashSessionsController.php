@@ -83,11 +83,15 @@ class CashSessionsController extends Controller
 
     private function reviewOpen(bool $approve)
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $id = (int)($data['id'] ?? 0);
         $note = isset($data['review_note']) ? (string)$data['review_note'] : null;
         if (!$id) Response::error('ไม่พบรหัสรอบประจำวัน', 400);
+
+        // P0-5: manager อนุมัติ/ปฏิเสธได้เฉพาะ session ในสาขาตัวเอง
+        $this->assertSessionBranchAccess($id, 'ไม่มีสิทธิ์พิจารณายอดเปิดของสาขาอื่น');
+
         try {
             $model = new CashSession();
             if ($approve) $model->approveOpen($id, $this->userId(), $note);
@@ -110,16 +114,36 @@ class CashSessionsController extends Controller
 
     private function reviewClose(bool $approve)
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $id = (int)($data['id'] ?? 0);
         $note = isset($data['review_note']) ? (string)$data['review_note'] : null;
         if (!$id) Response::error('ไม่พบรหัสรอบประจำวัน', 400);
+
+        // P0-5: manager อนุมัติ/ปฏิเสธได้เฉพาะ session ในสาขาตัวเอง
+        $this->assertSessionBranchAccess($id, 'ไม่มีสิทธิ์พิจารณายอดปิดของสาขาอื่น');
+
         try {
             (new CashSession())->reviewClose($id, $this->userId(), $approve, $note);
             Response::success($approve ? 'อนุมัติปิดยอดแล้ว' : 'ปฏิเสธคำขอปิดยอดแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
+        }
+    }
+
+    /**
+     * P0-5: admin/super_manager ผ่านทุกสาขา — manager ต้องตรงสาขาตัวเอง
+     */
+    private function assertSessionBranchAccess(int $sessionId, string $message): void
+    {
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return;
+        }
+        $branchId = (new CashSession())->getBranch($sessionId);
+        $userBranch = (int)($this->user['branch_id'] ?? 0);
+        if (!$branchId || !$userBranch || $branchId !== $userBranch) {
+            Response::error($message, 403);
         }
     }
 

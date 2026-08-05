@@ -37,6 +37,21 @@ class PurchaseOrderCancellation extends Model
         ) ?: [];
     }
 
+    /**
+     * P0-1: คืน branch_id ของใบรับซื้อที่ถูกขอยกเลิก เพื่อใช้ตรวจ branch scope
+     */
+    public function getRequestBranch(int $requestId): ?int
+    {
+        $branchId = $this->db->fetchColumn(
+            "SELECT po.branch_id
+             FROM purchase_order_cancellation_requests r
+             JOIN purchase_orders po ON po.id = r.purchase_order_id
+             WHERE r.id = ?",
+            [$requestId]
+        );
+        return $branchId !== null && $branchId !== false ? (int)$branchId : null;
+    }
+
     public function request(int $purchaseOrderId, string $reason, int $requesterId): array
     {
         $reason = substr(trim($reason), 0, 500);
