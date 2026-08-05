@@ -112,38 +112,39 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+// P0-6: เมนูตามสิทธิ์จริง — map หน้า → role ที่ API อนุญาต (ตรงกับ requireAuth ใน controller)
+// super_manager ยังคงเห็นเฉพาะที่กำหนดเดิม (financial-summary) + เปิด-ปิดยอด ตาม PRD v2
+const PAGE_ROLE_ACCESS = {
+  'users.html':             ['admin'],
+  'settings.html':          ['admin', 'manager'],
+  'branches.html':          ['admin', 'manager', 'cashier'],
+  'employees.html':         ['admin', 'manager'],
+  'expenses.html':          ['admin', 'manager', 'cashier'],
+  'financial-summary.html': ['admin', 'manager', 'super_manager'],
+  'cash-sessions.html':     ['admin', 'manager', 'super_manager', 'cashier'],
+  'stock-transfers.html':   ['admin', 'manager', 'cashier'],
+  'price-board.html':       ['admin', 'manager', 'cashier'],
+};
+
 function applyRoleNavigation(user) {
   const role = user?.role || '';
   const isAdmin = role === 'admin';
-  const isSuperManager = role === 'super_manager';
 
+  // พื้นฐาน: non-admin ซ่อนทุกอย่างที่ markup ตี .admin-only (เมนู + ปุ่ม เช่น "+ เพิ่มสาขา")
   if (!isAdmin) {
     document.querySelectorAll('.admin-only').forEach((el) => {
-      const href = el.querySelector('a')?.getAttribute('href') || '';
-      const canReadFinancial = isSuperManager && href.includes('financial-summary.html');
-      el.style.display = canReadFinancial ? '' : 'none';
+      el.style.display = 'none';
     });
   }
 
-  if (!isSuperManager) return;
-
-  const blockedLinks = [
-    'users.html',
-    'settings.html',
-    'branches.html',
-    'employees.html',
-    'expenses.html',
-    'stock-transfers.html',
-    'price-board.html',
-  ];
-
+  // P0-6: role matrix ตรงกับ backend — ซ่อน/แสดงเมนูตาม API ที่อนุญาตจริง
   document.querySelectorAll('a').forEach((link) => {
     const href = link.getAttribute('href') || '';
-    if (blockedLinks.some((blocked) => href.includes(blocked))) {
-      const item = link.closest('li');
-      const wrapper = item || link;
-      wrapper.style.display = 'none';
-    }
+    const page = href.split('/').pop();
+    const allowed = PAGE_ROLE_ACCESS[page];
+    if (!allowed) return; // หน้าไม่อยู่ใน matrix → ปล่อยตาม markup
+    const item = link.closest('li') || link;
+    item.style.display = allowed.includes(role) ? '' : 'none';
   });
 }
 
