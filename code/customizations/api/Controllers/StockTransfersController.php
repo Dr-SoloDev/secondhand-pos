@@ -28,7 +28,7 @@ class StockTransfersController extends Controller
 
     public function store()
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'cashier', 'super_manager']);
         $user = $this->user;
         $body = $this->getRequestData() ?? [];
 
@@ -127,7 +127,7 @@ class StockTransfersController extends Controller
 
     public function confirm()
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'cashier', 'super_manager']);
         $user = $this->user;
         $body = $this->getRequestData() ?? [];
         $id = (int)($body['id'] ?? 0);
@@ -290,7 +290,7 @@ class StockTransfersController extends Controller
         try {
             $userId = (int)($user['user_id'] ?? $user['id']);
             (new StockTransfer())->rejectReversal($id, $userId, $reviewNote);
-            Logger::logActivity($userId, 'reject_stock_transfer_reversal', "ปฏิเสธใบโอนย้อนกลับ ID:{$id}");
+            Logger::logActivity($userId, 'reject_stock_transfer_reversal', "ปฏิเสธคำขอโอนย้อนกลับ ID:{$id}");
             Response::success('ปฏิเสธคำขอโอนย้อนกลับแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);

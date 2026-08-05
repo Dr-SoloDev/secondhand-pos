@@ -89,9 +89,9 @@ class SellersController extends Controller
             $data['id_card'] = $idCard;
         }
 
-        // tier_level — เฉพาะ admin/manager กำหนดได้ตอนเพิ่ม
+        // tier_level — เฉพาะ admin/manager/cashier กำหนดได้ตอนเพิ่ม
         if (isset($data['tier_level'])) {
-            $this->requireAuth(['admin', 'manager']);
+            $this->requireAuth(['admin', 'manager', 'cashier']);
             $tierLevel = (int)$data['tier_level'];
             if ($tierLevel < 1 || $tierLevel > 3) {
                 Response::error('ระดับราคาพิเศษไม่ถูกต้อง (1-3)', 400);
@@ -165,9 +165,9 @@ class SellersController extends Controller
         }
         unset($data['pdpa_consent']);
 
-        // tier_level — เฉพาะ admin/manager ที่เปลี่ยนได้
+        // tier_level — เฉพาะ admin/manager/cashier ที่เปลี่ยนได้
         if (isset($data['tier_level']) && (int)$data['tier_level'] !== (int)($current['tier_level'] ?? 1)) {
-            $this->requireAuth(['admin', 'manager']);
+            $this->requireAuth(['admin', 'manager', 'cashier']);
             $newTier = (int)$data['tier_level'];
             if ($newTier < 1 || $newTier > 3) {
                 Response::error('ระดับราคาพิเศษไม่ถูกต้อง (1-3)', 400);

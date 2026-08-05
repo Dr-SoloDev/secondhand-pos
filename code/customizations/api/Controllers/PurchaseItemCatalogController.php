@@ -50,7 +50,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function createItem()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'cashier']);
         $data = $this->getRequestData();
         $model = new PurchaseItemCatalog();
         try {
@@ -68,7 +68,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function updateItem($id = null)
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'cashier']);
         if (!$id) {
             $data = $this->getRequestData();
             $id = $data['id'] ?? null;
@@ -115,7 +115,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function updateCategory()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'cashier']);
         $data = json_decode(file_get_contents('php://input'), true);
         $catalogId = $data['catalog_id'] ?? null;
         $categoryId = $data['category_id'] ?? null;
