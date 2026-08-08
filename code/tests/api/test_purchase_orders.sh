@@ -42,6 +42,32 @@ test_purchase_orders() {
   assert_contains "$res" '"status":"success"' "Create PO with items"
   assert_contains "$res" '"reference_no"' "PO has reference number"
 
+  # SEC-04: replaying a completed request returns HTTP 409 and the original
+  # document identity without creating another purchase order.
+  local po_idempotency_key po_idempotency_payload po_idempotency_first
+  local po_idempotency_second po_idempotency_body po_idempotency_code
+  local po_idempotency_first_id po_idempotency_second_id
+  po_idempotency_key="qa-po-idem-$$-$(date +%s)"
+  po_idempotency_payload="{
+    \"branch_id\":$branch_id,
+    \"seller_id\":$seller_id,
+    \"payment_method\":\"bank_transfer\",
+    \"idempotency_key\":\"$po_idempotency_key\",
+    \"items\":[{\"item_name\":\"SEC-04 PO\",\"category_id\":$cat_id,\"quantity\":0.01,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+  }"
+  po_idempotency_first=$(api_post "purchase-orders" "$po_idempotency_payload")
+  po_idempotency_first_id=$(echo "$po_idempotency_first" | json_get "data.id" 2>/dev/null)
+  assert_contains "$po_idempotency_first" '"status":"success"' "SEC-04: First PO request succeeds"
+  po_idempotency_second=$(curl -s -w $'\n%{http_code}' -b "$COOKIE_JAR" \
+    "$API_BASE/purchase-orders" -X POST -H 'Content-Type: application/json' \
+    -d "$po_idempotency_payload")
+  po_idempotency_code="${po_idempotency_second##*$'\n'}"
+  po_idempotency_body="${po_idempotency_second%$'\n'*}"
+  po_idempotency_second_id=$(echo "$po_idempotency_body" | json_get "data.id" 2>/dev/null)
+  assert_eq "409" "$po_idempotency_code" "SEC-04: Repeated PO request is rejected with HTTP 409"
+  assert_eq "$po_idempotency_first_id" "$po_idempotency_second_id" "SEC-04: Repeated PO returns the original document"
+  assert_contains "$po_idempotency_body" 'Duplicate request' "SEC-04: Repeated PO response is explicit"
+
   # 3. Create PO without items — rejected
   local fail_res
   fail_res=$(api_post "purchase-orders" "{

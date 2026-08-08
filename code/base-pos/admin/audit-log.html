@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>บันทึกการใช้งาน - รักษ์สะอาดรีไซเคิล</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+  <style>
+    .audit-filters { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:10px; }
+    .audit-filter-actions { display:flex; align-items:flex-end; gap:8px; grid-column:span 2; }
+    .audit-filter-actions .btn { min-height:38px; }
+    .audit-details { max-width:340px; }
+    .audit-details summary { cursor:pointer; color:#92400e; }
+    .audit-json { margin:8px 0 0; padding:8px; max-height:220px; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#f8fafc; border:1px solid #e2e8f0; font-size:11px; }
+    .audit-outcome-success { color:#047857; font-weight:600; }
+    .audit-outcome-denied,.audit-outcome-failure { color:#b91c1c; font-weight:600; }
+    @media (max-width:1100px) { .audit-filters { grid-template-columns:repeat(2,minmax(140px,1fr)); } }
+    @media (max-width:640px) { .audit-filters { grid-template-columns:1fr; } .audit-filter-actions { grid-column:span 1; flex-wrap:wrap; } }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon">
+          <span>รักษ์สะอาด</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="catalog.html"><i class="icon-additem"></i><span>แคตตาล็อกสินค้า</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li><a href="cash-sessions.html"><i class="icon-money"></i><span>เปิด-ปิดยอด</span></a></li>
+        <li><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
+        <li><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+        <li><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+        <li><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li><a href="audit-log.html" class="active"><i class="icon-report"></i><span>บันทึกการใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+      </ul>
+    </aside>
+
+    <main class="content-area">
+      <div class="topbar">
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle" type="button">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="currentUser"></span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-header">
+        <h1>บันทึกการใช้งาน</h1>
+      </div>
+
+      <section class="card">
+        <div class="card-body">
+          <form id="auditFilterForm" class="audit-filters">
+            <input type="datetime-local" id="auditStart" class="form-control" aria-label="วันที่เริ่มต้น">
+            <input type="datetime-local" id="auditEnd" class="form-control" aria-label="วันที่สิ้นสุด">
+            <select id="auditRole" class="form-control" aria-label="สิทธิผู้ใช้">
+              <option value="">ทุกสิทธิ</option><option value="cashier">Cashier</option><option value="manager">Manager</option>
+              <option value="super_manager">Super manager</option><option value="admin">Admin</option><option value="system">System</option>
+            </select>
+            <select id="auditBranch" class="form-control" aria-label="สาขา"><option value="">ทุกสาขา</option></select>
+            <select id="auditUser" class="form-control" aria-label="ผู้ใช้"><option value="">ผู้ใช้ทั้งหมด</option></select>
+            <input type="text" id="auditModule" class="form-control" placeholder="Module">
+            <input type="text" id="auditAction" class="form-control" placeholder="Action">
+            <input type="text" id="auditEntity" class="form-control" placeholder="Entity / Reference">
+            <select id="auditOutcome" class="form-control" aria-label="ผลลัพธ์">
+              <option value="">ทุกผลลัพธ์</option><option value="success">Success</option><option value="denied">Denied</option><option value="failure">Failure</option>
+            </select>
+            <input type="search" id="auditKeyword" class="form-control" placeholder="ค้นหารายละเอียด">
+            <div class="audit-filter-actions">
+              <button class="btn btn-primary" type="submit">ค้นหา</button>
+              <button class="btn btn-secondary" type="button" id="auditReset">ล้าง</button>
+              <button class="btn btn-secondary" type="button" id="auditExport">Export CSV</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-body">
+          <div class="table-container">
+            <table class="data-table" id="auditTable">
+              <thead><tr><th>วันเวลา</th><th>ผู้ใช้</th><th>สิทธิ / สาขา</th><th>Module / Action</th><th>Entity</th><th>ผลลัพธ์</th><th>รายละเอียด</th></tr></thead>
+              <tbody><tr><td colspan="7" class="text-center">กำลังโหลด...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="auditPagination"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="notification-container"></div>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/audit-log.js"></script>
+  <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
+</body>
+</html>

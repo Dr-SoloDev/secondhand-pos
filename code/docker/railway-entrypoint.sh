@@ -14,21 +14,11 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
-# Initialize DB schema if empty
-TABLE_COUNT=$(mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
-    -se "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME'" 2>/dev/null || echo "0")
-
-if [ "$TABLE_COUNT" -lt "5" ]; then
-    echo "Loading base schema..."
-    mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
-        < /var/www/html/database/pos_system.sql
-    echo "Running migrations..."
-    for f in $(ls /var/www/customizations/database/migrations/*.sql 2>/dev/null | sort); do
-        echo "  $f"
-        mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$f" 2>/dev/null || true
-    done
-    echo "DB initialized"
-fi
+# Initialize an empty database, then apply every pending tracked migration.
+# Any migration failure must stop startup so an incompatible release is never served.
+echo "Applying database migrations..."
+bash /var/www/customizations/database/run-migrations.sh "$DB_USER" "$DB_PASS"
+echo "Database migrations complete"
 
 echo "Starting Apache..."
 exec apache2-foreground

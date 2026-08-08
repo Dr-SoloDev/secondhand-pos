@@ -1,6 +1,7 @@
 const API_REQUEST_TIMEOUT_MS = 15000;
 let pendingApiRequests = 0;
 let slowApiRequestTimer = null;
+let appPermissionsPromise = null;
 
 // === Cart State Protection ===
 // ป้องกันข้อมูลหายเมื่อ token expire
@@ -89,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const userJson = localStorage.getItem('posUser');
   if (userJson) {
     const user = JSON.parse(userJson);
-    applyRoleNavigation(user);
+    loadAppPermissions();
     const userNameElem = document.querySelector('.user-name');
     if (userNameElem) {
       userNameElem.textContent = user.full_name || user.username;
@@ -112,40 +113,83 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-function applyRoleNavigation(user) {
-  const role = user?.role || '';
-  const isAdmin = role === 'admin';
-  const isSuperManager = role === 'super_manager';
-
-  if (!isAdmin) {
-    document.querySelectorAll('.admin-only').forEach((el) => {
-      const href = el.querySelector('a')?.getAttribute('href') || '';
-      const canReadFinancial = isSuperManager && href.includes('financial-summary.html');
-      el.style.display = canReadFinancial ? '' : 'none';
+function loadAppPermissions() {
+  if (appPermissionsPromise) return appPermissionsPromise;
+  appPermissionsPromise = fetch(`${apiPath}/auth/permissions`, { credentials: 'include' })
+    .then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.status !== 'success') {
+        if (response.status === 401) {
+          localStorage.removeItem('posUser');
+          window.location.replace(`${basePath}/index.html?expired=1`);
+        }
+        throw new Error(result.message || 'Unable to load permissions');
+      }
+      window.appPermissions = result.data;
+      syncStoredUserFromPermissions(result.data);
+      applyPermissionNavigation(result.data);
+      applyActionPermissions(result.data);
+      guardCurrentPage(result.data);
+      document.dispatchEvent(new CustomEvent('apppermissionsready', { detail: result.data }));
+      return result.data;
+    })
+    .catch((error) => {
+      console.error('Permission loading failed:', error);
+      return null;
     });
+  return appPermissionsPromise;
+}
+
+function syncStoredUserFromPermissions(permissions) {
+  try {
+    const stored = JSON.parse(localStorage.getItem('posUser') || '{}');
+    stored.role = permissions.role;
+    stored.branch_id = permissions.branch_id;
+    localStorage.setItem('posUser', JSON.stringify(stored));
+  } catch (error) {
+    console.error('Unable to refresh stored user scope:', error);
   }
+}
 
-  if (!isSuperManager) return;
-
-  const blockedLinks = [
-    'users.html',
-    'settings.html',
-    'branches.html',
-    'employees.html',
-    'expenses.html',
-    'stock-transfers.html',
-    'price-board.html',
-  ];
-
-  document.querySelectorAll('a').forEach((link) => {
+function applyPermissionNavigation(permissions) {
+  const pages = permissions?.pages || {};
+  document.querySelectorAll('a[href]').forEach((link) => {
     const href = link.getAttribute('href') || '';
-    if (blockedLinks.some((blocked) => href.includes(blocked))) {
-      const item = link.closest('li');
-      const wrapper = item || link;
+    const page = href.split('#')[0].split('?')[0].split('/').pop();
+    if (page && Object.prototype.hasOwnProperty.call(pages, page) && !pages[page]) {
+      const wrapper = link.closest('.sidebar-menu li') || link;
       wrapper.style.display = 'none';
+      wrapper.setAttribute('aria-hidden', 'true');
     }
   });
 }
+
+function applyActionPermissions(permissions) {
+  document.querySelectorAll('[data-permission]').forEach((element) => {
+    if (!hasAppPermission(element.dataset.permission, permissions)) {
+      element.style.display = 'none';
+      element.setAttribute('aria-hidden', 'true');
+    }
+  });
+}
+
+function guardCurrentPage(permissions) {
+  const page = window.location.pathname.split('/').pop() || 'index.html';
+  const pages = permissions?.pages || {};
+  if (Object.prototype.hasOwnProperty.call(pages, page) && !pages[page]) {
+    window.location.replace(`${basePath}/admin/index.html?forbidden=1`);
+  }
+}
+
+function hasAppPermission(path, permissions = window.appPermissions) {
+  if (!path || !permissions) return false;
+  return path.split('.').reduce((value, part) => (
+    value && Object.prototype.hasOwnProperty.call(value, part) ? value[part] : undefined
+  ), permissions) === true;
+}
+
+window.getAppPermissions = loadAppPermissions;
+window.hasAppPermission = hasAppPermission;
 
 // ตรวจสอบ auth และ return user object — redirect ถ้าไม่ได้ login
 async function requireAuth() {
@@ -243,6 +287,15 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function formatNumber(value, fractionDigits = 2) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return (0).toFixed(fractionDigits);
+  return number.toLocaleString('th-TH', {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits
+  });
 }
 
 // Format currency

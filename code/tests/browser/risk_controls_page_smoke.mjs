@@ -156,6 +156,7 @@ async function run() {
     ];
     for (const [page, selector] of pages) {
       await navigate(cdp, `${BASE_URL}/admin/${page}.html?risk_smoke=${Date.now()}`);
+      await waitFor(cdp, `window.appPermissions?.role === 'admin'`);
       await waitFor(cdp, `document.querySelector(${JSON.stringify(selector)}) && document.querySelector(${JSON.stringify(selector)}).textContent.trim().length > 0`);
       await delay(500);
       snapshots.push(await pageSnapshot(cdp, `admin-desktop-${page}`));
@@ -177,6 +178,7 @@ async function run() {
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
     for (const page of ['cash-sessions', 'expenses', 'stock-transfers']) {
       await navigate(cdp, `${BASE_URL}/admin/${page}.html?risk_mobile=${Date.now()}`);
+      await waitFor(cdp, `window.appPermissions?.role === 'admin'`);
       await waitFor(cdp, 'document.body && document.body.textContent.trim().length > 0');
       await delay(600);
       snapshots.push(await pageSnapshot(cdp, `admin-mobile-${page}`));
@@ -194,7 +196,7 @@ async function run() {
       sourceValue:document.querySelector('#fromBranch')?.value || ''
     })`);
     if (!managerState.transferLinkVisible || !managerState.sourceDisabled || managerState.sourceValue !== '2') issues.push(`Manager transfer scope is wrong: ${JSON.stringify(managerState)}`);
-    if (managerState.saleLotLinkVisible) issues.push('Manager can see Sale Lot navigation');
+    if (!managerState.saleLotLinkVisible) issues.push('Manager cannot see Sale Lot navigation');
 
     const relevantNetwork = networkErrors.filter(item => !item.url.includes('favicon') && !item.url.includes('/auth/verify'));
     if (consoleErrors.length) issues.push(`Console errors: ${JSON.stringify(consoleErrors.slice(0,8))}`);

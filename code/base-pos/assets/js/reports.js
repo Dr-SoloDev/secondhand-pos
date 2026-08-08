@@ -3,6 +3,7 @@ let branches = [];
 let currentBranchId = null;
 let currentBranchName = '';
 let currentReportMonth = '';
+let reportPermissions = null;
 
 const reportState = {
   summary: null,
@@ -22,19 +23,19 @@ async function initReports() {
     return;
   }
 
-  if (!['admin', 'manager', 'super_manager'].includes(currentUser.role)) {
-    showNotification('หน้านี้สำหรับผู้จัดการสาขาเท่านั้น', 'error');
+  reportPermissions = await getAppPermissions();
+  if (!reportPermissions || !hasAppPermission('actions.reports.operational', reportPermissions)) {
     window.location.href = 'index.html';
     return;
   }
-
-  if (currentUser.role !== 'admin' && currentUser.role !== 'super_manager') {
-    document.querySelectorAll('.admin-only').forEach((el) => {
-      el.style.display = 'none';
+  if (!hasAppPermission('actions.reports.full', reportPermissions)) {
+    ['branchSummaryCard', 'saleLotsCard', 'employeesCard', 'taxCard'].forEach(id => {
+      const card = document.getElementById(id);
+      if (card) card.style.display = 'none';
     });
   }
 
-  const isFullAccess = ['admin', 'super_manager'].includes(currentUser.role);
+  const isFullAccess = reportPermissions.multi_branch;
   currentBranchId = isFullAccess ? '' : (currentUser.branch_id ? String(currentUser.branch_id) : '');
   if (!isFullAccess && !currentBranchId) {
     showNotification('ไม่พบสาขาที่ผูกกับบัญชีนี้', 'error');
@@ -50,11 +51,11 @@ async function initReports() {
   bindEvents();
   updateScopeLabels();
   setLoadingState();
-  await Promise.all([
-    loadMonthlyReports(),
-    loadEmployeesReport(),
-    loadTaxReport(),
-  ]);
+  const initialLoads = [loadMonthlyReports()];
+  if (hasAppPermission('actions.reports.full', reportPermissions)) {
+    initialLoads.push(loadEmployeesReport(), loadTaxReport());
+  }
+  await Promise.all(initialLoads);
 }
 
 function bindEvents() {
@@ -139,7 +140,7 @@ function setupBranchSelector() {
 }
 
 function canViewAllBranches() {
-  return ['admin', 'super_manager'].includes(currentUser?.role);
+  return reportPermissions?.multi_branch === true;
 }
 
 function updateCurrentBranchName() {
@@ -174,11 +175,11 @@ function getReportPeriodText(key) {
 }
 
 async function reloadAllReports() {
-  await Promise.all([
-    loadMonthlyReports(),
-    loadEmployeesReport(),
-    loadTaxReport(),
-  ]);
+  const loads = [loadMonthlyReports()];
+  if (hasAppPermission('actions.reports.full', reportPermissions)) {
+    loads.push(loadEmployeesReport(), loadTaxReport());
+  }
+  await Promise.all(loads);
 }
 
 function getCurrentMonthValue() {
@@ -281,11 +282,11 @@ function setSummaryLoading() {
 async function loadMonthlyReports() {
   const range = getMonthRange(currentReportMonth);
 
-  await Promise.all([
-    loadBranchSummary(range),
-    loadPurchaseItems(range),
-    loadSaleLots(range),
-  ]);
+  const loads = [loadPurchaseItems(range)];
+  if (hasAppPermission('actions.reports.full', reportPermissions)) {
+    loads.push(loadBranchSummary(range), loadSaleLots(range));
+  }
+  await Promise.all(loads);
 }
 
 async function loadBranchSummary(range) {

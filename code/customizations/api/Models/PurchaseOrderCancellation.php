@@ -37,6 +37,19 @@ class PurchaseOrderCancellation extends Model
         ) ?: [];
     }
 
+    public function findRequestWithBranch(int $requestId): ?array
+    {
+        return $this->db->fetch(
+            "SELECT r.id, r.requested_by, r.status,
+                    po.user_id AS purchase_created_by, po.branch_id,
+                    po.source_type, po.created_at AS purchase_created_at
+             FROM purchase_order_cancellation_requests r
+             JOIN purchase_orders po ON po.id = r.purchase_order_id
+             WHERE r.id = ?",
+            [$requestId]
+        ) ?: null;
+    }
+
     public function request(int $purchaseOrderId, string $reason, int $requesterId): array
     {
         $reason = substr(trim($reason), 0, 500);
@@ -100,7 +113,7 @@ class PurchaseOrderCancellation extends Model
         }
     }
 
-    public function approve(int $requestId, int $approverId, ?string $reviewNote = null): void
+    public function approve(int $requestId, int $approverId, ?string $reviewNote = null, bool $allowAdminSelfApproval = false): void
     {
         $this->db->beginTransaction();
         try {
@@ -118,8 +131,9 @@ class PurchaseOrderCancellation extends Model
             if (($request['status'] ?? '') !== 'pending') {
                 throw new Exception('คำขอนี้ถูกดำเนินการแล้ว');
             }
-            if ((int)$request['requested_by'] === $approverId
-                || (int)$request['purchase_created_by'] === $approverId) {
+            if (!$allowAdminSelfApproval
+                && ((int)$request['requested_by'] === $approverId
+                    || (int)$request['purchase_created_by'] === $approverId)) {
                 throw new Exception('ผู้สร้างรายการหรือผู้ส่งคำขอไม่สามารถอนุมัติรายการตัวเองได้');
             }
             if (($request['source_type'] ?? 'manual') !== 'manual') {

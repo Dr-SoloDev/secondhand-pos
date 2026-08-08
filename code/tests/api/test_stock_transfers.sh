@@ -191,6 +191,11 @@ test_stock_transfers() {
 
   res=$(curl -s -b "$destination_cookie" "$API_BASE/stock-transfers/confirm" \
     -X POST -H 'Content-Type: application/json' \
+    -d "{\"id\":$multi_transfer_id,\"items\":[{\"id\":$multi_line_one_id,\"received_weight_kg\":1.26,\"receive_note\":\"QA over-receipt guard\"},{\"id\":$multi_line_two_id,\"received_weight_kg\":0.80}]}")
+  assert_contains "$res" '"status":"error"' "Transfer: Cannot receive above ordered weight"
+
+  res=$(curl -s -b "$destination_cookie" "$API_BASE/stock-transfers/confirm" \
+    -X POST -H 'Content-Type: application/json' \
     -d "{
       \"id\":$multi_transfer_id,
       \"confirmed_by\":1,
@@ -221,7 +226,7 @@ test_stock_transfers() {
   assert_eq "ผู้จัดการสาขา 4" "$multi_confirmed_by" "Transfer: Confirmed by authenticated destination manager"
 
   # Transfer-generated POs are provenance records and cannot be cancelled directly.
-  local generated_po_id reversal_id self_reversal_id reversal_source_item_id
+  local generated_po_id reversal_id self_reversal_id reversal_source_item_id manager_approval_reversal_id
   res=$(api_get "purchase-orders?branch_id=$multi_destination_branch&limit=100")
   generated_po_id=$(echo "$res" | python3 -c "import sys,json; d=json.load(sys.stdin); sid=int(sys.argv[1]); rows=d.get('data',{}).get('items',[]); row=next((r for r in rows if r.get('source_type') == 'stock_transfer' and int(r.get('source_id') or 0) == sid), {}); print(row.get('id',''))" "$multi_transfer_id" 2>/dev/null)
   assert_neq "" "$generated_po_id" "Transfer reversal: Generated PO stores transfer provenance"
@@ -229,18 +234,29 @@ test_stock_transfers() {
   assert_contains "$res" '"status":"error"' "Transfer reversal: Generated PO cannot be cancelled directly"
   assert_contains "$res" 'โอนสต็อก' "Transfer reversal: Generated PO directs user to reversal workflow"
 
-  # An admin may request a reversal, but the same admin may not approve it.
+  # Owner may override and self-approve a reversal; the regular confirm
+  # endpoint must still reject the reversal workflow.
   res=$(api_get "stock-transfers?status=confirmed")
   reversal_source_item_id=$(echo "$res" | python3 -c "import sys,json; d=json.load(sys.stdin); tid=int(sys.argv[1]); rows=d.get('data',{}).get('items',[]); row=next((r for r in rows if int(r.get('id',0)) == tid), {}); items=row.get('items',[]); print(items[0].get('id','') if items else '')" "$transfer_id" 2>/dev/null)
   res=$(api_post "stock-transfers/reversal-request" "{\"id\":$transfer_id,\"reason\":\"QA admin self approval guard\",\"items\":[{\"source_transfer_item_id\":$reversal_source_item_id,\"weight_kg\":0.25}]}")
   self_reversal_id=$(stock_transfer_extract_id "$res")
   assert_contains "$res" '"status":"success"' "Transfer reversal: Admin can submit request"
   res=$(api_post "stock-transfers/reversal-approve" "{\"id\":$self_reversal_id}")
-  assert_contains "$res" '"status":"error"' "Transfer reversal: Requester cannot approve own request"
+  assert_contains "$res" '"status":"success"' "Transfer reversal: Admin may self-approve with override"
   res=$(api_post "stock-transfers/confirm" "{\"id\":$self_reversal_id}")
   assert_contains "$res" '"status":"error"' "Transfer reversal: Regular confirm endpoint cannot bypass approval"
 
-  # Destination manager requests a full return; only admin may approve it.
+  # A manager may approve a reversal created by another actor when the
+  # reversal originates from the manager's branch.
+  res=$(api_post "stock-transfers/reversal-request" "{\"id\":$transfer_id,\"reason\":\"QA manager reversal approval\",\"items\":[{\"source_transfer_item_id\":$reversal_source_item_id,\"weight_kg\":0.25}]}")
+  manager_approval_reversal_id=$(stock_transfer_extract_id "$res")
+  assert_contains "$res" '"status":"success"' "Transfer reversal: Admin creates manager-review request"
+  res=$(curl -s -b "$manager_cookie" "$API_BASE/stock-transfers/reversal-approve" \
+    -X POST -H 'Content-Type: application/json' -d "{\"id\":$manager_approval_reversal_id,\"review_note\":\"QA manager approved\"}")
+  assert_contains "$res" '"status":"success"' "Transfer reversal: Destination manager approves in-branch request"
+
+  # Destination manager requests a full return; a different reviewer must
+  # approve it (the same manager remains blocked by the self-approval guard).
   res=$(curl -s -b "$destination_cookie" "$API_BASE/stock-transfers/reversal-request" \
     -X POST -H 'Content-Type: application/json' \
     -d "{

@@ -49,6 +49,30 @@ test_sale_lots() {
     assert_contains "$res" '"status":"success"' "Delete draft sale lot"
   fi
 
+  local lot_idempotency_key lot_idempotency_payload lot_idempotency_first
+  local lot_idempotency_second lot_idempotency_body lot_idempotency_code
+  local lot_idempotency_first_id lot_idempotency_second_id
+  lot_idempotency_key="qa-lot-idem-$$-$(date +%s)"
+  lot_idempotency_payload="{
+    \"branch_id\":$branch_id,
+    \"buyer_name\":\"SEC-04 Buyer\",
+    \"sale_date\":\"$(date +%Y-%m-%d)\",
+    \"idempotency_key\":\"$lot_idempotency_key\",
+    \"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.001,\"unit_price\":1}]
+  }"
+  lot_idempotency_first=$(api_post "sale-lots" "$lot_idempotency_payload")
+  lot_idempotency_first_id=$(echo "$lot_idempotency_first" | json_get "data.id" 2>/dev/null)
+  assert_contains "$lot_idempotency_first" '"status":"success"' "SEC-04: First Sale Lot request succeeds"
+  lot_idempotency_second=$(curl -s -w $'\n%{http_code}' -b "$COOKIE_JAR" \
+    "$API_BASE/sale-lots" -X POST -H 'Content-Type: application/json' \
+    -d "$lot_idempotency_payload")
+  lot_idempotency_code="${lot_idempotency_second##*$'\n'}"
+  lot_idempotency_body="${lot_idempotency_second%$'\n'*}"
+  lot_idempotency_second_id=$(echo "$lot_idempotency_body" | json_get "data.id" 2>/dev/null)
+  assert_eq "409" "$lot_idempotency_code" "SEC-04: Repeated Sale Lot request is rejected with HTTP 409"
+  assert_eq "$lot_idempotency_first_id" "$lot_idempotency_second_id" "SEC-04: Repeated Sale Lot returns the original document"
+  assert_contains "$lot_idempotency_body" 'Duplicate request' "SEC-04: Repeated Sale Lot response is explicit"
+
   # 3. Create sale lot without category_id — rejected
   local fail_res
   fail_res=$(api_post "sale-lots" "{

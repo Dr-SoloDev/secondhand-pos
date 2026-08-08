@@ -96,7 +96,7 @@ class BusinessExpense extends Model
         }
     }
 
-    public function approve(int $id, int $approverId, string $approverRole, ?string $reviewNote = null): void
+    public function approve(int $id, int $approverId, string $approverRole, ?string $reviewNote = null, bool $allowSelfApproval = false): void
     {
         $this->db->beginTransaction();
         try {
@@ -104,7 +104,7 @@ class BusinessExpense extends Model
             if (!$expense || $expense['status'] !== 'pending') {
                 throw new Exception('ไม่พบคำขอรายจ่ายที่รออนุมัติ');
             }
-            if ((int)$expense['requested_by'] === $approverId) {
+            if (!$allowSelfApproval && (int)$expense['requested_by'] === $approverId) {
                 throw new Exception('ผู้ส่งคำขอไม่สามารถอนุมัติรายการตัวเองได้');
             }
             $amount = (float)$expense['amount'];

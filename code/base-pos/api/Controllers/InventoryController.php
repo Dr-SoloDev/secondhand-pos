@@ -379,8 +379,11 @@ class InventoryController extends Controller
 
     public function createTransaction()
     {
-        // Check permissions
-        $this->requireAuth(['admin', 'manager']);
+        // Direct legacy-product adjustments are an Owner-only operation.
+        // Branch users must use an approved business document (PO, Sale Lot,
+        // transfer, or adjustment workflow) so inventory cannot be changed
+        // without a branch-scoped audit trail.
+        $this->requireAuth(['admin']);
 
         // Get and validate request data
         $data = $this->getRequestData();

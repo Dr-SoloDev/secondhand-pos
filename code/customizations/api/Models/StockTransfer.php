@@ -164,7 +164,7 @@ class StockTransfer extends Model
         ];
     }
 
-    public function confirm($id, $userId, $data = [], bool $allowReversal = false)
+    public function confirm($id, $userId, $data = [], bool $allowReversal = false, bool $allowSelfApproval = false)
     {
         $this->db->beginTransaction();
         try {
@@ -189,7 +189,7 @@ class StockTransfer extends Model
                 if (($st['approval_status'] ?? '') !== 'pending') {
                     throw new Exception('สถานะอนุมัติใบโอนย้อนกลับไม่ถูกต้อง');
                 }
-                if ((int)$st['created_by'] === (int)$userId) {
+                if (!$allowSelfApproval && (int)$st['created_by'] === (int)$userId) {
                     throw new Exception('ผู้สร้างคำขอไม่สามารถอนุมัติรายการตัวเองได้');
                 }
             }
@@ -515,11 +515,11 @@ class StockTransfer extends Model
         }
     }
 
-    public function approveReversal(int $id, int $adminId, ?string $reviewNote = null): void
+    public function approveReversal(int $id, int $userId, ?string $reviewNote = null, bool $allowSelfApproval = false): void
     {
-        $this->confirm($id, $adminId, [
+        $this->confirm($id, $userId, [
             'review_note' => $reviewNote,
-        ], true);
+        ], true, $allowSelfApproval);
     }
 
     public function rejectReversal(int $id, int $adminId, string $reviewNote): void
@@ -723,6 +723,7 @@ class StockTransfer extends Model
                 $receivedWeight = $transferCount === 1 && $receivedWeightFallback !== null
                     ? $receivedWeightFallback
                     : round((float)$transferItem['weight_kg'], 3);
+                $this->assertReceivedWeightWithinOrder($receivedWeight, (float)$transferItem['weight_kg']);
                 $note = $receiveNoteFallback;
                 if (abs($receivedWeight - (float)$transferItem['weight_kg']) > 0.001 && empty($note)) {
                     throw new Exception('น้ำหนักรับจริงไม่ตรง กรุณาระบุหมายเหตุ');
@@ -821,6 +822,7 @@ class StockTransfer extends Model
             $usedRequests[$requestIndex] = true;
 
             $receivedWeight = (float)$source['_received_weight_kg'];
+            $this->assertReceivedWeightWithinOrder($receivedWeight, (float)$transferItem['weight_kg']);
             $note = $this->extractReceiveNote($source, $receiveNoteFallback);
             if (abs($receivedWeight - (float)$transferItem['weight_kg']) > 0.001 && empty($note)) {
                 throw new Exception('น้ำหนักรับจริงไม่ตรง กรุณาระบุหมายเหตุ');
@@ -841,6 +843,13 @@ class StockTransfer extends Model
         }
 
         return $normalized;
+    }
+
+    private function assertReceivedWeightWithinOrder(float $receivedWeight, float $orderedWeight): void
+    {
+        if ($receivedWeight - $orderedWeight > 0.0001) {
+            throw new Exception('น้ำหนักรับจริงเกินน้ำหนักในใบโอน');
+        }
     }
 
     private function extractReceiveNote($source, ?string $fallback): ?string
@@ -930,10 +939,11 @@ class StockTransfer extends Model
 
     private function getTransferSellerId($branchId)
     {
-        $idCard = 'TRANSFER0000';
         $sellerId = $this->db->fetchColumn(
-            "SELECT id FROM sellers WHERE id_card = ? LIMIT 1",
-            [$idCard]
+            "SELECT id FROM sellers
+             WHERE full_name = 'โอนสต็อกระหว่างสาขา'
+               AND notes = 'system placeholder สำหรับ stock transfer'
+             LIMIT 1"
         );
         if ($sellerId) {
             return (int)$sellerId;
@@ -941,9 +951,9 @@ class StockTransfer extends Model
 
         $stmt = $this->db->prepare(
             "INSERT INTO sellers (id_card, full_name, notes)
-             VALUES (?, 'โอนสต็อกระหว่างสาขา', 'system placeholder สำหรับ stock transfer')"
+             VALUES (NULL, 'โอนสต็อกระหว่างสาขา', 'system placeholder สำหรับ stock transfer')"
         );
-        $this->db->execute($stmt, [$idCard]);
+        $this->db->execute($stmt);
         return (int)$this->db->lastInsertId();
     }
 

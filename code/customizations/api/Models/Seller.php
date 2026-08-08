@@ -3,13 +3,33 @@ class Seller extends Model
 {
     protected $table = 'sellers';
 
+    private function decryptRow($row)
+    {
+        if (!$row) return $row;
+        if (!empty($row['id_card_encrypted'])) {
+            $row['id_card'] = SellerIdCipher::decrypt($row['id_card_encrypted']);
+        } else {
+            $row['id_card'] = $row['id_card'] ?? null;
+        }
+        unset($row['id_card_encrypted'], $row['id_card_search_hash'], $row['id_card_key_version']);
+        return $row;
+    }
+
+    private function decryptRows($rows)
+    {
+        foreach ($rows as &$row) $row = $this->decryptRow($row);
+        unset($row);
+        return $rows;
+    }
+
     /**
      * ดึงผู้ขายทั้งหมด
      */
     public function getAll($includeBlacklisted = false)
     {
         $query = "SELECT
-                    id, id_card, full_name, phone, address, vehicle_plate, vehicle_type,
+                    id, id_card, id_card_encrypted, id_card_search_hash, id_card_key_version,
+                    full_name, phone, address, vehicle_plate, vehicle_type,
                     id_card_photo, is_blacklisted, blacklist_reason, blacklisted_at,
                     notes, tier_level,
                     total_transactions, total_amount,
@@ -22,7 +42,7 @@ class Seller extends Model
         
         $query .= " ORDER BY created_at DESC";
         
-        return $this->db->fetchAll($query);
+        return $this->decryptRows($this->db->fetchAll($query));
     }
 
     /**
@@ -31,7 +51,7 @@ class Seller extends Model
     public function getById($id)
     {
         $query = "SELECT * FROM {$this->table} WHERE id = ?";
-        return $this->db->fetch($query, [$id]);
+        return $this->decryptRow($this->db->fetch($query, [$id]));
     }
 
     /**
@@ -40,7 +60,7 @@ class Seller extends Model
     public function findByPhone($phone)
     {
         $query = "SELECT * FROM {$this->table} WHERE phone = ?";
-        return $this->db->fetch($query, [$phone]);
+        return $this->decryptRow($this->db->fetch($query, [$phone]));
     }
 
     /**
@@ -48,8 +68,12 @@ class Seller extends Model
      */
     public function findByIdCard($idCard)
     {
-        $query = "SELECT * FROM {$this->table} WHERE id_card = ?";
-        return $this->db->fetch($query, [$idCard]);
+        $idCard = SellerIdCipher::normalize($idCard);
+        $query = "SELECT * FROM {$this->table}
+                  WHERE id_card_search_hash = ?
+                     OR (id_card_search_hash IS NULL AND id_card = ?)
+                  LIMIT 1";
+        return $this->decryptRow($this->db->fetch($query, [SellerIdCipher::searchHash($idCard), $idCard]));
     }
 
     /**
@@ -59,7 +83,10 @@ class Seller extends Model
     {
         $query = "SELECT id,
                          full_name            AS name,
-                         id_card              AS national_id,
+                         id_card,
+                         id_card_encrypted,
+                         id_card_search_hash,
+                         id_card_key_version,
                          phone,
                          id_card_photo,
                           vehicle_plate, vehicle_type,
@@ -71,13 +98,26 @@ class Seller extends Model
                          total_amount,
                          last_transaction_at
                   FROM {$this->table}
-                  WHERE (full_name LIKE ? OR id_card LIKE ? OR phone LIKE ?)";
+                  WHERE (full_name LIKE ? OR phone LIKE ?";
+        $params = ["%{$keyword}%", "%{$keyword}%"];
+        $digits = preg_replace('/\D/', '', $keyword);
+        if (strlen($digits) === 13) {
+            $query .= " OR id_card_search_hash = ? OR (id_card_search_hash IS NULL AND id_card = ?)";
+            $params[] = SellerIdCipher::searchHash($digits);
+            $params[] = $digits;
+        }
+        $query .= ')';
         if (!$includeBlacklisted) {
             $query .= " AND is_blacklisted = 0";
         }
         $query .= " ORDER BY full_name ASC LIMIT 20";
-        $t = "%{$keyword}%";
-        return $this->db->fetchAll($query, [$t, $t, $t]);
+        $rows = $this->decryptRows($this->db->fetchAll($query, $params));
+        foreach ($rows as &$row) {
+            $row['national_id'] = $row['id_card'] ?? null;
+            unset($row['id_card']);
+        }
+        unset($row);
+        return $rows;
     }
 
     /**
@@ -126,8 +166,12 @@ class Seller extends Model
             }
         }
 
+        $idCard = !empty($data['id_card']) ? SellerIdCipher::normalize($data['id_card']) : null;
         return $this->insert([
-            'id_card' => !empty($data['id_card']) ? $data['id_card'] : null,
+            'id_card' => null,
+            'id_card_encrypted' => $idCard ? SellerIdCipher::encrypt($idCard) : null,
+            'id_card_search_hash' => $idCard ? SellerIdCipher::searchHash($idCard) : null,
+            'id_card_key_version' => $idCard ? SellerIdCipher::KEY_VERSION : null,
             'full_name' => $data['full_name'],
             'phone' => !empty($data['phone']) ? $data['phone'] : null,
             'address' => !empty($data['address']) ? $data['address'] : null,
@@ -150,14 +194,17 @@ class Seller extends Model
         }
 
         // ตรวจสอบ Checksum เลขบัตรประชาชน (ถ้ามีการเปลี่ยน)
-        if (!empty($data['id_card']) && $data['id_card'] !== $seller['id_card']) {
-            $this->validateIdCard($data['id_card']);
+        $requestedIdCard = array_key_exists('id_card', $data)
+            ? preg_replace('/[^0-9]/', '', (string)$data['id_card'])
+            : null;
+        if ($requestedIdCard !== null && $requestedIdCard !== '' && $requestedIdCard !== ($seller['id_card'] ?? null)) {
+            $this->validateIdCard($requestedIdCard);
         }
 
         // ตรวจสอบบัตรประชาชนซ้ำ (ถ้ามีการเปลี่ยน)
-        if (!empty($data['id_card']) && $data['id_card'] !== $seller['id_card']) {
-            $exists = $this->findByIdCard($data['id_card']);
-            if ($exists) {
+        if ($requestedIdCard !== null && $requestedIdCard !== '' && $requestedIdCard !== ($seller['id_card'] ?? null)) {
+            $exists = $this->findByIdCard($requestedIdCard);
+            if ($exists && (int)$exists['id'] !== (int)$id) {
                 throw new Exception('เลขบัตรประชาชนนี้มีในระบบแล้ว');
             }
         }
@@ -171,7 +218,12 @@ class Seller extends Model
         }
 
         $updateData = [];
-        if (isset($data['id_card'])) $updateData['id_card'] = $data['id_card'];
+        if ($requestedIdCard !== null) {
+            $updateData['id_card'] = null;
+            $updateData['id_card_encrypted'] = $requestedIdCard !== '' ? SellerIdCipher::encrypt($requestedIdCard) : null;
+            $updateData['id_card_search_hash'] = $requestedIdCard !== '' ? SellerIdCipher::searchHash($requestedIdCard) : null;
+            $updateData['id_card_key_version'] = $requestedIdCard !== '' ? SellerIdCipher::KEY_VERSION : null;
+        }
         if (isset($data['full_name'])) $updateData['full_name'] = $data['full_name'];
         if (isset($data['phone'])) $updateData['phone'] = $data['phone'];
         if (isset($data['address'])) $updateData['address'] = $data['address'];

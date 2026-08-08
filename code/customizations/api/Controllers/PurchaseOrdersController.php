@@ -65,7 +65,17 @@ class PurchaseOrdersController extends Controller
             Logger::logActivity(
                 $this->user['user_id'] ?? $this->user['id'],
                 'request_purchase_order_cancellation',
-                "Requested PO cancellation: {$po['reference_no']} (ID: {$id}) reason: {$reason}"
+                "Requested PO cancellation: {$po['reference_no']} (ID: {$id})",
+                [
+                    'actor' => $this->user,
+                    'module' => 'purchase_orders',
+                    'entity_type' => 'purchase_order',
+                    'entity_id' => $id,
+                    'entity_branch_id' => $po['branch_id'] ?? null,
+                    'reason' => $reason,
+                    'before' => ['status' => $po['status']],
+                    'after' => ['cancellation_request_id' => $result['id'], 'status' => 'pending'],
+                ]
             );
             Response::success('ส่งคำขอยกเลิกเพื่อรอผู้มีอำนาจอนุมัติแล้ว', $result);
         } catch (Exception $e) {
@@ -96,19 +106,35 @@ class PurchaseOrdersController extends Controller
 
     public function approveCancellation()
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $requestId = (int)($data['id'] ?? $data['request_id'] ?? 0);
         if (!$requestId) Response::error('ไม่พบรหัสคำขอ', 400);
 
         try {
+            $model = new PurchaseOrderCancellation();
+            $request = $this->assertCancellationReviewAccess($model, $requestId);
             $userId = (int)($this->user['user_id'] ?? $this->user['id']);
-            (new PurchaseOrderCancellation())->approve(
+            $isAdminSelfApproval = ($this->user['role'] ?? '') === 'admin'
+                && ((int)($request['requested_by'] ?? 0) === $userId
+                    || (int)($request['purchase_created_by'] ?? 0) === $userId);
+            $model->approve(
                 $requestId,
                 $userId,
-                isset($data['review_note']) ? (string)$data['review_note'] : null
+                isset($data['review_note']) ? (string)$data['review_note'] : null,
+                $isAdminSelfApproval
             );
-            Logger::logActivity($userId, 'approve_purchase_order_cancellation', "Approved PO cancellation request ID: {$requestId}");
+            $selfApprovalNote = $isAdminSelfApproval ? ' self_approved:1' : '';
+            Logger::logActivity($userId, 'approve_purchase_order_cancellation', "Approved PO cancellation request ID: {$requestId}{$selfApprovalNote}", [
+                'actor' => $this->user,
+                'module' => 'purchase_orders',
+                'entity_type' => 'purchase_order_cancellation',
+                'entity_id' => $requestId,
+                'entity_branch_id' => $request['branch_id'] ?? null,
+                'before' => ['status' => $request['status'] ?? 'pending'],
+                'after' => ['status' => 'approved'],
+                'self_approved' => $isAdminSelfApproval,
+            ]);
             Response::success('อนุมัติและยกเลิกใบรับซื้อแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
@@ -117,16 +143,27 @@ class PurchaseOrdersController extends Controller
 
     public function rejectCancellation()
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $requestId = (int)($data['id'] ?? $data['request_id'] ?? 0);
         $reviewNote = substr(trim((string)($data['review_note'] ?? '')), 0, 500);
         if (!$requestId || $reviewNote === '') Response::error('กรุณาระบุคำขอและเหตุผลที่ปฏิเสธ', 400);
 
         try {
+            $model = new PurchaseOrderCancellation();
+            $request = $this->assertCancellationReviewAccess($model, $requestId);
             $userId = (int)($this->user['user_id'] ?? $this->user['id']);
-            (new PurchaseOrderCancellation())->reject($requestId, $userId, $reviewNote);
-            Logger::logActivity($userId, 'reject_purchase_order_cancellation', "Rejected PO cancellation request ID: {$requestId}");
+            $model->reject($requestId, $userId, $reviewNote);
+            Logger::logActivity($userId, 'reject_purchase_order_cancellation', "Rejected PO cancellation request ID: {$requestId}", [
+                'actor' => $this->user,
+                'module' => 'purchase_orders',
+                'entity_type' => 'purchase_order_cancellation',
+                'entity_id' => $requestId,
+                'entity_branch_id' => $request['branch_id'] ?? null,
+                'reason' => $reviewNote,
+                'before' => ['status' => $request['status'] ?? 'pending'],
+                'after' => ['status' => 'rejected'],
+            ]);
             Response::success('ปฏิเสธคำขอยกเลิกแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
@@ -270,7 +307,19 @@ class PurchaseOrdersController extends Controller
             Logger::logActivity(
                 $this->user['user_id'],
                 'create_purchase_order',
-                "Created PO: {$result['reference_no']} (฿{$result['total_amount']})"
+                "Created PO: {$result['reference_no']}",
+                [
+                    'actor' => $this->user,
+                    'module' => 'purchase_orders',
+                    'entity_type' => 'purchase_order',
+                    'entity_id' => $result['id'],
+                    'entity_branch_id' => $cleanData['branch_id'] ?? null,
+                    'after' => [
+                        'reference_no' => $result['reference_no'],
+                        'total_amount' => $result['total_amount'],
+                        'seller_id' => $cleanData['seller_id'] ?? null,
+                    ],
+                ]
             );
             Response::success('สร้างใบรับซื้อสำเร็จ', $result);
         } catch (Exception $e) {
@@ -570,6 +619,28 @@ class PurchaseOrdersController extends Controller
         if (!$userBranch || (int)$branchId !== $userBranch) {
             Response::error($message, 403);
         }
+    }
+
+    /**
+     * Review actions are branch-scoped for a single-branch manager. The
+     * request is loaded before the model mutation so a forged request id
+     * cannot be used to review another branch's document.
+     */
+    private function assertCancellationReviewAccess(PurchaseOrderCancellation $model, int $requestId): array
+    {
+        $request = $model->findRequestWithBranch($requestId);
+        if (!$request) {
+            Response::error('ไม่พบคำขอยกเลิกใบรับซื้อ', 404);
+        }
+
+        if (($this->user['role'] ?? '') === 'manager') {
+            $userBranch = (int)($this->user['branch_id'] ?? 0);
+            if (!$userBranch || (int)($request['branch_id'] ?? 0) !== $userBranch) {
+                Response::error('ไม่มีสิทธิ์พิจารณาคำขอยกเลิกของสาขาอื่น', 403);
+            }
+        }
+
+        return $request;
     }
 
     private function applyReceiptSettings($po)

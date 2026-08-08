@@ -37,6 +37,12 @@ class SellersController extends Controller
             Response::error('ไม่พบผู้ขายนี้', 404);
         }
 
+        Logger::logActivity($this->user['user_id'], 'view_seller_detail', "Viewed seller ID: {$id}", [
+            'actor' => $this->user,
+            'module' => 'sellers',
+            'entity_type' => 'seller',
+            'entity_id' => $id,
+        ]);
         Response::success('ดึงข้อมูลผู้ขายสำเร็จ', $this->withProtectedSellerPhoto($seller));
     }
 
@@ -89,14 +95,19 @@ class SellersController extends Controller
             $data['id_card'] = $idCard;
         }
 
-        // tier_level — เฉพาะ admin/manager กำหนดได้ตอนเพิ่ม
+        // Cashier may assign the seller tier as part of the purchase workflow.
         if (isset($data['tier_level'])) {
-            $this->requireAuth(['admin', 'manager']);
+            $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
             $tierLevel = (int)$data['tier_level'];
             if ($tierLevel < 1 || $tierLevel > 3) {
                 Response::error('ระดับราคาพิเศษไม่ถูกต้อง (1-3)', 400);
             }
             $data['tier_level'] = $tierLevel;
+        }
+
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'manager', 'super_manager'], true)
+            && !empty($data['is_blacklisted'])) {
+            Response::error('ไม่มีสิทธิ์ขึ้นบัญชีดำผู้ขาย', 403);
         }
 
         // Stamp PDPA consent timestamp on first consent
@@ -114,7 +125,14 @@ class SellersController extends Controller
             Logger::logActivity(
                 $this->user['user_id'],
                 'create_seller',
-                "เพิ่มผู้ขาย: {$data['full_name']}"
+                "Created seller ID: {$sellerId}",
+                [
+                    'actor' => $this->user,
+                    'module' => 'sellers',
+                    'entity_type' => 'seller',
+                    'entity_id' => $sellerId,
+                    'after' => $sellerModel->getById($sellerId),
+                ]
             );
 
             Response::success('เพิ่มผู้ขายสำเร็จ', ['id' => $sellerId]);
@@ -157,6 +175,17 @@ class SellersController extends Controller
             Response::error('ไม่พบผู้ขายนี้', 404);
         }
 
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'manager', 'super_manager'], true)) {
+            $blacklistChanged = isset($data['is_blacklisted'])
+                && (int)$data['is_blacklisted'] !== (int)($current['is_blacklisted'] ?? 0);
+            $reasonChanged = array_key_exists('blacklist_reason', $data)
+                && trim((string)$data['blacklist_reason']) !== trim((string)($current['blacklist_reason'] ?? ''));
+            if ($blacklistChanged || $reasonChanged) {
+                Response::error('ไม่มีสิทธิ์เปลี่ยนสถานะบัญชีดำผู้ขาย', 403);
+            }
+            unset($data['is_blacklisted'], $data['blacklist_reason'], $data['blacklisted_at'], $data['blacklisted_by']);
+        }
+
         // Only stamp pdpa_consented_at once — if consent given and not yet recorded
         if (!empty($data['pdpa_consent'])) {
             if ($current && $current['pdpa_consented_at'] === null) {
@@ -165,9 +194,9 @@ class SellersController extends Controller
         }
         unset($data['pdpa_consent']);
 
-        // tier_level — เฉพาะ admin/manager ที่เปลี่ยนได้
+        // Cashier may change tier_level; blacklist remains manager/admin-only.
         if (isset($data['tier_level']) && (int)$data['tier_level'] !== (int)($current['tier_level'] ?? 1)) {
-            $this->requireAuth(['admin', 'manager']);
+            $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
             $newTier = (int)$data['tier_level'];
             if ($newTier < 1 || $newTier > 3) {
                 Response::error('ระดับราคาพิเศษไม่ถูกต้อง (1-3)', 400);
@@ -186,14 +215,30 @@ class SellersController extends Controller
                 Logger::logActivity(
                     $this->user['user_id'],
                     'update_seller_tier',
-                    "เปลี่ยนระดับราคาผู้ขาย ID: {$id}: {$oldLabel} → {$newLabel} โดย {$this->user['full_name']}"
+                    "Changed seller tier ID: {$id}: {$oldLabel} to {$newLabel}",
+                    [
+                        'actor' => $this->user,
+                        'module' => 'sellers',
+                        'entity_type' => 'seller',
+                        'entity_id' => $id,
+                        'before' => ['tier_level' => $current['tier_level'] ?? 1],
+                        'after' => ['tier_level' => $newTier],
+                    ]
                 );
             }
 
             Logger::logActivity(
                 $this->user['user_id'],
                 'update_seller',
-                "แก้ไขผู้ขาย ID: {$id}"
+                "Updated seller ID: {$id}",
+                [
+                    'actor' => $this->user,
+                    'module' => 'sellers',
+                    'entity_type' => 'seller',
+                    'entity_id' => $id,
+                    'before' => $current,
+                    'after' => $sellerModel->getById($id),
+                ]
             );
 
             Response::success('แก้ไขข้อมูลผู้ขายสำเร็จ');
@@ -385,6 +430,13 @@ class SellersController extends Controller
             }
         }
 
+        Logger::logActivity($this->user['user_id'], 'view_seller_data_center', "Viewed seller data center ID: {$id}", [
+            'actor' => $this->user,
+            'module' => 'sellers',
+            'entity_type' => 'seller',
+            'entity_id' => $id,
+        ]);
+
         // 6. Response
         Response::success('สำเร็จ', [
             'seller' => [
@@ -424,7 +476,7 @@ class SellersController extends Controller
      */
     public function blacklistSeller()
     {
-        $this->requireAuth(['admin', 'manager']); // เฉพาะ admin/manager
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
 
         $data = $this->getRequestData();
         $id = $data['id'] ?? null;
@@ -442,7 +494,15 @@ class SellersController extends Controller
             Logger::logActivity(
                 $this->user['user_id'],
                 'blacklist_seller',
-                "Blacklist ผู้ขาย ID: {$id} เหตุผล: {$reason}"
+                "Blacklisted seller ID: {$id}",
+                [
+                    'actor' => $this->user,
+                    'module' => 'sellers',
+                    'entity_type' => 'seller',
+                    'entity_id' => $id,
+                    'reason' => $reason,
+                    'after' => $sellerModel->getById($id),
+                ]
             );
 
             Response::success('Blacklist ผู้ขายสำเร็จ');
@@ -457,7 +517,7 @@ class SellersController extends Controller
      */
     public function unblacklistSeller()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
 
         $data = $this->getRequestData();
         $id = $data['id'] ?? null;
@@ -474,7 +534,14 @@ class SellersController extends Controller
             Logger::logActivity(
                 $this->user['user_id'],
                 'unblacklist_seller',
-                "ยกเลิก Blacklist ผู้ขาย ID: {$id}"
+                "Removed seller blacklist ID: {$id}",
+                [
+                    'actor' => $this->user,
+                    'module' => 'sellers',
+                    'entity_type' => 'seller',
+                    'entity_id' => $id,
+                    'after' => $sellerModel->getById($id),
+                ]
             );
 
             Response::success('ยกเลิก Blacklist สำเร็จ');
@@ -573,7 +640,14 @@ class SellersController extends Controller
         Logger::logActivity(
             $this->user['user_id'],
             'upload_seller_photo',
-            "อัปโหลดรูปบัตรผู้ขาย ID: {$id}"
+            "Uploaded seller ID card photo ID: {$id}",
+            [
+                'actor' => $this->user,
+                'module' => 'sellers',
+                'entity_type' => 'seller',
+                'entity_id' => $id,
+                'after' => ['id_card_photo' => $urlPath],
+            ]
         );
 
         Response::success('อัปโหลดรูปบัตรสำเร็จ', [
@@ -601,6 +675,13 @@ class SellersController extends Controller
         if (!$baseDir || !$filePath || strpos($filePath, $baseDir . DIRECTORY_SEPARATOR) !== 0 || !is_file($filePath)) {
             Response::error('ไม่พบไฟล์รูปบัตรผู้ขาย', 404);
         }
+
+        Logger::logActivity($this->user['user_id'], 'view_seller_id_card_photo', "Viewed seller ID card photo ID: {$id}", [
+            'actor' => $this->user,
+            'module' => 'sellers',
+            'entity_type' => 'seller',
+            'entity_id' => $id,
+        ]);
 
         header('Content-Type: image/jpeg');
         header('Content-Length: ' . filesize($filePath));

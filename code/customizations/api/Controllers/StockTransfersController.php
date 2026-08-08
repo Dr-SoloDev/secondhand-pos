@@ -28,7 +28,7 @@ class StockTransfersController extends Controller
 
     public function store()
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $user = $this->user;
         $body = $this->getRequestData() ?? [];
 
@@ -127,7 +127,7 @@ class StockTransfersController extends Controller
 
     public function confirm()
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $user = $this->user;
         $body = $this->getRequestData() ?? [];
         $id = (int)($body['id'] ?? 0);
@@ -155,7 +155,7 @@ class StockTransfersController extends Controller
         if (!in_array(($user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = (int)($user['branch_id'] ?? 0);
             if (!$userBranch || (int)$st['to_branch_id'] !== $userBranch) {
-                Response::error('ไม่มีสิทธิ์ตรวจรับใบโอนนี้', 403);
+                Response::error('ไม่พบรายการรอตรวจรับที่สาขานี้ — กรุณาตรวจสอบว่าส่งของถูกสาขาหรือไม่', 403);
                 return;
             }
         }
@@ -255,7 +255,7 @@ class StockTransfersController extends Controller
 
     public function approveReversal()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $user = $this->user;
         $body = $this->getRequestData() ?? [];
         $id = (int)($body['id'] ?? 0);
@@ -267,8 +267,14 @@ class StockTransfersController extends Controller
 
         try {
             $userId = (int)($user['user_id'] ?? $user['id']);
-            (new StockTransfer())->approveReversal($id, $userId, $reviewNote);
-            Logger::logActivity($userId, 'approve_stock_transfer_reversal', "อนุมัติใบโอนย้อนกลับ ID:{$id}");
+            $transfer = new StockTransfer();
+            $reversal = $this->assertReversalReviewAccess($transfer, $id);
+            $allowSelfApproval = ($user['role'] ?? '') === 'admin';
+            $transfer->approveReversal($id, $userId, $reviewNote, $allowSelfApproval);
+            $selfApprovalNote = $allowSelfApproval && (int)($reversal['created_by'] ?? 0) === $userId
+                ? ' self_approved:1'
+                : '';
+            Logger::logActivity($userId, 'approve_stock_transfer_reversal', "อนุมัติใบโอนย้อนกลับ ID:{$id}{$selfApprovalNote}");
             Response::success('อนุมัติและโอนสต็อกย้อนกลับแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
@@ -277,7 +283,7 @@ class StockTransfersController extends Controller
 
     public function rejectReversal()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $user = $this->user;
         $body = $this->getRequestData() ?? [];
         $id = (int)($body['id'] ?? 0);
@@ -289,11 +295,30 @@ class StockTransfersController extends Controller
 
         try {
             $userId = (int)($user['user_id'] ?? $user['id']);
-            (new StockTransfer())->rejectReversal($id, $userId, $reviewNote);
+            $transfer = new StockTransfer();
+            $this->assertReversalReviewAccess($transfer, $id);
+            $transfer->rejectReversal($id, $userId, $reviewNote);
             Logger::logActivity($userId, 'reject_stock_transfer_reversal', "ปฏิเสธใบโอนย้อนกลับ ID:{$id}");
             Response::success('ปฏิเสธคำขอโอนย้อนกลับแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
         }
+    }
+
+    private function assertReversalReviewAccess(StockTransfer $transfer, int $id): array
+    {
+        $reversal = $transfer->findById($id);
+        if (!$reversal || ($reversal['transfer_type'] ?? 'normal') !== 'reversal') {
+            Response::error('ไม่พบคำขอโอนย้อนกลับ', 404);
+        }
+
+        if (($this->user['role'] ?? '') === 'manager') {
+            $userBranch = (int)($this->user['branch_id'] ?? 0);
+            if (!$userBranch || (int)($reversal['from_branch_id'] ?? 0) !== $userBranch) {
+                Response::error('ไม่มีสิทธิ์พิจารณาคำขอโอนย้อนกลับของสาขาอื่น', 403);
+            }
+        }
+
+        return $reversal;
     }
 }

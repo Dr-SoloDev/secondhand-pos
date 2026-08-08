@@ -83,15 +83,22 @@ class CashSessionsController extends Controller
 
     private function reviewOpen(bool $approve)
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $id = (int)($data['id'] ?? 0);
         $note = isset($data['review_note']) ? (string)$data['review_note'] : null;
         if (!$id) Response::error('ไม่พบรหัสรอบประจำวัน', 400);
         try {
             $model = new CashSession();
-            if ($approve) $model->approveOpen($id, $this->userId(), $note);
+            $session = $this->assertSessionReviewAccess($model, $id);
+            $allowSelfApproval = ($this->user['role'] ?? '') === 'admin';
+            if ($approve) $model->approveOpen($id, $this->userId(), $note, $allowSelfApproval);
             else $model->rejectOpen($id, $this->userId(), (string)$note);
+            $selfApprovalNote = $allowSelfApproval && (int)($session['opening_requested_by'] ?? 0) === $this->userId()
+                ? ' self_approved:1'
+                : '';
+            Logger::logActivity($this->userId(), $approve ? 'approve_cash_session_open' : 'reject_cash_session_open',
+                "พิจารณาเปิดยอดรอบ ID:{$id}" . $selfApprovalNote);
             Response::success($approve ? 'อนุมัติเปิดยอดแล้ว' : 'ปฏิเสธคำขอเปิดยอดแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
@@ -110,13 +117,21 @@ class CashSessionsController extends Controller
 
     private function reviewClose(bool $approve)
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $id = (int)($data['id'] ?? 0);
         $note = isset($data['review_note']) ? (string)$data['review_note'] : null;
         if (!$id) Response::error('ไม่พบรหัสรอบประจำวัน', 400);
         try {
-            (new CashSession())->reviewClose($id, $this->userId(), $approve, $note);
+            $model = new CashSession();
+            $session = $this->assertSessionReviewAccess($model, $id);
+            $allowSelfApproval = ($this->user['role'] ?? '') === 'admin';
+            $model->reviewClose($id, $this->userId(), $approve, $note, $allowSelfApproval);
+            $selfApprovalNote = $allowSelfApproval && (int)($session['closing_requested_by'] ?? 0) === $this->userId()
+                ? ' self_approved:1'
+                : '';
+            Logger::logActivity($this->userId(), $approve ? 'approve_cash_session_close' : 'reject_cash_session_close',
+                "พิจารณาปิดยอดรอบ ID:{$id}" . $selfApprovalNote);
             Response::success($approve ? 'อนุมัติปิดยอดแล้ว' : 'ปฏิเสธคำขอปิดยอดแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
@@ -169,12 +184,21 @@ class CashSessionsController extends Controller
 
     public function approveDeposit()
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $id = (int)($data['id'] ?? 0);
         if (!$id) Response::error('ไม่พบ id', 400);
         try {
-            (new CashDepositRequest())->approve($id, $this->userId(), $data['review_note'] ?? null);
+            $model = new CashDepositRequest();
+            $request = $model->findById($id);
+            if (!$request) Response::error('ไม่พบคำขอเติมเงินสด', 404);
+            $this->assertDepositBranchAccess((int)$request['branch_id']);
+            $allowSelfApproval = ($this->user['role'] ?? '') === 'admin';
+            $model->approve($id, $this->userId(), $data['review_note'] ?? null, $allowSelfApproval);
+            $selfApprovalNote = $allowSelfApproval && (int)($request['requested_by'] ?? 0) === $this->userId()
+                ? ' self_approved:1'
+                : '';
+            Logger::logActivity($this->userId(), 'approve_cash_deposit', "อนุมัติคำขอเติมเงินสด ID:{$id}" . $selfApprovalNote);
             Response::success('อนุมัติและเพิ่มเงินสดเข้าลิ้นชักแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
@@ -183,13 +207,18 @@ class CashSessionsController extends Controller
 
     public function rejectDeposit()
     {
-        $this->requireAuth(['admin', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData() ?? [];
         $id = (int)($data['id'] ?? 0);
         $note = trim((string)($data['review_note'] ?? ''));
         if (!$id || $note === '') Response::error('กรุณาระบุรายการและเหตุผล', 400);
         try {
-            (new CashDepositRequest())->reject($id, $this->userId(), $note);
+            $model = new CashDepositRequest();
+            $request = $model->findById($id);
+            if (!$request) Response::error('ไม่พบคำขอเติมเงินสด', 404);
+            $this->assertDepositBranchAccess((int)$request['branch_id']);
+            $model->reject($id, $this->userId(), $note);
+            Logger::logActivity($this->userId(), 'reject_cash_deposit', "ปฏิเสธคำขอเติมเงินสด ID:{$id}");
             Response::success('ปฏิเสธคำขอเติมเงินสดแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
@@ -219,5 +248,27 @@ class CashSessionsController extends Controller
     private function userId(): int
     {
         return (int)($this->user['user_id'] ?? $this->user['id']);
+    }
+
+    private function assertSessionReviewAccess(CashSession $model, int $sessionId): array
+    {
+        $session = $model->findById($sessionId);
+        if (!$session) Response::error('ไม่พบรอบประจำวัน', 404);
+        if (($this->user['role'] ?? '') === 'manager') {
+            $userBranch = (int)($this->user['branch_id'] ?? 0);
+            if (!$userBranch || (int)$session['branch_id'] !== $userBranch) {
+                Response::error('ไม่มีสิทธิ์พิจารณารอบประจำวันของสาขาอื่น', 403);
+            }
+        }
+        return $session;
+    }
+
+    private function assertDepositBranchAccess(int $branchId): void
+    {
+        if ($this->hasMultiBranchAccess()) return;
+        $userBranch = (int)($this->user['branch_id'] ?? 0);
+        if (!$userBranch || $userBranch !== $branchId) {
+            Response::error('ไม่มีสิทธิ์พิจารณาคำขอเติมเงินสดของสาขาอื่น', 403);
+        }
     }
 }

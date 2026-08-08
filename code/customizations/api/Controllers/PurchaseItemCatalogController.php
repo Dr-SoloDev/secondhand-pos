@@ -50,12 +50,18 @@ class PurchaseItemCatalogController extends Controller
      */
     public function createItem()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $data = $this->getRequestData();
         $model = new PurchaseItemCatalog();
         try {
             $id = $model->create($data);
-            Logger::logActivity($this->user['user_id'] ?? null, 'create_catalog_item', "เพิ่ม catalog item ID:{$id}");
+            Logger::logActivity($this->user['user_id'] ?? null, 'create_catalog_item', "Created catalog item ID: {$id}", [
+                'actor' => $this->user,
+                'module' => 'catalog',
+                'entity_type' => 'catalog_item',
+                'entity_id' => $id,
+                'after' => $model->getById($id),
+            ]);
             Response::success('เพิ่มรายการสำเร็จ', ['id' => $id]);
         } catch (Exception $e) {
             error_log('Catalog create failed: ' . $e->getMessage());
@@ -68,7 +74,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function updateItem($id = null)
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         if (!$id) {
             $data = $this->getRequestData();
             $id = $data['id'] ?? null;
@@ -80,8 +86,16 @@ class PurchaseItemCatalogController extends Controller
         }
         $model = new PurchaseItemCatalog();
         try {
+            $before = $model->getById($id);
             $model->update($id, $data);
-            Logger::logActivity($this->user['user_id'] ?? null, 'update_catalog_item', "แก้ไข catalog item ID:{$id}");
+            Logger::logActivity($this->user['user_id'] ?? null, 'update_catalog_item', "Updated catalog item ID: {$id}", [
+                'actor' => $this->user,
+                'module' => 'catalog',
+                'entity_type' => 'catalog_item',
+                'entity_id' => $id,
+                'before' => $before,
+                'after' => $model->getById($id),
+            ]);
             Response::success('แก้ไขสำเร็จ');
         } catch (Exception $e) {
             error_log('Catalog update failed: ' . $e->getMessage());
@@ -100,8 +114,15 @@ class PurchaseItemCatalogController extends Controller
         }
         $model = new PurchaseItemCatalog();
         try {
+            $before = $model->getById($id);
             $model->delete($id);
-            Logger::logActivity($this->user['user_id'] ?? null, 'delete_catalog_item', "ลบ catalog item ID:{$id}");
+            Logger::logActivity($this->user['user_id'] ?? null, 'delete_catalog_item', "Deleted catalog item ID: {$id}", [
+                'actor' => $this->user,
+                'module' => 'catalog',
+                'entity_type' => 'catalog_item',
+                'entity_id' => $id,
+                'before' => $before,
+            ]);
             Response::success('ลบรายการสำเร็จ');
         } catch (Exception $e) {
             error_log('Catalog delete failed: ' . $e->getMessage());
@@ -115,7 +136,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function updateCategory()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $data = json_decode(file_get_contents('php://input'), true);
         $catalogId = $data['catalog_id'] ?? null;
         $categoryId = $data['category_id'] ?? null;
@@ -126,8 +147,16 @@ class PurchaseItemCatalogController extends Controller
 
         $model = new PurchaseItemCatalog();
         try {
+            $before = $model->getById($catalogId);
             $model->updateCategory($catalogId, $categoryId);
-            Logger::logActivity($this->user['user_id'] ?? null, 'update_catalog_category', "อัปเดต category catalog:{$catalogId} → cat:{$categoryId}");
+            Logger::logActivity($this->user['user_id'] ?? null, 'update_catalog_category', "Updated catalog category ID: {$catalogId}", [
+                'actor' => $this->user,
+                'module' => 'catalog',
+                'entity_type' => 'catalog_item',
+                'entity_id' => $catalogId,
+                'before' => $before,
+                'after' => $model->getById($catalogId),
+            ]);
             Response::success('บันทึกหมวดหมู่สำเร็จ');
         } catch (Exception $e) {
             error_log('Update category failed: ' . $e->getMessage());

@@ -1,6 +1,7 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   // Initialize user management
-  initUserManagement();
+  const initialized = await initUserManagement();
+  if (!initialized) return;
 
   // Event listeners
   document.getElementById('userSearch').addEventListener('input', filterUsers);
@@ -9,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('addUserBtn').addEventListener('click', showAddUserModal);
   document.getElementById('cancelUser').addEventListener('click', hideUserModal);
   document.getElementById('saveUser').addEventListener('click', saveUser);
-  document.getElementById('userActivityFilter').addEventListener('change', loadActivityLog);
+  document.getElementById('userActivityFilter')?.addEventListener('change', loadActivityLog);
   document.getElementById('savePassword').addEventListener('click', changePassword);
   document.getElementById('cancelPassword').addEventListener('click', hidePasswordModal);
   document.getElementById('closeResetPassword').addEventListener('click', hideResetPasswordModal);
@@ -34,24 +35,29 @@ let branches = [];
 // Initialize user management
 async function initUserManagement() {
   try {
-    // Check if current user is admin
-    const userJson = localStorage.getItem('posUser');
-    if (userJson) {
-      const currentUser = JSON.parse(userJson);
-      if (currentUser.role !== 'admin') {
-        // Redirect non-admin users
-        window.location.href = `${basePath}/admin/index.html`;
-        return;
-      }
+    const permissions = await getAppPermissions();
+    if (!permissions || !hasAppPermission('actions.users.read', permissions)) {
+      window.location.href = `${basePath}/admin/index.html`;
+      return false;
+    }
+    if (!hasAppPermission('actions.users.manage_elevated_roles', permissions)) {
+      document.querySelectorAll('#role option[value="admin"], #role option[value="super_manager"], #roleFilter option[value="admin"], #roleFilter option[value="super_manager"]')
+        .forEach(option => option.remove());
+    }
+    if (!hasAppPermission('actions.audit.read', permissions)) {
+      document.getElementById('activityLogTable')?.closest('.card')?.remove();
     }
 
     await Promise.all([loadBranches(), loadUsers()]);
 
-    // Load initial activity log
-    loadActivityLog();
+    if (hasAppPermission('actions.audit.read', permissions)) {
+      loadActivityLog();
+    }
+    return true;
   } catch (error) {
     console.error('Failed to initialize user management:', error);
     showNotification('โหลดข้อมูลผู้ใช้ไม่สำเร็จ', 'error');
+    return false;
   }
 }
 
@@ -77,7 +83,7 @@ async function loadUsers() {
     if (response.status === 'success') {
       users = response.data;
       renderUsers(users);
-      populateUserActivityFilter();
+      if (document.getElementById('userActivityFilter')) populateUserActivityFilter();
     } else {
       showNotification(response.message || 'โหลดข้อมูลผู้ใช้ไม่สำเร็จ', 'error');
     }

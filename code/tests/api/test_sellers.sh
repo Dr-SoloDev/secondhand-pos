@@ -1,13 +1,22 @@
 # Helper: generate a valid 13-digit Thai ID card number from a 12-digit prefix
 make_valid_id() {
   local prefix="$1"
-  python3 -c "
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "
 p='$prefix'
 digits=[int(c) for c in p]
 total=sum(digits[i]*(13-i) for i in range(12))
 check=(11-(total%11))%10
 print(p+str(check))
 "
+    return
+  fi
+  php -r '
+    $prefix = $argv[1];
+    $total = 0;
+    for ($i = 0; $i < 12; $i++) $total += ((int)$prefix[$i]) * (13 - $i);
+    echo $prefix . ((11 - ($total % 11)) % 10);
+  ' "$prefix"
 }
 
 # Sellers API Tests
@@ -36,7 +45,7 @@ test_sellers() {
   assert_contains "$res" '"status":"success"' "Create seller"
   assert_contains "$res" '"id"' "Create returns id"
   local seller_id
-  seller_id=$(echo "$res" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('id',''))" 2>/dev/null)
+  seller_id=$(echo "$res" | json_get 'data.id' 2>/dev/null)
 
   # 4. Duplicate ID card rejected
   local dup_res
@@ -67,17 +76,17 @@ test_sellers() {
     # 7. Search by partial name match — response must contain slim fields
     local name_part
     name_part="Test Seller"
-    srch_name=$(api_get "sellers/search?q=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$name_part'))")")
+    srch_name=$(api_get "sellers/search?q=$(url_encode "$name_part")")
     assert_contains "$srch_name" '"status":"success"' "Search by name partial match"
     assert_contains "$srch_name" '"national_id"' "Search response contains national_id field"
     assert_contains "$srch_name" '"name"' "Search response contains name field"
     assert_contains "$srch_name" '"is_blacklisted"' "Search response contains is_blacklisted flag"
 
-    # 8. Search by partial id_card match
-    local id_part="${unique_id:0:6}"
+    # 8. Encrypted ID cards support exact lookup through a keyed search hash.
+    local id_part="$unique_id"
     srch_id=$(api_get "sellers/search?q=$id_part")
-    assert_contains "$srch_id" '"status":"success"' "Search by id_card partial match"
-    assert_contains "$srch_id" '"national_id"' "id_card search returns national_id field"
+    assert_contains "$srch_id" '"status":"success"' "Search by exact id_card hash"
+    assert_contains "$srch_id" '"national_id"' "Exact id_card search returns national_id field"
 
     # 9. Empty query returns error (not crash)
     srch_empty=$(api_get "sellers/search?q=")

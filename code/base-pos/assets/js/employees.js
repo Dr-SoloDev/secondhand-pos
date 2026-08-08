@@ -2,12 +2,21 @@ let employees = [];
 let branches = [];
 let currentPage = 1;
 let searchTimer = null;
+let employeePermissions = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   currentUser = await requireAuth();
   if (!currentUser) return;
+  employeePermissions = await getAppPermissions();
+  if (!employeePermissions || !hasAppPermission('actions.employees.read', employeePermissions)) return;
   document.getElementById('currentUser').textContent = currentUser.full_name || currentUser.username || '-';
   await loadBranches();
+  if (!employeePermissions.multi_branch) {
+    document.getElementById('filterBranch').value = String(employeePermissions.branch_id || '');
+    document.getElementById('filterBranch').disabled = true;
+    document.getElementById('empBranch').value = String(employeePermissions.branch_id || '');
+    document.getElementById('empBranch').disabled = true;
+  }
   await loadEmployees();
   setupSearch();
 });
@@ -71,7 +80,8 @@ function renderTable(items) {
     return;
   }
 
-  const isAdmin = currentUser && currentUser.role === 'admin';
+  const canManage = hasAppPermission('actions.employees.manage', employeePermissions);
+  const canDelete = hasAppPermission('actions.employees.delete', employeePermissions);
 
   tbody.innerHTML = items.map(e => {
     const statusBadge = e.status === 'active'
@@ -91,9 +101,9 @@ function renderTable(items) {
         <td>${statusBadge}</td>
         <td>
           <div style="display:flex;gap:4px">
-            <button class="btn btn-sm btn-primary" onclick="openEditModal(${e.id})">แก้ไข</button>
-            ${isAdmin ? `<button class="btn btn-sm btn-success" onclick="openSalaryModal(${e.id})">จ่ายเงินเดือน</button>` : ''}
-            ${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="deleteEmployee(${e.id})">ลบ</button>` : ''}
+            ${canManage ? `<button class="btn btn-sm btn-primary" onclick="openEditModal(${e.id})">แก้ไข</button>` : ''}
+            ${canManage ? `<button class="btn btn-sm btn-success" onclick="openSalaryModal(${e.id})">จ่ายเงินเดือน</button>` : ''}
+            ${canDelete ? `<button class="btn btn-sm btn-danger" onclick="deleteEmployee(${e.id})">ลบ</button>` : ''}
           </div>
         </td>
       </tr>
@@ -121,6 +131,9 @@ function openAddModal() {
   document.getElementById('employeeId').value = '';
   document.getElementById('employeeForm').reset();
   document.getElementById('empStatus').value = 'active';
+  if (!employeePermissions?.multi_branch) {
+    document.getElementById('empBranch').value = String(employeePermissions?.branch_id || '');
+  }
   document.getElementById('empSSORate').value = '5';
   document.getElementById('modalTitle').textContent = 'เพิ่มพนักงาน';
   document.getElementById('employeeModal').classList.add('show');

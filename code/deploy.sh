@@ -24,16 +24,23 @@ if [ "$DISK_FREE" -lt 5120 ]; then echo "ERROR: Disk < 5GB free"; exit 1; fi
 echo "[1/5] Backup existing database..."
 BACKUP_FILE="data/backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql"
 mkdir -p data/backups
-(
-  export MYSQL_PWD="${MYSQL_ROOT_PASSWORD}"
-  docker compose exec -T db mysqldump -u root \
-    --all-databases --single-transaction --routines --triggers > "$BACKUP_FILE" 2>/dev/null || \
-    echo "WARN: No existing DB to backup (fresh deploy?)"
+if [ "$(docker compose ps --status running --services db 2>/dev/null || true)" = "db" ]; then
+  if ! docker compose exec -T db sh -lc \
+    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -u root --all-databases --single-transaction --routines --triggers' \
+    > "$BACKUP_FILE"; then
+    echo "ERROR: Database backup failed; deploy stopped"
+    exit 1
+  fi
+
   BACKUP_SIZE=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || echo 0)
   if [ "$BACKUP_SIZE" -lt 100 ]; then
-    echo "WARN: Backup appears too small (${BACKUP_SIZE}B) — may be corrupt"
+    echo "ERROR: Backup appears too small (${BACKUP_SIZE}B); deploy stopped"
+    exit 1
   fi
-)
+  echo "  Backup ready: $BACKUP_FILE (${BACKUP_SIZE} bytes)"
+else
+  echo "  No running DB container; skipping backup for fresh deploy"
+fi
 
 # 3. Pull latest code
 echo "[2/5] Pull latest code..."
@@ -56,13 +63,7 @@ docker compose up -d
 
 # 5. Run migrations
 echo "[4/5] Run database migrations..."
-docker compose exec -T db mysql -u root pos_system \
-  -e "SELECT COUNT(*) FROM schema_migrations" 2>/dev/null || \
-  docker compose exec -T db sh -c \
-  'for f in /docker-entrypoint-initdb.d/*.sql; do
-     echo "Running $f...";
-     mysql -u root pos_system < "$f" 2>&1;
-   done'
+docker compose exec -T db bash /docker-entrypoint-initdb.d/99-run-migrations.sh
 
 # 6. Health check (wait for container health, then verify API)
 echo "[5/5] Health check..."
@@ -95,4 +96,3 @@ else
   echo "Rolled back. Please check logs."
   exit 1
 fi
-

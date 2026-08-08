@@ -1,8 +1,18 @@
 let sellers = [];
 let currentSeller = null;
 let pendingSellerIdPhoto = null; // File | null
+let sellerPermissions = null;
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    sellerPermissions = await getAppPermissions();
+    if (!hasAppPermission('actions.sellers.blacklist', sellerPermissions)) {
+        const blacklistToggle = document.getElementById('isBlacklisted');
+        if (blacklistToggle) {
+            blacklistToggle.disabled = true;
+            blacklistToggle.closest('.form-group').style.display = 'none';
+        }
+        document.getElementById('blacklistReasonGroup').style.display = 'none';
+    }
     loadSellers();
     setupIdCardFormatter();
     document.getElementById('isBlacklisted').addEventListener('change', function() {
@@ -69,10 +79,11 @@ function renderSellersTable() {
                     <button class="btn-sm btn-info" onclick="viewSeller(${seller.id})" title="ดูรายละเอียด"><i class="icon-search"></i></button>
                     <a class="btn-sm btn-secondary" href="seller-history.html?id=${seller.id}" title="ประวัติการขาย" style="display:inline-flex;align-items:center;text-decoration:none"><i class="icon-report"></i></a>
                     <button class="btn-sm btn-warning" onclick="editSeller(${seller.id})" title="แก้ไข"><i class="icon-edit"></i></button>
-                    ${seller.is_blacklisted
-                        ? `<button class="btn-sm btn-success" onclick="unblacklistSeller(${seller.id})" title="ยกเลิกบัญชีดำ">✓</button>`
-                        : `<button class="btn-sm btn-danger" onclick="confirmBlacklist(${seller.id})" title="ขึ้นบัญชีดำ">×</button>`
-                    }
+                    ${hasAppPermission('actions.sellers.blacklist', sellerPermissions)
+                        ? (seller.is_blacklisted
+                            ? `<button class="btn-sm btn-success" onclick="unblacklistSeller(${seller.id})" title="ยกเลิกบัญชีดำ">✓</button>`
+                            : `<button class="btn-sm btn-danger" onclick="confirmBlacklist(${seller.id})" title="ขึ้นบัญชีดำ">×</button>`)
+                        : ''}
                     </div>
                 </td>
             </tr>
@@ -118,16 +129,9 @@ function openAddSellerModal() {
     document.getElementById('pdpaConsentText').textContent =
         'ยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น';
     resetSellerPhoto();
-    // tier_level — แสดงเฉพาะ admin/manager
     const tierGroup = document.getElementById('tierLevelGroup');
     if (tierGroup) {
-        try {
-            const user = JSON.parse(localStorage.getItem('posUser'));
-            const isAdminOrManager = user && (user.role === 'admin' || user.role === 'manager');
-            tierGroup.style.display = isAdminOrManager ? '' : 'none';
-        } catch(e) {
-            tierGroup.style.display = 'none';
-        }
+        tierGroup.style.display = hasAppPermission('actions.sellers.set_tier', sellerPermissions) ? '' : 'none';
         document.getElementById('tierLevel').value = '1';
     }
     document.getElementById('sellerModal').classList.add('show');
@@ -152,18 +156,11 @@ function editSeller(id) {
     const vt = currentSeller.vehicle_type || '';
     document.querySelectorAll('input[name="vehicleType"]').forEach(r => r.checked = r.value === vt);
 
-    // tier_level dropdown — admin/manager only
     const tierSelect = document.getElementById('tierLevel');
     const tierGroup = document.getElementById('tierLevelGroup');
     if (tierSelect && tierGroup) {
         tierSelect.value = currentSeller.tier_level || 1;
-        try {
-            const user = JSON.parse(localStorage.getItem('posUser'));
-            const isAdminOrManager = user && (user.role === 'admin' || user.role === 'manager');
-            tierGroup.style.display = isAdminOrManager ? '' : 'none';
-        } catch(e) {
-            tierGroup.style.display = 'none';
-        }
+        tierGroup.style.display = hasAppPermission('actions.sellers.set_tier', sellerPermissions) ? '' : 'none';
     }
     const bl = currentSeller.is_blacklisted == 1;
     document.getElementById('isBlacklisted').checked = bl;

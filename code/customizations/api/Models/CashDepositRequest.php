@@ -55,7 +55,7 @@ class CashDepositRequest extends Model
         }
     }
 
-    public function approve(int $id, int $approverId, ?string $reviewNote = null): void
+    public function approve(int $id, int $approverId, ?string $reviewNote = null, bool $allowSelfApproval = false): void
     {
         $this->db->beginTransaction();
         try {
@@ -63,7 +63,7 @@ class CashDepositRequest extends Model
             if (!$request || $request['status'] !== 'pending') {
                 throw new Exception('ไม่พบคำขอเติมเงินสดที่รออนุมัติ');
             }
-            if ((int)$request['requested_by'] === $approverId) {
+            if (!$allowSelfApproval && (int)$request['requested_by'] === $approverId) {
                 throw new Exception('ผู้ส่งคำขอไม่สามารถอนุมัติรายการตัวเองได้');
             }
             (new CashSession())->recordMovement(

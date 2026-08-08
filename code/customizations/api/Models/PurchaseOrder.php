@@ -3,6 +3,15 @@ class PurchaseOrder extends Model
 {
     protected $table = 'purchase_orders';
 
+    private function decryptSellerIdCard(&$row)
+    {
+        if (!$row) return;
+        if (!empty($row['seller_id_card_encrypted'])) {
+            $row['seller_id_card'] = SellerIdCipher::decrypt($row['seller_id_card_encrypted']);
+        }
+        unset($row['seller_id_card_encrypted'], $row['seller_id_card_key_version']);
+    }
+
     public function getPaginated($page = 1, $limit = 20, $filters = [])
     {
         $offset = ($page - 1) * $limit;
@@ -38,6 +47,8 @@ class PurchaseOrder extends Model
 
         $items = $this->db->fetchAll(
             "SELECT po.*, s.full_name AS seller_name, s.id_card AS seller_id_card,
+                    s.id_card_encrypted AS seller_id_card_encrypted,
+                    s.id_card_key_version AS seller_id_card_key_version,
                     b.name AS branch_name, b.code AS branch_code,
                     u.full_name AS user_name,
                     (SELECT r.status FROM purchase_order_cancellation_requests r
@@ -54,6 +65,9 @@ class PurchaseOrder extends Model
             $params
         );
 
+        foreach ($items as &$item) $this->decryptSellerIdCard($item);
+        unset($item);
+
         return [
             'items' => $items,
             'pagination' => [
@@ -69,6 +83,8 @@ class PurchaseOrder extends Model
     {
         $po = $this->db->fetch(
             "SELECT po.*, s.full_name AS seller_name, s.id_card AS seller_id_card,
+                    s.id_card_encrypted AS seller_id_card_encrypted,
+                    s.id_card_key_version AS seller_id_card_key_version,
                     s.phone AS seller_phone, s.address AS seller_address,
                     b.name AS branch_name, b.code AS branch_code,
                     b.phone AS branch_phone,
@@ -85,6 +101,7 @@ class PurchaseOrder extends Model
             [$id]
         );
         if (!$po) return null;
+        $this->decryptSellerIdCard($po);
         $po['items'] = $this->db->fetchAll(
             "SELECT poi.*, ic.name AS condition_name, ic.code AS condition_code,
                      c.name AS category_name, c.requires_precious_receipt

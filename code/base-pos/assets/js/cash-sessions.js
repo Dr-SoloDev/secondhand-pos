@@ -1,27 +1,30 @@
 let cashUser = null;
+let cashPermissions = null;
 let cashBranches = [];
 let cashSession = null;
 
 const cashEl = id => document.getElementById(id);
 const cashMoney = value => `฿${Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const cashEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const canReviewCash = () => ['admin', 'super_manager'].includes(cashUser?.role);
+const canReviewCash = () => hasAppPermission('actions.cash_sessions.review', cashPermissions);
 
 async function initCashPage() {
   cashUser = await requireAuth();
   if (!cashUser) return;
+  cashPermissions = await getAppPermissions();
+  if (!cashPermissions || !hasAppPermission('actions.cash_sessions.read', cashPermissions)) return;
   const response = await apiRequest('branches/active');
   cashBranches = response.status === 'success' ? (response.data || []) : [];
   const select = cashEl('cashBranch');
   cashBranches.forEach(branch => select.appendChild(new Option(branch.name, branch.id)));
-  if (!['admin', 'super_manager'].includes(cashUser.role)) {
+  if (!cashPermissions.multi_branch) {
     select.value = String(cashUser.branch_id || '');
     select.disabled = true;
   }
   select.addEventListener('change', loadCashPage);
   cashEl('refreshCashBtn').addEventListener('click', loadCashPage);
   cashEl('requestDepositBtn').addEventListener('click', requestCashDeposit);
-  if (cashUser.role === 'admin') {
+  if (hasAppPermission('actions.adjustments.manage', cashPermissions)) {
     cashEl('adjustmentSection').classList.remove('hidden');
     cashEl('adjustmentHistorySection').classList.remove('hidden');
     cashEl('adjustmentType').addEventListener('change', renderAdjustmentFields);
@@ -38,12 +41,12 @@ async function loadCashPage() {
     apiRequest(`cash-sessions/current?branch_id=${branchId}`),
     apiRequest(`cash-sessions/deposits?branch_id=${branchId}`),
   ];
-  if (cashUser.role === 'admin') requests.push(apiRequest(`adjustment-documents?branch_id=${branchId}`));
+  if (hasAppPermission('actions.adjustments.manage', cashPermissions)) requests.push(apiRequest(`adjustment-documents?branch_id=${branchId}`));
   const [currentRes, depositRes, adjustmentRes] = await Promise.all(requests);
   cashSession = currentRes.status === 'success' ? currentRes.data : null;
   renderCashSession();
   renderCashDeposits(depositRes.status === 'success' ? (depositRes.data?.items || []) : []);
-  if (cashUser.role === 'admin') renderAdjustmentDocuments(adjustmentRes?.status === 'success' ? (adjustmentRes.data?.items || []) : []);
+  if (hasAppPermission('actions.adjustments.manage', cashPermissions)) renderAdjustmentDocuments(adjustmentRes?.status === 'success' ? (adjustmentRes.data?.items || []) : []);
 }
 
 function renderCashSession() {
@@ -100,7 +103,7 @@ function renderSessionAction() {
     return;
   }
   title.textContent = 'รอบประจำวัน';
-  body.innerHTML = cashSession.status === 'closed' && cashUser.role === 'admin'
+  body.innerHTML = cashSession.status === 'closed' && hasAppPermission('actions.cash_sessions.reopen', cashPermissions)
     ? '<div class="cash-action-row"><button class="btn btn-primary" id="reopenSessionBtn">เปิดรอบใหม่</button></div>'
     : '<div class="cash-empty">ปิดยอดแล้ว</div>';
   if (cashEl('reopenSessionBtn')) cashEl('reopenSessionBtn').onclick = reopenCashSession;

@@ -28,6 +28,13 @@ define('JWT_SECRET', getenv('JWT_SECRET') ?: (function() {
 })());
 define('JWT_EXPIRY', 28800); // 8 hours (reduced from 24h for security)
 define('API_URL', '/api');
+define('APP_ENV', strtolower(getenv('APP_ENV') ?: 'development'));
+if (APP_ENV === 'production' && strlen(trim((string)getenv('SELLER_ID_ENCRYPTION_KEY'))) < 32) {
+    error_log('CRITICAL: SELLER_ID_ENCRYPTION_KEY is missing or too short');
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Server configuration error']);
+    exit;
+}
 
 // Backup settings - outside web root for security
 define('BACKUP_DIR', __DIR__.'/../../data/backups');

@@ -1,9 +1,14 @@
 // ===== แคตตาล็อกสินค้า — แยกจาก inventory.js =====
 let catalogItems = [];
 let categories = [];
+let catalogPermissions = null;
 
-document.addEventListener('DOMContentLoaded', function() {
-  initCatalog();
+document.addEventListener('DOMContentLoaded', async function() {
+  catalogPermissions = await getAppPermissions();
+  if (!hasAppPermission('actions.catalog.manage_categories', catalogPermissions)) {
+    document.getElementById('manageCategories').style.display = 'none';
+  }
+  await initCatalog();
 
   document.getElementById('productSearch').addEventListener('input', filterCatalogItems);
   document.getElementById('categoryFilter').addEventListener('change', filterCatalogItems);
@@ -104,7 +109,9 @@ function renderCatalogItems(items) {
       </td>
       <td class="actions">
         <button class="btn btn-sm btn-info edit-catalog" data-id="${item.id}"><i class="icon-edit"></i></button>
-        <button class="btn btn-sm btn-danger delete-catalog" data-id="${item.id}"><i class="icon-delete"></i></button>
+        ${hasAppPermission('actions.catalog.delete', catalogPermissions)
+          ? `<button class="btn btn-sm btn-danger delete-catalog" data-id="${item.id}"><i class="icon-delete"></i></button>`
+          : ''}
       </td>
     `;
     tableBody.appendChild(row);
@@ -291,8 +298,12 @@ function renderCategoryList() {
     item.innerHTML = `
       <div class="category-name">${escapeHtml(cat.name)}</div>
       <div class="category-actions">
-        <button class="btn-icon edit-category" data-id="${cat.id}"><i class="icon-edit"></i></button>
-        <button class="btn-icon delete-category" data-id="${cat.id}"><i class="icon-delete"></i></button>
+        ${hasAppPermission('actions.catalog.manage_categories', catalogPermissions)
+          ? `<button class="btn-icon edit-category" data-id="${cat.id}"><i class="icon-edit"></i></button>`
+          : ''}
+        ${hasAppPermission('actions.catalog.delete', catalogPermissions)
+          ? `<button class="btn-icon delete-category" data-id="${cat.id}"><i class="icon-delete"></i></button>`
+          : ''}
       </div>`;
     categoryList.appendChild(item);
   });

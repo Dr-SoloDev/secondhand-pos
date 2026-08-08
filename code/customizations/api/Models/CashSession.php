@@ -177,9 +177,9 @@ class CashSession extends Model
         }
     }
 
-    public function approveOpen(int $sessionId, int $approverId, ?string $reviewNote = null): void
+    public function approveOpen(int $sessionId, int $approverId, ?string $reviewNote = null, bool $allowSelfApproval = false): void
     {
-        $this->reviewOpen($sessionId, $approverId, true, $reviewNote);
+        $this->reviewOpen($sessionId, $approverId, true, $reviewNote, $allowSelfApproval);
     }
 
     public function rejectOpen(int $sessionId, int $reviewerId, string $reviewNote): void
@@ -187,7 +187,7 @@ class CashSession extends Model
         $this->reviewOpen($sessionId, $reviewerId, false, $reviewNote);
     }
 
-    private function reviewOpen(int $sessionId, int $reviewerId, bool $approve, ?string $reviewNote): void
+    private function reviewOpen(int $sessionId, int $reviewerId, bool $approve, ?string $reviewNote, bool $allowSelfApproval = false): void
     {
         $reviewNote = $this->normalizeReason($reviewNote);
         if (!$approve && $reviewNote === null) {
@@ -199,7 +199,7 @@ class CashSession extends Model
             if (!$session || $session['status'] !== 'pending_open') {
                 throw new Exception('ไม่พบคำขอเปิดยอดที่รอพิจารณา');
             }
-            if ((int)$session['opening_requested_by'] === $reviewerId) {
+            if (!$allowSelfApproval && (int)$session['opening_requested_by'] === $reviewerId) {
                 throw new Exception('ผู้ขอเปิดยอดไม่สามารถอนุมัติรายการตัวเองได้');
             }
             $newStatus = $approve ? 'open' : 'rejected';
@@ -262,7 +262,7 @@ class CashSession extends Model
         }
     }
 
-    public function reviewClose(int $sessionId, int $reviewerId, bool $approve, ?string $reviewNote): void
+    public function reviewClose(int $sessionId, int $reviewerId, bool $approve, ?string $reviewNote, bool $allowSelfApproval = false): void
     {
         $reviewNote = $this->normalizeReason($reviewNote);
         if (!$approve && $reviewNote === null) {
@@ -274,7 +274,7 @@ class CashSession extends Model
             if (!$session || $session['status'] !== 'pending_close') {
                 throw new Exception('ไม่พบคำขอปิดยอดที่รอพิจารณา');
             }
-            if ((int)$session['closing_requested_by'] === $reviewerId) {
+            if (!$allowSelfApproval && (int)$session['closing_requested_by'] === $reviewerId) {
                 throw new Exception('ผู้ขอปิดยอดไม่สามารถอนุมัติรายการตัวเองได้');
             }
             $newStatus = $approve ? 'closed' : 'open';

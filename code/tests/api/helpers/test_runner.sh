@@ -1,6 +1,7 @@
 # Test runner core
 HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HELPER_DIR/auth.sh"
+source "$HELPER_DIR/role_fixtures.sh"
 
 PASS_COUNT=0
 FAIL_COUNT=0

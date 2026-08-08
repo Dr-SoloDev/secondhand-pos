@@ -94,6 +94,9 @@ class Router
         $this->routes[] = ['route' => 'auth/verify', 'controller' => 'AuthController', 'method' => 'verify', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'auth/verify', 'controller' => 'AuthController', 'method' => 'verify', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'auth/logout', 'controller' => 'AuthController', 'method' => 'logout', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'auth/permissions', 'controller' => 'PermissionsController', 'method' => 'getPermissions', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'audit-logs', 'controller' => 'AuditLogsController', 'method' => 'index', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'audit-logs/export', 'controller' => 'AuditLogsController', 'method' => 'export', 'verb' => 'GET'];
 
         // Inventory routes
         $this->routes[] = ['route' => 'inventory/categories', 'controller' => 'InventoryController', 'method' => 'getCategories', 'verb' => 'GET'];

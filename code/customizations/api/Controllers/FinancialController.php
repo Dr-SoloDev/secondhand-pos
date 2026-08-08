@@ -244,10 +244,14 @@ class FinancialController extends Controller
             if (!$expense) Response::error('ไม่พบคำขอรายจ่าย', 404);
             $this->assertExpenseBranchAccess((int)$expense['branch_id']);
             $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+            $allowSelfApproval = ($this->user['role'] ?? '') === 'admin';
             $model->approve(
-                $id, $userId, (string)($this->user['role'] ?? ''), $body['review_note'] ?? null
+                $id, $userId, (string)($this->user['role'] ?? ''), $body['review_note'] ?? null, $allowSelfApproval
             );
-            Logger::logActivity($userId, 'approve_business_expense', "อนุมัติค่าใช้จ่าย ID:{$id}");
+            $selfApprovalNote = $allowSelfApproval && (int)($expense['requested_by'] ?? 0) === $userId
+                ? ' self_approved:1'
+                : '';
+            Logger::logActivity($userId, 'approve_business_expense', "อนุมัติค่าใช้จ่าย ID:{$id}" . $selfApprovalNote);
             Response::success('อนุมัติและบันทึกการจ่ายแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
@@ -358,7 +362,8 @@ class FinancialController extends Controller
         if ($type === 'purchases') {
             $headers = ['เลขที่บิล','วันที่','สาขา','ผู้ขาย','เลขบัตร','ยอด (บาท)','สถานะ'];
             $sql = "SELECT po.reference_no, po.created_at, b.name AS branch_name,
-                           s.full_name AS seller_name, s.id_card, po.total_amount, po.status
+                           s.full_name AS seller_name, s.id_card, s.id_card_encrypted,
+                           po.total_amount, po.status
                     FROM purchase_orders po
                     LEFT JOIN branches b ON b.id = po.branch_id
                     LEFT JOIN sellers s ON s.id = po.seller_id
@@ -369,8 +374,11 @@ class FinancialController extends Controller
                     ORDER BY po.created_at DESC";
             $raw = $db->fetchAll($sql, $params['bindings_po']);
             foreach ($raw as $r) {
+                $sellerIdCard = !empty($r['id_card_encrypted'])
+                    ? SellerIdCipher::decrypt($r['id_card_encrypted'])
+                    : $r['id_card'];
                 $rows[] = [$r['reference_no'], $r['created_at'], $r['branch_name'],
-                           $r['seller_name'], $r['id_card'], $r['total_amount'], 'สำเร็จ'];
+                           $r['seller_name'], $sellerIdCard, $r['total_amount'], 'สำเร็จ'];
             }
 
         } elseif ($type === 'salelots') {
@@ -679,7 +687,8 @@ class FinancialController extends Controller
         if ($type === 'purchases') {
             $headers = ['เลขที่บิล','วันที่','สาขา','ผู้ขาย','เลขบัตร','ยอด (บาท)','สถานะ'];
             $sql = "SELECT po.reference_no, po.created_at, b.name AS branch_name,
-                           s.full_name AS seller_name, s.id_card, po.total_amount, po.status
+                           s.full_name AS seller_name, s.id_card, s.id_card_encrypted,
+                           po.total_amount, po.status
                     FROM purchase_orders po
                     LEFT JOIN branches b ON b.id = po.branch_id
                     LEFT JOIN sellers s ON s.id = po.seller_id
@@ -690,8 +699,11 @@ class FinancialController extends Controller
                     ORDER BY po.created_at DESC";
             $raw = $db->fetchAll($sql, $params['bindings_po']);
             foreach ($raw as $r) {
+                $sellerIdCard = !empty($r['id_card_encrypted'])
+                    ? SellerIdCipher::decrypt($r['id_card_encrypted'])
+                    : $r['id_card'];
                 $rows[] = [$r['reference_no'], $r['created_at'], $r['branch_name'],
-                           $r['seller_name'], $r['id_card'], $r['total_amount'], 'สำเร็จ'];
+                           $r['seller_name'], $sellerIdCard, $r['total_amount'], 'สำเร็จ'];
             }
 
         } elseif ($type === 'salelots') {

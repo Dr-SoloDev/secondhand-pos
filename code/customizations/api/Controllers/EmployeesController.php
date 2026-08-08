@@ -3,6 +3,10 @@ class EmployeesController extends Controller
 {
     private function getScopedBranchId()
     {
+        if (in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
+            return null;
+        }
+
         if (($this->user['role'] ?? '') !== 'admin') {
             $branchId = intval($this->user['branch_id'] ?? 0);
             if (!$branchId) {
@@ -44,7 +48,7 @@ class EmployeesController extends Controller
 
     private function assertEmployeeBranchAccess($employee)
     {
-        if (($this->user['role'] ?? '') !== 'admin') {
+        if (!in_array(($this->user['role'] ?? ''), ['admin', 'super_manager'], true)) {
             $userBranch = $this->getScopedBranchId();
             if (!$employee || (int)($employee['branch_id'] ?? 0) !== (int)$userBranch) {
                 Response::error('ไม่มีสิทธิ์เข้าถึงข้อมูลพนักงานสาขานี้', 403);
@@ -107,7 +111,7 @@ class EmployeesController extends Controller
 
     public function store()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData();
         $userBranch = $this->getScopedBranchId();
         if ($userBranch !== null) {
@@ -130,7 +134,7 @@ class EmployeesController extends Controller
 
     public function update()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $id = isset($_GET['id']) ? intval($_GET['id']) : null;
         if (!$id) {
             Response::error('Missing employee ID', 400);
@@ -159,7 +163,7 @@ class EmployeesController extends Controller
 
     public function destroy()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(['admin', 'super_manager']);
         $id = isset($_GET['id']) ? intval($_GET['id']) : null;
         if (!$id) {
             Response::error('Missing employee ID', 400);
@@ -179,7 +183,7 @@ class EmployeesController extends Controller
 
     public function createSalaryExpense()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['employee_id', 'salary_date', 'amount']);
 
@@ -207,7 +211,7 @@ class EmployeesController extends Controller
 
     public function createSSOExpense()
     {
-        $this->requireAuth(['admin', 'manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData();
         $this->validateRequiredFields($data, ['employee_id', 'salary_date', 'amount']);
 

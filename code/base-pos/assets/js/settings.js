@@ -1,13 +1,18 @@
-document.addEventListener('DOMContentLoaded', function() {
-  const userJson = localStorage.getItem('posUser');
-  const currentUser = userJson ? JSON.parse(userJson) : null;
-  if (!currentUser || !['admin', 'manager'].includes(currentUser.role)) {
+let settingsPermissions = null;
+let currentSettingsBranchId = null;
+
+document.addEventListener('DOMContentLoaded', async function() {
+  settingsPermissions = await getAppPermissions();
+  if (!settingsPermissions || !hasAppPermission('actions.settings.branch', settingsPermissions)) {
     window.location.href = `${basePath}/admin/index.html`;
     return;
   }
 
+  await setupSettingsScope();
+  applySettingsPermissions();
+
   // Initialize settings page
-  loadSettings();
+  await loadSettings();
 
   // Event listeners for form submissions
   document.getElementById('storeSettingsForm').addEventListener('submit', function(e) {
@@ -21,23 +26,23 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Event listeners for backup/restore actions
-  document.getElementById('createBackup').addEventListener('click', createBackup);
-  document.getElementById('restoreBackup').addEventListener('click', function() {
+  document.getElementById('createBackup')?.addEventListener('click', createBackup);
+  document.getElementById('restoreBackup')?.addEventListener('click', function() {
     document.getElementById('backupFileInput').click();
   });
 
-  document.getElementById('backupFileInput').addEventListener('change', function(e) {
+  document.getElementById('backupFileInput')?.addEventListener('change', function(e) {
     if (e.target.files.length > 0) {
       showRestoreConfirmation(e.target.files[0]);
     }
   });
 
-  document.getElementById('cancelRestore').addEventListener('click', function() {
+  document.getElementById('cancelRestore')?.addEventListener('click', function() {
     document.getElementById('restoreConfirmModal').classList.remove('show');
     document.getElementById('backupFileInput').value = '';
   });
 
-  document.getElementById('confirmRestore').addEventListener('click', restoreBackup);
+  document.getElementById('confirmRestore')?.addEventListener('click', restoreBackup);
 
   // Close modal when clicking on X
   document.querySelectorAll('.close-modal').forEach(button => {
@@ -47,20 +52,59 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Load backup history
-  loadBackupHistory();
+  if (hasAppPermission('actions.settings.backup', settingsPermissions)) loadBackupHistory();
 });
+
+async function setupSettingsScope() {
+  if (hasAppPermission('actions.settings.global', settingsPermissions)) return;
+  currentSettingsBranchId = settingsPermissions.branch_id || null;
+  if (!settingsPermissions.multi_branch) return;
+
+  const response = await apiRequest('branches/active');
+  const branches = response.status === 'success' ? (response.data || []) : [];
+  const select = document.createElement('select');
+  select.id = 'settingsBranch';
+  select.className = 'form-control';
+  select.style.maxWidth = '320px';
+  branches.forEach(branch => select.appendChild(new Option(branch.name, branch.id)));
+  currentSettingsBranchId = branches[0]?.id || null;
+  select.value = String(currentSettingsBranchId || '');
+  select.addEventListener('change', async () => {
+    currentSettingsBranchId = Number(select.value) || null;
+    await loadSettings();
+  });
+  document.querySelector('.page-header')?.appendChild(select);
+}
+
+function applySettingsPermissions() {
+  const canGlobal = hasAppPermission('actions.settings.global', settingsPermissions);
+  ['storeName', 'taxId', 'taxRate', 'currencySymbol', 'dateFormat', 'timeZone', 'language']
+    .forEach(id => {
+      const field = document.getElementById(id);
+      if (field) field.disabled = !canGlobal;
+    });
+  if (!hasAppPermission('actions.settings.backup', settingsPermissions)) {
+    document.getElementById('backupsTable')?.closest('.row')?.remove();
+    document.getElementById('backupFileInput')?.remove();
+    document.getElementById('restoreConfirmModal')?.remove();
+  }
+}
+
+function scopedSettingsEndpoint(endpoint) {
+  return currentSettingsBranchId ? `${endpoint}?branch_id=${currentSettingsBranchId}` : endpoint;
+}
 
 // Load all settings from API
 async function loadSettings() {
   try {
     // Fetch store settings
-    const storeResponse = await apiRequest('settings/store');
+    const storeResponse = await apiRequest(scopedSettingsEndpoint('settings/store'));
     if (storeResponse.status === 'success') {
       populateStoreSettings(storeResponse.data);
     }
 
     // Fetch system settings
-    const systemResponse = await apiRequest('settings/system');
+    const systemResponse = await apiRequest(scopedSettingsEndpoint('settings/system'));
     if (systemResponse.status === 'success') {
       populateSystemSettings(systemResponse.data);
     }
@@ -99,15 +143,19 @@ async function saveStoreSettings() {
     const formData = new FormData(form);
 
     const settingsData = {
-      store_name: formData.get('store_name'),
       store_phone: formData.get('store_phone'),
       store_address: formData.get('store_address'),
-      tax_id: formData.get('tax_id'),
       receipt_welcome_message: formData.get('receipt_welcome_message'),
-      tax_rate: formData.get('tax_rate'),
-      currency_symbol: formData.get('currency_symbol'),
       receipt_footer: formData.get('receipt_footer')
     };
+    if (hasAppPermission('actions.settings.global', settingsPermissions)) {
+      settingsData.store_name = formData.get('store_name');
+      settingsData.tax_id = formData.get('tax_id');
+      settingsData.tax_rate = formData.get('tax_rate');
+      settingsData.currency_symbol = formData.get('currency_symbol');
+    } else {
+      settingsData.branch_id = currentSettingsBranchId;
+    }
 
     const response = await apiRequest('settings/store', 'POST', settingsData);
 
@@ -132,12 +180,14 @@ async function saveSystemSettings() {
     const form = document.getElementById('systemSettingsForm');
     const formData = new FormData(form);
 
-    const settingsData = {
-      low_stock_threshold: formData.get('low_stock_threshold'),
-      date_format: formData.get('date_format'),
-      time_zone: formData.get('time_zone'),
-      language: formData.get('language')
-    };
+    const settingsData = { low_stock_threshold: formData.get('low_stock_threshold') };
+    if (hasAppPermission('actions.settings.global', settingsPermissions)) {
+      settingsData.date_format = formData.get('date_format');
+      settingsData.time_zone = formData.get('time_zone');
+      settingsData.language = formData.get('language');
+    } else {
+      settingsData.branch_id = currentSettingsBranchId;
+    }
 
     const response = await apiRequest('settings/system', 'POST', settingsData);
 

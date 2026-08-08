@@ -1,21 +1,27 @@
 <?php
 class UsersController extends Controller
 {
+    private const USER_MANAGEMENT_ROLES = ['admin', 'super_manager'];
+    private const SUPER_MANAGER_TARGET_ROLES = ['cashier', 'manager'];
+
     public function getAllUsers()
     {
-        // Check permissions
-        $this->requireAuth(['admin']);
+        $this->requireAuth(self::USER_MANAGEMENT_ROLES);
 
         $userModel = new User();
         $users = $userModel->getAllWithLastLogin();
+        if (($this->user['role'] ?? '') === 'super_manager') {
+            $users = array_values(array_filter($users, function ($user) {
+                return in_array(($user['role'] ?? ''), self::SUPER_MANAGER_TARGET_ROLES, true);
+            }));
+        }
 
         Response::success('Users retrieved', $users);
     }
 
     public function createUser()
     {
-        // Check permissions
-        $this->requireAuth(['admin']);
+        $this->requireAuth(self::USER_MANAGEMENT_ROLES);
 
         // Get and validate request data
         $data = $this->getRequestData();
@@ -36,6 +42,7 @@ class UsersController extends Controller
         if (!in_array($data['role'], $validRoles)) {
             Response::error('Invalid role', 400);
         }
+        $this->assertAssignableRole($data['role']);
         if (isset($data['status']) && !in_array($data['status'], ['active', 'inactive'], true)) {
             Response::error('Invalid status', 400);
         }
@@ -81,8 +88,7 @@ class UsersController extends Controller
      */
     public function getUser($id)
     {
-        // Check permissions
-        $this->requireAuth(['admin']);
+        $this->requireAuth(self::USER_MANAGEMENT_ROLES);
 
         if (!$id) {
             Response::error('User ID is required', 400);
@@ -94,6 +100,7 @@ class UsersController extends Controller
         if (!$user) {
             Response::error('User not found', 404);
         }
+        $this->assertTargetManageable($user);
 
         // Remove sensitive data
         unset($user['password']);
@@ -106,8 +113,7 @@ class UsersController extends Controller
      */
     public function updateUser($id)
     {
-        // Check permissions
-        $this->requireAuth(['admin']);
+        $this->requireAuth(self::USER_MANAGEMENT_ROLES);
 
         if (!$id) {
             Response::error('User ID is required', 400);
@@ -125,6 +131,7 @@ class UsersController extends Controller
             if (!in_array($data['role'], $validRoles)) {
                 Response::error('Invalid role', 400);
             }
+            $this->assertAssignableRole($data['role']);
         }
         if (isset($data['status']) && !in_array($data['status'], ['active', 'inactive'], true)) {
             Response::error('Invalid status', 400);
@@ -146,6 +153,7 @@ class UsersController extends Controller
         if (!$user) {
             Response::error('User not found', 404);
         }
+        $this->assertTargetManageable($user);
 
         $effectiveRole = $data['role'] ?? $user['role'];
         $effectiveBranchId = array_key_exists('branch_id', $data) ? $branchId : ($user['branch_id'] ?? null);
@@ -202,8 +210,7 @@ class UsersController extends Controller
      */
     public function deleteUser($id)
     {
-        // Check permissions
-        $this->requireAuth(['admin']);
+        $this->requireAuth(self::USER_MANAGEMENT_ROLES);
 
         if (!$id) {
             Response::error('User ID is required', 400);
@@ -221,6 +228,7 @@ class UsersController extends Controller
         if (!$user) {
             Response::error('User not found', 404);
         }
+        $this->assertTargetManageable($user);
 
         try {
             $userModel->delete($id);
@@ -241,8 +249,7 @@ class UsersController extends Controller
 
     public function changePassword()
     {
-        // Check permissions
-        $this->requireAuth(['admin']);
+        $this->requireAuth(self::USER_MANAGEMENT_ROLES);
 
         // Get and validate request data
         $data = $this->getRequestData();
@@ -261,6 +268,7 @@ class UsersController extends Controller
         if (!$user) {
             Response::error('User not found', 404);
         }
+        $this->assertTargetManageable($user);
 
         try {
             $userModel->updatePassword($userId, $newPassword);
@@ -414,7 +422,7 @@ class UsersController extends Controller
      */
     public function resetPassword()
     {
-        $this->requireAuth(['admin']);
+        $this->requireAuth(self::USER_MANAGEMENT_ROLES);
 
         $data = $this->getRequestData();
         $userId = isset($data['user_id']) ? intval($data['user_id']) : 0;
@@ -429,6 +437,7 @@ class UsersController extends Controller
         if (!$user) {
             Response::error('User not found', 404);
         }
+        $this->assertTargetManageable($user);
 
         // Generate a temporary password
         $tempPassword = bin2hex(random_bytes(8)); // 16-char random password
@@ -451,6 +460,22 @@ class UsersController extends Controller
         } catch (Exception $e) {
             error_log('Password generation failed: ' . $e->getMessage());
             Response::error('Failed to generate temporary password', 500);
+        }
+    }
+
+    private function assertAssignableRole(string $role): void
+    {
+        if (($this->user['role'] ?? '') === 'super_manager'
+            && !in_array($role, self::SUPER_MANAGER_TARGET_ROLES, true)) {
+            Response::error('ผู้จัดการข้ามสาขาจัดการได้เฉพาะผู้ใช้ cashier และ manager', 403);
+        }
+    }
+
+    private function assertTargetManageable(array $target): void
+    {
+        if (($this->user['role'] ?? '') === 'super_manager'
+            && !in_array(($target['role'] ?? ''), self::SUPER_MANAGER_TARGET_ROLES, true)) {
+            Response::error('ไม่มีสิทธิ์จัดการผู้ใช้ระดับ admin หรือ super manager', 403);
         }
     }
 

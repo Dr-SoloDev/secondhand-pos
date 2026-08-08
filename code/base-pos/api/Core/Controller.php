@@ -30,11 +30,32 @@ class Controller
         }
 
         if (!empty($roles) && !in_array($this->user['role'], $roles)) {
+            Logger::logActivity(
+                $this->user['user_id'] ?? null,
+                'authorization_denied',
+                'Role is not permitted for requested action',
+                [
+                    'actor' => $this->user,
+                    'module' => $this->requestModule(),
+                    'outcome' => 'denied',
+                    'reason' => 'role_not_allowed',
+                    'after' => ['request_method' => $_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN'],
+                ]
+            );
             Response::error('You do not have permission to perform this action', 403);
             exit;
         }
 
         return true;
+    }
+
+    private function requestModule()
+    {
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+        $parts = explode('/', trim((string)$path, '/'));
+        $indexPosition = array_search('index.php', $parts, true);
+        if ($indexPosition !== false && isset($parts[$indexPosition + 1])) return $parts[$indexPosition + 1];
+        return $parts[0] ?? 'system';
     }
 
     protected function getRequestData()

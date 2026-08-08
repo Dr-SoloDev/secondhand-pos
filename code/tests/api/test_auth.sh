@@ -74,6 +74,32 @@ test_auth() {
     -d "{\"username\":\"$auth_user\",\"password\":\"$auth_new_password\"}")
   assert_contains "$new_login" '"status":"success"' "JWT invalidation: New password can log in"
 
+  # SEC-03: an already-issued cookie must use the current role and branch,
+  # never the stale authorization claims embedded at login time.
+  local policy_user policy_password policy_create policy_id policy_cookie policy_login
+  local branch_a branch_b policy_update policy_permissions
+  policy_user="auth-policy-$$"
+  policy_password='AuthPolicy123!'
+  branch_a=$(api_get "branches" | json_get "data.0.id" 2>/dev/null)
+  branch_b=$(api_get "branches" | json_get "data.1.id" 2>/dev/null)
+  policy_create=$(api_post "users" \
+    "{\"username\":\"$policy_user\",\"password\":\"$policy_password\",\"phone\":\"$policy_user\",\"full_name\":\"Auth Policy Test\",\"role\":\"cashier\",\"branch_id\":$branch_a,\"status\":\"active\"}")
+  policy_id=$(echo "$policy_create" | json_get "data.id" 2>/dev/null)
+  assert_contains "$policy_create" '"status":"success"' "SEC-03: Create stale-policy test user"
+
+  policy_cookie="/tmp/auth_policy_$$.cookie"
+  policy_login=$(curl -s -c "$policy_cookie" "$API_BASE/auth/login" \
+    -X POST -H 'Content-Type: application/json' \
+    -d "{\"username\":\"$policy_user\",\"password\":\"$policy_password\"}")
+  assert_contains "$policy_login" '"status":"success"' "SEC-03: Login before role and branch change"
+
+  policy_update=$(api_put "users/user?id=$policy_id" \
+    "{\"role\":\"manager\",\"branch_id\":$branch_b}")
+  assert_contains "$policy_update" '"status":"success"' "SEC-03: Admin changes role and branch"
+  policy_permissions=$(curl -s -b "$policy_cookie" "$API_BASE/auth/permissions")
+  assert_contains "$policy_permissions" '"role":"manager"' "SEC-03: Old cookie uses current role policy"
+  assert_contains "$policy_permissions" "\"branch_id\":$branch_b" "SEC-03: Old cookie uses current branch scope"
+
   # 5. Verify with invalid token (no cookie)
   local res_bad
   res_bad=$(curl -s "$API_BASE/auth/verify" \
