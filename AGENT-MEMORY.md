@@ -1,6 +1,6 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 26 กรกฎาคม 2569 (Tech Debt Cleanup Session)
-**Status:** GOALS G1-G11 โค้ดพร้อม ตรวจสอบโค้ดจริงทุกข้อ ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅ | **Migrations 001-053 ครบถ้วน** ✅ | **Tech Debt Cleanup เสร็จ** ✅
+**Last updated:** 08 สิงหาคม 2569 (Deploy Prep — Fresh Start 2 สาขา + แก้บั๊ก 3 ตัว + Test 405/405)
+**Status:** GOALS G1-G11 โค้ดพร้อม ตรวจสอบโค้ดจริงทุกข้อ ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅ | **Migrations 001-070 ครบถ้วน** ✅ | **Tech Debt Cleanup เสร็จ** ✅ | **ลูกค้าตรวจรับงานผ่าน 04 ส.ค.** ✅ | **Ubuntu Server ติดตั้งที่ร้านลูกค้าแล้ว** ✅ | **Test Suite 405/405 ผ่าน** ✅ | **DB pristine พร้อมเริ่มใช้จริง 2 สาขา** ✅
 
 ---
 
@@ -33,10 +33,35 @@
 
 ## ⏳ Todo
 
-### ด่วน — ก่อนนำเสนอลูกค้า
-- [ ] **นำเสนอลูกค้า (ผู้ว่าจ้าง)** — เปิด `http://localhost:8080/admin/index.html` (desktop) + `http://localhost:8080/mobile/purchase.html` (tablet)
+### 🚀 08 ส.ค. 2569 — Deploy Prep: Fresh Start 2 สาขา (Phase: Deploy)
+**จุดประสงค์:** deploy ใช้จริงครั้งแรก แค่ 2 สาขา + ล้างข้อมูลทดสอบหมด (เริ่มนับ 1 ใหม่) — ลูกค้าตั้งชื่อสาขาใหม่ตั้งแต่ต้นผ่าน UI
+
+- [x] **ซ่อม migration permission** — 037/038 มี mode 600 → container อ่านไม่ได้ → migration ค้างที่ 036 → login 500 (AuthController ใช้ login_attempts) — chmod 644 + เพิ่ม pre-flight check ใน `run-migrations.sh` (กันเกิดซ้ำ)
+- [x] **Fix บั๊ก RC1** — `006p_seed_demo_data.sql` ไม่เคยถูกรัน (runner ตัด suffix → ซ้ำกับ 006) → แก้ให้ version มี suffix รันจริง — test suite/CI อิง demo seed
+- [x] **Fix บั๊ก RC2 (block production)** — `sellers.vehicle_type` ที่ model/controller/UI ใช้แต่ migration ไม่เคยสร้าง → seller API 500 ทุก endpoint → สร้าง `070_add_vehicle_type_to_sellers.sql`
+- [x] **Fix บั๊ก RC3** — `tests/api/helpers/auth.sh` TEST_PASS default ผิด (`password` → `admin`)
+- [x] **Test Suite 405/405 ผ่าน** (ก่อนแก้: 110/96) — phpunit ยังไม่ได้ติดตั้ง (ไม่มี vendor/)
+- [x] **`reset-data.sql`** — standalone (ห้ามใส่ migrations/!) — TRUNCATE 34 ตาราง + reset ID=1 + branches เหลือ BR01/BR02 + ลบ demo users + ล้างข้อมูลปลอม 006p — รันหลัง init DB ใหม่เท่านั้น (local + production)
+- [x] **DB pristine** — migrations 070/70, users=1 (admin/admin), branches=2 (ยังไม่ได้ตั้งชื่อ), categories/catalog/sellers/PO/sale_lots=0, settings/item_conditions เก็บไว้, uploads=0
+- [x] **Commit + push** — `9d39242` (fix 3 บั๊ก + reset-data.sql + OWNER-FIRST-USE.md), `b071b12` (SHOP-DEPLOY-RUNBOOK.md + BRANCH-INFO-FORM.md)
+- [x] **แพ็กเกจไปร้าน** — `/tmp/opencode/pos-deploy-package/pos-deploy-package.zip` (.env.production พร้อมรหัสสุ่ม + runbook 8 STEP + ฟอร์มสาขา)
+- [ ] **Owner ไปร้าน (รอทำ)** — runbook STEP 1-8: Docker + Tailscale + SSH + git clone + `.env` + `compose up` + รอ migration + รัน reset-data.sql + ทดสอบ Windows 10 login
+- [ ] **Deploy จริงจากบ้าน (ผมอัปเดตต่อ)** — ตรวจผ่าน Tailscale SSH + เปลี่ยน admin password + remote access
+- [ ] **ตัดสินใจ domain** — ยังไม่มี → ใช้ Tailscale ก่อน (ร้าน LAN + owner มือถือ); ถ้าลูกค้าอยากได้ URL งามๆ ค่อยซื้อ .com (~300฿/ปี) + Cloudflare Tunnel
+
+### 🎉 04 ส.ค. 2569 — Client Acceptance + Deployment (Phase: Stabilize)
+- [x] **ลูกค้าตรวจรับงานผ่าน** ✅ (ลูกค้าโดนทิ้งงาน 2 ครั้ง → trust สำคัญ — ผ่านด่านนี้แล้ว)
+- [x] **ติดตั้ง Ubuntu Server ที่ร้านลูกค้า** ✅ — Owner ลงมือเอง เสร็จ 04 ส.ค.
+- [ ] **Deploy แอปขึ้น server ร้าน** — docker compose prod (upload path `/var/data/secondhand-pos/uploads`)
+- [ ] **Cloudflare Tunnel** — remote access dashboard จากมือถือ (ยังค้างจากก่อนนำเสนอ)
+- [ ] **NAS/Storage setup จริง** — photo upload (Owner เลือก Host Directory แล้ว รอ setup)
+- [ ] **QA photo capture** — ทดสอบเต็มรูปแบบหลัง deploy จริง
+- [ ] **ปรับให้สมบูรณ์ + เสถียร** — รับ feedback การใช้งานจริงจากพนักงานหน้าร้าน, monitor logs
+
+### ด่วน — ก่อนนำเสนอลูกค้า (ประวัติ — จบแล้ว)
+- [x] **นำเสนอลูกค้า (ผู้ว่าจ้าง)** — เปิด `http://localhost:8080/admin/index.html` (desktop) + `http://localhost:8080/mobile/purchase.html` (tablet) ✅ ตรวจผ่าน
 - [x] G1: choose storage ✅ — **Owner เลือก Host Directory** — `docker-compose.prod.yml` ใช้ `/var/data/secondhand-pos/uploads`
-- [ ] เปิด Docker + Cloudflare Tunnel ก่อนนำเสนอ — remote access dashboard จากมือถือ
+- [ ] เปิด Docker + Cloudflare Tunnel ก่อนนำเสนอ — remote access dashboard จากมือถือ (ย้ายไป Todo ข้างบน)
 
 ### ✅ Tech Debt — Fixed (verified)
 - [x] ~~JWT_SECRET ย้ายออกจาก apache-config.conf ก่อน production~~ → ย้ายเข้า .env แล้ว
