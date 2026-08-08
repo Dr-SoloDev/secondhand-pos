@@ -96,6 +96,36 @@ echo "   ✅ schema_migrations ready"
 echo ""
 echo "🔧 Step 3: รัน migration (ข้ามอันที่รันแล้ว)"
 
+# --- Pre-flight: ตรวจ permission ไฟล์ migration (กันปัญหาไฟล์อ่านไม่ได้ซ้ำ) ---
+# เจอไฟล์ .sql ที่ others อ่านไม่ได้ (! -perm -o+r) เช่น mode 600
+# → พยายาม chmod 644 (กันกรณีรันบน host ที่เขียนได้)
+# → ถ้า chmod fail (เช่นรันใน container ที่ mount :ro) ให้ warn เท่านั้น ปล่อยให้ error handling เดิมจัดการ
+broken_files=$(find "$MIGRATIONS_DIR" -maxdepth 1 -name '*.sql' ! -perm -o+r 2>/dev/null || true)
+
+if [ -n "$broken_files" ]; then
+    echo ""
+    echo "⚠️ พบไฟล์ migration ที่ others อ่านไม่ได้:"
+    while IFS= read -r f; do
+        [ -n "$f" ] && echo "   ⚠️ $f"
+    done <<< "$broken_files"
+    echo "   🔧 พยายามแก้ permission เป็น 644 (กรณีรันบน host) ..."
+    fixed_all=true
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        if chmod 644 "$f" 2>/dev/null; then
+            echo "   ✅ $f → 644"
+        else
+            echo "   ⚠️ chmod ไม่สำเร็จ: $f (mount แบบ read-only?)"
+            fixed_all=false
+        fi
+    done <<< "$broken_files"
+    if [ "$fixed_all" = false ]; then
+        echo "   ⚠️ ยังมีไฟล์ที่อ่านไม่ได้ — ปล่อยให้ error handling เดิมจัดการตอนรัน migration"
+    fi
+else
+    echo "   ✅ Pre-flight: ไฟล์ migration ทั้งหมดอ่านได้ (permission ผ่าน)"
+fi
+
 for migration in "$MIGRATIONS_DIR"/*.sql; do
     [ -f "$migration" ] || continue
     filename=$(basename "$migration")
@@ -107,8 +137,11 @@ for migration in "$MIGRATIONS_DIR"/*.sql; do
         exit 1
     fi
 
-    # Legacy 006p is an alternate file for version 006, not a new migration.
-    version="${raw_version%%[a-z]}"
+    # Files with a letter suffix (e.g. 006p_seed_demo_data.sql) are DISTINCT
+    # migrations and MUST run — keep the full version ('006p') so they are not
+    # deduplicated against their numeric counterpart (006).
+    # (test suite + CI depend on the demo seed from 006p)
+    version="${raw_version}"
 
     already_run=$("${MYSQL_CMD[@]}" --silent --skip-column-names "$DB_NAME" \
         -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$version';")

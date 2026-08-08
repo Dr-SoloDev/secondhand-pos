@@ -1,7 +1,7 @@
 # Auth helper — login via httpOnly cookie (posToken)
 API_BASE="${API_BASE:-http://localhost:8080/api/index.php}"
 TEST_USER="${TEST_USER:-admin}"
-TEST_PASS="${TEST_PASS:-password}"
+TEST_PASS="${TEST_PASS:-admin}"
 COOKIE_JAR="${COOKIE_JAR:-/tmp/test_cookies.txt}"
 
 login() {
