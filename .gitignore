@@ -47,3 +47,4 @@ login-screenshot.png
 backups/
 *.pdf
 code/base-pos/uploads/
+*.bak
