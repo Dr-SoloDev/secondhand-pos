@@ -160,7 +160,7 @@ class AuthController extends Controller
         unset($user['password']);
 
         $cookieExpiry = time() + JWT_EXPIRY;
-        $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+        $secure = getenv('APP_ENV') === 'production';
         setcookie('posToken', $token, [
             'expires' => $cookieExpiry,
             'path' => '/',
@@ -239,7 +239,7 @@ class AuthController extends Controller
         }
 
         // F2: Clear cookies
-        $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+        $secure = getenv('APP_ENV') === 'production';
         setcookie('posToken', '', [
             'expires' => time() - 3600,
             'path' => '/',
