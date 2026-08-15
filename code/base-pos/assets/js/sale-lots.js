@@ -332,7 +332,7 @@ function calcExpensesTotal() {
 
 function resetForm() {
   document.getElementById('modalTitle').textContent = 'สร้าง Lot แบบร่าง';
-  document.getElementById('saveLotBtn').textContent = 'บันทึก (แบบร่าง)';
+  document.getElementById('saveLotBtn').textContent = 'ยืนยันขาย (ตัดสต็อก)';
   document.getElementById('buyerName').value = '';
   document.getElementById('saleDate').value = new Date().toISOString().slice(0, 10);
   document.getElementById('branchSelect').value = '';
@@ -357,7 +357,7 @@ async function openModal(id) {
     document.getElementById('saveLotBtn').disabled = true;
 
     const res = await apiRequest(`sale-lots/sale-lot?id=${id}`);
-    document.getElementById('saveLotBtn').textContent = 'บันทึก (แบบร่าง)';
+    document.getElementById('saveLotBtn').textContent = 'ยืนยันขาย (ตัดสต็อก)';
     document.getElementById('saveLotBtn').disabled = false;
 
     if (res.status !== 'success') {
@@ -470,10 +470,50 @@ async function saveLot() {
   }
 
   btn.disabled = false;
-  btn.textContent = 'บันทึก (แบบร่าง)';
+  btn.textContent = 'ยืนยันขาย (ตัดสต็อก)';
 
   if (res.status === 'success') {
-    showNotification(editId ? 'แก้ไข Lot สำเร็จ' : 'สร้าง Lot สำเร็จ', 'success');
+    if (editId) {
+      // แก้ไขแบบร่าง — ยังไม่ตัดสต็อก (ต้องกด ✓ ยืนยันในตาราง)
+      showNotification('แก้ไข Lot สำเร็จ (แบบร่าง — ยังไม่ตัดสต็อก)', 'success');
+      document.getElementById('saleLotModal').classList.remove('show');
+      editId = null;
+      resetForm();
+      loadLots();
+      return;
+    }
+
+    // LOT-CONFIRM-FIX: บันทึก = ยืนยันทันที (ตัดสต็อก)
+    const newLotId = res.data && res.data.id;
+    if (!newLotId) {
+      showNotification('สร้าง Lot สำเร็จ แต่ไม่พบ ID — กด ✓ ในตารางเพื่อยืนยัน', 'error');
+      document.getElementById('saleLotModal').classList.remove('show');
+      editId = null;
+      resetForm();
+      loadLots();
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'กำลังยืนยัน (ตัดสต็อก)...';
+    try {
+      const confirmRes = await apiRequest(`sale-lots/confirm?id=${newLotId}`, 'POST');
+      if (confirmRes.status === 'success') {
+        showNotification('ยืนยันขาย Lot สำเร็จ (ตัดสต็อกแล้ว)', 'success');
+      } else {
+        // ยืนยันไม่สำเร็จ (เช่น สต็อกไม่พอ) → ลบแบบร่างทิ้ง ไม่ให้ค้าง
+        try { await apiRequest(`sale-lots/sale-lot?id=${newLotId}`, 'DELETE'); } catch (e) {}
+        errorEl.textContent = confirmRes.message || 'ยืนยันขายไม่สำเร็จ (สต็อกไม่พอ?)';
+        errorEl.style.display = 'block';
+        showNotification(confirmRes.message || 'ยืนยันขายไม่สำเร็จ', 'error');
+        btn.disabled = false;
+        btn.textContent = 'ยืนยันขาย (ตัดสต็อก)';
+        return;
+      }
+    } catch (e) {
+      // เน็ตขัดข้อง — เก็บแบบร่างไว้ ให้กด ✓ ยืนยันเองในตารางได้
+      showNotification('บันทึกสำเร็จ แต่ยืนยันขัดข้อง — กด ✓ ในตารางเพื่อยืนยันและตัดสต็อก', 'error');
+    }
     document.getElementById('saleLotModal').classList.remove('show');
     editId = null;
     resetForm();

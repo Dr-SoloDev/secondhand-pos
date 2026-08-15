@@ -1,0 +1,14 @@
+# 🔒 Secrets — ห้ามขึ้น GitHub
+.env
+.env.*
+!.env.example
+docker/ssl/
+
+# Backups
+*.bak-*
+
+# OS / tooling
+.DS_Store
+__pycache__/
+*.pyc
+*.log

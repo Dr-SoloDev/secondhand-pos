@@ -8,5 +8,6 @@ mkdir -p /var/www/html/uploads
 chown -R www-data:www-data /var/www/html/uploads
 echo "Uploads ownership: www-data (fixed)"
 
+a2enmod ssl headers rewrite >/dev/null 2>&1
 echo "Starting Apache..."
 exec apache2-foreground

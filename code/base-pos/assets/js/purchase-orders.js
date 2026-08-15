@@ -21,6 +21,7 @@ let pendingItemPhotos = {};   // { [cartIndex]: File }
 let pendingSellerIdPhoto = null; // File | null
 let pendingNewItemPhoto = null; // File | null — ถ่ายตอนคีย์ก่อนกดเพิ่ม
 let activePhotoTarget = null; // { type: 'item', index: N } | { type: 'seller-id' }
+let photoCaptured = false; // true เฉพาะเมื่อ capture สำเร็จ (กัน confirm ภาพดำ)
 let cameraStream = null;
 const THERMAL_PRINT_BUTTON_TEXT = '🖨️ พิมพ์ความร้อน';
 
@@ -1649,6 +1650,13 @@ function capturePhoto() {
   const canvas = document.getElementById('cameraCanvas');
   const flash = document.getElementById('cameraFlash');
 
+  // ⚠️ กันถ่ายตอนกล้องยังไม่พร้อม (videoWidth=0 / readyState<2) → ภาพดำ/ว่าง
+  if (!video.videoWidth || !video.videoHeight || video.readyState < 2) {
+    console.warn('[Photo] Camera not ready - videoWidth:', video.videoWidth, 'readyState:', video.readyState);
+    showNotification('กล้องยังไม่พร้อม กรุณารอสักครู่แล้วถ่ายใหม่', 'error');
+    return;
+  }
+
   // Flash effect
   flash.classList.remove('flash-out');
   flash.classList.add('flash');
@@ -1666,42 +1674,67 @@ function capturePhoto() {
   const previewImg = document.getElementById('cameraPreviewImg');
   previewImg.src = canvas.toDataURL('image/jpeg', 0.85);
   document.getElementById('cameraPreviewOverlay').classList.add('show');
+  photoCaptured = true; // capture สำเร็จแล้ว อนุญาต confirm ได้
 }
 
 // ── Confirm captured photo ─────────────────────────────────
 function confirmPhoto() {
   const canvas = document.getElementById('cameraCanvas');
 
+  // ⚠️ กัน canvas ว่าง หรือยังไม่ได้ถ่าย → ไม่ต้องไป toBlob
+  if (!canvas.width || !canvas.height || !photoCaptured) {
+    console.error('[Photo] ❌ nothing captured yet — confirm blocked.', { w: canvas.width, h: canvas.height, photoCaptured });
+    showNotification('ยังไม่มีภาพที่จะใช้ กรุณากดถ่ายก่อน', 'error');
+    return;
+  }
+
   // Convert canvas to File
-  canvas.toBlob(async (blob) => {
+  canvas.toBlob((blob) => {
+    // ⚠️ จุดที่ 2: กัน blob null → เคยเป็น TypeError → ค้างที่พรีวิวไม่ปิดกล้อง
+    if (!blob) {
+      console.error('[Photo] ❌ blob is null — cannot create file.');
+      showNotification('ถ่ายรูปไม่สำเร็จ กรุณาถ่ายใหม่', 'error');
+      return;
+    }
+
     const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
 
     console.log('[Photo] confirmPhoto - activePhotoTarget:', activePhotoTarget);
     console.log('[Photo] confirmPhoto - file created:', file.name, file.size, 'bytes');
 
-    if (activePhotoTarget) {
-      if (activePhotoTarget.type === 'item') {
-        pendingItemPhotos[activePhotoTarget.id] = file;
-        console.log('[Photo] ✓ Saved to pendingItemPhotos[' + activePhotoTarget.id + ']');
-        console.log('[Photo] pendingItemPhotos keys now:', Object.keys(pendingItemPhotos));
-      } else if (activePhotoTarget.type === 'new-item') {
-        pendingNewItemPhoto = file;
-        console.log('[Photo] ✓ Saved to pendingNewItemPhoto (will transfer to pendingItemPhotos on add)');
-        showItemPhotoIndicator(file);
-      } else if (activePhotoTarget.type === 'seller-id') {
-        pendingSellerIdPhoto = file;
-        console.log('[Photo] ✓ Saved to pendingSellerIdPhoto');
-        showSellerIdPhotoPreview(file);
-      }
-    } else {
+    // ⚠️ จุดที่ 3: กัน target หาย → เคยรูปหายเงียบ (เด้งกลับแต่ไม่มีรูปแนบ)
+    if (!activePhotoTarget) {
       console.error('[Photo] ❌ activePhotoTarget is null! Photo will be lost.');
+      showNotification('กรุณาเลือกรูป/ตำแหน่งที่จะวาง แล้วถ่ายใหม่', 'error');
+      closeCamera();
+      return;
+    }
+
+    if (activePhotoTarget.type === 'item') {
+      pendingItemPhotos[activePhotoTarget.id] = file;
+      console.log('[Photo] ✓ Saved to pendingItemPhotos[' + activePhotoTarget.id + ']');
+      console.log('[Photo] pendingItemPhotos keys now:', Object.keys(pendingItemPhotos));
+    } else if (activePhotoTarget.type === 'new-item') {
+      pendingNewItemPhoto = file;
+      console.log('[Photo] ✓ Saved to pendingNewItemPhoto (will transfer to pendingItemPhotos on add)');
+      showItemPhotoIndicator(file);
+    } else if (activePhotoTarget.type === 'seller-id') {
+      pendingSellerIdPhoto = file;
+      console.log('[Photo] ✓ Saved to pendingSellerIdPhoto');
+      showSellerIdPhotoPreview(file);
     }
 
     // Close camera
     closeCamera();
     console.log('[Photo] After closeCamera, activePhotoTarget:', activePhotoTarget);
-    renderCart(); // refresh to show ✓
-    updatePhotoUI(); // refresh FAB badge + photo strip
+
+    // ⚠️ กัน error ตรง refresh UI → ดูเหมือนรูปหาย (รูปบันทึกไปแล้ว แต่วาด UI ไม่ทัน)
+    try {
+      renderCart(); // refresh to show ✓
+      updatePhotoUI(); // refresh FAB badge + photo strip
+    } catch (uiErr) {
+      console.error('[Photo] UI refresh error (photo still saved):', uiErr);
+    }
 
     showUploadToast('ถ่ายรูปสำเร็จ', 1500);
   }, 'image/jpeg', 0.85);
@@ -1715,12 +1748,14 @@ function closeCamera() {
   document.getElementById('cameraPreviewOverlay').classList.remove('show');
   // ล้าง activePhotoTarget หลังจาก confirmPhoto() บันทึกไปแล้ว
   activePhotoTarget = null;
+  photoCaptured = false; // reset ด้วย — รอบหน้าต้อง capture ใหม่
   console.log('[Camera] Cleared activePhotoTarget after close');
 }
 
 // ── Retry photo (go back to live view) ─────────────────────
 function retryPhoto() {
   document.getElementById('cameraPreviewOverlay').classList.remove('show');
+  photoCaptured = false; // กลับไป live view — ต้องถ่ายใหม่ก่อน confirm
 }
 
 // ── Show ID card photo preview ─────────────────────────────
