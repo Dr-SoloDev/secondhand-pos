@@ -12,25 +12,7 @@
   gap: 12px;
 }
 
-/* ===== 2. PAGE HEADER ===== */
-.po-page-header {
-  align-items: flex-start;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(217, 119, 6, 0.1);
-}
-
-.po-page-header h1 {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.15;
-  margin: 0;
-}
-
-.po-page-header p {
-  font-size: 13px;
-  color: var(--color-text-light);
-  margin-top: 4px;
-}
+/* ===== 2. PAGE HEADER (merged into .topbar — rules removed, see layout.css) ===== */
 
 .po-header-status {
   display: inline-flex;
@@ -869,10 +851,6 @@
 }
 
 @media (max-width: 768px) {
-  .po-page-header {
-    align-items: stretch;
-  }
-
   .po-header-status {
     width: 100%;
     justify-content: space-between;

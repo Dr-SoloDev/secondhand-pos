@@ -48,3 +48,4 @@ backups/
 *.pdf
 code/base-pos/uploads/
 *.bak
+code/uploads-ui/

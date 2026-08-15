@@ -32,19 +32,17 @@
       </ul>
   </aside>
   <main class="content-area">
-    <div class="topbar">
-      <div style="flex:1"></div>
-      <div class="user-dropdown">
-        <button class="user-dropdown-toggle"><div class="user-avatar"><i class="icon-user"></i></div><span class="user-name">-</span><i class="icon-down"></i></button>
-        <div class="user-dropdown-menu"><a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a></div>
-      </div>
-    </div>
-    <div class="cash-page">
-      <div class="cash-page-header">
+      <div class="topbar">
+      <div class="page-header" style="flex:1">
         <div><h1 class="page-title">เปิด-ปิดยอดรายสาขา</h1></div>
         <div class="cash-page-tools">
           <div><label for="cashBranch">สาขา</label><select id="cashBranch" class="form-control"></select></div>
           <button type="button" class="btn btn-secondary" id="refreshCashBtn" title="รีเฟรช"><i class="icon-refresh"></i> รีเฟรช</button>
+        </div>
+      </div>
+      <div class="user-dropdown">
+        <button class="user-dropdown-toggle"><div class="user-avatar"><i class="icon-user"></i></div><span class="user-name">-</span><i class="icon-down"></i></button>
+          <div class="user-dropdown-menu"><a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a></div>
         </div>
       </div>
 
@@ -122,7 +120,6 @@
           <table class="data-table"><thead><tr><th>เลขที่</th><th>วันที่มีผล</th><th>ประเภท</th><th>รายการอ้างอิง</th><th>ก่อนปรับ</th><th>หลังปรับ</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลาบันทึก</th></tr></thead><tbody id="adjustmentBody"></tbody></table>
         </div>
       </section>
-    </div>
   </main>
 </div>
 <div id="notification-container"></div>
