@@ -608,7 +608,7 @@ class SellersController extends Controller
         $dir = "{$uploadBase}/{$year}/{$month}";
 
         if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-            Response::error('ไม่สามารถสร้าง目录จัดเก็บได้', 500);
+            Response::error('ไม่สามารถสร้างโฟลเดอร์จัดเก็บได้', 500);
         }
 
         // ตรวจสอบพื้นที่ว่าง

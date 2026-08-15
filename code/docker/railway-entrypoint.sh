@@ -3,6 +3,11 @@ set -e
 
 echo "=== Scrap POS startup ==="
 
+# Fix uploads ownership on every start (volume mounts override Dockerfile chown)
+mkdir -p /var/www/html/uploads
+chown -R www-data:www-data /var/www/html/uploads
+echo "Uploads ownership: www-data (fixed)"
+
 # Wait for MySQL
 echo "Waiting for MySQL at $DB_HOST:${DB_PORT:-3306}..."
 for i in $(seq 1 30); do
