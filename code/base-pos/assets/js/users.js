@@ -315,8 +315,8 @@ async function saveUser() {
         showNotification('รหัสผ่านไม่ตรงกัน', 'error');
         return;
       }
-      if (password.length < 12) {
-        showNotification('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 'error');
+      if (password.length < 8) {
+        showNotification('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร', 'error');
         return;
       }
     }

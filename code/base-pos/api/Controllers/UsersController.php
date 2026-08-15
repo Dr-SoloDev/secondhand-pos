@@ -484,8 +484,8 @@ class UsersController extends Controller
         if (!is_string($password)) {
             Response::error('Password must be a string', 400);
         }
-        if (mb_strlen($password, 'UTF-8') < 12) {
-            Response::error('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร', 400);
+        if (mb_strlen($password, 'UTF-8') < 8) {
+            Response::error('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร', 400);
         }
     }
 }
