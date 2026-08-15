@@ -65,6 +65,17 @@ docker compose up -d
 docker compose logs db | grep -E "Done|เสร็จสมบูรณ์" | tail -5
 # ต้องเห็น: "✅ Migration เสร็จสมบูรณ์" และ "Done: 070_add_vehicle_type_to_sellers.sql"
 ```
+> 📌 **ใช้ compose ตัว dev (`docker-compose.yml`) — รูปเก็บในโฟลเดอร์ `code/uploads`; ยังไม่ใช้ `docker-compose.prod.yml` (NAS ทีหลัง)**
+>
+> ⚠️ **SELLER_ID_ENCRYPTION_KEY** ใน .env ต้องเก็บสำเนาไว้ที่บ้าน (password manager) — ถ้า server พัง กู้ข้อมูลบัตรประชาชนไม่ได้
+
+## STEP 5.5 — สร้างโฟลเดอร์เก็บรูป (1 นาที — กันถ่ายรูปพังวันแรก)
+```bash
+# สร้างโฟลเดอร์เก็บรูป + มอบสิทธิ์ให้ Apache (สำคัญ — กันถ่ายรูปพังวันแรก)
+mkdir -p ~/secondhand-pos/code/uploads
+sudo chown -R 33:33 ~/secondhand-pos/code/uploads
+# ตรวจ: ls -ld ~/secondhand-pos/code/uploads  ← ต้องเป็น www-data
+```
 
 ## STEP 6 — ล้างข้อมูล demo (1 นาที)
 ```bash
@@ -72,6 +83,14 @@ cd ~/secondhand-pos/code
 docker compose exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root < /docker-entrypoint-initdb.d/pos-database/reset-data.sql'
 ```
 > ผลลัพธ์: เหลือ 2 สาขา (สาขา 1 / สาขา 2 ยังไม่ได้ตั้งชื่อ), users เหลือแค่ admin, ทุกตารางข้อมูลว่าง (เริ่มนับ 1)
+
+## STEP 6.5 — Backup baseline หลังล้างข้อมูล demo (1 นาที — กันข้อมูลสูญ)
+```bash
+# Backup baseline ก่อนคีย์ข้อมูลจริง (กันข้อมูลสูญ)
+mkdir -p ~/secondhand-pos/backups
+docker compose exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -u root --all-databases' > ~/secondhand-pos/backups/backup-20260809.sql
+ls -lh ~/secondhand-pos/backups/  # ต้องเห็นไฟล์ backup
+```
 
 ## STEP 7 — ทดสอบจาก Windows 10 (5 นาที)
 1. เปิด **Chrome/Edge** บนเครื่อง Windows 10
@@ -94,6 +113,7 @@ docker compose exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root
 4. เปิดระบบสำเร็จไหม: admin login ผ่านไหม ✅/❌ (ถ้าไม่ ถ่ายรูป error)
 5. ชื่อจริง 2 สาขา + ที่อยู่ (กรอกใน BRANCH-INFO-FORM.md ได้)
 6. เครื่องพิมพ์: รุ่น/ต่อกับเครื่องไหน ______
+7. backup สร้างสำเร็จไหม (STEP 6.5): ✅/❌ ขนาดไฟล์ ______
 ```
 
 ---
@@ -106,3 +126,4 @@ docker compose exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root
 | login แล้ว error 500 | migration ยังไม่ครบ — รอ STEP 5 แล้วค่อยทดสอบ |
 | ไม่เห็น "Migration เสร็จสมบูรณ์" | `docker compose logs db --tail 30` ถ่ายรูปส่งทีม |
 | windows เปิดเว็บไม่ได้ | เช็ค IP ถูกต้อง + อยู่เครือข่ายเดียวกัน (LAN เดียวกัน) |
+| ถ่ายรูป error / เขียนไฟล์ไม่ได้ | เช็ค `ls -ld code/uploads` ต้องเป็น www-data (STEP 5.5) |

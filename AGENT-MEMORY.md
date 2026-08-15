@@ -1,5 +1,5 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 08 สิงหาคม 2569 (Deploy Prep — Fresh Start 2 สาขา + แก้บั๊ก 3 ตัว + Test 405/405)
+**Last updated:** 08 สิงหาคม 2569 (Deploy Prep — Fresh Start 2 สาขา + แก้บั๊ก 3 ตัว + Test 405/405 + แก้ 3 deploy blockers)
 **Status:** GOALS G1-G11 โค้ดพร้อม ตรวจสอบโค้ดจริงทุกข้อ ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅ | **Migrations 001-070 ครบถ้วน** ✅ | **Tech Debt Cleanup เสร็จ** ✅ | **ลูกค้าตรวจรับงานผ่าน 04 ส.ค.** ✅ | **Ubuntu Server ติดตั้งที่ร้านลูกค้าแล้ว** ✅ | **Test Suite 405/405 ผ่าน** ✅ | **DB pristine พร้อมเริ่มใช้จริง 2 สาขา** ✅
 
 ---
@@ -17,7 +17,7 @@
 
 | Goal | สถานะ | รายละเอียด | ตรวจสอบโค้ดจริง |
 |:-----|:-----:|:------------|:-----------------|
-| G1 | ✅✅ | ถ่ายรูปสินค้า — `PhotoUploadController` (255 lines, resize, HMAC auth), `photo-upload.html`+`js` (mobile standalone), camera/gallery/FAB/QR handoff ใน `purchase-orders.js`, ID card photo ใน `sellers.js` | **Owner เลือก Host Directory** — `docker-compose.prod.yml` + `docs/NAS-SETUP.md` updated |
+| G1 | ✅✅ | ถ่ายรูปสินค้า — `PhotoUploadController` (255 lines, resize, HMAC auth), `photo-upload.html`+`js` (mobile standalone), camera/gallery/FAB/QR handoff ใน `purchase-orders.js`, ID card photo ใน `sellers.js` | ใช้ dev compose → `code/uploads` ไปก่อน (G1 Host Directory เลื่อนทำหลัง deploy — 08 ส.ค.) |
 | G2 | ✅ | ใบรับซื้อ 2 แบบ (ปกติ + โลหะมีค่า auto-detect, บังคับเซ็นรับรอง) | `PurchaseOrdersController:152,212`, `purchase-orders.js:627` |
 | G3 | ✅ | Blacklist alert popup สีแดง + blacklist_reason | `purchase-orders.js:972`, `sellers.js:44`, routes `sellers/blacklist`, `sellers/unblacklist` |
 | G4 | ✅ | ค้นหาผู้ขาย real-time debounce 300ms + blacklist badge | `purchase-orders.js:933`, `sellers.js:75` |
@@ -52,15 +52,15 @@
 ### 🎉 04 ส.ค. 2569 — Client Acceptance + Deployment (Phase: Stabilize)
 - [x] **ลูกค้าตรวจรับงานผ่าน** ✅ (ลูกค้าโดนทิ้งงาน 2 ครั้ง → trust สำคัญ — ผ่านด่านนี้แล้ว)
 - [x] **ติดตั้ง Ubuntu Server ที่ร้านลูกค้า** ✅ — Owner ลงมือเอง เสร็จ 04 ส.ค.
-- [ ] **Deploy แอปขึ้น server ร้าน** — docker compose prod (upload path `/var/data/secondhand-pos/uploads`)
+- [ ] **Deploy แอปขึ้น server ร้าน** — docker compose ตัว dev (`docker-compose.yml`) — upload path `code/uploads` (ใช้ dev compose ไปก่อน; G1 Host Directory เลื่อนทำหลัง deploy)
 - [ ] **Cloudflare Tunnel** — remote access dashboard จากมือถือ (ยังค้างจากก่อนนำเสนอ)
-- [ ] **NAS/Storage setup จริง** — photo upload (Owner เลือก Host Directory แล้ว รอ setup)
+- [ ] **NAS/Storage setup จริง** — ⏸️ เลื่อนทำหลัง deploy — ระหว่างนี้ใช้ dev compose → `code/uploads` ไปก่อน
 - [ ] **QA photo capture** — ทดสอบเต็มรูปแบบหลัง deploy จริง
 - [ ] **ปรับให้สมบูรณ์ + เสถียร** — รับ feedback การใช้งานจริงจากพนักงานหน้าร้าน, monitor logs
 
 ### ด่วน — ก่อนนำเสนอลูกค้า (ประวัติ — จบแล้ว)
 - [x] **นำเสนอลูกค้า (ผู้ว่าจ้าง)** — เปิด `http://localhost:8080/admin/index.html` (desktop) + `http://localhost:8080/mobile/purchase.html` (tablet) ✅ ตรวจผ่าน
-- [x] G1: choose storage ✅ — **Owner เลือก Host Directory** — `docker-compose.prod.yml` ใช้ `/var/data/secondhand-pos/uploads`
+- [x] G1: choose storage ✅ — **Owner เลือก Host Directory** — ⏸️ เลื่อนทำหลัง deploy (08 ส.ค.) → ใช้ dev compose `code/uploads` ไปก่อน
 - [ ] เปิด Docker + Cloudflare Tunnel ก่อนนำเสนอ — remote access dashboard จากมือถือ (ย้ายไป Todo ข้างบน)
 
 ### ✅ Tech Debt — Fixed (verified)
