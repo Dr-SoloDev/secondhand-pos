@@ -457,9 +457,24 @@
   </div>
   <div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:149" id="mTierOverlay" onclick="closeTierSheet()"></div>
 
+  <!-- ===== PRINT BILL BOTTOM SHEET ===== -->
+  <div style="display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,0.15);z-index:160;padding:16px" id="mPrintSheet">
+    <div style="text-align:center;font-weight:700;font-size:16px;color:#059669;margin-bottom:4px">✅ บันทึกใบรับซื้อสำเร็จ!</div>
+    <div style="text-align:center;font-size:13px;color:#6b7280;margin-bottom:12px">เลือกรูปแบบบิลที่ต้องการพิมพ์</div>
+    <div class="m-print-error" id="mPrintError" style="display:none;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px"></div>
+    <div class="m-btn-group" style="margin-bottom:8px">
+      <button class="m-btn m-btn-primary" onclick="printBillA4()" id="mPrintA4Btn">📄 พิมพ์ A4</button>
+      <button class="m-btn m-btn-success" onclick="printBillThermal()" id="mPrintThermalBtn">🧾 พิมพ์ความร้อน</button>
+    </div>
+    <div style="text-align:center">
+      <a href="javascript:void(0)" onclick="closePrintSheet(true)" style="color:#9CA3AF;font-size:14px;text-decoration:none">✕ ไม่พิมพ์ กลับหน้าเลย</a>
+    </div>
+  </div>
+  <div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:159" id="mPrintOverlay"></div>
+
   <div class="m-footer">รักษ์สะอาดรีไซเคิล · SoloCorp OS</div>
 
-  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/config.js?v=20260815d"></script>
   <script>
   // ============================================================
   // Mobile Purchase Order — State & Logic
@@ -958,13 +973,76 @@
       document.getElementById('mSellerSelected').style.display = 'none';
       document.getElementById('mNotes').value = '';
       renderCart();
-      goStep(1);
+      openPrintSheet(poId);
     } else {
       showToast(res.message || 'บันทึกไม่สำเร็จ', 'error');
     }
 
     btn.disabled = false;
     btn.innerHTML = '💾 บันทึกใบรับซื้อ';
+  }
+
+  // --- Print Bill Sheet (หลังบันทึก: เลือก A4 / Thermal / ข้าม) ---
+  let mLastPoId = null;
+
+  function openPrintSheet(poId) {
+    mLastPoId = poId;
+    document.getElementById('mPrintError').style.display = 'none';
+    setPrintButtonsBusy(false);
+    document.getElementById('mPrintSheet').style.display = 'block';
+    document.getElementById('mPrintOverlay').style.display = 'block';
+  }
+
+  function closePrintSheet(backToStart) {
+    document.getElementById('mPrintSheet').style.display = 'none';
+    document.getElementById('mPrintOverlay').style.display = 'none';
+    mLastPoId = null;
+    setPrintButtonsBusy(false);
+    if (backToStart) goStep(1);
+  }
+
+  function setPrintButtonsBusy(busy) {
+    const a4 = document.getElementById('mPrintA4Btn');
+    const th = document.getElementById('mPrintThermalBtn');
+    if (busy) {
+      if (a4) a4.disabled = true;
+      if (th) { th.disabled = true; th.innerHTML = '<span class="m-spinner"></span> กำลังพิมพ์...'; }
+    } else {
+      if (a4) { a4.disabled = false; }
+      if (th) { th.disabled = false; th.innerHTML = '🧾 พิมพ์ความร้อน'; }
+    }
+  }
+
+  function printBillA4() {
+    if (!mLastPoId) return;
+    // เปิดหน้า A4 auto-print (popup ผ่านเพราะมาจากการแตะปุ่ม)
+    window.open(`../admin/print-receipt.html?id=${mLastPoId}&auto=1`, '_blank');
+    closePrintSheet(true);
+  }
+
+  async function printBillThermal() {
+    if (!mLastPoId) return;
+    setPrintButtonsBusy(true);
+    const errorBox = document.getElementById('mPrintError');
+    errorBox.style.display = 'none';
+    try {
+      const res = await fetch(`${window.apiPath}/print/thermal-purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id: mLastPoId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.status !== 'success') {
+        throw new Error(data.message || 'Print Server ไม่พร้อมทำงาน');
+      }
+      showToast('🧾 พิมพ์ความร้อนสำเร็จ', 'success');
+      closePrintSheet(true);
+    } catch (e) {
+      errorBox.textContent = `⚠️ พิมพ์ไม่ได้: ${e.message || 'กรุณาลองใหม่'}`;
+      errorBox.style.display = 'block';
+      setPrintButtonsBusy(false);
+    }
   }
 
   // --- Photo Capture ---
