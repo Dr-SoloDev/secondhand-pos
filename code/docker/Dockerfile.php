@@ -33,6 +33,6 @@ RUN mkdir -p /var/www/html/uploads /var/www/html/backups /var/www/html/temp \
     && chown -R www-data:www-data /var/www/html
 
 # Entrypoint: fix uploads ownership then start Apache
-COPY docker/entrypoint.sh /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
