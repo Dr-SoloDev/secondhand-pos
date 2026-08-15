@@ -42,6 +42,8 @@ services:
       - ./customizations:/var/www/customizations:rw
       - ./uploads:/var/www/html/uploads:rw
       - ./docker/apache-config.conf:/etc/apache2/sites-available/000-default.conf:ro
+      - ./docker/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/entrypoint.sh"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
