@@ -66,6 +66,15 @@
         <label for="reportMonth">เดือนรายงาน</label>
         <input type="month" id="reportMonth" class="form-control">
       </div>
+      <div class="reports-filter-field" id="reportDateRangeField">
+        <label for="reportDateFrom">หรือเลือกช่วงวันที่</label>
+        <div class="report-date-range">
+          <input type="date" id="reportDateFrom" class="form-control" aria-label="วันที่เริ่มต้น">
+          <span class="report-date-sep">ถึง</span>
+          <input type="date" id="reportDateTo" class="form-control" aria-label="วันที่สิ้นสุด">
+          <button type="button" id="reportDateClear" class="btn btn-secondary" title="กลับไปดูตามเดือน" aria-label="ล้างช่วงวันที่">✕</button>
+        </div>
+      </div>
     </div>
 
     <div class="tabs" id="reportsTabs">

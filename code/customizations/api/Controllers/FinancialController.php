@@ -116,6 +116,8 @@ class FinancialController extends Controller
                 'period'   => $params['period_raw'],
                 'year'     => $params['year_raw'],
                 'month'    => $params['month_raw'],
+                'date_from'=> $params['date_from_raw'],
+                'date_to'  => $params['date_to_raw'],
                 'branch_id'=> $params['branch_id_raw'],
             ],
         ]);
@@ -311,10 +313,18 @@ class FinancialController extends Controller
         $period   = $_GET['period']    ?? 'month';
         $year     = intval($_GET['year']     ?? date('Y'));
         $month    = intval($_GET['month']    ?? date('n'));
+        $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : null;
+        $dateTo   = isset($_GET['date_to'])   ? $this->sanitizeInput($_GET['date_to'])   : null;
         $branchId = $this->resolveBranchId();
 
         // date filter สำหรับ purchase_orders (created_at)
-        if ($period === 'month') {
+        if ($dateFrom && $dateTo) {
+            // ช่วงวันที่เจาะจง (รายงานตามวันที่)
+            $dateFilterPO = "DATE(po.created_at) BETWEEN ? AND ?";
+            $bindingsPO   = [$dateFrom, $dateTo];
+            $dateFilterSL = "DATE(sl.sale_date) BETWEEN ? AND ?";
+            $bindingsSL   = [$dateFrom, $dateTo];
+        } elseif ($period === 'month') {
             $dateFilterPO = "YEAR(po.created_at) = ? AND MONTH(po.created_at) = ?";
             $bindingsPO   = [$year, $month];
             $dateFilterSL = "YEAR(sl.sale_date) = ? AND MONTH(sl.sale_date) = ?";
@@ -345,6 +355,8 @@ class FinancialController extends Controller
             'period_raw'      => $period,
             'year_raw'        => $year,
             'month_raw'       => $month,
+            'date_from_raw'   => $dateFrom,
+            'date_to_raw'     => $dateTo,
         ];
     }
 

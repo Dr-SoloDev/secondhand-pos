@@ -3,6 +3,8 @@ let branches = [];
 let currentBranchId = null;
 let currentBranchName = '';
 let currentReportMonth = '';
+let currentDateFrom = '';
+let currentDateTo = '';
 let reportPermissions = null;
 
 const reportState = {
@@ -61,6 +63,7 @@ async function initReports() {
 function bindEvents() {
   document.getElementById('reportMonth')?.addEventListener('change', async function() {
     currentReportMonth = this.value || getCurrentMonthValue();
+    clearDateRangeInputs();
     setDefaultTaxDates();
     updateScopeLabels();
     await reloadAllReports();
@@ -74,9 +77,54 @@ function bindEvents() {
     await reloadAllReports();
   });
 
+  document.getElementById('reportDateFrom')?.addEventListener('change', handleDateRangeChange);
+  document.getElementById('reportDateTo')?.addEventListener('change', handleDateRangeChange);
+  document.getElementById('reportDateClear')?.addEventListener('click', clearDateRange);
+
   document.getElementById('generateTaxReport')?.addEventListener('click', loadTaxReport);
 
   document.addEventListener('click', handleReportActionClick);
+}
+
+function handleDateRangeChange() {
+  const fromInput = document.getElementById('reportDateFrom');
+  const toInput = document.getElementById('reportDateTo');
+  const from = fromInput?.value || '';
+  const to = toInput?.value || '';
+
+  // รอให้ครบทั้ง 2 ฝั่งก่อน แล้วค่อยโหลด
+  if (!from || !to) return;
+
+  if (from > to) {
+    alert('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด');
+    if (fromInput) fromInput.value = currentDateFrom;
+    if (toInput) toInput.value = currentDateTo;
+    return;
+  }
+
+  currentDateFrom = from;
+  currentDateTo = to;
+  setDefaultTaxDates();
+  updateScopeLabels();
+  setLoadingState();
+  reloadAllReports();
+}
+
+function clearDateRange() {
+  clearDateRangeInputs();
+  setDefaultTaxDates();
+  updateScopeLabels();
+  setLoadingState();
+  reloadAllReports();
+}
+
+function clearDateRangeInputs() {
+  currentDateFrom = '';
+  currentDateTo = '';
+  const fromInput = document.getElementById('reportDateFrom');
+  const toInput = document.getElementById('reportDateTo');
+  if (fromInput) fromInput.value = '';
+  if (toInput) toInput.value = '';
 }
 
 async function loadBranchLookup() {
@@ -166,12 +214,12 @@ function getScopeSlug() {
 
 function getReportPeriodText(key) {
   if (key === 'tax') {
-    const dateFrom = document.getElementById('taxDateFrom')?.value || getMonthRange(currentReportMonth).dateFrom;
-    const dateTo = document.getElementById('taxDateTo')?.value || getMonthRange(currentReportMonth).dateTo;
+    const dateFrom = document.getElementById('taxDateFrom')?.value || getActiveRange().dateFrom;
+    const dateTo = document.getElementById('taxDateTo')?.value || getActiveRange().dateTo;
     return `${formatDisplayDate(dateFrom)} - ${formatDisplayDate(dateTo)}`;
   }
 
-  return getMonthRange(currentReportMonth).label;
+  return getActiveRange().label;
 }
 
 async function reloadAllReports() {
@@ -202,7 +250,7 @@ function setDefaultDailyExportDate() {
 }
 
 function setDefaultTaxDates() {
-  const { dateFrom, dateTo } = getMonthRange(currentReportMonth || getCurrentMonthValue());
+  const { dateFrom, dateTo } = getActiveRange();
   const fromInput = document.getElementById('taxDateFrom');
   const toInput = document.getElementById('taxDateTo');
   if (fromInput) fromInput.value = dateFrom;
@@ -231,6 +279,22 @@ function getMonthRange(monthValue) {
   };
 }
 
+// ช่วงเวลาที่ใช้งานจริง: ถ้าผู้ใช้เลือกช่วงวันที่ -> ใช้ช่วงนั้น; ไม่งั้นใช้เดือน
+function getActiveRange() {
+  if (currentDateFrom && currentDateTo) {
+    return {
+      year: parseInt(currentDateFrom.slice(0, 4), 10),
+      month: parseInt(currentDateFrom.slice(5, 7), 10),
+      dateFrom: currentDateFrom,
+      dateTo: currentDateTo,
+      label: `${formatDisplayDate(currentDateFrom)} – ${formatDisplayDate(currentDateTo)}`,
+      customRange: true,
+    };
+  }
+  const range = getMonthRange(currentReportMonth || getCurrentMonthValue());
+  return Object.assign({}, range, { customRange: false });
+}
+
 function formatDateForInput(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -251,10 +315,10 @@ function updateScopeLabels() {
   const saleScope = document.getElementById('saleLotsScope');
   const employeesScope = document.getElementById('employeesScope');
   const taxScope = document.getElementById('taxScope');
-  const monthRange = getMonthRange(currentReportMonth);
+  const activeRange = getActiveRange();
 
-  if (purchaseItemsScope) purchaseItemsScope.textContent = `${currentBranchName} · ${monthRange.label}`;
-  if (saleScope) saleScope.textContent = `${currentBranchName} · ${monthRange.label}`;
+  if (purchaseItemsScope) purchaseItemsScope.textContent = `${currentBranchName} · ${activeRange.label}`;
+  if (saleScope) saleScope.textContent = `${currentBranchName} · ${activeRange.label}`;
   if (employeesScope) employeesScope.textContent = currentBranchName;
   if (taxScope) taxScope.textContent = `${currentBranchName} · จากข้อมูลที่เลือก`;
 }
@@ -280,7 +344,7 @@ function setSummaryLoading() {
 }
 
 async function loadMonthlyReports() {
-  const range = getMonthRange(currentReportMonth);
+  const range = getActiveRange();
 
   const loads = [loadPurchaseItems(range)];
   if (hasAppPermission('actions.reports.full', reportPermissions)) {
@@ -291,11 +355,15 @@ async function loadMonthlyReports() {
 
 async function loadBranchSummary(range) {
   try {
-    const params = addBranchParam(new URLSearchParams({
-      period: 'month',
-      year: String(range.year),
-      month: String(range.month),
-    }));
+    const params = addBranchParam(new URLSearchParams());
+    if (range.customRange) {
+      params.set('date_from', range.dateFrom);
+      params.set('date_to', range.dateTo);
+    } else {
+      params.set('period', 'month');
+      params.set('year', String(range.year));
+      params.set('month', String(range.month));
+    }
     const res = await apiRequest(`financial/summary?${params.toString()}`);
     if (res.status !== 'success') {
       throw new Error(res.message || 'โหลดสรุปสาขาไม่สำเร็จ');
@@ -541,8 +609,8 @@ function renderEmployees(items) {
 
 async function loadTaxReport() {
   try {
-    const dateFrom = document.getElementById('taxDateFrom')?.value || getMonthRange(currentReportMonth).dateFrom;
-    const dateTo = document.getElementById('taxDateTo')?.value || getMonthRange(currentReportMonth).dateTo;
+    const dateFrom = document.getElementById('taxDateFrom')?.value || getActiveRange().dateFrom;
+    const dateTo = document.getElementById('taxDateTo')?.value || getActiveRange().dateTo;
     const period = document.getElementById('taxPeriod')?.value || 'daily';
 
     const params = new URLSearchParams({
@@ -646,9 +714,10 @@ document.addEventListener('click', async (e) => {
 });
 
 function exportReportCard(key) {
-  const monthLabel = getMonthRange(currentReportMonth).label;
+  const monthLabel = getActiveRange().label;
   const scopeSlug = getScopeSlug();
-  const filename = `report-${key}-${scopeSlug}-${currentReportMonth || getCurrentMonthValue()}.csv`;
+  const periodSlug = (currentDateFrom && currentDateTo) ? `${currentDateFrom}_${currentDateTo}` : (currentReportMonth || getCurrentMonthValue());
+  const filename = `report-${key}-${scopeSlug}-${periodSlug}.csv`;
   let csv = '';
 
   switch (key) {
