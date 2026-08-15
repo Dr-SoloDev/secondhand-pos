@@ -68,9 +68,15 @@
       </div>
     </div>
 
-    <div class="carousel" id="reportsCarousel">
-      <div class="carousel-track">
-      <div class="carousel-slide">
+    <div class="tabs" id="reportsTabs">
+      <div class="tab-nav" role="tablist">
+        <button class="tab-btn active" type="button">รายรับรายจ่าย</button>
+        <button class="tab-btn" type="button">สรุปการรับซื้อ</button>
+        <button class="tab-btn" type="button">ขาย Lot</button>
+        <button class="tab-btn" type="button">พนักงาน</button>
+        <button class="tab-btn" type="button">ภาษี</button>
+      </div>
+      <div class="tab-panel active" id="panel-summary">
       <section class="card report-card" id="branchSummaryCard">
         <div class="card-header report-card-header">
           <h2 class="card-title">รายรับรายจ่ายประจำสาขา</h2>
@@ -123,7 +129,7 @@
         </div>
       </section>
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-purchase">
       <section class="card report-card" id="purchaseItemsCard">
         <div class="card-header report-card-header">
           <h2 class="card-title">สรุปการรับซื้อแยกตามสินค้า</h2>
@@ -177,7 +183,7 @@
         </div>
       </section>
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-lots">
       <section class="card report-card" id="saleLotsCard">
         <div class="card-header report-card-header">
           <h2 class="card-title">รายงานขาย Lot</h2>
@@ -231,7 +237,7 @@
         </div>
       </section>
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-employees">
       <section class="card report-card" id="employeesCard">
         <div class="card-header report-card-header">
           <h2 class="card-title">ประสิทธิภาพพนักงาน</h2>
@@ -288,7 +294,7 @@
         </div>
       </section>
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-tax">
       <section class="card report-card" id="taxCard">
         <div class="card-header report-card-header">
           <h2 class="card-title">รายงานภาษี</h2>
@@ -357,7 +363,6 @@
         </div>
       </section>
       </div>
-      </div>
     </div>
     </main>
   </div>
@@ -368,7 +373,7 @@
   <script src="../assets/js/common.js"></script>
   <script src="../assets/js/reports.js"></script>
   <script src="../assets/js/animations.js"></script>
-  <script src="../assets/js/carousel.js"></script>
+  <script src="../assets/js/tabs.js"></script>
   <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 </body>
 </html>

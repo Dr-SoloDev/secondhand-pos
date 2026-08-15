@@ -147,9 +147,16 @@
         </div>
       </div>
 
-    <div class="carousel" id="fsCarousel">
-      <div class="carousel-track">
-      <div class="carousel-slide">
+    <div class="tabs" id="fsTabs">
+      <div class="tab-nav" role="tablist">
+        <button class="tab-btn active" type="button">ภาพรวม</button>
+        <button class="tab-btn" type="button">แนวโน้มรายเดือน</button>
+        <button class="tab-btn" type="button">กำไร &amp; เทียบสาขา</button>
+        <button class="tab-btn" type="button">Top 5</button>
+        <button class="tab-btn" type="button">รายละเอียดขาย Lot</button>
+        <button class="tab-btn" type="button">หมวดหมู่รายจ่าย</button>
+      </div>
+      <div class="tab-panel active" id="panel-overview">
       <!-- Summary Cards -->
       <div class="summary-grid" id="summaryCards">
         <div class="summary-card">
@@ -180,7 +187,7 @@
       </div>
 
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-trend">
       <!-- Monthly Trend Chart -->
       <div class="card" style="margin-bottom:24px">
         <div class="card-header">
@@ -194,7 +201,7 @@
       </div>
 
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-profit">
       <!-- Profit Chart & Branch Comparison -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:24px;margin-bottom:24px">
         <div class="card">
@@ -220,7 +227,7 @@
       </div>
 
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-top5">
       <!-- Top 5 Sellers & Buyers -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;margin-bottom:24px">
         <div class="card">
@@ -252,7 +259,7 @@
       </div>
 
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-lotdetail">
       <!-- Lot Revenue Detail -->
       <div class="card" style="margin-bottom:24px">
         <div class="card-header">
@@ -281,7 +288,7 @@
       </div>
 
       </div>
-      <div class="carousel-slide">
+      <div class="tab-panel" id="panel-category">
       <!-- Purchase Summary by Category -->
       <div class="card">
         <div class="card-header">
@@ -305,20 +312,18 @@
           </div>
         </div>
       </div>
-
+      </div>
+      </div>
     </div><!-- /.content-area -->
   </div><!-- /.app-container -->
 
   <div id="notification-container"></div>
 
-      </div>
-      </div>
-    </div>
   <script src="../assets/js/vendor/chart.umd.min.js"></script>
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
   <script src="../assets/js/financial-summary.js"></script>
-  <script src="../assets/js/carousel.js"></script>
+  <script src="../assets/js/tabs.js"></script>
 <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 </body>
 </html>
