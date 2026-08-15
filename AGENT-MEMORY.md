@@ -1,6 +1,6 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 08 สิงหาคม 2569 (Deploy Prep — Fresh Start 2 สาขา + แก้บั๊ก 3 ตัว + Test 405/405 + แก้ 3 deploy blockers)
-**Status:** GOALS G1-G11 โค้ดพร้อม ตรวจสอบโค้ดจริงทุกข้อ ✅ | Production Audit ✅ | FIFO Code Review — Architecture 9/10 ✅ | **Migrations 001-070 ครบถ้วน** ✅ | **Tech Debt Cleanup เสร็จ** ✅ | **ลูกค้าตรวจรับงานผ่าน 04 ส.ค.** ✅ | **Ubuntu Server ติดตั้งที่ร้านลูกค้าแล้ว** ✅ | **Test Suite 405/405 ผ่าน** ✅ | **DB pristine พร้อมเริ่มใช้จริง 2 สาขา** ✅
+**Last updated:** 15 สิงหาคม 2569 (UI Refresh V2 — Header 48px รวมแถวเดียว + Carousel + Sandbox แยก)
+**Status:** UI Refresh V2 ระยะ 0-3 เสร็จ (branch `feat/ui-refresh-v2`) | Sandbox ทดสอบแยก 8081 | Test 404/405 (1 fail = pre-existing TEST-MODE) | รอ Owner/Lูกค้า approve → deploy ที่ร้าน
 
 ---
 
@@ -32,6 +32,21 @@
 ---
 
 ## ⏳ Todo
+
+### 🚀 15 ส.ค. 2569 — UI Refresh V2: Header 48px + Carousel (Phase: UI Refresh)
+**จุดประสงค์:** รวม Top Bar + Page Header เป็นแถวเดียว (48px) + หน้าข้อมูลยาวใช้ Carousel — ทดสอบใน sandbox แยก ไม่แตะ production ที่ร้าน
+
+- [x] **Sync กับ production** — pull 5 commits (`bbedf1a`..`4119b6d`), local = prod `4119b6d`, tag `prod-2026-08-15`, commit `caa1e34` (AGENT-MEMORY + SHOP-DEPLOY-RUNBOOK)
+- [x] **Sandbox แยก** — branch `feat/ui-refresh-v2` + `docker-compose.ui-sandbox.yml` (project `ui-sandbox`, ports 8081/3308/8444, volume `ui_db_data`, uploads `uploads-ui/`) — container `scrap-pos-ui-web`/`scrap-pos-ui-db` — login admin/admin
+- [x] **Fix docker bugs จาก 4119b6d** — `Dockerfile.php` COPY path ผิด (build context ./docker) + `docker/ssl/` ว่าง (mount :ro) → สร้าง cert + `entrypoint.sh` fallback สร้าง cert อัตโนมัติ
+- [x] **Test suite บน sandbox: 404/405** (1 fail = `AUTH-52b backup:false` — pre-existing, super_manager = admin TEST-MODE ชั่วคราว — test ยังไม่ update ตาม Access Control v3)
+- [x] **Header merge 18 หน้า** — `19b8f97`: `topbar > [page-header(flex:1) + user-dropdown]`, `--header-height` 60→48px, h1 32→20px, seller-history เพิ่ม h1 "ประวัติผู้ขาย", stock-transfers รวม transfer-page-header, ลบ `.po-page-header` CSS, purchase-orders ชื่อร้านชิดซ้าย
+- [x] **Carousel 2 หน้า** — `2f2b507`: `carousel.js` (scroll-snap, prev/next, dots, keyboard, print expand) + `layout.css` — financial-summary 6 slides, reports 5 slides
+- [x] **QA CDP (Chrome headless 151)** — `87a6afd`: header 49px desktop / 53px mobile วัดจริง, ROW ติดทุกหน้า 19 หน้า, overflow none, console errors none, carousel scroll 0→1142px + dots active — screenshots หลักฐาน `/tmp/opencode/shots/final/`
+- [x] **QA พบ fix** — reports-filter/cash-page-tools ออกจาก topbar (header สูง 81/79px), avatar 32→28px + padding จัดให้ได้ 49px จริง
+- [ ] **Owner ตรวจ visual** — screenshots `/tmp/opencode/shots/final/` (8 หน้า) — รอ approve ก่อน merge main
+- [ ] **Merge `feat/ui-refresh-v2` → main** — หลัง approve: merge + push + ลูกค้าตรวจบน sandbox link
+- [ ] **Deploy UI ไปร้าน** — หลังลูกค้า approve: ตาม SHOP-DEPLOY-RUNBOOK (pull + restart web container ที่ร้าน)
 
 ### 🚀 08 ส.ค. 2569 — Deploy Prep: Fresh Start 2 สาขา (Phase: Deploy)
 **จุดประสงค์:** deploy ใช้จริงครั้งแรก แค่ 2 สาขา + ล้างข้อมูลทดสอบหมด (เริ่มนับ 1 ใหม่) — ลูกค้าตั้งชื่อสาขาใหม่ตั้งแต่ต้นผ่าน UI
