@@ -1,6 +1,6 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 15 สิงหาคม 2569 (UI Refresh V2 — Header 48px รวมแถวเดียว + Carousel + Sandbox แยก)
-**Status:** UI Refresh V2 ระยะ 0-3 เสร็จ (branch `feat/ui-refresh-v2`) | Sandbox ทดสอบแยก 8081 | Test 404/405 (1 fail = pre-existing TEST-MODE) | รอ Owner/Lูกค้า approve → deploy ที่ร้าน
+**Last updated:** 15 สิงหาคม 2569 (UI Refresh V2 — DEPLOYED ✅)
+**Status:** UI Refresh V2 **deploy ถึงร้านแล้ว** (main `a0911ab`, tag `prod-2026-08-15-v2`) — Header 48px + Tabs (reports 5 / financial-summary 6) + กรองตามช่วงวันที่ + cache-busting ?v=20260815b | Cloudflare purged ✅ | ข้อมูลจริงปลอดภัย (PO=7/sellers=3/ล็อต=1 เท่าเดิม) | Backup: `~/secondhand-pos/backups/backup-20260815-pre-v2.sql` | rollback: tag `prod-2026-08-15` | ไฟล์ร้านแก้เอง (purchase-orders.js, print-receipt-thermal.html) ยังอยู่
 
 ---
 
@@ -44,9 +44,9 @@
 - [x] **Carousel 2 หน้า** — `2f2b507`: `carousel.js` (scroll-snap, prev/next, dots, keyboard, print expand) + `layout.css` — financial-summary 6 slides, reports 5 slides
 - [x] **QA CDP (Chrome headless 151)** — `87a6afd`: header 49px desktop / 53px mobile วัดจริง, ROW ติดทุกหน้า 19 หน้า, overflow none, console errors none, carousel scroll 0→1142px + dots active — screenshots หลักฐาน `/tmp/opencode/shots/final/`
 - [x] **QA พบ fix** — reports-filter/cash-page-tools ออกจาก topbar (header สูง 81/79px), avatar 32→28px + padding จัดให้ได้ 49px จริง
-- [ ] **Owner ตรวจ visual** — screenshots `/tmp/opencode/shots/final/` (8 หน้า) — รอ approve ก่อน merge main
-- [ ] **Merge `feat/ui-refresh-v2` → main** — หลัง approve: merge + push + ลูกค้าตรวจบน sandbox link
-- [ ] **Deploy UI ไปร้าน** — หลังลูกค้า approve: ตาม SHOP-DEPLOY-RUNBOOK (pull + restart web container ที่ร้าน)
+- [x] **Owner ตรวจ visual** (ผ่าน + เปลี่ยนเป็น tabs) — screenshots `/tmp/opencode/shots/final/` (8 หน้า) — รอ approve ก่อน merge main
+- [x] **Merge `feat/ui-refresh-v2` → main** (`a0911ab` + tag `prod-2026-08-15-v2`) — หลัง approve: merge + push + ลูกค้าตรวจบน sandbox link
+- [x] **Deploy UI ไปร้าน** (15 ส.ค. 66e9c2c→a0911ab, backup ก่อน deploy, ข้อมูลจริงเท่าเดิม, Cloudflare purge + cache-busting) — หลังลูกค้า approve: ตาม SHOP-DEPLOY-RUNBOOK (pull + restart web container ที่ร้าน)
 
 ### 🚀 08 ส.ค. 2569 — Deploy Prep: Fresh Start 2 สาขา (Phase: Deploy)
 **จุดประสงค์:** deploy ใช้จริงครั้งแรก แค่ 2 สาขา + ล้างข้อมูลทดสอบหมด (เริ่มนับ 1 ใหม่) — ลูกค้าตั้งชื่อสาขาใหม่ตั้งแต่ต้นผ่าน UI
