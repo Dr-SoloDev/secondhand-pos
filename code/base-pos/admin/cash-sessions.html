@@ -34,16 +34,17 @@
   <main class="content-area">
       <div class="topbar">
       <div class="page-header" style="flex:1">
-        <div><h1 class="page-title">เปิด-ปิดยอดรายสาขา</h1></div>
-        <div class="cash-page-tools">
-          <div><label for="cashBranch">สาขา</label><select id="cashBranch" class="form-control"></select></div>
-          <button type="button" class="btn btn-secondary" id="refreshCashBtn" title="รีเฟรช"><i class="icon-refresh"></i> รีเฟรช</button>
-        </div>
+        <h1 class="page-title">เปิด-ปิดยอดรายสาขา</h1>
       </div>
       <div class="user-dropdown">
         <button class="user-dropdown-toggle"><div class="user-avatar"><i class="icon-user"></i></div><span class="user-name">-</span><i class="icon-down"></i></button>
           <div class="user-dropdown-menu"><a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a></div>
         </div>
+      </div>
+
+      <div class="cash-page-tools">
+        <div><label for="cashBranch">สาขา</label><select id="cashBranch" class="form-control"></select></div>
+        <button type="button" class="btn btn-secondary" id="refreshCashBtn" title="รีเฟรช"><i class="icon-refresh"></i> รีเฟรช</button>
       </div>
 
       <div id="cashStatusBand" class="cash-status-band"><strong id="cashStatusText">กำลังโหลด...</strong><span id="cashBusinessDate">-</span></div>
