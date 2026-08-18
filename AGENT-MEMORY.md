@@ -1,7 +1,7 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 18 สิงหาคม 2569 (WF-06 v2.1 ตาม Owner decisions — implement เสร็จ + ทดสอบผ่าน 70/70 + UI QA ผ่าน — **ยังไม่ commit**)
-**Status:** ทำงานตาม **`docs/WORK-PLAN-2026-08-18.md`** (อ่านก่อนทำงานทุกครั้ง — mission control) — main อยู่ที่ `9bbed77` (ก่อน v2.1); working tree มี v2.1 ทั้งชุด (CashSession/PO/Expense/SaleLot/CashDepositRequest/migration 071/UI/tests) — **ยังไม่ได้ commit + push + deploy** — production ร้าน untouched `81d2306`
-**งานค้างที่สำคัญ:** (1) commit + push v2.1 → รายงาน Owner → รออนุมัติ **clean start** (ลบตัวเลขเก่า baseline 0) → backup → deploy (ชุด A/B ที่ยังไม่ deploy ต้องรวมด้วย) (2) cash sandbox 8082 ใช้ compose `-p cash-sandbox` — อย่า reset ซ้ำซาก ตัวเลข test อยู่ใน sandbox นี้ (3) sandbox หลัก `scrap-pos-ui-*` (8081) ยัง Exited — ฟื้นเมื่อทำงาน print server QA (Track A รอ Owner เรียก)
+**Last updated:** 18 สิงหาคม 2569 (WF-06 v2.1 **DEPLOYED ถึงร้านแล้ว** — clean start baseline 0 + migration 071 + verify ผ่าน)
+**Status:** ทำงานตาม **`docs/WORK-PLAN-2026-08-18.md`** — main `925853e` deployed ถึงร้าน (SSH `ragsaaad_v1@100.91.242.99` — username 2 a! WORK-PLAN เขียน 3 a ผิด); production อยู่บน v2.1 (cash_model_version=2, baseline 0 ทั้ง 4 สาขา 18 ส.ค. 69)
+**งานค้างที่สำคัญ:** (1) ร้านใช้จริง 12-18 ส.ค. (PO=11/sellers=5/lots=5/users=3) — **ตัวเลข cash เก่าถูกล้างตาม clean start ที่ Owner อนุมัติ** — backup อยู่ที่ร้าน `~/secondhand-pos/backups/backup-20260818-pre-v21.sql` (222K) + backup-20260815-pre-v2.sql (3.9M) (2) ไฟล์ร้านแก้เอง stash+pop กลับครบ: M `purchase-orders.js` + ?? `print-receipt-thermal.html` — **ห้ามแตะ** (3) cash sandbox 8082: ต้องใช้ `docker compose -p cash-sandbox -f docker-compose.cash-sandbox.yml` **เสมอ** (ทั้ง up/down — กติกา #6) — volume ถูก = `cash-sandbox_cash_db_data` (4) Track A print server: เจอ printer POS-80 USB บนร้าน (lpadmin ตั้งแล้ว ตอนนั้น) — รอ Owner เรียกต่อ (5) sandbox หลัก 8081 ยัง Exited
 
 ---
 
