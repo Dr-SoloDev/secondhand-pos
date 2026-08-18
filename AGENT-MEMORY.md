@@ -1,7 +1,7 @@
 # 🤖 Agent Memory — Scrap POS
 **Last updated:** 18 สิงหาคม 2569 (WF-06 v2.1 **DEPLOYED ถึงร้านแล้ว** — clean start baseline 0 + migration 071 + verify ผ่าน)
 **Status:** ทำงานตาม **`docs/WORK-PLAN-2026-08-18.md`** — main `925853e` deployed ถึงร้าน (SSH `ragsaaad_v1@100.91.242.99` — username 2 a! WORK-PLAN เขียน 3 a ผิด); production อยู่บน v2.1 (cash_model_version=2, baseline 0 ทั้ง 4 สาขา 18 ส.ค. 69)
-**งานค้างที่สำคัญ:** (1) ร้านใช้จริง 12-18 ส.ค. (PO=11/sellers=5/lots=5/users=3) — **ตัวเลข cash เก่าถูกล้างตาม clean start ที่ Owner อนุมัติ** — backup อยู่ที่ร้าน `~/secondhand-pos/backups/backup-20260818-pre-v21.sql` (222K) + backup-20260815-pre-v2.sql (3.9M) (2) ไฟล์ร้านแก้เอง stash+pop กลับครบ: M `purchase-orders.js` + ?? `print-receipt-thermal.html` — **ห้ามแตะ** (3) cash sandbox 8082: ต้องใช้ `docker compose -p cash-sandbox -f docker-compose.cash-sandbox.yml` **เสมอ** (ทั้ง up/down — กติกา #6) — volume ถูก = `cash-sandbox_cash_db_data` (4) Track A print server: เจอ printer POS-80 USB บนร้าน (lpadmin ตั้งแล้ว ตอนนั้น) — รอ Owner เรียกต่อ (5) sandbox หลัก 8081 ยัง Exited
+**งานค้างที่สำคัญ:** (1) ร้านใช้จริง 12-18 ส.ค. (PO=11/sellers=5/lots=5/users=3) — **ตัวเลข cash เก่าถูกล้างตาม clean start ที่ Owner อนุมัติ** — backup อยู่ที่ร้าน `~/secondhand-pos/backups/backup-20260818-pre-v21.sql` (222K) + backup-20260815-pre-v2.sql (3.9M) (2) ~~ไฟล์ร้านแก้เอง M/??~~ **committed แล้ว (0b29c3c)** — repo = สิ่งที่ร้านใช้ 100% — ครั้งหน้า deploy pull ได้ clean — งาน thermal ยังค้าง (รอทดสอบพิมพ์ ES-8804) (3) cash sandbox 8082: ต้องใช้ `docker compose -p cash-sandbox -f docker-compose.cash-sandbox.yml` **เสมอ** (ทั้ง up/down — กติกา #6) — volume ถูก = `cash-sandbox_cash_db_data` (4) Track A print server: เจอ printer POS-80 USB บนร้าน (lpadmin ตั้งแล้ว ตอนนั้น) — รอ Owner เรียกต่อ (5) sandbox หลัก 8081 ยัง Exited
 
 ---
 
@@ -34,7 +34,7 @@ docker compose exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" bash /docker-
 2. revoke GitHub token ที่แชร์ไว้ใน runbook/PAT (ถ้ายัง active)
 3. SSH key-only (ปิด password auth) — ตั้งแล้วบางส่วน (deploy ด้วย key ได้)
 4. คืนสิทธิ์ super_manager (ตอนนี้ super_manager = admin TEST-MODE ชั่วคราว — test AUTH-52b fail เพราะอันนี้)
-5. Cloudflare purge หลัง deploy ที่แตะ assets (cache-busting `?v=` ต้อง bump — ตัวถัดไป `20260815e`)
+5. Cloudflare purge หลัง deploy ที่แตะ assets (cache-busting `?v=` ต้อง bump — ตัวถัดไป `20260819c` (ล่าสุด `20260818b` Enter-add))
 
 ---
 
