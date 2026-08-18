@@ -1,6 +1,7 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 15 สิงหาคม 2569 (UI Refresh V2 — DEPLOYED ✅)
-**Status:** UI Refresh V2 **deploy ถึงร้านแล้ว** (main `a0911ab`, tag `prod-2026-08-15-v2`) — Header 48px + Tabs (reports 5 / financial-summary 6) + กรองตามช่วงวันที่ + cache-busting ?v=20260815b | Cloudflare purged ✅ | ข้อมูลจริงปลอดภัย (PO=7/sellers=3/ล็อต=1 เท่าเดิม) | Backup: `~/secondhand-pos/backups/backup-20260815-pre-v2.sql` | rollback: tag `prod-2026-08-15` | ไฟล์ร้านแก้เอง (purchase-orders.js, print-receipt-thermal.html) ยังอยู่
+**Last updated:** 18 สิงหาคม 2569 (WF-06 cash position v2 + print server ต่อสาขา — commited แต่ยังไม่ deploy)
+**Status:** ทำงานตาม **`docs/WORK-PLAN-2026-08-18.md`** (อ่านก่อนทำงานทุกครั้ง — mission control) — 3 commits ใหม่บน main: `7bdbd5b` (print server Windows), `9c42960` (WF-06 cash position + bug fix), `e51efa2` (work plan) — **ยังไม่ได้ push/deploy ถึงร้าน** — production ยังอยู่ที่ `81d2306`
+**งานค้างที่สำคัญ:** (1) push + deploy ชุด A/B ถึงร้าน (รอ Owner ยืนยัน 5 decisions WF-06 + IP Windows) (2) cash sandbox 8082 ต้อง reset ก่อนรัน test (`docker compose -p cash-sandbox -f code/docker-compose.cash-sandbox.yml down -v && up -d`) (3) sandbox หลัก `scrap-pos-ui-*` (8081) ยัง Exited — ฟื้นเมื่อทำงาน print server QA
 
 ---
 
