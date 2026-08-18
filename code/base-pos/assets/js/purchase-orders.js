@@ -127,6 +127,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   ['itemQuantity', 'itemWeightDeduct'].forEach(id =>
     document.getElementById(id).addEventListener('focus', function() { this.select(); })
   );
+  // IMP: Enter ที่น้ำหนัก/หัก = เพิ่มรายการ (ลูกค้าขอ — แคชเชียร์ไม่ต้องยกมือจากคีย์บอร์ดไปคลิกเมาส์)
+  ['itemQuantity', 'itemWeightDeduct'].forEach(id =>
+    document.getElementById(id).addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addItemToCart();
+      }
+    })
+  );
   document.getElementById('itemCategorySelect').addEventListener('change', saveCategoryToCatalog);
   document.getElementById('itemName').addEventListener('input', debounce(function(e) {
     const q = e.target.value.trim();
