@@ -5,6 +5,41 @@
 
 ---
 
+## 🏪 การเข้าถึงร้าน + Deploy (ใช้งานจริง 18 ส.ค. 69 — ไว้ใช้ session ต่อไป)
+
+### เข้าถึงร้าน (verified ใช้ได้)
+- **SSH:** `ssh ragsaaad_v1@100.91.242.99` — key `~/.ssh/id_ed25519` ใช้ได้เลย (ไม่ต้อง password) — ⚠️ username **2 a** (`ragsaaad_v1`) — WORK-PLAN/WORKFLOW เขียน 3 a ผิด
+- **HTTP:** `http://pos.mkxmeme.xyz` (Cloudflare Tunnel — cloudflared crontab @reboot) + Tailscale serve (กลับมาเองหลัง reboot — ไฟดับ 17 ส.ค. ผ่านมาแล้ว)
+- **Server:** hostname `ragsaaadserver` (Ubuntu) · repo `~/secondhand-pos` (bind mount → pull เท่านั้น **ห้าม rebuild**) · containers `scrap-pos-web` (host port **8080**) + `scrap-pos-db` (3306) · compose ต้องรันจาก `~/secondhand-pos/code`
+- **Backups:** `~/secondhand-pos/backups/` — backup ก่อนทุก deploy (mysqldump ผ่าน `docker compose exec -T db`)
+
+### ขั้น deploy ฉบับจริง (ใช้ครั้งล่าสุด 18 ส.ค.)
+```bash
+# 1) Backup DB
+mkdir -p ~/secondhand-pos/backups && cd ~/secondhand-pos/code
+docker compose exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -u root --single-transaction --routines --triggers pos_system' > ~/secondhand-pos/backups/backup-YYYYMMDD-pre-xxx.sql
+# 2) stash ไฟล์ร้านแก้เอง (ถ้ามี M/??) → pull → pop กลับ (อย่าลืม!)
+git stash push -m shop-local -- code/base-pos/assets/js/purchase-orders.js   # + untracked ต้อง -u
+git pull origin main && git stash pop
+# 3) รัน migration ใหม่ด้วยมือ (container ไม่ restart อัตโนมัติ)
+docker compose exec -T db sh -lc 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" bash /docker-entrypoint-initdb.d/pos-database/run-migrations.sh --migrations-only root "$MYSQL_ROOT_PASSWORD"'
+# 4) (เฉพาะ clean start — ต้องอนุมัติ Owner) รัน clean-start-cash-v21.sql ผ่าน mysql < /dev/stdin
+# 5) docker compose restart web → verify passive (login + current + counts) — ห้ามสร้างข้อมูลทดสอบใน production
+```
+- verify passive: login `admin/admin` (⚠️ ยังไม่เปลี่ยน — TODO ล่าง) → `cash-sessions/current?branch_id=1` ต้อง `cash_model_version:2` → sellers/PO/lots counts ครบ
+- **อย่าเปิด/ปิด session ให้ร้านเอง** — คนร้านเปิดเองตอนทำงานจริง (เปิดยอด = rollover)
+
+### 🔒 Security TODO ค้าง (จาก 15 ส.ค. — ยังไม่ทำ)
+1. เปลี่ยน password `admin/admin` (ร้านยังใช้ default อยู่!)
+2. revoke GitHub token ที่แชร์ไว้ใน runbook/PAT (ถ้ายัง active)
+3. SSH key-only (ปิด password auth) — ตั้งแล้วบางส่วน (deploy ด้วย key ได้)
+4. คืนสิทธิ์ super_manager (ตอนนี้ super_manager = admin TEST-MODE ชั่วคราว — test AUTH-52b fail เพราะอันนี้)
+5. Cloudflare purge หลัง deploy ที่แตะ assets (cache-busting `?v=` ต้อง bump — ตัวถัดไป `20260815e`)
+
+---
+
+---
+
 ## 🎯 Deal & Context
 
 - **ราคา:** 40,000 บาท | ปิดดีล 18 พ.ค. 2569
