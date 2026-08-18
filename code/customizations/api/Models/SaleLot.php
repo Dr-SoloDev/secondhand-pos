@@ -891,6 +891,11 @@ class SaleLot extends Model
                     (int)$lot['branch_id'], 'in', 'sale_lot_revenue', (float)$data['actual_revenue'],
                     'sale_lot', (int)$id, 'รับเงินสดจาก LOT ' . $lot['reference_no'], $userId
                 );
+            } elseif ($paymentMethod === 'bank_transfer' && (float)$data['actual_revenue'] > 0) {
+                $cashSession->recordBankMovement(
+                    (int)$lot['branch_id'], 'in', (float)$data['actual_revenue'], 'bank_sale_lot_revenue',
+                    (int)$id, 'รับเงินโอนจาก LOT ' . $lot['reference_no'], $userId
+                );
             }
             $this->db->commit();
             return true;

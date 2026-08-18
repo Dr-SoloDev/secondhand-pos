@@ -25,7 +25,7 @@ test_cash_sessions() {
 
   deposit=$(curl -s -b "$manager_cookie" "$API_BASE/cash-sessions/deposit-request" \
     -X POST -H 'Content-Type: application/json' \
-    -d "{\"branch_id\":$branch_id,\"amount\":20000,\"source_name\":\"QA Owner\",\"reason\":\"Cash float for integration test\"}")
+    -d "{\"branch_id\":$branch_id,\"amount\":20000,\"source_type\":\"owner_capital\",\"source_name\":\"QA Owner\",\"reason\":\"Cash float for integration test\"}")
   deposit_id=$(echo "$deposit" | json_get "data.id" 2>/dev/null)
   assert_contains "$deposit" '"status":"success"' "Cash deposit: Cashier-side user submits top-up request"
   res=$(curl -s -b "$manager_cookie" "$API_BASE/cash-sessions/deposit-approve" \

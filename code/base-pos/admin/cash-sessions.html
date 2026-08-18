@@ -67,7 +67,7 @@
           <div class="card-header"><h2 class="card-title">นำเงินเข้าลิ้นชัก</h2></div>
           <div class="card-body">
             <div class="cash-form-grid">
-              <div><label for="depositSourceType">ประเภทเงิน</label><select id="depositSourceType" class="form-control"><option value="reserve_transfer">เงินสำรองเดิมของกิจการ</option><option value="owner_capital">เงินทุนใหม่จาก Owner</option></select></div>
+              <div><label for="depositSourceType">ประเภทเงิน</label><select id="depositSourceType" class="form-control"><option value="reserve_transfer">เงินสำรองเดิมของกิจการ</option><option value="owner_capital">เงินทุนใหม่จาก Owner</option><option value="drawer_to_reserve">ย้ายเงินลิ้นชักเข้าสำรอง</option><option value="drawer_to_owner">Owner เบิกเงินจากลิ้นชัก</option></select></div>
               <div><label for="depositAmount">จำนวนเงิน</label><input id="depositAmount" type="number" min="0.01" step="0.01" class="form-control" placeholder="0.00"></div>
               <div class="full"><label for="depositSource">รายละเอียดแหล่งเงิน</label><input id="depositSource" type="text" maxlength="200" class="form-control" placeholder="เช่น เซฟสาขา หรือ Owner เติมทุน"></div>
               <div class="full"><label for="depositReason">เหตุผล</label><textarea id="depositReason" rows="2" maxlength="500" class="form-control"></textarea></div>

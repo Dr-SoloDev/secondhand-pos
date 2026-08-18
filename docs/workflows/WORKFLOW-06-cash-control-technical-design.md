@@ -47,14 +47,14 @@ business_total_funds = business_total_cash + bank_balance
 
 ## 3. Recommended data model
 
-### 3.1 ไม่สร้าง bank ledger เต็มรูปแบบในเฟสแรก
+### 3.1 ไม่สร้าง bank ledger เต็มรูปแบบในเฟสแรก (v2.1: bank กระทบ total ผ่าน bank_net)
 
-เพื่อจำกัดความเสี่ยง เฟสแรกจะรองรับเฉพาะ:
+เพื่อจำกัดความเสี่ยง เฟสแรกยังไม่ทำ bank ledger เต็มรูปแบบ แต่ **bank จ่าย/รับต้องตัดยอดรวมให้ถูก** (D3):
 
-- `drawer`
-- `business_reserve` (รวม safe/Owner)
-
-payment method `bank_transfer` ยังคงอยู่ใน PO, Sale Lot และ expenses ตามเดิม แต่ไม่สร้าง movement ใน cash drawer และไม่ต้องมี `cash_session.status = open`
+- payment method `bank_transfer` ใน PO, Sale Lot และ expenses → สร้าง movement ประเภท `bank_*` (ผ่าน `CashSession::recordBankMovement()`) — **ไม่แตะ drawer/reserve**
+- `bank_net = sum(bank_increase) - sum(bank_decrease)` — `business_total_cash = drawer + reserve + bank_net`
+- bank movement ผูก `cash_session_id` (schema FK NOT NULL) — ผูกกับ session `status IN ('open','pending_close')` ล่าสุดของสาขา (bank ยังทำงานได้ขณะรออนุมัติปิด)
+- bank movement ต้องไม่ถูกนับใน drawer (movementTotal กรอง `movement_type NOT LIKE 'bank\_%'`)
 
 ### 3.2 Additive columns ใน `cash_movements`
 
@@ -87,7 +87,8 @@ business_date         DATE NULL
 ```text
 drawer_balance  = opening baseline + sum(entries affecting drawer)
 reserve_balance  = opening baseline + sum(entries affecting reserve)
-total_cash      = drawer_balance + reserve_balance
+bank_net         = sum(bank increases) - sum(bank decreases)
+total_cash      = drawer_balance + reserve_balance + bank_net
 ```
 
 หาก performance ไม่พอภายหลัง ค่อยเพิ่ม snapshot table พร้อม reconciliation job เป็น phase แยก
@@ -113,50 +114,45 @@ created_at         DATETIME
 
 ---
 
-## 4. Session lifecycle
+## 4. Session lifecycle (v2.1 — ตาม Owner decisions 18 ส.ค. 2026)
 
-### 4.1 Opening
+> **v2.1 เปลี่ยนจาก design เดิม (Codex):** เปิด = rollover (ไม่ transfer/capital อัตโนมัติ), ปิด = ไม่ย้ายเงิน, reopen = ไม่มี reversal, bank = บันทึก bank movement กระทบ total ไม่แตะ drawer
 
-ข้อมูลจาก cashier/ผู้เปิด:
+### 4.1 Opening (rollover)
 
-- `drawer_opening_actual`: เงินที่นำมาไว้ในลิ้นชักจริง
-- optional note/source
+ข้อมูลจาก cashier/ผู้เปิด: **ไม่มี input ยอด** — ระบบแสดงยอด rollover ให้ยืนยัน
 
 Algorithm:
 
-1. อ่าน `reserve_balance` และ `business_total_cash` ล่าสุดของสาขา
-2. จำนวนที่นำเข้าลิ้นชักจาก reserve = `min(drawer_opening_actual, reserve_balance)`
-3. ถ้าจำนวนเกิน reserve ให้ส่วนเกินเป็น `owner_capital_injection`
-4. สร้าง transfer `business_reserve -> drawer` ตามจำนวนที่มีอยู่จริง
-5. สร้าง external increase เฉพาะส่วนเกิน
-6. ไม่ถือว่าส่วนต่างระหว่างยอดรวมเดิมกับ drawer opening เป็น variance โดยอัตโนมัติ
-7. เปิด drawer session เมื่อข้อมูลและ ledger transaction สำเร็จใน transaction เดียว
+1. อ่าน `drawer_balance` ล่าสุดของสาขา (จาก ledger — ตอน open ยังไม่มี session เปิด)
+2. `opening_actual = drawer_balance` (ยอดลิ้นชักจาก ledger — เงินจริงค้างในลิ้นชักข้ามคืนตาม D1)
+3. `reserveTransfer = 0`, `capitalInjection = 0` — **ไม่มีการ transfer/capital อัตโนมัติ**
+4. เปิด drawer session `status=open` — ledger ไม่เปลี่ยน (นอกจาก session row)
 
-ตัวอย่าง: total=30,000, reserve=30,000, opening drawer=20,000 -> transfer 20,000, total ยัง 30,000
+เงินเข้าลิ้นชักเพิ่มระหว่างวัน = ผ่าน deposit flow (`reserve_transfer` / `owner_capital`) เท่านั้น
 
-ตัวอย่าง: total=30,000, reserve=30,000, opening drawer=40,000 -> transfer 30,000 + capital 10,000, total ใหม่ 40,000
+ตัวอย่าง: ปิดเมื่อวาน ledger drawer=10,000 → เปิดวันนี้ = opening 10,000, total คงเดิม
 
 ### 4.2 During day
 
-- cash PO: ต้องมี open session และเงินใน drawer เพียงพอ
-- cash expense: ต้องมี open session และเงินใน source location เพียงพอ
+- cash PO: ต้องมี open session และเงินใน drawer เพียงพอ (`assertDrawerSufficient`) — ไม่พอ → error "เงินสดในลิ้นชักไม่เพียงพอ กรุณาเติมเงินเข้าลิ้นชักก่อน"
+- cash expense: ต้องมี open session และเงินใน drawer เพียงพอ
 - cash Sale Lot revenue: ต้องมี open session แล้วเพิ่มเข้า drawer
-- bank transfer PO/expense/revenue: ไม่ต้องมี open drawer session และไม่สร้าง drawer movement
-- reserve -> drawer top-up: บันทึก internal transfer ไม่เพิ่ม total
-- external owner top-up: บันทึก increase เฉพาะเงินจริงที่เพิ่มจากภายนอก
+- **bank transfer PO/expense/revenue: ไม่แตะ drawer — สร้าง `bank_*` movement (บันทึกผ่าน `recordBankMovement`) ผูก session open/pending_close ล่าสุด — กระทบ `business_total_cash` ผ่าน `bank_net`** (การไม่มี session เปิด = bank ทำงานไม่ได้ ตาม schema FK — ตรวจสอบ/บันทึกให้ชัดเจน)
+- reserve -> drawer top-up: deposit `reserve_transfer` — internal transfer ไม่เพิ่ม total
+- drawer -> reserve: deposit `drawer_to_reserve` — internal transfer ไม่ลด total
+- external owner top-up: deposit `owner_capital` — increase เฉพาะเงินจริงที่เพิ่มจากภายนอก
+- owner เบิกจากลิ้นชัก: deposit `drawer_to_owner` — decrease (เงินออกจากระบบ) — ต้องไม่เกินยอด drawer
 
-### 4.3 Closing
+### 4.3 Closing (ไม่ย้ายเงิน)
 
-ร้านนำเงินออกจากลิ้นชักทุกครั้งเมื่อปิดวัน ดังนั้น closing flow ใช้กติกานี้:
+ตาม D1 — เงินจริงผู้บริหารจัดการเอง ระบบแค่บันทึก:
 
-1. นับ `drawer_closing_actual`
-2. เปรียบเทียบกับ `drawer_balance` ตาม ledger
-3. หากต่างกัน ให้บันทึก variance/reason และใช้ approval ตาม policy
-4. เมื่อปิดสำเร็จ ให้สร้าง transfer `drawer -> business_reserve` จำนวน `drawer_closing_actual` อัตโนมัติ
-5. หลังปิดสำเร็จ `drawer_balance = 0` และ `business_total_cash` ไม่เปลี่ยนจากการ transfer
-6. หากปิดไม่ผ่าน/ถูก reject ห้ามสร้าง transfer และ session ยังคงเปิดเพื่อ recount
-
-การนำเงินเข้าระบบปิดวันจึงไม่ใช่การลดเงินรวม แต่เป็นการย้ายเงินไป reserve
+1. นับ `drawer_closing_actual` (กรอก — expected = `drawer_balance` ตาม ledger)
+2. เปรียบเทียบกับ `drawer_balance` — ต่างกัน → variance/reason + approval ตาม policy
+3. เมื่อปิดสำเร็จ → `status=closed` — **ไม่มีการสร้าง transfer** (`closing_transfer_amount = 0` — ไม่มี movement ใดๆ เพิ่ม)
+4. `drawer_balance` ยังคงเท่าเดิม (ค้างในระบบ) — `business_total_cash` ไม่เปลี่ยน
+5. หากปิดไม่ผ่าน/ถูก reject → session ยังคงเปิดเพื่อ recount
 
 ### 4.4 Reopen
 
@@ -164,9 +160,8 @@ Algorithm:
 
 - เป็น admin-only ตาม policy เดิม
 - ต้องระบุเหตุผล
-- ย้อนสถานะ drawer session อย่าง audit ได้
+- **ไม่มี reversal movement** (ไม่เคยมี transfer ตอนปิด) — แค่ย้อนสถานะ `closed -> open` อย่าง audit ได้
 - ห้ามสร้างยอดซ้ำจากการ re-open
-- หากมีการ transfer drawer -> reserve ไปแล้ว ต้องสร้าง reversal transfer ที่จับคู่กับรายการเดิม ไม่ใช้ rebase แบบไม่มี location
 
 ---
 
@@ -262,20 +257,21 @@ Algorithm:
 
 ## 9. Test matrix
 
-### Core scenarios
+### Core scenarios (v2.1 — ตรง test_cash_position.sh 36 กรณี)
 
-- Day 1: open 0 -> capital 50,000 -> purchase 20,000 -> close transfer
-- Day 2: total 30,000 -> open drawer 20,000 -> total remains 30,000
-- Day 2: total 30,000 -> open drawer 40,000 -> capital increase 10,000
-- reserve top-up during day does not increase total
-- cash purchase reduces drawer and total
-- bank purchase succeeds while drawer session is closed
-- cash sale increases drawer and total
-- bank sale does not alter drawer
-- owner expense records reason and reduces total
-- close transfers all counted drawer cash to reserve
-- variance reject keeps session open and creates no close transfer
-- reopen reverses transfer exactly once
+- Day 1: baseline 0 -> open 0 (rollover) -> capital 50,000 -> purchase cash 20,000 -> close **ไม่ย้าย** (drawer ค้าง 30,000)
+- Day 2: open rollover = 30,000 (ไม่กรอก) -> total remains 30,000
+- reserve top-up (`reserve_transfer`) during day does not increase total
+- owner capital (`owner_capital`) during day increases total
+- drawer -> reserve (`drawer_to_reserve`) does not change total, moves position
+- drawer -> owner (`drawer_to_owner`) decreases total, blocked when drawer insufficient
+- cash purchase reduces drawer and total; blocked when drawer insufficient (error message)
+- bank purchase reduces total only (bank_net), drawer untouched
+- bank sale increases total only, drawer untouched
+- bank purchase while session pending_close works (bank ผูก session open/pending_close)
+- close variance reject keeps session open and creates no transfer
+- reopen makes no reversal movement
+- bank movements excluded from drawer balance (movementTotal)
 
 ### Regression
 

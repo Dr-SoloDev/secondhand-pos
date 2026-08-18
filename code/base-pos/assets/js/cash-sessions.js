@@ -179,25 +179,33 @@ function renderSessionAction() {
 
 function cashCountForm(mode) {
   const expected = mode === 'open'
-    ? (cashSession?.opening_expected ?? cashSession?.current_expected_cash ?? 0)
+    ? (cashSession?.drawer_balance ?? cashSession?.opening_expected ?? cashSession?.current_expected_cash ?? 0)
     : (cashSession?.current_expected_cash ?? 0);
-  const expectedLabel = mode === 'open' ? 'ยอดยกมาจากวันก่อน' : 'ยอดตามระบบตอนนี้';
+  const expectedLabel = mode === 'open' ? 'ยอดลิ้นชักยกมาจากก่อนหน้า' : 'ยอดตามระบบตอนนี้';
+  if (mode === 'open') {
+    return `<div class="cash-form-grid">
+      <div class="full cash-expected-hint">${expectedLabel}: <strong>${cashMoney(expected)}</strong> บาท — เปิดรอบต่อจากยอดนี้โดยอัตโนมัติ</div>
+      <div class="cash-action-row"><button class="btn btn-success" id="submitCashCount">เปิดยอด</button></div>
+    </div>`;
+  }
   return `<div class="cash-form-grid">
     <div class="full cash-expected-hint">${expectedLabel}: <strong>${cashMoney(expected)}</strong></div>
     <div class="full"><label for="cashActual">ยอดเงินสดที่นับได้</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value=""></div>
     <div class="full"><label for="cashReason">เหตุผลเมื่อยอดไม่ตรง</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="จำเป็นเมื่อยอดนับไม่ตรงกับยอดตามระบบ"></textarea></div>
   </div>
-  <div class="cash-action-row"><button class="btn ${mode === 'open' ? 'btn-success' : 'btn-primary'}" id="submitCashCount">${mode === 'open' ? 'เปิดยอด' : 'ปิดยอด'}</button></div>`;
+  <div class="cash-action-row"><button class="btn btn-primary" id="submitCashCount">ปิดยอด</button></div>`;
 }
 
 function bindCashCountForm(mode) {
   cashEl('submitCashCount').onclick = async () => {
-    const actual = Number(cashEl('cashActual').value);
-    if (!Number.isFinite(actual) || actual < 0) return showNotification('กรุณาระบุยอดเงินสดที่นับได้', 'error');
+    const actual = mode === 'open'
+      ? Number(cashSession?.drawer_balance ?? cashSession?.opening_expected ?? cashSession?.current_expected_cash ?? 0)
+      : Number(cashEl('cashActual').value);
+    if (mode !== 'open' && (!Number.isFinite(actual) || actual < 0)) return showNotification('กรุณาระบุยอดเงินสดที่นับได้', 'error');
     const button = cashEl('submitCashCount');
     setButtonLoading(button, true);
     try {
-      const res = await apiRequest(`cash-sessions/${mode}`, 'POST', { branch_id:Number(cashEl('cashBranch').value), actual_cash:actual, reason:cashEl('cashReason').value.trim() || null });
+      const res = await apiRequest(`cash-sessions/${mode}`, 'POST', { branch_id:Number(cashEl('cashBranch').value), actual_cash:actual, reason:cashEl('cashReason')?.value.trim() || null });
       showNotification(res.message || (res.status === 'success' ? 'บันทึกแล้ว' : 'บันทึกไม่สำเร็จ'), res.status === 'success' ? 'success' : 'error');
       if (res.status === 'success') await loadCashPage();
     } finally { setButtonLoading(button, false); }

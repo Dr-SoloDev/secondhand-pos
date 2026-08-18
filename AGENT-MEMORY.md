@@ -1,7 +1,7 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 18 สิงหาคม 2569 (WF-06 cash position v2 + print server ต่อสาขา — commited แต่ยังไม่ deploy)
-**Status:** ทำงานตาม **`docs/WORK-PLAN-2026-08-18.md`** (อ่านก่อนทำงานทุกครั้ง — mission control) — 3 commits ใหม่บน main: `7bdbd5b` (print server Windows), `9c42960` (WF-06 cash position + bug fix), `e51efa2` (work plan) — **ยังไม่ได้ push/deploy ถึงร้าน** — production ยังอยู่ที่ `81d2306`
-**งานค้างที่สำคัญ:** (1) push + deploy ชุด A/B ถึงร้าน (รอ Owner ยืนยัน 5 decisions WF-06 + IP Windows) (2) cash sandbox 8082 ต้อง reset ก่อนรัน test (`docker compose -p cash-sandbox -f code/docker-compose.cash-sandbox.yml down -v && up -d`) (3) sandbox หลัก `scrap-pos-ui-*` (8081) ยัง Exited — ฟื้นเมื่อทำงาน print server QA
+**Last updated:** 18 สิงหาคม 2569 (WF-06 v2.1 ตาม Owner decisions — implement เสร็จ + ทดสอบผ่าน 70/70 + UI QA ผ่าน — **ยังไม่ commit**)
+**Status:** ทำงานตาม **`docs/WORK-PLAN-2026-08-18.md`** (อ่านก่อนทำงานทุกครั้ง — mission control) — main อยู่ที่ `9bbed77` (ก่อน v2.1); working tree มี v2.1 ทั้งชุด (CashSession/PO/Expense/SaleLot/CashDepositRequest/migration 071/UI/tests) — **ยังไม่ได้ commit + push + deploy** — production ร้าน untouched `81d2306`
+**งานค้างที่สำคัญ:** (1) commit + push v2.1 → รายงาน Owner → รออนุมัติ **clean start** (ลบตัวเลขเก่า baseline 0) → backup → deploy (ชุด A/B ที่ยังไม่ deploy ต้องรวมด้วย) (2) cash sandbox 8082 ใช้ compose `-p cash-sandbox` — อย่า reset ซ้ำซาก ตัวเลข test อยู่ใน sandbox นี้ (3) sandbox หลัก `scrap-pos-ui-*` (8081) ยัง Exited — ฟื้นเมื่อทำงาน print server QA (Track A รอ Owner เรียก)
 
 ---
 

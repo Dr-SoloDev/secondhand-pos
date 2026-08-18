@@ -31,8 +31,8 @@ SET @column_exists = (
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cash_deposit_requests' AND COLUMN_NAME = 'source_type'
 );
 SET @sql = IF(@column_exists = 0,
-  'ALTER TABLE cash_deposit_requests ADD COLUMN source_type ENUM(''reserve_transfer'',''owner_capital'') NULL AFTER amount',
-  'SELECT ''071 cash_deposit_requests.source_type already exists'' AS info');
+  'ALTER TABLE cash_deposit_requests ADD COLUMN source_type ENUM(''reserve_transfer'',''owner_capital'',''drawer_to_reserve'',''drawer_to_owner'') NULL AFTER amount',
+  'ALTER TABLE cash_deposit_requests MODIFY COLUMN source_type ENUM(''reserve_transfer'',''owner_capital'',''drawer_to_reserve'',''drawer_to_owner'') NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @column_exists = (

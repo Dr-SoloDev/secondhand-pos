@@ -39,6 +39,7 @@ node_modules/
 
 # Uploads (runtime data — not committed)
 code/uploads/
+code/uploads-cash-sandbox/
 
 # Document screenshots/samples
 login-screenshot.png

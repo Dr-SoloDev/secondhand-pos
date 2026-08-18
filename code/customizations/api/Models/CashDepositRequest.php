@@ -38,8 +38,8 @@ class CashDepositRequest extends Model
         }
         $cashSession = new CashSession();
         if ($cashSession->hasPositionModel($branchId)
-            && !in_array($sourceType, ['reserve_transfer', 'owner_capital'], true)) {
-            throw new Exception('กรุณาระบุว่าเป็นเงินสำรองเดิมหรือเงินทุนใหม่');
+            && !in_array($sourceType, ['reserve_transfer', 'owner_capital', 'drawer_to_reserve', 'drawer_to_owner'], true)) {
+            throw new Exception('กรุณาระบุประเภทของรายการเงินให้ถูกต้อง');
         }
         if (!$cashSession->hasPositionModel($branchId)) $sourceType = null;
         $this->db->beginTransaction();
@@ -73,11 +73,22 @@ class CashDepositRequest extends Model
             if (!$allowSelfApproval && (int)$request['requested_by'] === $approverId) {
                 throw new Exception('ผู้ส่งคำขอไม่สามารถอนุมัติรายการตัวเองได้');
             }
-            (new CashSession())->fundDrawer(
-                (int)$request['branch_id'], (float)$request['amount'],
-                (string)($request['source_type'] ?? ''), $id,
-                'นำเงินเข้าลิ้นชักจาก ' . $request['source_name'] . ': ' . $request['reason'], $approverId
-            );
+            $cashSession = new CashSession();
+            $sourceType = (string)($request['source_type'] ?? '');
+            if (in_array($sourceType, ['drawer_to_reserve', 'drawer_to_owner'], true)) {
+                $cashSession->transferDrawerOut(
+                    (int)$request['branch_id'], (float)$request['amount'],
+                    $sourceType === 'drawer_to_reserve' ? 'business_reserve' : 'external',
+                    'นำเงินออกจากลิ้นชัก: ' . $request['source_name'] . ': ' . $request['reason'],
+                    $approverId, (int)$id, 'cash_deposit_request'
+                );
+            } else {
+                $cashSession->fundDrawer(
+                    (int)$request['branch_id'], (float)$request['amount'],
+                    $sourceType, $id,
+                    'นำเงินเข้าลิ้นชักจาก ' . $request['source_name'] . ': ' . $request['reason'], $approverId
+                );
+            }
             $this->db->query(
                 "UPDATE cash_deposit_requests SET status='approved', reviewed_by=?, reviewed_at=NOW(), review_note=? WHERE id=?",
                 [$approverId, $this->normalizeNote($reviewNote), $id]

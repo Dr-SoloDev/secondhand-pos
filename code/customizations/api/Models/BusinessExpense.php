@@ -135,6 +135,12 @@ class BusinessExpense extends Model
                     'จ่ายเงินสด ' . $expense['category'] . ' ให้ ' . $expense['beneficiary_name'],
                     $approverId
                 );
+            } elseif ($expense['payment_method'] === 'bank_transfer') {
+                $cashSession->recordBankMovement(
+                    (int)$expense['branch_id'], 'out', $amount, 'bank_business_expense',
+                    $id, 'จ่ายเงินโอน ' . $expense['category'] . ' ให้ ' . $expense['beneficiary_name'],
+                    $approverId
+                );
             }
             $this->db->commit();
         } catch (Exception $e) {

@@ -256,6 +256,16 @@ class PurchaseOrder extends Model
                     'คืนเงินสดจากการยกเลิกใบรับซื้อ ' . $po['id'],
                     $actorId
                 );
+            } elseif (($po['payment_method'] ?? 'cash') === 'bank_transfer') {
+                $cashSession->recordBankMovement(
+                    (int)$po['branch_id'],
+                    'in',
+                    (float)$po['total_amount'],
+                    'bank_purchase_cancellation',
+                    (int)$po['id'],
+                    'คืนเงินโอนจากการยกเลิกใบรับซื้อ ' . $po['id'],
+                    $actorId
+                );
             }
 
             return true;
@@ -370,6 +380,16 @@ class PurchaseOrder extends Model
                     'purchase_order',
                     (int)$poId,
                     "จ่ายเงินสดใบรับซื้อ {$referenceNo}",
+                    (int)$userId
+                );
+            } elseif ($paymentMethod === 'bank_transfer' && $totalAmount > 0) {
+                $cashSession->recordBankMovement(
+                    (int)$data['branch_id'],
+                    'out',
+                    $totalAmount,
+                    'bank_purchase_payment',
+                    (int)$poId,
+                    "จ่ายเงินโอนใบรับซื้อ {$referenceNo}",
                     (int)$userId
                 );
             }
