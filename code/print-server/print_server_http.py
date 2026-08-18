@@ -24,6 +24,18 @@ from print_receipt import (
     render_receipt_image_as_png,
 )
 
+# ── Load local env file (print-server.env) if present ──────────────
+# Windows installer (install.bat) writes PRINTER_NAME here so the server
+# works without setting system-wide environment variables.
+_ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'print-server.env')
+if os.path.exists(_ENV_FILE):
+    with open(_ENV_FILE, 'r', encoding='utf-8') as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith('#') and '=' in _line:
+                _k, _v = _line.split('=', 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 # ── Config ──
 HOST = os.environ.get('PRINT_SERVER_HOST', '0.0.0.0')
 PORT = int(os.environ.get('PRINT_SERVER_PORT', '9120'))
@@ -55,14 +67,39 @@ class PrintHandler(BaseHTTPRequestHandler):
         """GET /health — health check"""
         if self.path == '/health' or self.path == '/':
             # Test if printer is reachable
-            try:
-                result = subprocess.run(
-                    ['lpstat', '-p', PRINTER_NAME],
-                    capture_output=True, timeout=10, text=True
-                )
-                printer_ok = 'idle' in result.stdout
-            except Exception as e:
+            if sys.platform.startswith('win'):
+                # Windows: check via spooler
                 printer_ok = False
+                try:
+                    import win32print
+                    available = [p[2].lower() for p in win32print.EnumPrinters(
+                        win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+                    )]
+                    printer_ok = PRINTER_NAME.lower() in available or any(
+                        p == PRINTER_NAME.lower() for p in available
+                    )
+                    if not printer_ok:
+                        printer_ok = any(
+                            p == PRINTER_NAME.lower()
+                            for p in available
+                        )
+                    if not printer_ok and available:
+                        printer_ok = any(
+                            k in p for p in available
+                            for k in ('es-88', 'easyprint', 'thermal', 'pos', 'receipt')
+                        )
+                except Exception:
+                    printer_ok = False
+            else:
+                # Linux: check via CUPS lpstat
+                try:
+                    result = subprocess.run(
+                        ['lpstat', '-p', PRINTER_NAME],
+                        capture_output=True, timeout=10, text=True
+                    )
+                    printer_ok = 'idle' in result.stdout
+                except Exception:
+                    printer_ok = False
 
             self._send_json(200, {
                 'status': 'success',

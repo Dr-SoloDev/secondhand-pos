@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadBranches() {
   try {
-    showTableLoading('branchesTableBody', 7, 5);
+    showTableLoading('branchesTableBody', 8, 5);
     const res = await apiRequest('branches');
     if (res.status === 'success') {
       branches = res.data || [];
@@ -27,7 +27,7 @@ async function loadBranches() {
 function renderBranchesTable() {
   const tbody = document.getElementById('branchesTableBody');
   if (!branches || branches.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">ไม่มีข้อมูลสาขา</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center">ไม่มีข้อมูลสาขา</td></tr>';
     return;
   }
 
@@ -44,6 +44,10 @@ function renderBranchesTable() {
          </button>`
       : '<span class="text-muted">ไม่มีสิทธิ์</span>';
 
+    const printServer = b.print_server_host
+      ? `<span class="badge badge-info" title="เครื่องพิมพ์ความร้อนของสาขานี้">🖨️ ${escapeHtml(b.print_server_host)}${b.print_server_port ? ':' + escapeHtml(b.print_server_port) : ''}</span>`
+      : '<span class="text-muted">ยังไม่ตั้งค่า</span>';
+
     return `
       <tr>
         <td>${escapeHtml(b.code)}</td>
@@ -52,6 +56,7 @@ function renderBranchesTable() {
         <td>${escapeHtml(b.phone || '-')}</td>
         <td>${escapeHtml(b.manager_name || '-')}</td>
         <td>${statusBadge}</td>
+        <td>${printServer}</td>
         <td>${editBtn}</td>
       </tr>
     `;
@@ -81,6 +86,8 @@ function openEditModal(branchId) {
   document.getElementById('branchAddress').value = branch.address || '';
   document.getElementById('branchPhone').value = branch.phone || '';
   document.getElementById('branchManager').value = branch.manager_name || '';
+  document.getElementById('printServerHost').value = branch.print_server_host || '';
+  document.getElementById('printServerPort').value = branch.print_server_port || '';
 
   document.getElementById('modalTitle').textContent = 'แก้ไขข้อมูลสาขา';
   document.getElementById('branchModal').classList.add('show');
@@ -107,15 +114,28 @@ async function saveBranch() {
     manager_name: document.getElementById('branchManager').value.trim() || null,
   };
 
+  const printServerHost = document.getElementById('printServerHost').value.trim();
+  const printServerPort = document.getElementById('printServerPort').value.trim();
+
   const saveBtn = document.querySelector('#branchModal .btn-primary');
   setButtonLoading(saveBtn, true);
   try {
-    const res = branchId
-      ? await apiRequest(`branches/branch?id=${branchId}`, 'PUT', data)
-      : await apiRequest('branches', 'POST', {
-          code: document.getElementById('branchCode').value.trim(),
-          ...data,
+    let res;
+    if (branchId) {
+      res = await apiRequest(`branches/branch?id=${branchId}`, 'PUT', data);
+      if (res.status === 'success') {
+        // บันทึก print server ของสาขา (แยก endpoint เก็บใน branch_settings)
+        res = await apiRequest(`branches/branch/print-server?id=${branchId}`, 'PUT', {
+          print_server_host: printServerHost || '',
+          print_server_port: printServerPort || '',
         });
+      }
+    } else {
+      res = await apiRequest('branches', 'POST', {
+        code: document.getElementById('branchCode').value.trim(),
+        ...data,
+      });
+    }
     if (res.status === 'success') {
       showNotification('บันทึกข้อมูลสาขาสำเร็จ', 'success');
       closeBranchModal();

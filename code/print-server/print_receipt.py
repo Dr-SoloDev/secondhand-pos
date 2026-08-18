@@ -24,14 +24,27 @@ except ImportError:
     HAS_PIL = False
 
 # ── Configuration ──────────────────────────────────────────────────
+IS_WINDOWS = sys.platform.startswith('win')
 API_BASE = os.environ.get("PRINT_API_URL", "http://localhost:8080/api/index.php")
-PRINTER_NAME = os.environ.get("PRINTER_NAME", "Deli-S420")
+# Default printer name per platform: Windows = EasyPrint driver name, Linux = CUPS queue
+PRINTER_NAME = os.environ.get(
+    "PRINTER_NAME",
+    "EasyPrint ES-8804" if IS_WINDOWS else "Deli-S420"
+)
 W = 32  # ตัวอักษรต่อบรรทัดสำหรับ 58mm thermal (~12cpi)
 DEFAULT_SHOP_NAME = 'รักษ์สะอาดรีไซเคิล'
 DEFAULT_RECEIPT_WELCOME_MESSAGE = 'บริการดี ราคาดี ตาชั่งมาตรฐาน'
 DEFAULT_RECEIPT_FOOTER = 'ขอบคุณที่ใช้บริการ'
 # Garuda includes Thai plus ASCII digits/Latin; some Noto Thai installs do not.
+# Windows paths (Leelawadee/Tahoma have Thai glyphs) come first when on Windows.
 THAI_FONT_PATHS = [
+    # Windows 8+ — Leelawadee designed for Thai; Tahoma as fallback
+    r'C:\Windows\Fonts\Leelawadee.ttf',
+    r'C:\Windows\Fonts\LeelawadeeUI.ttf',
+    r'C:\Windows\Fonts\NotoSansThai-Regular.ttf',
+    r'C:\Windows\Fonts\tahoma.ttf',
+    r'C:\Windows\Fonts\DejaVuSans.ttf',
+    # Linux (tlwg/noto)
     '/usr/share/fonts/truetype/tlwg/Garuda.ttf',
     '/usr/share/fonts/truetype/tlwg/Loma.ttf',
     '/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf',
@@ -310,7 +323,7 @@ def print_raw(data: bytes, printer_name=None):
 
 
 def print_via_cups(data: bytes, raw_mode=True):
-    """Send data to printer via CUPS lp command"""
+    """Send data to printer via CUPS lp command (Linux)"""
     cmd = ['lp', '-d', PRINTER_NAME]
     if raw_mode:
         cmd.extend(['-o', 'raw'])
@@ -327,6 +340,71 @@ def print_via_cups(data: bytes, raw_mode=True):
         raise Exception(f"CUPS print failed (code {proc.returncode}): {stderr}")
 
     return proc.stdout.decode('utf-8', errors='replace').strip()
+
+
+def print_via_windows(data: bytes, raw_mode=True):
+    """Send raw ESC/POS bytes to printer via Windows spooler (win32print).
+
+    Uses the installed Windows printer driver ("EasyPrint ES-8804") so no
+    CUPS/libusb is needed — works with any USB printer Windows can see.
+    """
+    try:
+        import win32print
+    except ImportError:
+        raise Exception(
+            "pywin32 not installed — run install.bat (Windows setup) first"
+        )
+
+    printer_name = PRINTER_NAME
+
+    # Fallback: if configured name not found, pick first local printer that looks like a thermal (POS)
+    try:
+        available = [p[2] for p in win32print.EnumPrinters(
+            win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+        )]
+    except Exception:
+        available = []
+
+    if available and printer_name not in available:
+        # Try case-insensitive match
+        lower = printer_name.lower()
+        match = next((p for p in available if p.lower() == lower), None)
+        if match:
+            printer_name = match
+        else:
+            thermal = next((p for p in available if any(
+                k in p.lower() for k in ('es-88', 'easyprint', 'thermal', 'pos', 'receipt', '88')
+            )), None)
+            if thermal:
+                printer_name = thermal
+            else:
+                raise Exception(
+                    f"ไม่พบเครื่องพิมพ์ '{printer_name}' ใน Windows\n"
+                    f"เครื่องพิมพ์ที่พบ: {available or '(ไม่มีเครื่องพิมพ์)'}\n"
+                    f"ตรวจว่า Driver ES-8804 ติดตั้งแล้ว และพิมพ์ Test Page สำเร็จ"
+                )
+
+    try:
+        handle = win32print.OpenPrinter(printer_name)
+    except Exception as e:
+        raise Exception(f"เปิดเครื่องพิมพ์ '{printer_name}' ไม่สำเร็จ: {e}")
+
+    try:
+        try:
+            win32print.StartDocPrinter(handle, 1, ("scrap-pos-thermal", None, "RAW"))
+            win32print.StartPagePrinter(handle)
+            win32print.WritePrinter(handle, data)
+            win32print.EndPagePrinter(handle)
+            win32print.EndDocPrinter(handle)
+        except Exception as e:
+            raise Exception(f"พิมพ์ไม่สำเร็จ (RAW job): {e}")
+    finally:
+        try:
+            win32print.ClosePrinter(handle)
+        except Exception:
+            pass
+
+    return f"sent to '{printer_name}' via Windows spooler"
 
 
 def _draw_receipt_pil_image(po_data, include_stub=True):
@@ -989,7 +1067,7 @@ def print_direct(text: str, printer_name=None, encoding='cp874', mode='text'):
             print(f"[Print] Warning: {encoding} not supported, fallback to utf-8", file=sys.stderr)
             raw = build_escpos_raw(text, encoding='utf-8')
 
-    result = print_via_cups(raw, raw_mode=True)
+    result = print_via_cups(raw, raw_mode=True) if not IS_WINDOWS else print_via_windows(raw, raw_mode=True)
     return result
 
 

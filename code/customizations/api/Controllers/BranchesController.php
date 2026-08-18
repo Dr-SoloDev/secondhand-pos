@@ -6,6 +6,19 @@ class BranchesController extends Controller
         $this->requireAuth();
         $model = new Branch();
         $branches = $model->getAll();
+        // แนบ print server (เครื่องพิมพ์ความร้อน) ของแต่ละสาขา
+        if ($branches) {
+            $settingModel = new BranchSetting();
+            foreach ($branches as &$b) {
+                $s = $settingModel->getByBranch(
+                    (int)$b['id'],
+                    ['print_server_host', 'print_server_port']
+                );
+                $b['print_server_host'] = $s['print_server_host'] ?? '';
+                $b['print_server_port'] = $s['print_server_port'] ?? '';
+            }
+            unset($b);
+        }
         Response::success('Branches retrieved', $branches);
     }
 
@@ -86,6 +99,81 @@ class BranchesController extends Controller
         } catch (Exception $e) {
             error_log('Branch update failed: ' . $e->getMessage());
             Response::error('Failed to update branch', 500);
+        }
+    }
+
+    /**
+     * GET /api/branches/branch/print-server?id=X
+     * อ่านค่า Print Server (เครื่องพิมพ์ความร้อน) ของสาขา
+     */
+    public function getBranchPrintServer($id)
+    {
+        $this->requireAuth();
+        if (!$id) Response::error('Branch ID is required', 400);
+
+        $model = new Branch();
+        if (!$model->findById($id)) {
+            Response::error('Branch not found', 404);
+        }
+
+        $settings = (new BranchSetting())->getByBranch(
+            (int)$id,
+            ['print_server_host', 'print_server_port']
+        );
+
+        Response::success('Print server settings retrieved', [
+            'branch_id' => (int)$id,
+            'print_server_host' => $settings['print_server_host'] ?? '',
+            'print_server_port' => $settings['print_server_port'] ?? '',
+        ]);
+    }
+
+    /**
+     * PUT /api/branches/branch/print-server?id=X
+     * Body: { "print_server_host": "192.168.1.50", "print_server_port": "9120" }
+     * ตั้งค่า Print Server (เครื่องพิมพ์ความร้อน USB) ของสาขา
+     * — แต่ละสาขามี Windows PC + เครื่องพิมพ์ของตัวเอง
+     */
+    public function updateBranchPrintServer($id)
+    {
+        $this->requireAuth(['admin']);
+        if (!$id) Response::error('Branch ID is required', 400);
+
+        $model = new Branch();
+        if (!$model->findById($id)) {
+            Response::error('Branch not found', 404);
+        }
+
+        $data = $this->getRequestData();
+        $host = trim((string)($data['print_server_host'] ?? ''));
+        $port = trim((string)($data['print_server_port'] ?? ''));
+
+        // port ต้องเป็นตัวเลข 1-65535 ถ้าระบุ
+        if ($port !== '') {
+            if (!ctype_digit($port) || (int)$port < 1 || (int)$port > 65535) {
+                Response::error('print_server_port ต้องเป็นเลข 1-65535', 422);
+            }
+        }
+
+        $settings = [];
+        if ($host !== '') {
+            $settings['print_server_host'] = $host;
+        }
+        if ($port !== '') {
+            $settings['print_server_port'] = $port;
+        }
+
+        try {
+            (new BranchSetting())->updateForBranch((int)$id, $settings);
+            Logger::logActivity(
+                $this->user['user_id'],
+                'update_branch_print_server',
+                "Updated print server for branch ID: {$id} → {$host}" . ($port !== '' ? ":{$port}" : '')
+            );
+            Response::success('Print server settings updated', $settings);
+        } catch (Exception $e) {
+            error_log('Branch print server update failed: ' . $e->getMessage());
+            Response::error('Failed to update print server settings', 500);
         }
     }
 }

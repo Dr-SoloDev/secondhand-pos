@@ -19,6 +19,45 @@ class PrintController extends Controller
     }
 
     /**
+     * หา Print Server ของสาขาที่ใบรับซื้อเกิดขึ้น
+     * ลำดับ: branch_settings.print_server_host → env PRINT_SERVER_HOST → host.docker.internal
+     * ระบบ multi-branch: แต่ละสาขามี Windows PC + เครื่องพิมพ์ความร้อน USB ของตัวเอง
+     */
+    private function getPrintServerUrlForBranch($branchId)
+    {
+        if (!$branchId) {
+            return $this->printServerUrl;
+        }
+        try {
+            $settings = (new BranchSetting())->getByBranch(
+                (int)$branchId,
+                ['print_server_host', 'print_server_port']
+            );
+        } catch (Exception $e) {
+            error_log("[Print] branch_settings read failed for #{$branchId}: {$e->getMessage()}");
+            return $this->printServerUrl;
+        }
+
+        $host = $settings['print_server_host'] ?? null;
+        if (!$host || trim($host) === '') {
+            return $this->printServerUrl;
+        }
+        $host = trim($host);
+        // รองรับค่า "192.168.1.50" หรือ "192.168.1.50:9120"
+        $port = $settings['print_server_port'] ?? null;
+        if ($port !== null && trim($port) !== '') {
+            $port = (int)trim($port);
+        } elseif (strpos($host, ':') !== false) {
+            [$host, $port] = explode(':', $host, 2);
+            $port = (int)$port;
+        } else {
+            $port = (int)(getenv('PRINT_SERVER_PORT') ?: '9120');
+        }
+
+        return "http://{$host}:{$port}";
+    }
+
+    /**
      * POST /api/print/thermal-purchase
      * Body: { "id": 123 }
      *
@@ -33,7 +72,10 @@ class PrintController extends Controller
         $po = $this->getPrintablePurchaseOrder($id);
         $payload = $this->buildThermalPurchasePayload($id, $po);
 
-        $result = $this->callPrintServer('/print', $payload);
+        $branchId = $po['branch_id'] ?? null;
+        $serverUrl = $this->getPrintServerUrlForBranch($branchId);
+        error_log("[Print] #{$id} → print server {$serverUrl} (branch " . ($branchId ?: '?') . ")");
+        $result = $this->callPrintServer('/print', $payload, $serverUrl);
 
         if (!$result['success']) {
             error_log("[Print] #{$id} failed: {$result['error']}");
@@ -59,7 +101,8 @@ class PrintController extends Controller
         $po = $this->getPrintablePurchaseOrder($id);
         $payload = $this->buildThermalPurchasePayload($id, $po, 'image');
 
-        $result = $this->callPrintServer('/preview', $payload);
+        $serverUrl = $this->getPrintServerUrlForBranch($po['branch_id'] ?? null);
+        $result = $this->callPrintServer('/preview', $payload, $serverUrl);
 
         if (!$result['success']) {
             error_log("[Print Preview] #{$id} failed: {$result['error']}");
@@ -185,9 +228,10 @@ class PrintController extends Controller
     /**
      * เรียก Print Server HTTP
      */
-    private function callPrintServer($path, $postBody = null)
+    private function callPrintServer($path, $postBody = null, $url = null)
     {
-        $url = $this->printServerUrl . $path;
+        $baseUrl = $url ?: $this->printServerUrl;
+        $url = $baseUrl . $path;
 
         $ch = curl_init();
         curl_setopt_array($ch, [

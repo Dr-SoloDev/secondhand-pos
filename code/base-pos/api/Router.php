@@ -174,6 +174,8 @@ class Router
         $this->routes[] = ['route' => 'branches/summary', 'controller' => 'BranchesController', 'method' => 'getBranchSummary', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'branches/branch', 'controller' => 'BranchesController', 'method' => 'getBranch', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'branches/branch', 'controller' => 'BranchesController', 'method' => 'updateBranch', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'branches/branch/print-server', 'controller' => 'BranchesController', 'method' => 'getBranchPrintServer', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'branches/branch/print-server', 'controller' => 'BranchesController', 'method' => 'updateBranchPrintServer', 'verb' => 'PUT'];
 
         // Sellers routes
         $this->routes[] = ['route' => 'sellers', 'controller' => 'SellersController', 'method' => 'getSellers', 'verb' => 'GET'];
@@ -257,6 +259,7 @@ class Router
         $this->routes[] = ['route' => 'cash-sessions/close-approve', 'controller' => 'CashSessionsController', 'method' => 'approveClose', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'cash-sessions/close-reject',  'controller' => 'CashSessionsController', 'method' => 'rejectClose',  'verb' => 'POST'];
         $this->routes[] = ['route' => 'cash-sessions/reopen',        'controller' => 'CashSessionsController', 'method' => 'reopen',       'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/initialize-position', 'controller' => 'CashSessionsController', 'method' => 'initializePosition', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'cash-sessions/deposits',        'controller' => 'CashSessionsController', 'method' => 'listDeposits',    'verb' => 'GET'];
         $this->routes[] = ['route' => 'cash-sessions/deposit-request', 'controller' => 'CashSessionsController', 'method' => 'requestDeposit',  'verb' => 'POST'];
         $this->routes[] = ['route' => 'cash-sessions/deposit-approve', 'controller' => 'CashSessionsController', 'method' => 'approveDeposit',  'verb' => 'POST'];
