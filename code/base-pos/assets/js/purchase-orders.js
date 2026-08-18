@@ -1221,10 +1221,11 @@ window.showReceipt = async function(id) {
     btnPrint.onclick = () => window.open(`print-receipt.html?id=${id}&auto=1`, '_blank');
   }
 
-  // Thermal print button handler — โหลดภาพก่อน แล้วให้ผู้ใช้ยืนยันพิมพ์
+  // Thermal print button — พิมพ์ผ่าน browser 80mm (print-receipt-thermal.html)
+  // ไม่พึ่ง print server (port 9120) ที่ไม่มี — ใช้ driver ของเครื่องพิมพ์โดยตรง
   const btnThermal = document.getElementById('btnOpenPrintThermal');
   if (btnThermal) {
-    btnThermal.onclick = () => openThermalPrintPreview(id, btnThermal);
+    btnThermal.onclick = () => window.open(`print-receipt-thermal.html?id=${id}&auto=1`, '_blank');
   }
 
   // WF-01: สร้าง QR code หลังเปิด modal
