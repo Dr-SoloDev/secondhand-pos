@@ -875,7 +875,9 @@ class SaleLot extends Model
                 throw new Exception('วิธีรับเงินไม่ถูกต้อง');
             }
             $cashSession = new CashSession();
-            $cashSession->assertOpen((int)$lot['branch_id']);
+            if ($paymentMethod === 'cash') {
+                $cashSession->assertOpen((int)$lot['branch_id']);
+            }
 
             $this->db->query(
                 "UPDATE {$this->table}

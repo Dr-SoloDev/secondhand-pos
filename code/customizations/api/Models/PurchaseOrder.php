@@ -159,7 +159,9 @@ class PurchaseOrder extends Model
                 throw new Exception('ใบรับซื้อที่เกิดจากการโอนสต็อกห้ามยกเลิกโดยตรง กรุณาใช้ใบโอนย้อนกลับ');
             }
             $cashSession = new CashSession();
-            $cashSession->assertOpen((int)$po['branch_id']);
+            if (($po['payment_method'] ?? 'cash') === 'cash') {
+                $cashSession->assertOpen((int)$po['branch_id']);
+            }
 
             $items = $this->db->fetchAll(
                 "SELECT category_id,
@@ -268,7 +270,10 @@ class PurchaseOrder extends Model
         $this->db->beginTransaction();
         try {
             $cashSession = new CashSession();
-            $cashSession->assertOpen((int)$data['branch_id']);
+            $paymentMethod = $data['payment_method'] ?? 'cash';
+            if ($paymentMethod === 'cash') {
+                $cashSession->assertOpen((int)$data['branch_id']);
+            }
             $totalAmount = 0;
             $itemMappings = [];
             $totalItems = count($items);
@@ -282,7 +287,7 @@ class PurchaseOrder extends Model
                 'user_id' => $userId,
                 'total_items' => $totalItems,
                 'total_amount' => $totalAmount,
-                'payment_method' => $data['payment_method'] ?? 'cash',
+                'payment_method' => $paymentMethod,
                 'payment_status' => 'paid',
                 'status' => 'completed',
                 'notes' => $data['notes'] ?? null,
@@ -356,7 +361,7 @@ class PurchaseOrder extends Model
                 [$totalAmount, $data['seller_id']]
             );
 
-            if (($data['payment_method'] ?? 'cash') === 'cash' && $totalAmount > 0) {
+            if ($paymentMethod === 'cash' && $totalAmount > 0) {
                 $cashSession->recordMovement(
                     (int)$data['branch_id'],
                     'out',

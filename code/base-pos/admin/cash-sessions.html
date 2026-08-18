@@ -53,19 +53,23 @@
         <div class="cash-stat"><div class="cash-stat-label">เงินเข้า-ออกสุทธิ</div><div class="cash-stat-value" id="ledgerTotal">฿0.00</div></div>
         <div class="cash-stat"><div class="cash-stat-label">ยอดตามระบบ</div><div class="cash-stat-value success" id="expectedCash">฿0.00</div></div>
         <div class="cash-stat"><div class="cash-stat-label">ส่วนต่างล่าสุด</div><div class="cash-stat-value" id="latestVariance">฿0.00</div></div>
+        <div class="cash-stat cash-position-stat hidden" id="drawerStat"><div class="cash-stat-label">เงินลิ้นชัก (ปัจจุบัน)</div><div class="cash-stat-value" id="drawerBalance">฿0.00</div></div>
+        <div class="cash-stat cash-position-stat hidden" id="reserveStat"><div class="cash-stat-label">เงินสำรองกิจการ</div><div class="cash-stat-value" id="reserveBalance">฿0.00</div></div>
+        <div class="cash-stat cash-position-stat hidden" id="totalStat"><div class="cash-stat-label">เงินรวมกิจการ</div><div class="cash-stat-value" id="businessTotalCash">฿0.00</div></div>
       </div>
 
       <div class="cash-work-grid">
         <section class="card">
-          <div class="card-header"><h2 class="card-title" id="sessionActionTitle">รอบประจำวัน</h2></div>
+          <div class="card-header"><h2 class="card-title" id="sessionActionTitle">รอบประจำวัน</h2><button type="button" class="btn btn-secondary hidden" id="initPositionBtn" title="ตั้งยอดเริ่มต้น drawer/สำรอง ของสาขานี้ (ครั้งเดียว)"><i class="icon-cog"></i> ตั้งยอดเริ่มต้น</button></div>
           <div class="card-body" id="sessionActionBody"></div>
         </section>
         <section class="card">
-          <div class="card-header"><h2 class="card-title">เติมเงินสดเข้าลิ้นชัก</h2></div>
+          <div class="card-header"><h2 class="card-title">นำเงินเข้าลิ้นชัก</h2></div>
           <div class="card-body">
             <div class="cash-form-grid">
+              <div><label for="depositSourceType">ประเภทเงิน</label><select id="depositSourceType" class="form-control"><option value="reserve_transfer">เงินสำรองเดิมของกิจการ</option><option value="owner_capital">เงินทุนใหม่จาก Owner</option></select></div>
               <div><label for="depositAmount">จำนวนเงิน</label><input id="depositAmount" type="number" min="0.01" step="0.01" class="form-control" placeholder="0.00"></div>
-              <div><label for="depositSource">นำเงินมาจาก</label><input id="depositSource" type="text" maxlength="200" class="form-control"></div>
+              <div class="full"><label for="depositSource">รายละเอียดแหล่งเงิน</label><input id="depositSource" type="text" maxlength="200" class="form-control" placeholder="เช่น เซฟสาขา หรือ Owner เติมทุน"></div>
               <div class="full"><label for="depositReason">เหตุผล</label><textarea id="depositReason" rows="2" maxlength="500" class="form-control"></textarea></div>
             </div>
             <div class="cash-action-row"><button type="button" class="btn btn-primary" id="requestDepositBtn">ส่งคำขอเติมเงิน</button></div>
@@ -123,7 +127,40 @@
       </section>
   </main>
 </div>
-<div id="notification-container"></div>
+<div class="modal" id="initPositionModal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>ตั้งยอดเริ่มต้นของสาขา (Cash Position)</h2>
+            <button class="close-modal" onclick="closeInitPositionModal()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p class="cash-init-note">ตั้งครั้งเดียวต่อสาขา เมื่อเริ่มใช้ระบบแยกเงิน — ตั้งแล้วแก้ไม่ได้ ต้องแจ้ง admin ฐานข้อมูล</p>
+            <form id="initPositionForm">
+              <div class="form-group">
+                <label for="initPositionBranch">สาขา</label>
+                <select id="initPositionBranch" class="form-control"></select>
+              </div>
+              <div class="cash-form-grid">
+                <div><label for="initDrawerBalance">ยอดเงินในลิ้นชัก (บาท) <span class="required">*</span></label><input id="initDrawerBalance" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" required></div>
+                <div><label for="initReserveBalance">ยอดเงินสำรองกิจการ (บาท) <span class="required">*</span></label><input id="initReserveBalance" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" required></div>
+              </div>
+              <div class="form-group">
+                <label for="initEffectiveDate">วันที่ตั้งต้น <span class="required">*</span></label>
+                <input type="date" id="initEffectiveDate" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label for="initPositionNote">เหตุผล/หลักฐานยอดตั้งต้น <span class="required">*</span></label>
+                <textarea id="initPositionNote" rows="3" maxlength="500" class="form-control" placeholder="เช่น นับลิ้นชัก 12,450 บาท + เงินเซฟ 50,000 บาท ณ วันที่..." required></textarea>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeInitPositionModal()">ยกเลิก</button>
+            <button type="button" class="btn btn-primary" id="saveInitPositionBtn">บันทึกยอดตั้งต้น</button>
+          </div>
+        </div>
+      </div>
+      <div id="notification-container"></div>
 <script src="../assets/js/config.js?v=20260815d"></script>
 <script src="../assets/js/common.js?v=20260815d"></script>
 <script src="../assets/js/cash-sessions.js?v=20260815d"></script>

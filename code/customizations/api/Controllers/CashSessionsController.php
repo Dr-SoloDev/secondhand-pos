@@ -153,6 +153,32 @@ class CashSessionsController extends Controller
         }
     }
 
+    public function initializePosition()
+    {
+        $this->requireAuth(['admin']);
+        $data = $this->getRequestData() ?? [];
+        $branchId = (int)($data['branch_id'] ?? 0);
+        if (!$branchId) Response::error('กรุณาระบุสาขา', 400);
+        $effectiveDate = trim((string)($data['effective_date'] ?? date('Y-m-d')));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $effectiveDate)) {
+            Response::error('วันที่ตั้งต้นไม่ถูกต้อง', 422);
+        }
+        try {
+            $result = (new CashSession())->initializePositionBaseline(
+                $branchId,
+                (float)($data['drawer_balance'] ?? 0),
+                (float)($data['reserve_balance'] ?? 0),
+                $effectiveDate,
+                (string)($data['note'] ?? ''),
+                $this->userId()
+            );
+            Logger::logActivity($this->userId(), 'initialize_cash_position', "Initialized cash position baseline branch:{$branchId}");
+            Response::success('ตั้งต้นยอดเงินของสาขาแล้ว', $result);
+        } catch (Exception $e) {
+            Response::error($e->getMessage(), 400);
+        }
+    }
+
     public function listDeposits()
     {
         $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
@@ -173,7 +199,8 @@ class CashSessionsController extends Controller
         $branchId = $this->resolveBranchId($data['branch_id'] ?? null);
         try {
             $result = (new CashDepositRequest())->request(
-                $branchId, (float)($data['amount'] ?? 0), (string)($data['source_name'] ?? ''),
+                $branchId, (float)($data['amount'] ?? 0), (string)($data['source_type'] ?? ''),
+                (string)($data['source_name'] ?? ''),
                 (string)($data['reason'] ?? ''), $this->userId()
             );
             Response::success('ส่งคำขอเติมเงินสดเพื่อรออนุมัติแล้ว', $result);

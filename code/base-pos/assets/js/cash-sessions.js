@@ -30,8 +30,60 @@ async function initCashPage() {
     cashEl('adjustmentType').addEventListener('change', renderAdjustmentFields);
     cashEl('createAdjustmentBtn').addEventListener('click', createAdjustmentDocument);
     renderAdjustmentFields();
+    cashEl('initPositionBtn').classList.remove('hidden');
+    cashEl('initPositionBtn').addEventListener('click', openInitPositionModal);
+    cashEl('saveInitPositionBtn').addEventListener('click', saveInitPosition);
+    cashEl('initPositionModal').addEventListener('click', e => { if (e.target === cashEl('initPositionModal')) closeInitPositionModal(); });
   }
   await loadCashPage();
+}
+
+function openInitPositionModal() {
+  const select = cashEl('initPositionBranch');
+  select.innerHTML = '';
+  cashBranches.forEach(branch => select.appendChild(new Option(branch.name, branch.id)));
+  select.value = cashEl('cashBranch').value || '';
+  cashEl('initDrawerBalance').value = '';
+  cashEl('initReserveBalance').value = '';
+  cashEl('initEffectiveDate').value = cashLocalDate(new Date());
+  cashEl('initPositionNote').value = '';
+  cashEl('initPositionModal').classList.add('show');
+  setTimeout(() => cashEl('initDrawerBalance').focus(), 50);
+}
+
+function closeInitPositionModal() {
+  cashEl('initPositionModal').classList.remove('show');
+}
+
+async function saveInitPosition() {
+  const branchId = Number(cashEl('initPositionBranch').value || 0);
+  const drawer = Number(cashEl('initDrawerBalance').value);
+  const reserve = Number(cashEl('initReserveBalance').value);
+  const effectiveDate = cashEl('initEffectiveDate').value;
+  const note = cashEl('initPositionNote').value.trim();
+  if (!branchId) return showNotification('กรุณาเลือกสาขา', 'error');
+  if (!Number.isFinite(drawer) || drawer < 0) return showNotification('ยอดเงินในลิ้นชักไม่ถูกต้อง', 'error');
+  if (!Number.isFinite(reserve) || reserve < 0) return showNotification('ยอดเงินสำรองไม่ถูกต้อง', 'error');
+  if (!effectiveDate) return showNotification('กรุณาเลือกวันที่ตั้งต้น', 'error');
+  if (!note) return showNotification('กรุณาระบุเหตุผล/หลักฐานของยอดตั้งต้น', 'error');
+  const button = cashEl('saveInitPositionBtn');
+  setButtonLoading(button, true);
+  try {
+    const res = await apiRequest('cash-sessions/initialize-position', 'POST', {
+      branch_id: branchId, drawer_balance: drawer, reserve_balance: reserve,
+      effective_date: effectiveDate, note,
+    });
+    showNotification(res.message || (res.status === 'success' ? 'ตั้งยอดเริ่มต้นแล้ว' : 'ตั้งไม่สำเร็จ'), res.status === 'success' ? 'success' : 'error');
+    if (res.status === 'success') {
+      closeInitPositionModal();
+      cashEl('cashBranch').value = String(branchId);
+      await loadCashPage();
+    }
+  } catch (err) {
+    showNotification(err.message || 'ไม่สามารถตั้งยอดเริ่มต้นได้', 'error');
+  } finally {
+    setButtonLoading(button, false);
+  }
 }
 
 async function loadCashPage() {
@@ -61,6 +113,22 @@ function renderCashSession() {
   cashEl('openingActual').textContent = cashMoney(cashSession?.opening_actual);
   cashEl('ledgerTotal').textContent = cashMoney(cashSession?.ledger_total);
   cashEl('expectedCash').textContent = cashMoney(cashSession?.current_expected_cash);
+  const positionOn = cashSession && Number(cashSession.cash_model_version) === 2;
+  if (positionOn) {
+    cashEl('drawerBalance').textContent = cashMoney(cashSession.drawer_balance);
+    cashEl('reserveBalance').textContent = cashMoney(cashSession.reserve_balance);
+    cashEl('businessTotalCash').textContent = cashMoney(cashSession.business_total_cash);
+  }
+  ['drawerStat', 'reserveStat', 'totalStat'].forEach(id => cashEl(id).classList.toggle('hidden', !positionOn));
+  const initBtn = cashEl('initPositionBtn');
+  if (initBtn) {
+    if (positionOn) {
+      initBtn.classList.add('hidden');
+    } else {
+      initBtn.classList.remove('hidden');
+      initBtn.disabled = !!cashSession && ['pending_open', 'open', 'pending_close'].includes(cashSession.status);
+    }
+  }
   const variance = cashSession?.closing_variance ?? cashSession?.opening_variance ?? 0;
   cashEl('latestVariance').textContent = cashMoney(variance);
   cashEl('latestVariance').className = `cash-stat-value ${Number(variance) === 0 ? '' : 'danger'}`;
@@ -158,10 +226,11 @@ async function reopenCashSession() {
 
 async function requestCashDeposit() {
   const amount = Number(cashEl('depositAmount').value);
+  const sourceType = cashEl('depositSourceType').value;
   const source = cashEl('depositSource').value.trim();
   const reason = cashEl('depositReason').value.trim();
   if (!(amount > 0) || !source || !reason) return showNotification('กรุณากรอกข้อมูลเติมเงินให้ครบ', 'error');
-  const res = await apiRequest('cash-sessions/deposit-request', 'POST', { branch_id:Number(cashEl('cashBranch').value), amount, source_name:source, reason });
+  const res = await apiRequest('cash-sessions/deposit-request', 'POST', { branch_id:Number(cashEl('cashBranch').value), amount, source_type:sourceType, source_name:source, reason });
   showNotification(res.message, res.status === 'success' ? 'success' : 'error');
   if (res.status === 'success') { cashEl('depositAmount').value=''; cashEl('depositSource').value=''; cashEl('depositReason').value=''; loadCashPage(); }
 }

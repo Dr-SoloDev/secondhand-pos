@@ -14,7 +14,7 @@
 | **WF-03** | Seller Search + Blacklist Alert | ✅ DONE | สืบค้นประวัติผู้ขายและการดักจับการติดแบล็กลิสต์ [→](WORKFLOW-03-seller-search-blacklist.md) |
 | **WF-04** | 4-Branch Dashboard + auto-refresh | ✅ DONE | สรุปยอดข้อมูลรวมรายเดือนของ 4 สาขา [→](WORKFLOW-04-dashboard.md) |
 | **WF-05** | Purchase Flow UX — Keyboard-first | ✅ DONE | หน้ารับซื้อสินค้าด่วนสำหรับพนักงานหน้าร้าน [→](WORKFLOW-05-purchase-flow-ux.md) |
-| **WF-06** | Daily Cash Sessions (Cash Drawer Control) | ✅ DONE | การเปิด/ปิดกะเงินสด การแจ้งเตือนยอดส่วนต่าง (Variance) และการฝากเงินสด |
+| **WF-06** | Daily Cash Sessions (Cash Drawer Control) | 🔄 REDESIGN IN PROGRESS | แยกยอดเงินรวมกิจการออกจากยอดในลิ้นชัก, รองรับ reserve/owner cash และแก้ flow เปิด-ปิดยอดตาม `WORKFLOW-06-cash-control-redesign.md` |
 | **WF-07** | PO Cancellation Approval Workflow | ✅ DONE | การยกเลิกใบเสร็จรับซื้อด้วยระบบอนุมัติคู่ข้ามบัญชี (Dual-Authorization) |
 | **WF-08** | Stock Transfers & Reversals | ✅ DONE | การโอนสินค้าข้ามสาขา และสิทธิ์ยื่นคำขอส่งสต็อกคืน (Reversal Request) |
 | **WF-09** | Adjustment Documents Administration | ✅ DONE | ระบบกรอกเอกสารแก้ไขย้อนหลังและล้างบิลทุจริตสำหรับสิทธิ์แอดมิน |

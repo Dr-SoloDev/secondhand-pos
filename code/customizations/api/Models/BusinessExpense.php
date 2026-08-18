@@ -77,7 +77,9 @@ class BusinessExpense extends Model
 
         $this->db->beginTransaction();
         try {
-            (new CashSession())->assertOpen((int)$data['branch_id']);
+            if ($paymentMethod === 'cash') {
+                (new CashSession())->assertOpen((int)$data['branch_id']);
+            }
             $stmt = $this->db->prepare(
                 "INSERT INTO business_expenses
                    (branch_id,expense_date,category,amount,payment_method,beneficiary_name,note,status,created_by,requested_by)
@@ -118,7 +120,9 @@ class BusinessExpense extends Model
             }
 
             $cashSession = new CashSession();
-            $cashSession->assertOpen((int)$expense['branch_id']);
+            if ($expense['payment_method'] === 'cash') {
+                $cashSession->assertOpen((int)$expense['branch_id']);
+            }
             $this->db->query(
                 "UPDATE business_expenses
                  SET status='approved', approved_by=?, approved_at=NOW(), review_note=? WHERE id=?",

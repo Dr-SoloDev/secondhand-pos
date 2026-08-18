@@ -28,23 +28,30 @@ class CashDepositRequest extends Model
         ) ?: [];
     }
 
-    public function request(int $branchId, float $amount, string $sourceName, string $reason, int $userId): array
+    public function request(int $branchId, float $amount, string $sourceType,
+        string $sourceName, string $reason, int $userId): array
     {
         $sourceName = substr(trim($sourceName), 0, 200);
         $reason = substr(trim($reason), 0, 500);
         if (!is_finite($amount) || $amount <= 0 || $sourceName === '' || $reason === '') {
             throw new Exception('กรุณาระบุยอดเงิน แหล่งที่มา และเหตุผลให้ครบ');
         }
+        $cashSession = new CashSession();
+        if ($cashSession->hasPositionModel($branchId)
+            && !in_array($sourceType, ['reserve_transfer', 'owner_capital'], true)) {
+            throw new Exception('กรุณาระบุว่าเป็นเงินสำรองเดิมหรือเงินทุนใหม่');
+        }
+        if (!$cashSession->hasPositionModel($branchId)) $sourceType = null;
         $this->db->beginTransaction();
         try {
-            $session = (new CashSession())->assertOpen($branchId);
+            $session = $cashSession->assertOpen($branchId);
             $stmt = $this->db->prepare(
                 "INSERT INTO cash_deposit_requests
-                   (branch_id,cash_session_id,amount,source_name,reason,requested_by)
-                 VALUES (?,?,?,?,?,?)"
+                   (branch_id,cash_session_id,amount,source_type,source_name,reason,requested_by)
+                 VALUES (?,?,?,?,?,?,?)"
             );
             $this->db->execute($stmt, [
-                $branchId, (int)$session['id'], round($amount, 2), $sourceName, $reason, $userId,
+                $branchId, (int)$session['id'], round($amount, 2), $sourceType, $sourceName, $reason, $userId,
             ]);
             $id = (int)$this->db->lastInsertId();
             $this->db->commit();
@@ -66,10 +73,10 @@ class CashDepositRequest extends Model
             if (!$allowSelfApproval && (int)$request['requested_by'] === $approverId) {
                 throw new Exception('ผู้ส่งคำขอไม่สามารถอนุมัติรายการตัวเองได้');
             }
-            (new CashSession())->recordMovement(
-                (int)$request['branch_id'], 'in', 'cash_deposit', (float)$request['amount'],
-                'cash_deposit_request', $id,
-                'เติมเงินสดจาก ' . $request['source_name'] . ': ' . $request['reason'], $approverId
+            (new CashSession())->fundDrawer(
+                (int)$request['branch_id'], (float)$request['amount'],
+                (string)($request['source_type'] ?? ''), $id,
+                'นำเงินเข้าลิ้นชักจาก ' . $request['source_name'] . ': ' . $request['reason'], $approverId
             );
             $this->db->query(
                 "UPDATE cash_deposit_requests SET status='approved', reviewed_by=?, reviewed_at=NOW(), review_note=? WHERE id=?",

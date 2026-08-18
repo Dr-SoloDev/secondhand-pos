@@ -64,6 +64,7 @@ class CashSession extends Model
                 $row['ledger_total'] = $this->movementTotal((int)$row['id']);
                 $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
                 $row['movements'] = $this->getMovements((int)$row['id']);
+                $row = $this->applyPositionFields($row);
                 $row['is_stale'] = true;
                 return $row;
             }
@@ -80,7 +81,7 @@ class CashSession extends Model
                 [$branchId]
             );
             $expected = round((float)($previousClosing ?? 0), 2);
-            return [
+            $result = [
                 'id' => null,
                 'branch_id' => $branchId,
                 'branch_name' => $branchName ?: null,
@@ -93,17 +94,122 @@ class CashSession extends Model
                 'current_expected_cash' => $expected,
                 'movements' => [],
             ];
+            return $this->applyPositionFields($result);
         }
         $row['ledger_total'] = $this->movementTotal((int)$row['id']);
         $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
         $row['movements'] = $this->getMovements((int)$row['id']);
-        return $row;
+        return $this->applyPositionFields($row);
+    }
+
+    /**
+     * Position model is opt-in per branch after an owner-approved cutover baseline.
+     * Legacy branches intentionally keep the pre-WF-06 behavior until initialized.
+     */
+    public function hasPositionModel(int $branchId): bool
+    {
+        return (bool)$this->db->fetchColumn(
+            "SELECT id FROM cash_position_baselines WHERE branch_id=? LIMIT 1",
+            [$branchId]
+        );
+    }
+
+    public function getPositionBalances(int $branchId): array
+    {
+        $baseline = $this->db->fetch(
+            "SELECT * FROM cash_position_baselines WHERE branch_id=? LIMIT 1",
+            [$branchId]
+        );
+        if (!$baseline) {
+            return [
+                'model_version' => 1,
+                'drawer_balance' => 0.0,
+                'reserve_balance' => 0.0,
+                'business_total_cash' => 0.0,
+            ];
+        }
+
+        $drawer = (float)$baseline['drawer_balance'];
+        $reserve = (float)$baseline['reserve_balance'];
+        $movements = $this->db->fetchAll(
+            "SELECT source_location, destination_location, balance_effect, amount
+             FROM cash_movements
+             WHERE branch_id=? AND balance_effect IS NOT NULL AND created_at >= ?
+             ORDER BY id ASC",
+            [$branchId, $baseline['created_at']]
+        ) ?: [];
+        foreach ($movements as $movement) {
+            $amount = (float)$movement['amount'];
+            $source = $movement['source_location'] ?? null;
+            $destination = $movement['destination_location'] ?? null;
+            if ($source === 'drawer') $drawer -= $amount;
+            if ($source === 'business_reserve') $reserve -= $amount;
+            if ($destination === 'drawer') $drawer += $amount;
+            if ($destination === 'business_reserve') $reserve += $amount;
+        }
+
+        return [
+            'model_version' => 2,
+            'drawer_balance' => round($drawer, 2),
+            'reserve_balance' => round($reserve, 2),
+            'business_total_cash' => round($drawer + $reserve, 2),
+            'baseline_id' => (int)$baseline['id'],
+            'baseline_effective_date' => $baseline['effective_date'],
+        ];
+    }
+
+    public function initializePositionBaseline(int $branchId, float $drawerBalance, float $reserveBalance,
+        string $effectiveDate, string $note, int $userId): array
+    {
+        if (!is_finite($drawerBalance) || $drawerBalance < 0
+            || !is_finite($reserveBalance) || $reserveBalance < 0) {
+            throw new Exception('ยอดตั้งต้นของตำแหน่งเงินไม่ถูกต้อง');
+        }
+        $note = $this->normalizeReason($note);
+        if ($note === null) throw new Exception('กรุณาระบุเหตุผล/หลักฐานของยอดตั้งต้น');
+        $this->db->beginTransaction();
+        try {
+            if ($this->db->fetchColumn(
+                "SELECT id FROM cash_position_baselines WHERE branch_id=? FOR UPDATE",
+                [$branchId]
+            )) {
+                throw new Exception('สาขานี้ตั้งต้น cash position ไปแล้ว');
+            }
+            $active = $this->db->fetchColumn(
+                "SELECT id FROM cash_sessions WHERE branch_id=? AND status IN ('pending_open','open','pending_close') LIMIT 1 FOR UPDATE",
+                [$branchId]
+            );
+            if ($active) throw new Exception('ต้องปิดหรือเคลียร์รอบเงินสดที่ค้างอยู่ก่อนตั้งต้นระบบใหม่');
+            $stmt = $this->db->prepare(
+                "INSERT INTO cash_position_baselines
+                   (branch_id,effective_date,drawer_balance,reserve_balance,note,created_by)
+                 VALUES (?,?,?,?,?,?)"
+            );
+            $this->db->execute($stmt, [
+                $branchId, $effectiveDate, round($drawerBalance, 2), round($reserveBalance, 2), $note, $userId,
+            ]);
+            $id = (int)$this->db->lastInsertId();
+            $this->db->commit();
+            return [
+                'id' => $id,
+                'branch_id' => $branchId,
+                'effective_date' => $effectiveDate,
+                'drawer_balance' => round($drawerBalance, 2),
+                'reserve_balance' => round($reserveBalance, 2),
+            ];
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function openDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
         if (!is_finite($actualCash) || $actualCash < 0) {
             throw new Exception('ยอดเงินสดเปิดวันไม่ถูกต้อง');
+        }
+        if ($this->hasPositionModel($branchId)) {
+            return $this->openPositionDay($branchId, $actualCash, $reason, $userId);
         }
         $reason = $this->normalizeReason($reason);
 
@@ -224,6 +330,9 @@ class CashSession extends Model
         if (!is_finite($actualCash) || $actualCash < 0) {
             throw new Exception('ยอดเงินสดปิดวันไม่ถูกต้อง');
         }
+        if ($this->hasPositionModel($branchId)) {
+            return $this->closePositionDay($branchId, $actualCash, $reason, $userId);
+        }
         $reason = $this->normalizeReason($reason);
         $this->db->beginTransaction();
         try {
@@ -284,6 +393,26 @@ class CashSession extends Model
                 [$newStatus, $approve ? $reviewerId : null, $approve ? date('Y-m-d H:i:s') : null,
                  $reviewerId, $reviewNote, $sessionId]
             );
+            if ($approve && (int)($session['cash_model_version'] ?? 1) === 2
+                && (float)($session['closing_actual'] ?? 0) > 0) {
+                $this->insertPositionMovement(
+                    $sessionId,
+                    (int)$session['branch_id'],
+                    'out',
+                    'transfer',
+                    (float)$session['closing_actual'],
+                    'drawer',
+                    'business_reserve',
+                    'cash_session_close_transfer',
+                    $sessionId,
+                    'ย้ายเงินออกจากลิ้นชักเข้าเงินสำรองหลังอนุมัติปิดวัน',
+                    $reviewerId
+                );
+                $this->db->query(
+                    "UPDATE cash_sessions SET closing_transfer_amount=? WHERE id=?",
+                    [(float)$session['closing_actual'], $sessionId]
+                );
+            }
             $this->addEvent($sessionId, $approve ? 'close_approved' : 'close_rejected',
                 (float)$session['closing_expected'], (float)$session['closing_actual'], (float)$session['closing_variance'],
                 $reviewNote, (int)$session['closing_requested_by'], $reviewerId);
@@ -308,6 +437,48 @@ class CashSession extends Model
             }
             if ($session['business_date'] !== date('Y-m-d')) {
                 throw new Exception('เปิดยอดใหม่ได้เฉพาะวันเดียวกัน หลังเปลี่ยนวันให้ใช้เอกสารปรับปรุง');
+            }
+            if ((int)($session['cash_model_version'] ?? 1) === 2) {
+                $closingTransfer = $this->db->fetch(
+                    "SELECT id, amount FROM cash_movements
+                     WHERE movement_type='cash_session_close_transfer'
+                       AND reference_type='cash_position' AND reference_id=?
+                     LIMIT 1 FOR UPDATE",
+                    [$sessionId]
+                );
+                if ($closingTransfer && (float)$closingTransfer['amount'] > 0) {
+                    $this->insertPositionMovement(
+                        $sessionId,
+                        (int)$session['branch_id'],
+                        'in',
+                        'transfer',
+                        (float)$closingTransfer['amount'],
+                        'business_reserve',
+                        'drawer',
+                        'cash_session_close_reversal',
+                        $sessionId,
+                        'ย้อนการย้ายเงินปิดวันเพื่อเปิดรอบใหม่: ' . $reason,
+                        $adminId
+                    );
+                    $this->db->query(
+                        "UPDATE cash_movements SET reverses_movement_id=?
+                         WHERE movement_type='cash_session_close_reversal'
+                           AND reference_type='cash_position' AND reference_id=?",
+                        [(int)$closingTransfer['id'], $sessionId]
+                    );
+                }
+                $this->db->query(
+                    "UPDATE cash_sessions
+                     SET status='open', closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
+                         closing_requested_by=NULL, closed_by=NULL, closed_at=NULL, closing_transfer_amount=0,
+                         last_reviewed_by=?, last_reviewed_at=NOW(), last_review_note=?
+                     WHERE id=?",
+                    [$adminId, $reason, $sessionId]
+                );
+                $this->addEvent($sessionId, 'reopened', (float)$session['closing_expected'],
+                    (float)$session['closing_actual'], (float)$session['closing_variance'], $reason, $adminId, $adminId);
+                $this->db->commit();
+                return;
             }
             $currentExpected = round(
                 (float)$session['opening_actual'] + $this->movementTotal($sessionId),
@@ -367,6 +538,22 @@ class CashSession extends Model
         if (!in_array($direction, ['in', 'out'], true) || !is_finite($amount) || $amount <= 0) {
             throw new Exception('ข้อมูลรายการเงินสดไม่ถูกต้อง');
         }
+        if ($this->hasPositionModel($branchId)) {
+            $source = $direction === 'out' ? 'drawer' : 'external';
+            $destination = $direction === 'in' ? 'drawer' : 'external';
+            return $this->recordPositionMovement(
+                $branchId,
+                $direction === 'in' ? 'increase' : 'decrease',
+                $amount,
+                $source,
+                $destination,
+                $type,
+                $referenceType,
+                $referenceId,
+                $description,
+                $userId
+            );
+        }
         $session = $this->assertOpen($branchId);
         if ($direction === 'out') {
             $available = round((float)$session['opening_actual'] + $this->movementTotal((int)$session['id']), 2);
@@ -384,6 +571,230 @@ class CashSession extends Model
             substr($referenceType, 0, 40), $referenceId, substr(trim($description), 0, 500), $userId,
         ]);
         return (int)$this->db->lastInsertId();
+    }
+
+    public function fundDrawer(int $branchId, float $amount, string $sourceType,
+        int $referenceId, string $description, int $userId): int
+    {
+        if (!$this->hasPositionModel($branchId)) {
+            return $this->recordMovement(
+                $branchId, 'in', 'cash_deposit', $amount,
+                'cash_deposit_request', $referenceId, $description, $userId
+            );
+        }
+        if (!in_array($sourceType, ['reserve_transfer', 'owner_capital'], true)) {
+            throw new Exception('กรุณาระบุว่าเป็นเงินสำรองเดิมหรือเงินทุนใหม่');
+        }
+        $session = $this->assertOpen($branchId);
+        $positions = $this->getPositionBalances($branchId);
+        if ($sourceType === 'reserve_transfer') {
+            if ($positions['reserve_balance'] + 0.0001 < $amount) {
+                throw new Exception('เงินสำรองของกิจการไม่เพียงพอสำหรับนำเข้าลิ้นชัก');
+            }
+            return $this->insertPositionMovement(
+                (int)$session['id'], $branchId, 'in', 'transfer', $amount,
+                'business_reserve', 'drawer', 'cash_reserve_transfer', $referenceId,
+                $description, $userId, 'cash_deposit_request'
+            );
+        }
+        return $this->insertPositionMovement(
+            (int)$session['id'], $branchId, 'in', 'increase', $amount,
+            'external', 'drawer', 'owner_capital_injection', $referenceId,
+            $description, $userId, 'cash_deposit_request'
+        );
+    }
+
+    private function openPositionDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
+    {
+        $reason = $this->normalizeReason($reason);
+        $this->db->beginTransaction();
+        try {
+            $unfinished = $this->db->fetch(
+                "SELECT id FROM cash_sessions
+                 WHERE branch_id=? AND status IN ('pending_open','open','pending_close')
+                 ORDER BY business_date DESC LIMIT 1 FOR UPDATE",
+                [$branchId]
+            );
+            if ($unfinished) throw new Exception('สาขานี้มีรอบประจำวันที่ยังดำเนินการไม่เสร็จ');
+
+            $existing = $this->db->fetch(
+                "SELECT id, status FROM cash_sessions
+                 WHERE branch_id=? AND business_date=CURDATE() FOR UPDATE",
+                [$branchId]
+            );
+            if ($existing && ($existing['status'] ?? '') !== 'rejected') {
+                throw new Exception('สาขานี้เปิดรอบประจำวันนี้ไปแล้ว');
+            }
+
+            $positions = $this->getPositionBalances($branchId);
+            $actualCash = round($actualCash, 2);
+            $needToBring = round(max(0, $actualCash - $positions['drawer_balance']), 2);
+            $reserveTransfer = round(min($needToBring, max(0, $positions['reserve_balance'])), 2);
+            $capitalInjection = round($needToBring - $reserveTransfer, 2);
+            $sessionId = $existing ? (int)$existing['id'] : 0;
+
+            if ($sessionId) {
+                $this->db->query(
+                    "UPDATE cash_sessions
+                     SET status='open', cash_model_version=2, opening_expected=?, opening_actual=?,
+                         opening_reason=?, opening_requested_by=?, opened_by=?, opened_at=NOW(),
+                         opening_transfer_amount=?, opening_capital_amount=?,
+                         last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
+                     WHERE id=?",
+                    [$actualCash, $actualCash, $reason, $userId, $userId, $reserveTransfer, $capitalInjection, $sessionId]
+                );
+            } else {
+                $stmt = $this->db->prepare(
+                    "INSERT INTO cash_sessions
+                       (branch_id,business_date,status,cash_model_version,opening_expected,opening_actual,
+                        opening_reason,opening_requested_by,opened_by,opened_at,opening_transfer_amount,opening_capital_amount)
+                     VALUES (?,CURDATE(),'open',2,?,?,?,?,?,NOW(),?,?)"
+                );
+                $this->db->execute($stmt, [
+                    $branchId, $actualCash, $actualCash, $reason, $userId, $userId,
+                    $reserveTransfer, $capitalInjection,
+                ]);
+                $sessionId = (int)$this->db->lastInsertId();
+            }
+
+            if ($reserveTransfer > 0) {
+                $this->insertPositionMovement(
+                    $sessionId, $branchId, 'in', 'transfer', $reserveTransfer,
+                    'business_reserve', 'drawer', 'cash_session_open_transfer', $sessionId,
+                    'ย้ายเงินสำรองเข้าลิ้นชักตอนเปิดวัน', $userId
+                );
+            }
+            if ($capitalInjection > 0) {
+                $this->insertPositionMovement(
+                    $sessionId, $branchId, 'in', 'increase', $capitalInjection,
+                    'external', 'drawer', 'cash_session_open_capital', $sessionId,
+                    'เงินทุนใหม่จาก Owner ตอนเปิดวัน', $userId
+                );
+            }
+            $this->addEvent($sessionId, 'opened', $actualCash, $actualCash, 0, $reason, $userId);
+            $this->db->commit();
+            return [
+                'id' => $sessionId,
+                'status' => 'open',
+                'expected_cash' => $actualCash,
+                'variance' => 0.0,
+                'drawer_balance' => $actualCash,
+                'reserve_transfer' => $reserveTransfer,
+                'capital_injection' => $capitalInjection,
+            ];
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    private function closePositionDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
+    {
+        $reason = $this->normalizeReason($reason);
+        $this->db->beginTransaction();
+        try {
+            $session = $this->db->fetch(
+                "SELECT * FROM cash_sessions
+                 WHERE branch_id=? AND status='open' ORDER BY business_date DESC LIMIT 1 FOR UPDATE",
+                [$branchId]
+            );
+            if (!$session) throw new Exception('สาขานี้ยังไม่มีรอบประจำวันที่เปิดอยู่');
+            $positions = $this->getPositionBalances($branchId);
+            $expected = round($positions['drawer_balance'], 2);
+            $actualCash = round($actualCash, 2);
+            $variance = round($actualCash - $expected, 2);
+            if (abs($variance) > 0.009 && $reason === null) {
+                throw new Exception('ยอดเงินจริงไม่ตรงยอดในลิ้นชัก กรุณาระบุเหตุผล');
+            }
+            $requiresApproval = abs($variance) > self::VARIANCE_APPROVAL_THRESHOLD;
+            $status = $requiresApproval ? 'pending_close' : 'closed';
+            $this->db->query(
+                "UPDATE cash_sessions
+                 SET status=?, cash_model_version=2, closing_expected=?, closing_actual=?, closing_reason=?,
+                     closing_requested_by=?, closed_by=?, closed_at=?, closing_transfer_amount=?
+                 WHERE id=?",
+                [$status, $expected, $actualCash, $reason, $userId,
+                 $requiresApproval ? null : $userId,
+                 $requiresApproval ? null : date('Y-m-d H:i:s'),
+                 $requiresApproval ? 0 : $actualCash, (int)$session['id']]
+            );
+            if (!$requiresApproval && $actualCash > 0) {
+                $this->insertPositionMovement(
+                    (int)$session['id'], $branchId, 'out', 'transfer', $actualCash,
+                    'drawer', 'business_reserve', 'cash_session_close_transfer', (int)$session['id'],
+                    'ย้ายเงินออกจากลิ้นชักเข้าเงินสำรองตอนปิดวัน', $userId
+                );
+            }
+            $this->addEvent((int)$session['id'], $requiresApproval ? 'close_requested' : 'closed',
+                $expected, $actualCash, $variance, $reason, $userId);
+            $this->db->commit();
+            return [
+                'id' => (int)$session['id'], 'status' => $status,
+                'expected_cash' => $expected, 'variance' => $variance,
+                'drawer_balance' => $requiresApproval ? $expected : 0.0,
+                'reserve_transfer' => $requiresApproval ? 0.0 : $actualCash,
+            ];
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    private function recordPositionMovement(int $branchId, string $effect, float $amount,
+        string $source, string $destination, string $type, string $referenceType,
+        int $referenceId, string $description, int $userId): int
+    {
+        $session = $this->assertOpen($branchId);
+        $positions = $this->getPositionBalances($branchId);
+        if ($source === 'drawer' && $positions['drawer_balance'] + 0.0001 < $amount) {
+            throw new Exception('เงินสดในลิ้นชักไม่เพียงพอสำหรับรายการนี้');
+        }
+        return $this->insertPositionMovement(
+            (int)$session['id'], $branchId,
+            $destination === 'drawer' ? 'in' : 'out', $effect, $amount,
+            $source, $destination, $type, $referenceId, $description, $userId,
+            $referenceType
+        );
+    }
+
+    private function insertPositionMovement(int $sessionId, int $branchId, string $direction, string $effect,
+        float $amount, string $source, string $destination, string $type, int $referenceId,
+        string $description, int $userId, string $referenceType = 'cash_position'): int
+    {
+        if ($amount <= 0) return 0;
+        $existing = $this->db->fetchColumn(
+            "SELECT id FROM cash_movements WHERE movement_type=? AND reference_type=? AND reference_id=? LIMIT 1",
+            [$type, $referenceType, $referenceId]
+        );
+        if ($existing) return (int)$existing;
+        $stmt = $this->db->prepare(
+            "INSERT INTO cash_movements
+             (cash_session_id,branch_id,direction,source_location,destination_location,balance_effect,
+                business_date,amount,movement_type,reference_type,reference_id,description,recorded_by)
+             VALUES (?,?,?,?,?,?,CURDATE(),?,?,?,?,?,?)"
+        );
+        $this->db->execute($stmt, [
+            $sessionId, $branchId, $direction, $source, $destination, $effect,
+            round($amount, 2), substr($type, 0, 40), substr($referenceType, 0, 40),
+            $referenceId, substr(trim($description), 0, 500), $userId,
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    private function applyPositionFields(array $row): array
+    {
+        if (!$this->hasPositionModel((int)($row['branch_id'] ?? 0))) return $row;
+        $positions = $this->getPositionBalances((int)$row['branch_id']);
+        $row['cash_model_version'] = 2;
+        $row['drawer_balance'] = $positions['drawer_balance'];
+        $row['reserve_balance'] = $positions['reserve_balance'];
+        $row['business_total_cash'] = $positions['business_total_cash'];
+        $row['current_expected_cash'] = $positions['drawer_balance'];
+        $row['ledger_total'] = round(
+            $positions['drawer_balance'] - (float)($row['opening_actual'] ?? 0),
+            2
+        );
+        return $row;
     }
 
     public function hasMovement(string $type, string $referenceType, int $referenceId): bool

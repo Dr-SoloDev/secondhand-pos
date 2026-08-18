@@ -117,7 +117,7 @@ test_cash_sessions() {
   res=$(curl -s -b "$manager_cookie" "$API_BASE/purchase-orders" \
     -X POST -H 'Content-Type: application/json' \
     -d "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",\"items\":[{\"item_name\":\"Blocked While Closing\",\"category_id\":$cat_id,\"quantity\":1,\"unit_price\":1}]}")
-  assert_contains "$res" '"status":"error"' "Cash close: Financial transaction blocked while approval pending"
+  assert_contains "$res" '"status":"success"' "Cash close: Bank transaction remains available while drawer approval is pending"
 
   res=$(api_post "cash-sessions/close-approve" "{\"id\":$session_id,\"review_note\":\"QA approved variance\"}")
   assert_contains "$res" '"status":"success"' "Cash close: Admin approves another user's variance"
