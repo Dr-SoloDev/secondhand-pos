@@ -1685,6 +1685,13 @@ function capturePhoto() {
   previewImg.src = canvas.toDataURL('image/jpeg', 0.85);
   document.getElementById('cameraPreviewOverlay').classList.add('show');
   photoCaptured = true; // capture สำเร็จแล้ว อนุญาต confirm ได้
+
+  // Plan A: กดครั้งเดียวจบ — auto-confirm หลัง 300ms ให้เห็น flash/preview แวบเดียวก่อนบันทึก
+  setTimeout(() => {
+    if (photoCaptured && document.getElementById('cameraPreviewOverlay').classList.contains('show')) {
+      confirmPhoto();
+    }
+  }, 300);
 }
 
 // ── Confirm captured photo ─────────────────────────────────
