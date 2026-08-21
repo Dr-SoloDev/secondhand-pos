@@ -24,6 +24,8 @@ async function initCashPage() {
   select.addEventListener('change', loadCashPage);
   cashEl('refreshCashBtn').addEventListener('click', loadCashPage);
   cashEl('requestDepositBtn').addEventListener('click', requestCashDeposit);
+  cashEl('depositSourceType').addEventListener('change', updateDepositPlaceholder);
+  updateDepositPlaceholder();
   if (hasAppPermission('actions.adjustments.manage', cashPermissions)) {
     cashEl('adjustmentSection').classList.remove('hidden');
     cashEl('adjustmentHistorySection').classList.remove('hidden');
@@ -113,6 +115,11 @@ function renderCashSession() {
   cashEl('openingActual').textContent = cashMoney(cashSession?.opening_actual);
   cashEl('ledgerTotal').textContent = cashMoney(cashSession?.ledger_total);
   cashEl('expectedCash').textContent = cashMoney(cashSession?.current_expected_cash);
+  const ledgerLabel = cashEl('ledgerLabel');
+  if (ledgerLabel) {
+    ledgerLabel.textContent = positionOn ? 'เงินเข้า-ออก ลิ้นชัก' : 'เงินเข้า-ออกสุทธิ';
+    ledgerLabel.title = positionOn ? 'เฉพาะเงินในลิ้นชัก ไม่รวมสำรอง/โอนธนาคาร' : '';
+  }
   const positionOn = cashSession && Number(cashSession.cash_model_version) === 2;
   if (positionOn) {
     cashEl('drawerBalance').textContent = cashMoney(cashSession.drawer_balance);
@@ -190,13 +197,51 @@ function cashCountForm(mode) {
   }
   return `<div class="cash-form-grid">
     <div class="full cash-expected-hint">${expectedLabel}: <strong>${cashMoney(expected)}</strong></div>
-    <div class="full"><label for="cashActual">ยอดเงินสดที่นับได้</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value=""></div>
+    <div class="full"><label for="cashActual">ยอดเงินสดที่นับได้</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value=""><div id="closeVarianceHint" style="font-size:11px;color:#6b7280;margin-top:4px">💡 ส่วนต่างเกิน ฿100 ต้องรออนุมัติจากผู้จัดการ</div></div>
     <div class="full"><label for="cashReason">เหตุผลเมื่อยอดไม่ตรง</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="จำเป็นเมื่อยอดนับไม่ตรงกับยอดตามระบบ"></textarea></div>
   </div>
   <div class="cash-action-row"><button class="btn btn-primary" id="submitCashCount">ปิดยอด</button></div>`;
 }
 
+function updateDepositPlaceholder() {
+  const map = {
+    reserve_transfer: 'เช่น เซฟสาขา / ตู้เซฟ',
+    owner_capital: 'เช่น Owner เติมทุน 10,000 บาท',
+    drawer_to_reserve: 'เช่น ย้ายเข้าตู้เซฟ 5,000 บาท',
+    drawer_to_owner: 'เช่น Owner เบิกไปใช้ส่วนตัว'
+  };
+  const el = cashEl('depositSource');
+  if (el) el.placeholder = map[cashEl('depositSourceType').value] || '';
+}
+
 function bindCashCountForm(mode) {
+  if (mode === 'close') {
+    const actualInput = cashEl('cashActual');
+    const hint = () => {
+      const h = cashEl('closeVarianceHint');
+      if (!h || !actualInput) return;
+      const expected = Number(cashSession?.current_expected_cash || 0);
+      const actual = Number(actualInput.value);
+      if (!actualInput.value || !Number.isFinite(actual)) {
+        h.textContent = '💡 ส่วนต่างเกิน ฿100 ต้องรออนุมัติจากผู้จัดการ';
+        h.style.color = '#6b7280';
+        return;
+      }
+      const variance = actual - expected;
+      const absV = Math.abs(variance);
+      if (absV > 100) {
+        h.textContent = `⚠️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.abs(variance).toFixed(2)} — ต้องรออนุมัติ`;
+        h.style.color = '#d97706';
+      } else if (absV > 0.009) {
+        h.textContent = `ℹ️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.abs(variance).toFixed(2)} — ต้องระบุเหตุผล`;
+        h.style.color = '#2563eb';
+      } else {
+        h.textContent = '✅ ยอดตรงกัน';
+        h.style.color = '#16a34a';
+      }
+    };
+    if (actualInput) actualInput.addEventListener('input', hint);
+  }
   cashEl('submitCashCount').onclick = async () => {
     const actual = mode === 'open'
       ? Number(cashSession?.drawer_balance ?? cashSession?.opening_expected ?? cashSession?.current_expected_cash ?? 0)
@@ -244,13 +289,21 @@ async function requestCashDeposit() {
 }
 
 function renderCashMovements(items) {
-  cashEl('movementBody').innerHTML = items.length ? items.map(item => `<tr><td>${cashEscape((item.created_at || '').slice(11,16))}</td><td><span class="cash-direction ${item.direction}">${item.direction === 'in' ? 'เข้า' : 'ออก'}</span></td><td>${cashEscape(item.description)}</td><td>${cashEscape(item.recorded_by_name || '-')}</td><td class="text-right" style="color:${item.direction === 'in' ? 'var(--color-success)' : 'var(--color-danger)'}">${item.direction === 'in' ? '+' : '-'}${cashMoney(item.amount)}</td></tr>`).join('') : '<tr><td colspan="5" class="cash-empty">ยังไม่มีรายการเงินสด</td></tr>';
+  cashEl('movementBody').innerHTML = items.length ? items.map(item => {
+    const isBank = String(item.movement_type || '').startsWith('bank_');
+    const dirLabel = isBank ? 'โอนธนาคาร' : (item.direction === 'in' ? 'เข้า' : 'ออก');
+    const dirClass = isBank ? 'bank' : item.direction;
+    return `<tr><td>${cashEscape((item.created_at || '').slice(11,16))}</td><td><span class="cash-direction ${dirClass}">${dirLabel}</span></td><td>${cashEscape(item.description)}</td><td>${cashEscape(item.recorded_by_name || '-')}</td><td class="text-right" style="color:${isBank ? '#1e40af' : (item.direction === 'in' ? 'var(--color-success)' : 'var(--color-danger)')}">${item.direction === 'in' ? '+' : '-'}${cashMoney(item.amount)}</td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="cash-empty">ยังไม่มีรายการเงินสด</td></tr>';
 }
 
 function renderCashDeposits(items) {
+  const statusMap = { pending: ['รออนุมัติ','warning'], approved: ['อนุมัติแล้ว','success'], rejected: ['ปฏิเสธ','danger'] };
   cashEl('depositBody').innerHTML = items.length ? items.map(item => {
     const actions = item.status === 'pending' && canReviewCash() ? `<button class="btn btn-sm btn-success" onclick="reviewDeposit(${item.id},true)">อนุมัติ</button> <button class="btn btn-sm btn-danger" onclick="reviewDeposit(${item.id},false)">ปฏิเสธ</button>` : '';
-    return `<tr><td>${cashEscape(item.requested_at || '-')}</td><td>${cashEscape(item.requested_by_name || '-')}</td><td>${cashEscape(item.source_name)}</td><td>${cashEscape(item.reason)}</td><td class="text-right">${cashMoney(item.amount)}</td><td>${cashEscape(item.status)}</td><td>${actions}</td></tr>`;
+    const [label, cls] = statusMap[item.status] || [item.status, ''];
+    const badge = cls ? `<span class="badge badge-${cls}">${label}</span>` : cashEscape(item.status);
+    return `<tr><td>${cashEscape(item.requested_at || '-')}</td><td>${cashEscape(item.requested_by_name || '-')}</td><td>${cashEscape(item.source_name)}</td><td>${cashEscape(item.reason)}</td><td class="text-right">${cashMoney(item.amount)}</td><td>${badge}</td><td>${actions}</td></tr>`;
   }).join('') : '<tr><td colspan="7" class="cash-empty">ไม่มีคำขอเติมเงินสด</td></tr>';
 }
 

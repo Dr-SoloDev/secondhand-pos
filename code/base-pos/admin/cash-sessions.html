@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>เปิด-ปิดยอด - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css?v=20260815d">
-  <link rel="stylesheet" href="../assets/css/components/cash-sessions.css?v=20260815d">
+  <link rel="stylesheet" href="../assets/css/components/cash-sessions.css?v=20260819b">
 </head>
 <body>
 <div class="app-container">
@@ -50,7 +50,7 @@
       <div id="cashStatusBand" class="cash-status-band"><strong id="cashStatusText">กำลังโหลด...</strong><span id="cashBusinessDate">-</span></div>
       <div class="cash-stats">
         <div class="cash-stat"><div class="cash-stat-label">ยอดเปิดจริง</div><div class="cash-stat-value" id="openingActual">฿0.00</div></div>
-        <div class="cash-stat"><div class="cash-stat-label">เงินเข้า-ออกสุทธิ</div><div class="cash-stat-value" id="ledgerTotal">฿0.00</div></div>
+        <div class="cash-stat"><div class="cash-stat-label" id="ledgerLabel" title="">เงินเข้า-ออกสุทธิ</div><div class="cash-stat-value" id="ledgerTotal">฿0.00</div></div>
         <div class="cash-stat"><div class="cash-stat-label">ยอดตามระบบ</div><div class="cash-stat-value success" id="expectedCash">฿0.00</div></div>
         <div class="cash-stat"><div class="cash-stat-label">ส่วนต่างล่าสุด</div><div class="cash-stat-value" id="latestVariance">฿0.00</div></div>
         <div class="cash-stat cash-position-stat hidden" id="drawerStat"><div class="cash-stat-label">เงินลิ้นชัก (ปัจจุบัน)</div><div class="cash-stat-value" id="drawerBalance">฿0.00</div></div>
@@ -163,6 +163,6 @@
       <div id="notification-container"></div>
 <script src="../assets/js/config.js?v=20260815d"></script>
 <script src="../assets/js/common.js?v=20260815d"></script>
-<script src="../assets/js/cash-sessions.js?v=20260815d"></script>
+<script src="../assets/js/cash-sessions.js?v=20260819b"></script>
 </body>
 </html>
