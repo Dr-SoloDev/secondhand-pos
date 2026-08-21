@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>พิมพ์ใบขาย Lot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: #f0f0f0;
+      font-size: 12px;
+    }
+
+    /* ======== Print Controls (hidden on print) ======== */
+    #printControls {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 100;
+      font-size: 13px;
+    }
+    #printControls button {
+      padding: 6px 18px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    #btnPrint { background: #22c55e; color: #fff; }
+    #btnClose { background: #64748b; color: #fff; }
+    #printControls .ref-no { color: #94a3b8; font-size: 12px; margin-left: 8px; }
+
+    /* ======== Page Wrapper ======== */
+    #pageWrapper {
+      padding: 70px 20px 20px;
+    }
+
+    /* ======== A4 Preview Sheet ======== */
+    .a4-sheet {
+      width: 210mm;
+      min-height: 297mm;
+      background: #fff;
+      margin: 0 auto;
+      padding: 10mm 12mm;
+      display: block;
+      border: 1px solid #ccc;
+    }
+
+    /* ======== Bill Copy ======== */
+    .bill-copy {
+      width: 100%;
+      padding: 0;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 12px;
+    }
+
+    /* ======== Bill Header ======== */
+    .bill-header {
+      border: 2px solid #222;
+      border-radius: 3px;
+      padding: 6px 10px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .bill-header .shop-name {
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .bill-header .store-name {
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .bill-header .store-info,
+    .bill-header .receipt-welcome {
+      font-size: 10.5px;
+      color: #555;
+      line-height: 1.5;
+      margin-top: 2px;
+    }
+    .bill-header .branch-name {
+      font-size: 11px;
+      color: #444;
+      margin-top: 2px;
+    }
+    .bill-header .doc-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin-top: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ======== Bill Meta ======== */
+    .bill-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 6px;
+      color: #333;
+    }
+    .bill-meta .ref-no { font-weight: 700; font-size: 12px; }
+    .bill-meta .status-badge {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .status-draft { background: #fef3c7; color: #92400e; }
+    .status-confirmed { background: #dcfce7; color: #166534; }
+    .status-cancelled { background: #fee2e2; color: #991b1b; }
+
+    .bill-buyer {
+      background: #f7f7f7;
+      border-radius: 3px;
+      padding: 6px 8px;
+      font-size: 11px;
+      margin-bottom: 8px;
+      line-height: 1.7;
+    }
+
+    /* ======== Items Table ======== */
+    .bill-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      margin-bottom: 6px;
+    }
+    .bill-table thead tr {
+      background: #222;
+      color: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .bill-table thead th {
+      padding: 4px 6px;
+      font-weight: 600;
+    }
+    .bill-table tbody td {
+      padding: 4px 6px;
+      border-bottom: 1px solid #eee;
+    }
+    .bill-table .ta-c { text-align: center; }
+    .bill-table .ta-r { text-align: right; }
+
+    /* ======== Summary Boxes ======== */
+    .summary-grid {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .summary-box {
+      flex: 1;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 6px 8px;
+      text-align: center;
+    }
+    .summary-box .label { font-size: 10px; color: #888; }
+    .summary-box .value { font-size: 13px; font-weight: 700; margin-top: 2px; }
+    .summary-box.profit .value { color: #16a34a; }
+    .summary-box.profit.negative .value { color: #dc2626; }
+    .summary-box.cost .value { color: #6b7280; }
+
+    /* ======== Expenses ======== */
+    .expenses-section {
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+    .expenses-section .section-title {
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 4px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 3px;
+    }
+    .expense-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+
+    /* ======== Total Bar ======== */
+    .bill-total {
+      background: #222;
+      color: #fff;
+      border-radius: 3px;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .bill-total .label { font-size: 11px; opacity: .9; }
+    .bill-total .amount { font-size: 15px; font-weight: 800; }
+
+    .bill-total.net { background: #16a34a; }
+    .bill-total.net.negative { background: #dc2626; }
+
+    /* ======== Footer / Signatures ======== */
+    .sig-section {
+      display: flex;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .sig-box {
+      flex: 1;
+      text-align: center;
+    }
+    .sig-line {
+      border-bottom: 1.5px solid #333;
+      height: 32px;
+      margin-bottom: 4px;
+    }
+    .sig-label { font-size: 10px; color: #444; }
+    .sig-name { font-size: 9px; color: #888; margin-top: 2px; }
+
+    .bill-footer {
+      font-size: 10px;
+      text-align: center;
+      color: #666;
+      border-top: 1px dashed #ccc;
+      padding-top: 6px;
+      margin-top: 10px;
+      line-height: 1.8;
+      white-space: pre-line;
+    }
+
+    /* ======== Loading / Error ======== */
+    #loadingState, #errorState {
+      text-align: center;
+      padding: 40px;
+      font-size: 15px;
+      color: #555;
+    }
+    #errorState { color: #c00; }
+
+    /* ======== @media print ======== */
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+
+      body { background: #fff; }
+      #printControls { display: none !important; }
+      #pageWrapper { padding: 0; }
+      #loadingState, #errorState { display: none !important; }
+
+      .a4-sheet {
+        border: none;
+        width: 100%;
+        min-height: auto;
+        padding: 0;
+        display: block;
+      }
+      .bill-copy {
+        width: 100%;
+        padding: 0;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Print Controls Bar -->
+  <div id="printControls">
+    <button id="btnPrint" onclick="window.print()">พิมพ์</button>
+    <button id="btnClose" onclick="window.close()">ปิด</button>
+    <span id="refNoDisplay" class="ref-no"></span>
+  </div>
+
+  <div id="pageWrapper">
+    <div id="loadingState">กำลังโหลดข้อมูล...</div>
+    <div id="errorState" style="display:none"></div>
+
+    <div class="a4-sheet" id="billSheet" style="display:none">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <script src="../assets/js/config.js?v=20260815d"></script>
+  <script>
+    function fmtCurrency(v) {
+      const n = parseFloat(v) || 0;
+      return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fmtDate(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      if (isNaN(d)) return s;
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = d.getFullYear() + 543;
+      return `${dd}/${mm}/${yy}`;
+    }
+
+    function fmtDateTime(s) {
+      if (!s) return '-';
+      const d = new Date(s);
+      if (isNaN(d)) return s;
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = d.getFullYear() + 543;
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${dd}/${mm}/${yy} ${hh}:${mi}`;
+    }
+
+    function esc(s) {
+      if (s === null || s === undefined) return '';
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escLines(s) {
+      return esc(s).replace(/\r?\n/g, '<br>');
+    }
+
+    function statusLabel(status) {
+      const map = { draft: 'แบบร่าง', confirmed: 'ยืนยันแล้ว', cancelled: 'ยกเลิก' };
+      return map[status] || status || 'แบบร่าง';
+    }
+
+    function statusClass(status) {
+      const map = { draft: 'status-draft', confirmed: 'status-confirmed', cancelled: 'status-cancelled' };
+      return map[status] || 'status-draft';
+    }
+
+    function buildSaleLotCopy(lot, shop) {
+      const saleDate = fmtDate(lot.sale_date);
+      const createdAt = fmtDateTime(lot.created_at);
+      const branchLabel = [lot.branch_name || shop.branch_name, lot.branch_code ? `สาขา ${lot.branch_code}` : ''].filter(Boolean).join(' · ') || shop.shop_name || '';
+      const shopName = shop.shop_name || lot.shop_name || 'รักษ์สะอาดรีไซเคิล';
+      const shopAddress = shop.shop_address || lot.shop_address || '';
+      const taxId = shop.tax_id || lot.tax_id || '';
+      const shopPhone = shop.shop_phone || shop.branch_phone || lot.shop_phone || '';
+      const welcomeMessage = shop.receipt_welcome_message || '';
+      const receiptFooter = shop.receipt_footer || 'ขอบคุณที่ใช้บริการ';
+
+      const storeInfoRows = [
+        shopAddress,
+        [
+          taxId ? `เลขประจำตัวผู้เสียภาษี ${taxId}` : '',
+          shopPhone ? `โทร ${shopPhone}` : ''
+        ].filter(Boolean).join(' · ')
+      ].filter(Boolean).map(line => `<div class="store-info">${escLines(line)}</div>`).join('');
+
+      const transport = parseFloat(lot.transport_cost || 0);
+      const lotExpenses = lot.expenses || [];
+      const otherExpenses = lotExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+      const totalExpenses = lot.profit_breakdown?.total_expenses ?? (otherExpenses + transport);
+      const totalAmount = parseFloat(lot.total_amount || 0);
+      const totalCost = parseFloat(lot.total_cost || 0);
+      const profit = totalAmount - totalCost;
+      const netProfit = lot.profit_breakdown?.net_profit ?? (profit - totalExpenses);
+      const marginPct = totalAmount > 0 ? ((profit / totalAmount) * 100).toFixed(1) : '0.0';
+      const actualRevenue = lot.actual_revenue != null ? parseFloat(lot.actual_revenue) : null;
+
+      const itemRows = (lot.items || []).map((it, i) => {
+        const qty = parseFloat(it.quantity_kg ?? it.quantity ?? 0);
+        const price = parseFloat(it.unit_price || 0);
+        const subtotal = parseFloat(it.subtotal ?? (qty * price));
+        const fifoCost = parseFloat(it.fifo_cost || 0);
+        const bg = i % 2 === 0 ? '#fff' : '#f9f9f9';
+        return `<tr style="background:${bg}">
+          <td>${esc(it.item_name || it.category_name || '-')}</td>
+          <td class="ta-c">${qty.toFixed(2)}</td>
+          <td class="ta-r">${fmtCurrency(price)}</td>
+          <td class="ta-r" style="font-weight:600">${fmtCurrency(subtotal)}</td>
+          <td class="ta-r" style="color:#6b7280">${fmtCurrency(fifoCost)}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;padding:8px">ไม่มีรายการสินค้า</td></tr>';
+
+      const expensesHtml = lotExpenses.length > 0 ? lotExpenses.map(e => `
+        <div class="expense-row">
+          <span>${esc(e.description)}</span>
+          <span>${fmtCurrency(e.amount)}</span>
+        </div>
+      `).join('') : '<div style="color:#999;text-align:center;padding:4px">ไม่มีค่าใช้จ่ายอื่น</div>';
+
+      const revenueHtml = actualRevenue != null ? `
+        <div class="summary-grid" style="margin-top:8px">
+          <div class="summary-box" style="background:#f0fdf4;border-color:#bbf7d0">
+            <div class="label">รายรับจริง (บิลโรงงาน)</div>
+            <div class="value" style="color:#16a34a">฿ ${fmtCurrency(actualRevenue)}</div>
+            <div style="font-size:10px;color:#6b7280;margin-top:2px">${lot.revenue_payment_method === 'cash' ? 'เงินสดเข้าลิ้นชัก' : 'โอนเข้าบัญชี'}${lot.actual_revenue_date ? ` · ${fmtDate(lot.actual_revenue_date)}` : ''}</div>
+            ${lot.actual_revenue_note ? `<div style="font-size:10px;color:#6b7280">${esc(lot.actual_revenue_note)}</div>` : ''}
+          </div>
+        </div>
+      ` : '';
+
+      const profitClass = profit >= 0 ? 'profit' : 'profit negative';
+      const netClass = netProfit >= 0 ? 'net' : 'net negative';
+
+      return `
+        <div class="bill-header">
+          <div class="store-name">${esc(shopName)}</div>
+          ${storeInfoRows}
+          ${welcomeMessage ? `<div class="receipt-welcome">${escLines(welcomeMessage)}</div>` : ''}
+          <div class="doc-title">ใบขาย Lot</div>
+          <div class="branch-name">${esc(branchLabel)}</div>
+        </div>
+
+        <div class="bill-meta">
+          <span>เลขที่ <span class="ref-no">${esc(lot.reference_no || `SL-${lot.id}`)}</span></span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span>${esc(saleDate)}</span>
+            <span class="status-badge ${statusClass(lot.status)}">${esc(statusLabel(lot.status))}</span>
+          </span>
+        </div>
+
+        <div class="bill-buyer">
+          <div>ผู้ซื้อ &nbsp;<strong>${esc(lot.buyer_name || '-')}</strong></div>
+          <div style="color:#555;font-size:10px">พนักงาน &nbsp;${esc(lot.created_by_name || '-')}${lot.updated_by_name ? ` · แก้ไขโดย ${esc(lot.updated_by_name)}` : ''} &nbsp;·&nbsp; สร้างเมื่อ ${esc(createdAt)}</div>
+          ${lot.notes ? `<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #ddd">หมายเหตุ: ${esc(lot.notes)}</div>` : ''}
+        </div>
+
+        <table class="bill-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">สินค้า</th>
+              <th class="ta-c">น้ำหนัก (กก.)</th>
+              <th class="ta-r">ราคา/กก.</th>
+              <th class="ta-r">ยอดขาย</th>
+              <th class="ta-r">ต้นทุน</th>
+            </tr>
+          </thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+
+        <div class="summary-grid">
+          <div class="summary-box">
+            <div class="label">ยอดขายรวม</div>
+            <div class="value">฿ ${fmtCurrency(totalAmount)}</div>
+          </div>
+          <div class="summary-box cost">
+            <div class="label">ต้นทุนรวม</div>
+            <div class="value">฿ ${fmtCurrency(totalCost)}</div>
+          </div>
+          <div class="summary-box ${profitClass}">
+            <div class="label">กำไรขั้นต้น (${marginPct}%)</div>
+            <div class="value">${profit >= 0 ? '+' : ''}฿ ${fmtCurrency(profit)}</div>
+          </div>
+        </div>
+
+        <div class="expenses-section">
+          <div class="section-title">ค่าใช้จ่าย</div>
+          ${transport > 0 ? `
+          <div class="expense-row">
+            <span>🚛 ค่าขนส่ง</span>
+            <span>${fmtCurrency(transport)}</span>
+          </div>` : ''}
+          ${expensesHtml}
+          <div class="expense-row" style="border-top:1px solid #e5e7eb;margin-top:4px;padding-top:4px;font-weight:700">
+            <span>รวมค่าใช้จ่าย</span>
+            <span style="color:#dc2626">- ฿ ${fmtCurrency(totalExpenses)}</span>
+          </div>
+        </div>
+
+        <div class="bill-total ${netClass}">
+          <span class="label">กำไรสุทธิ</span>
+          <span class="amount">${netProfit >= 0 ? '+' : ''}฿ ${fmtCurrency(netProfit)}</span>
+        </div>
+
+        ${revenueHtml}
+
+        <div class="sig-section">
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <div class="sig-label">ผู้ขาย / ผู้ซื้อ</div>
+            <div class="sig-name">วันที่ ____/____/______</div>
+          </div>
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <div class="sig-label">พนักงานขาย</div>
+            <div class="sig-name">${esc(lot.created_by_name || '')}</div>
+          </div>
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <div class="sig-label">ผู้รับเงิน / ผู้จัดการ</div>
+            <div class="sig-name"></div>
+          </div>
+        </div>
+
+        <div class="bill-footer">
+          ${shopPhone ? `ติดต่อ ${esc(shopPhone)}<br>` : ''}
+          <span style="font-size:9px">${escLines(receiptFooter)}</span>
+        </div>
+      `;
+    }
+
+    async function loadAndRender() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (!id) {
+        showError('ไม่พบข้อมูล Lot ขาย กรุณาปิดและเปิดใหม่');
+        return;
+      }
+
+      try {
+        const [lotRes, shopRes] = await Promise.all([
+          fetch(`${window.apiPath}/sale-lots/sale-lot?id=${encodeURIComponent(id)}`, { credentials: 'include' }),
+          fetch(`${window.apiPath}/settings/store`, { credentials: 'include' }).catch(() => null)
+        ]);
+
+        if (lotRes.status === 401) { window.location.href = '../index.html'; return; }
+        const lotData = await lotRes.json();
+        if (!lotRes.ok || lotData.status !== 'success') {
+          showError(lotData.message || 'โหลดข้อมูล Lot ไม่สำเร็จ');
+          return;
+        }
+
+        let shop = {};
+        if (shopRes && shopRes.ok) {
+          try {
+            const shopData = await shopRes.json();
+            if (shopData.status === 'success' && shopData.data) {
+              shop = shopData.data;
+            }
+          } catch (e) {}
+        }
+
+        render(lotData.data, shop);
+      } catch (e) {
+        showError('ไม่สามารถโหลดข้อมูล Lot ได้ กรุณาปิดและเปิดใหม่');
+      }
+    }
+
+    function render(lot, shop) {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('refNoDisplay').textContent = `เลขที่: ${lot.reference_no || `SL-${lot.id}`}`;
+      document.title = `ใบขาย Lot ${lot.reference_no || lot.id}`;
+
+      const copyHtml = buildSaleLotCopy(lot, shop);
+      const sheet = document.getElementById('billSheet');
+      sheet.innerHTML = `<div class="bill-copy">${copyHtml}</div>`;
+      sheet.style.display = 'block';
+
+      if (new URLSearchParams(window.location.search).get('auto') === '1') {
+        document.fonts.ready.then(() => window.print());
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loadingState').style.display = 'none';
+      const el = document.getElementById('errorState');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    loadAndRender();
+  </script>
+</body>
+</html>

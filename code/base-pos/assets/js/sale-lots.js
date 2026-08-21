@@ -573,7 +573,17 @@ function openConfirmDialog(title, message, callback) {
   document.getElementById('confirmModal').classList.add('show');
 }
 
+let currentViewLotId = null;
+
+function printCurrentLot() {
+  if (!currentViewLotId) return;
+  window.open(`print-sale-lot.html?id=${encodeURIComponent(currentViewLotId)}&auto=1`, '_blank');
+}
+
 async function viewLot(id) {
+  currentViewLotId = id;
+  const printBtn = document.getElementById('printLotBtn');
+  if (printBtn) printBtn.style.display = 'none';
   const res = await apiRequest(`sale-lots/sale-lot?id=${id}`);
   if (res.status !== 'success') return;
   const lot = res.data;
@@ -661,6 +671,7 @@ async function viewLot(id) {
   `;
   document.getElementById('viewLotContent').innerHTML = html;
   document.getElementById('viewLotModal').classList.add('show');
+  if (printBtn) printBtn.style.display = '';
 }
 
 // ---- บันทึกรายรับจริงจากบิลศูนย์ ----
