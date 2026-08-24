@@ -1,7 +1,9 @@
 # 🤖 Agent Memory — Scrap POS
-**Last updated:** 18 สิงหาคม 2569 (WF-06 v2.1 **DEPLOYED ถึงร้านแล้ว** — clean start baseline 0 + migration 071 + verify ผ่าน)
-**Status:** ทำงานตาม **`docs/WORK-PLAN-2026-08-18.md`** — main `925853e` deployed ถึงร้าน (SSH `ragsaaad_v1@100.91.242.99` — username 2 a! WORK-PLAN เขียน 3 a ผิด); production อยู่บน v2.1 (cash_model_version=2, baseline 0 ทั้ง 4 สาขา 18 ส.ค. 69)
-**งานค้างที่สำคัญ:** (1) ร้านใช้จริง 12-18 ส.ค. (PO=11/sellers=5/lots=5/users=3) — **ตัวเลข cash เก่าถูกล้างตาม clean start ที่ Owner อนุมัติ** — backup อยู่ที่ร้าน `~/secondhand-pos/backups/backup-20260818-pre-v21.sql` (222K) + backup-20260815-pre-v2.sql (3.9M) (2) ~~ไฟล์ร้านแก้เอง M/??~~ **committed แล้ว (0b29c3c)** — repo = สิ่งที่ร้านใช้ 100% — ครั้งหน้า deploy pull ได้ clean — งาน thermal ยังค้าง (รอทดสอบพิมพ์ ES-8804) (3) cash sandbox 8082: ต้องใช้ `docker compose -p cash-sandbox -f docker-compose.cash-sandbox.yml` **เสมอ** (ทั้ง up/down — กติกา #6) — volume ถูก = `cash-sandbox_cash_db_data` (4) Track A print server: เจอ printer POS-80 USB บนร้าน (lpadmin ตั้งแล้ว ตอนนั้น) — รอ Owner เรียกต่อ (5) sandbox หลัก 8081 ยัง Exited
+**Last updated:** 22 สิงหาคม 2569 — **MVP เปิด-ปิดยอด (Excel Mode) + พิมพ์ A4 Lot + ถ่ายรูป auto-capture — DEPLOYED ถึงร้านแล้ว**
+**Status:** main `8032597` == shop `8032597` sync 100% (pull clean) — v2.1 + Enter `8f96bfe` + thermal `0b29c3c` + พิมพ์ Lot `e7b1b75` + Plan B `50e0d0a` + ถ่ายรูป `f149df1` + MVP `18ea028` + footer `8032597`; SSH `ragsaaad_v1@100.91.242.99` 2 a; `pos.mkxmeme.xyz` 200; cash_model_version=2 baseline 0 ทั้ง 4 สาขา
+**ควรจำ:** MVP ซ่อนด้วย `MVP_SIMPLE=true` + `body.mvp-simple` (ซ่อน 3 กระเป๋า/4 ประเภท/2 ตาราง/เอกสาร) — ถอด flag ออกคือกลับมาครบ ไม่ต้อง migration — Deploy ยัง pull clean — cash sandbox 8082 ต้อง `-f cash-sandbox.yml` เสมอ — Thermal ยังไม่พิมพ์จริง (TEST-OK ค้าง)
+**ควรปรับ:** หลังร้านซ้อม MVP 3 วัน เก็บ feedback 1) เปิดเช้าเข้าใจไหม 2) เติมเงินพอไหม 3) ปิดเย็นงงไหม — ค่อยเปิด 4 ประเภท/สำรอง/รวมคืนทีละขั้น — คู่มือ 1 หน้า A4 ยังไม่ได้ทำ (วางข้างลิ้นชัก)
+**ควรบันทึก:** PO ทดสอบ `PO-B1-20260822-001 id=26` 3 รูป, sellers `7,9` มีรูป — sandbox `scrap-pos-web` ยังเปิด — backup ก่อน MVP ยังไม่ได้ทำ (แต่ pull clean ไม่เสี่ยง) — Security TODO (admin/admin, token) + Thermal ES-8804 ยังค้าง
 
 ---
 
