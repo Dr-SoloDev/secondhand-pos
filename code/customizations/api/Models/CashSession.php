@@ -632,35 +632,38 @@ class CashSession extends Model
                 $description, $userId, 'cash_deposit_request'
             );
         }
-        // owner_capital: แยก base (ทุนเดิม) กับ excess (เพิ่มทุน — นับรายรับ)
+        // owner_capital: แยก base (เงินเดิมในระบบ — ดึงจากเซฟ/ลิ้นชัก) กับ excess (เงินใหม่ — นับรายรับเพิ่มทุน)
+        // สำคัญ: base ต้องหักออกจากเงินเดิมในระบบด้วย (เซฟก่อน) ไม่งั้นนับเงินซ้ำ 2 ที่
         $excess = max(0.0, round($excess, 2));
         $base = max(0.0, round($amount, 2) - $excess);
-        if ($base > 0 && $excess > 0) {
-            // 2 movements แยกประเภท — ยอดรวม +amount เท่าเดิม (เข้า drawer ทั้งคู่)
-            $this->insertPositionMovement(
-                (int)$session['id'], $branchId, 'in', 'increase', $base,
-                'external', 'drawer', 'owner_capital_base', $referenceId,
+        $lastId = 0;
+        // ส่วน base: ดึงจากเงินเดิมในระบบ — เซฟ (reserve) ก่อน → บันทึกเป็น transfer (ย้ายจากเซฟมาลิ้นชัก)
+        $fromReserve = min(round($positions['reserve_balance'] ?? 0, 2), $base);
+        if ($fromReserve > 0) {
+            $lastId = $this->insertPositionMovement(
+                (int)$session['id'], $branchId, 'in', 'transfer', $fromReserve,
+                'business_reserve', 'drawer', 'owner_capital_base', $referenceId,
+                $description . ' (จากเงินเดิมในเซฟ)', $userId, 'cash_deposit_request', 0
+            );
+        }
+        // base ส่วนที่เหลือ (มาจากนอกระบบแต่ไม่เกินทุนเดิม — เช่น เติมทดแทนที่ใช้ไปกับรับซื้อ) → increase แต่ไม่นับรายรับ
+        $baseExternal = $base - $fromReserve;
+        if ($baseExternal > 0) {
+            $lastId = $this->insertPositionMovement(
+                (int)$session['id'], $branchId, 'in', 'increase', $baseExternal,
+                'external', 'drawer', 'owner_capital_base_ext', $referenceId,
                 $description . ' (ทุนเดิม)', $userId, 'cash_deposit_request', 0
             );
-            return $this->insertPositionMovement(
-                (int)$session['id'], $branchId, 'in', 'increase', $excess,
-                'external', 'drawer', 'owner_capital_excess', $referenceId,
-                $description . ' (เพิ่มทุน)', $userId, 'cash_deposit_request', $excess
-            );
         }
+        // ส่วน excess: เงินใหม่จริง → นับรายรับเพิ่มทุน
         if ($excess > 0) {
-            return $this->insertPositionMovement(
+            $lastId = $this->insertPositionMovement(
                 (int)$session['id'], $branchId, 'in', 'increase', $excess,
                 'external', 'drawer', 'owner_capital_excess', $referenceId,
                 $description . ' (เพิ่มทุน)', $userId, 'cash_deposit_request', $excess
             );
         }
-        // base only (ไม่เกินทุนเดิม)
-        return $this->insertPositionMovement(
-            (int)$session['id'], $branchId, 'in', 'increase', $base > 0 ? $base : round($amount, 2),
-            'external', 'drawer', 'owner_capital_base', $referenceId,
-            $description . ' (ทุนเดิม)', $userId, 'cash_deposit_request', 0
-        );
+        return $lastId;
     }
 
     private function openPositionDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
