@@ -348,7 +348,7 @@ async function requestCashDeposit() {
   let source = cashEl('depositSource').value.trim();
   let reason = cashEl('depositReason').value.trim();
   if (MVP_SIMPLE) {
-    sourceType = 'reserve_transfer';
+    sourceType = 'owner_capital';
     source = reason || 'เติมเงิน';
     if (!(amount > 0) || !reason) return showNotification('กรุณากรอกจำนวนเงินและเหตุผล', 'error');
     reason = reason || 'เติมเงินระหว่างวัน';
