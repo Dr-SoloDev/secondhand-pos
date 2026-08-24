@@ -104,6 +104,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('submitPOCancellationBtn').addEventListener('click', submitPOCancellation);
   document.getElementById('approvePOCancellationBtn').addEventListener('click', () => submitPOCancellationReview('approve'));
   document.getElementById('rejectPOCancellationBtn').addEventListener('click', () => submitPOCancellationReview('reject'));
+  document.getElementById('branchSelect').addEventListener('change', () => {
+    loadRecentPOs();
+    loadPOCancellationRequests();
+  });
 
   // IMP-6: Keyboard shortcut Ctrl+Enter = บันทึกใบรับซื้อ
   document.addEventListener('keydown', function(e) {
@@ -903,7 +907,9 @@ function clearAll() {
 async function loadRecentPOs() {
   const tbody = document.querySelector('#recentPOTable tbody');
   showTableLoading(tbody, 8, 4);
-  const res = await apiRequest('purchase-orders?limit=10');
+  const branchId = document.getElementById('branchSelect')?.value;
+  const qs = branchId ? `?limit=10&branch_id=${encodeURIComponent(branchId)}` : `?limit=10`;
+  const res = await apiRequest(`purchase-orders${qs}`);
   if (res.status !== 'success') {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888">โหลดใบรับซื้อล่าสุดไม่สำเร็จ</td></tr>';
     return;
@@ -1004,7 +1010,9 @@ async function loadPOCancellationRequests() {
   queue.classList.remove('hidden');
   const tbody = document.querySelector('#poCancellationTable tbody');
   showTableLoading(tbody, 7, 4);
-  const response = await apiRequest('purchase-orders/cancellation-requests?status=pending', 'GET');
+  const branchId = document.getElementById('branchSelect')?.value;
+  const qs = branchId ? `?status=pending&branch_id=${encodeURIComponent(branchId)}` : `?status=pending`;
+  const response = await apiRequest(`purchase-orders/cancellation-requests${qs}`, 'GET');
   if (response.status !== 'success') {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">โหลดคำขอไม่สำเร็จ</td></tr>';
     return;
