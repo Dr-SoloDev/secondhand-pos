@@ -100,6 +100,27 @@ class FinancialController extends Controller
             $params['month_raw']
         );
 
+        // รายรับเพิ่มทุน — ส่วนเกิน owner_capital ที่เกินทุนเดิม (excess)
+        $dateFilterCM = "";
+        $bindingsCM = [];
+        if (!empty($params['date_from_raw']) && !empty($params['date_to_raw'])) {
+            $dateFilterCM = "business_date BETWEEN ? AND ?";
+            $bindingsCM = [$params['date_from_raw'], $params['date_to_raw']];
+        } elseif (($params['period_raw'] ?? 'month') === 'month') {
+            $dateFilterCM = "YEAR(business_date)=? AND MONTH(business_date)=?";
+            $bindingsCM = [$params['year_raw'], $params['month_raw']];
+        } else {
+            $dateFilterCM = "YEAR(business_date)=?";
+            $bindingsCM = [$params['year_raw']];
+        }
+        $branchFilterCM = !empty($params['branch_id_raw']) ? "AND branch_id=?" : "";
+        if (!empty($params['branch_id_raw'])) $bindingsCM[] = $params['branch_id_raw'];
+        $capitalRow = $db->fetch(
+            "SELECT COALESCE(SUM(excess_amount),0) AS total FROM cash_movements WHERE movement_type='owner_capital_excess' AND $dateFilterCM $branchFilterCM",
+            $bindingsCM
+        );
+        $totalCapitalIncrease = floatval($capitalRow['total'] ?? 0);
+
         $totalTransport  = floatval($lotExpRow['total_transport'] ?? 0);
         $totalLotExpenses = floatval($lotExpRow['total_lot_expenses'] ?? 0);
         $totalLotExpenses += $totalTransport;
@@ -112,6 +133,7 @@ class FinancialController extends Controller
             'total_expenses'    => $totalLotExpenses,
             'total_lot_expenses'=> $totalLotExpenses,
             'total_biz_expenses'=> floatval($bizExpenses),
+            'total_capital_increase' => $totalCapitalIncrease,
             'filters'           => [
                 'period'   => $params['period_raw'],
                 'year'     => $params['year_raw'],

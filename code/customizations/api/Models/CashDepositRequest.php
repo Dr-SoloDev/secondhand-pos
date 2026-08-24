@@ -75,18 +75,27 @@ class CashDepositRequest extends Model
             }
             $cashSession = new CashSession();
             $sourceType = (string)($request['source_type'] ?? '');
+            $amount = (float)$request['amount'];
+            $excess = 0.0;
+            if ($sourceType === 'owner_capital' && $cashSession->hasPositionModel((int)$request['branch_id'])) {
+                $balances = $cashSession->getPositionBalances((int)$request['branch_id']);
+                $existing = (float)($balances['drawer_balance'] ?? 0) + (float)($balances['reserve_balance'] ?? 0) + (float)($balances['bank_balance'] ?? 0);
+                $excess = max(0.0, round($amount, 2) - round($existing, 2));
+                // บันทึก excess ไว้ก่อน (สำหรับรายงาน)
+                $this->db->query("UPDATE cash_deposit_requests SET excess_amount=? WHERE id=?", [round($excess, 2), (int)$id]);
+            }
             if (in_array($sourceType, ['drawer_to_reserve', 'drawer_to_owner'], true)) {
                 $cashSession->transferDrawerOut(
-                    (int)$request['branch_id'], (float)$request['amount'],
+                    (int)$request['branch_id'], $amount,
                     $sourceType === 'drawer_to_reserve' ? 'business_reserve' : 'external',
                     'นำเงินออกจากลิ้นชัก: ' . $request['source_name'] . ': ' . $request['reason'],
                     $approverId, (int)$id, 'cash_deposit_request'
                 );
             } else {
                 $cashSession->fundDrawer(
-                    (int)$request['branch_id'], (float)$request['amount'],
+                    (int)$request['branch_id'], $amount,
                     $sourceType, $id,
-                    'นำเงินเข้าลิ้นชักจาก ' . $request['source_name'] . ': ' . $request['reason'], $approverId
+                    'นำเงินเข้าลิ้นชักจาก ' . $request['source_name'] . ': ' . $request['reason'], $approverId, $excess
                 );
             }
             $this->db->query(

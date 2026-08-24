@@ -419,6 +419,7 @@ function normalizeSummaryData(data, range) {
   const totalLots = parseInt(data.total_lots || 0, 10);
   const totalExpenses = parseFloat(data.total_expenses || 0);
   const totalBizExpenses = parseFloat(data.total_biz_expenses || 0);
+  const totalCapitalIncrease = parseFloat(data.total_capital_increase || 0);
   const netProfit = totalRevenue - totalPurchase - totalExpenses - totalBizExpenses;
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
@@ -430,6 +431,7 @@ function normalizeSummaryData(data, range) {
     totalLots,
     totalExpenses,
     totalBizExpenses,
+    totalCapitalIncrease,
     netProfit,
     margin,
   };
@@ -447,6 +449,12 @@ function renderBranchSummary(summary) {
   profitValue.textContent = `${summary.netProfit >= 0 ? '+' : ''}${formatCurrency(summary.netProfit)}`;
   profitValue.className = `report-kpi-value ${summary.netProfit >= 0 ? 'report-kpi-income' : 'report-kpi-expense'}`;
   document.getElementById('summaryMargin').textContent = `margin ${summary.margin.toFixed(1)}%`;
+  const capEl = document.getElementById('summaryCapitalIncrease');
+  const capKpi = document.getElementById('capitalIncreaseKpi');
+  if (capEl && capKpi) {
+    capEl.textContent = formatCurrency(summary.totalCapitalIncrease || 0);
+    capKpi.style.display = (summary.totalCapitalIncrease || 0) > 0 ? '' : 'none';
+  }
 
   const rows = [
     ['ยอดรับซื้อของ', formatCurrency(summary.totalPurchase)],
@@ -456,6 +464,9 @@ function renderBranchSummary(summary) {
     ['ค่าใช้จ่ายประจำสาขา', formatCurrency(summary.totalBizExpenses)],
     ['กำไรสุทธิ', `${summary.netProfit >= 0 ? '+' : ''}${formatCurrency(summary.netProfit)}`],
   ];
+  if ((summary.totalCapitalIncrease || 0) > 0) {
+    rows.push(['เพิ่มทุน (Owner)', formatCurrency(summary.totalCapitalIncrease)]);
+  }
 
   renderTableBody('summaryBreakdownBody', rows.map(([label, value]) => `
     <tr>

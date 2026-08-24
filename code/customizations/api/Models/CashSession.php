@@ -609,7 +609,7 @@ class CashSession extends Model
     }
 
     public function fundDrawer(int $branchId, float $amount, string $sourceType,
-        int $referenceId, string $description, int $userId): int
+        int $referenceId, string $description, int $userId, float $excess = 0.0): int
     {
         if (!$this->hasPositionModel($branchId)) {
             return $this->recordMovement(
@@ -632,10 +632,34 @@ class CashSession extends Model
                 $description, $userId, 'cash_deposit_request'
             );
         }
+        // owner_capital: แยก base (ทุนเดิม) กับ excess (เพิ่มทุน — นับรายรับ)
+        $excess = max(0.0, round($excess, 2));
+        $base = max(0.0, round($amount, 2) - $excess);
+        if ($base > 0 && $excess > 0) {
+            // 2 movements แยกประเภท — ยอดรวม +amount เท่าเดิม (เข้า drawer ทั้งคู่)
+            $this->insertPositionMovement(
+                (int)$session['id'], $branchId, 'in', 'increase', $base,
+                'external', 'drawer', 'owner_capital_base', $referenceId,
+                $description . ' (ทุนเดิม)', $userId, 'cash_deposit_request', 0
+            );
+            return $this->insertPositionMovement(
+                (int)$session['id'], $branchId, 'in', 'increase', $excess,
+                'external', 'drawer', 'owner_capital_excess', $referenceId,
+                $description . ' (เพิ่มทุน)', $userId, 'cash_deposit_request', $excess
+            );
+        }
+        if ($excess > 0) {
+            return $this->insertPositionMovement(
+                (int)$session['id'], $branchId, 'in', 'increase', $excess,
+                'external', 'drawer', 'owner_capital_excess', $referenceId,
+                $description . ' (เพิ่มทุน)', $userId, 'cash_deposit_request', $excess
+            );
+        }
+        // base only (ไม่เกินทุนเดิม)
         return $this->insertPositionMovement(
-            (int)$session['id'], $branchId, 'in', 'increase', $amount,
-            'external', 'drawer', 'owner_capital_injection', $referenceId,
-            $description, $userId, 'cash_deposit_request'
+            (int)$session['id'], $branchId, 'in', 'increase', $base > 0 ? $base : round($amount, 2),
+            'external', 'drawer', 'owner_capital_base', $referenceId,
+            $description . ' (ทุนเดิม)', $userId, 'cash_deposit_request', 0
         );
     }
 
@@ -787,7 +811,7 @@ class CashSession extends Model
 
     private function insertPositionMovement(int $sessionId, int $branchId, string $direction, string $effect,
         float $amount, string $source, string $destination, string $type, int $referenceId,
-        string $description, int $userId, string $referenceType = 'cash_position'): int
+        string $description, int $userId, string $referenceType = 'cash_position', float $excess = 0.0): int
     {
         if ($amount <= 0) return 0;
         $existing = $this->db->fetchColumn(
@@ -798,12 +822,12 @@ class CashSession extends Model
         $stmt = $this->db->prepare(
             "INSERT INTO cash_movements
              (cash_session_id,branch_id,direction,source_location,destination_location,balance_effect,
-                business_date,amount,movement_type,reference_type,reference_id,description,recorded_by)
-             VALUES (?,?,?,?,?,?,CURDATE(),?,?,?,?,?,?)"
+                business_date,amount,excess_amount,movement_type,reference_type,reference_id,description,recorded_by)
+             VALUES (?,?,?,?,?,?,CURDATE(),?,?,?,?,?,?,?)"
         );
         $this->db->execute($stmt, [
             $sessionId, $branchId, $direction, $source, $destination, $effect,
-            round($amount, 2), substr($type, 0, 40), substr($referenceType, 0, 40),
+            round($amount, 2), round($excess, 2), substr($type, 0, 50), substr($referenceType, 0, 40),
             $referenceId, substr(trim($description), 0, 500), $userId,
         ]);
         return (int)$this->db->lastInsertId();
