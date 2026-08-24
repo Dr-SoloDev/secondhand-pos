@@ -23,6 +23,22 @@
 .cash-direction.in { color:#047857; background:#d1fae5; }
 .cash-direction.out { color:#b91c1c; background:#fee2e2; }
 .cash-direction.bank { color:#1e40af; background:#dbeafe; }
+
+/* === MVP SIMPLE MODE — ซ่อนบัญชี ซ่อน 3 กระเป๋า เหลือลิ้นชักเดียว === */
+body.mvp-simple .cash-stat:not(#drawerStat) { display:none !important; }
+body.mvp-simple #drawerStat { display:block !important; grid-column:1/-1; text-align:center; padding:20px; }
+body.mvp-simple #drawerStat .cash-stat-label { font-size:14px; }
+body.mvp-simple #drawerStat .cash-stat-value { font-size:36px; }
+body.mvp-simple .cash-position-stat { display:none !important; }
+body.mvp-simple #drawerStat { display:block !important; }
+body.mvp-simple #adjustmentSection,
+body.mvp-simple #adjustmentHistorySection,
+body.mvp-simple #initPositionBtn { display:none !important; }
+body.mvp-simple .mvp-hide { display:none !important; }
+body.mvp-simple .cash-work-grid { grid-template-columns:1fr; max-width:600px; margin:0 auto; }
+body.mvp-simple .cash-table-section.mvp-hide-table { display:none !important; }
+.mvp-banner { display:none; background:#fef3c7; border:1px solid #fcd34d; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:13px; text-align:center; }
+body.mvp-simple .mvp-banner { display:block; }
 .cash-empty { padding:24px; text-align:center; color:var(--color-text-light); }
 .cash-adjustment-layout { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(240px,.7fr); gap:20px; align-items:start; }
 .cash-adjustment-fields { margin:12px 0; }

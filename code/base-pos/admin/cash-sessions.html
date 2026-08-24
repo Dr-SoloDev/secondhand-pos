@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>เปิด-ปิดยอด - รักษ์สะอาดรีไซเคิล</title>
   <link rel="stylesheet" href="../assets/css/main.css?v=20260815d">
-  <link rel="stylesheet" href="../assets/css/components/cash-sessions.css?v=20260819b">
+  <link rel="stylesheet" href="../assets/css/components/cash-sessions.css?v=20260822b">
 </head>
 <body>
 <div class="app-container">
@@ -47,8 +47,8 @@
         <button type="button" class="btn btn-secondary" id="refreshCashBtn" title="รีเฟรช"><i class="icon-refresh"></i> รีเฟรช</button>
       </div>
 
-      <div id="cashStatusBand" class="cash-status-band"><strong id="cashStatusText">กำลังโหลด...</strong><span id="cashBusinessDate">-</span></div>
-      <div class="cash-stats">
+       <div id="cashStatusBand" class="cash-status-band"><strong id="cashStatusText">กำลังโหลด...</strong><span id="cashBusinessDate">-</span></div>
+       <div class="cash-stats">
         <div class="cash-stat"><div class="cash-stat-label">ยอดเปิดจริง</div><div class="cash-stat-value" id="openingActual">฿0.00</div></div>
         <div class="cash-stat"><div class="cash-stat-label" id="ledgerLabel" title="">เงินเข้า-ออกสุทธิ</div><div class="cash-stat-value" id="ledgerTotal">฿0.00</div></div>
         <div class="cash-stat"><div class="cash-stat-label">ยอดตามระบบ</div><div class="cash-stat-value success" id="expectedCash">฿0.00</div></div>
@@ -58,38 +58,47 @@
         <div class="cash-stat cash-position-stat hidden" id="totalStat"><div class="cash-stat-label">เงินรวมกิจการ</div><div class="cash-stat-value" id="businessTotalCash">฿0.00</div></div>
       </div>
 
-      <div class="cash-work-grid">
-        <section class="card">
-          <div class="card-header"><h2 class="card-title" id="sessionActionTitle">รอบประจำวัน</h2><button type="button" class="btn btn-secondary hidden" id="initPositionBtn" title="ตั้งยอดเริ่มต้น drawer/สำรอง ของสาขานี้ (ครั้งเดียว)"><i class="icon-cog"></i> ตั้งยอดเริ่มต้น</button></div>
-          <div class="card-body" id="sessionActionBody"></div>
-        </section>
-        <section class="card">
-          <div class="card-header"><h2 class="card-title">นำเงินเข้าลิ้นชัก</h2></div>
-          <div class="card-body">
-            <div class="cash-form-grid">
-              <div><label for="depositSourceType">ประเภทเงิน</label><select id="depositSourceType" class="form-control"><option value="reserve_transfer">เงินสำรองเดิมของกิจการ</option><option value="owner_capital">เงินทุนใหม่จาก Owner</option><option value="drawer_to_reserve">ย้ายเงินลิ้นชักเข้าสำรอง</option><option value="drawer_to_owner">Owner เบิกเงินจากลิ้นชัก</option></select></div>
-              <div><label for="depositAmount">จำนวนเงิน</label><input id="depositAmount" type="number" min="0.01" step="0.01" class="form-control" placeholder="0.00"></div>
-              <div class="full"><label for="depositSource">รายละเอียดแหล่งเงิน</label><input id="depositSource" type="text" maxlength="200" class="form-control" placeholder="เช่น เซฟสาขา หรือ Owner เติมทุน"></div>
-              <div class="full"><label for="depositReason">เหตุผล</label><textarea id="depositReason" rows="2" maxlength="500" class="form-control"></textarea></div>
-            </div>
-            <div class="cash-action-row"><button type="button" class="btn btn-primary" id="requestDepositBtn">ส่งคำขอเติมเงิน</button></div>
-          </div>
-        </section>
-      </div>
+       <div class="cash-work-grid">
+         <section class="card">
+           <div class="card-header"><h2 class="card-title" id="sessionActionTitle">รอบประจำวัน</h2><button type="button" class="btn btn-secondary hidden" id="initPositionBtn" title="ตั้งยอดเริ่มต้น drawer/สำรอง ของสาขานี้ (ครั้งเดียว)"><i class="icon-cog"></i> ตั้งยอดเริ่มต้น</button></div>
+           <div class="card-body" id="sessionActionBody"></div>
+         </section>
+         <section class="card" id="depositCard">
+           <div class="card-header"><h2 class="card-title">💰 เติมเงินเข้าลิ้นชัก</h2></div>
+           <div class="card-body">
+             <!-- MVP: เหลือแค่ จำนวน + เหตุผล -->
+             <div class="cash-form-grid">
+               <div class="mvp-hide"><label for="depositSourceType">ประเภทเงิน</label><select id="depositSourceType" class="form-control"><option value="reserve_transfer">เงินสำรองเดิมของกิจการ</option><option value="owner_capital">เงินทุนใหม่จาก Owner</option><option value="drawer_to_reserve">ย้ายเงินลิ้นชักเข้าสำรอง</option><option value="drawer_to_owner">Owner เบิกเงินจากลิ้นชัก</option></select></div>
+               <div><label for="depositAmount">จำนวนเงิน</label><input id="depositAmount" type="number" min="0.01" step="0.01" class="form-control" placeholder="0.00"></div>
+               <div class="full mvp-hide"><label for="depositSource">รายละเอียดแหล่งเงิน</label><input id="depositSource" type="text" maxlength="200" class="form-control" placeholder="เช่น เซฟสาขา หรือ Owner เติมทุน"></div>
+               <div class="full"><label for="depositReason">เหตุผล <span style="color:#888;font-weight:400">เช่น เติมจากเซฟ / Owner เติมทุน</span></label><textarea id="depositReason" rows="2" maxlength="500" class="form-control" placeholder="เช่น เติมจากเซฟ 5,000 บาท"></textarea></div>
+             </div>
+             <div class="cash-action-row"><button type="button" class="btn btn-primary" id="requestDepositBtn">ส่งคำขอเติมเงิน</button></div>
+           </div>
+         </section>
+       </div>
 
-      <section class="card cash-table-section">
-        <div class="card-header"><h2 class="card-title">สมุดรายการเงินสดวันนี้</h2></div>
-        <div class="card-body table-container">
-          <table class="data-table"><thead><tr><th>เวลา</th><th>ประเภท</th><th>รายละเอียด</th><th>ผู้บันทึก</th><th class="text-right">จำนวนเงิน</th></tr></thead><tbody id="movementBody"></tbody></table>
-        </div>
-      </section>
+       <section class="card cash-table-section mvp-hide-table">
+         <div class="card-header"><h2 class="card-title">สมุดรายการเงินสดวันนี้</h2></div>
+         <div class="card-body table-container">
+           <table class="data-table"><thead><tr><th>เวลา</th><th>ประเภท</th><th>รายละเอียด</th><th>ผู้บันทึก</th><th class="text-right">จำนวนเงิน</th></tr></thead><tbody id="movementBody"></tbody></table>
+         </div>
+       </section>
 
-      <section class="card cash-table-section">
-        <div class="card-header"><h2 class="card-title">คำขอเติมเงินสด</h2></div>
-        <div class="card-body table-container">
-          <table class="data-table"><thead><tr><th>เวลา</th><th>ผู้ขอ</th><th>แหล่งที่มา</th><th>เหตุผล</th><th class="text-right">จำนวนเงิน</th><th>สถานะ</th><th></th></tr></thead><tbody id="depositBody"></tbody></table>
-        </div>
-      </section>
+       <section class="card cash-table-section mvp-hide-table">
+         <div class="card-header"><h2 class="card-title">คำขอเติมเงินสด</h2></div>
+         <div class="card-body table-container">
+           <table class="data-table"><thead><tr><th>เวลา</th><th>ผู้ขอ</th><th>แหล่งที่มา</th><th>เหตุผล</th><th class="text-right">จำนวนเงิน</th><th>สถานะ</th><th></th></tr></thead><tbody id="depositBody"></tbody></table>
+         </div>
+       </section>
+
+       <!-- MVP: สมุดย่อ 5 รายการ -->
+       <section class="card" id="mvpLedgerSection" style="display:none">
+         <div class="card-header"><h2 class="card-title">สมุดวันนี้ (5 รายการล่าสุด)</h2></div>
+         <div class="card-body table-container">
+           <table class="data-table"><thead><tr><th>เวลา</th><th>ประเภท</th><th>รายละเอียด</th><th class="text-right">จำนวนเงิน</th></tr></thead><tbody id="mvpMovementBody"></tbody></table>
+         </div>
+       </section>
 
       <section class="card cash-table-section hidden" id="adjustmentSection">
         <div class="card-header"><h2 class="card-title">เอกสารปรับปรุงย้อนหลัง</h2></div>
@@ -163,6 +172,6 @@
       <div id="notification-container"></div>
 <script src="../assets/js/config.js?v=20260815d"></script>
 <script src="../assets/js/common.js?v=20260815d"></script>
-<script src="../assets/js/cash-sessions.js?v=20260819b"></script>
+<script src="../assets/js/cash-sessions.js?v=20260822b"></script>
 </body>
 </html>

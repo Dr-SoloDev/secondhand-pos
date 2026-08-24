@@ -1,3 +1,4 @@
+const MVP_SIMPLE = true; // MVP ซ้อม — ซ่อนบัญชี เหลือแค่ เปิด/เติม/ปิด เหมือน Excel
 let cashUser = null;
 let cashPermissions = null;
 let cashBranches = [];
@@ -9,6 +10,7 @@ const cashEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'
 const canReviewCash = () => hasAppPermission('actions.cash_sessions.review', cashPermissions);
 
 async function initCashPage() {
+  if (MVP_SIMPLE) document.body.classList.add('mvp-simple');
   cashUser = await requireAuth();
   if (!cashUser) return;
   cashPermissions = await getAppPermissions();
@@ -104,6 +106,7 @@ async function loadCashPage() {
 }
 
 function renderCashSession() {
+  const positionOn = cashSession && Number(cashSession.cash_model_version) === 2;
   const statusMap = {
     pending_open: ['รออนุมัติเปิดยอด', 'warning'], open: ['เปิดทำการ', 'success'],
     pending_close: ['รออนุมัติปิดยอด', 'warning'], closed: ['ปิดยอดแล้ว', 'danger'], rejected: ['คำขอเปิดยอดถูกปฏิเสธ', 'danger'],
@@ -120,7 +123,6 @@ function renderCashSession() {
     ledgerLabel.textContent = positionOn ? 'เงินเข้า-ออก ลิ้นชัก' : 'เงินเข้า-ออกสุทธิ';
     ledgerLabel.title = positionOn ? 'เฉพาะเงินในลิ้นชัก ไม่รวมสำรอง/โอนธนาคาร' : '';
   }
-  const positionOn = cashSession && Number(cashSession.cash_model_version) === 2;
   if (positionOn) {
     cashEl('drawerBalance').textContent = cashMoney(cashSession.drawer_balance);
     cashEl('reserveBalance').textContent = cashMoney(cashSession.reserve_balance);
@@ -139,6 +141,38 @@ function renderCashSession() {
   const variance = cashSession?.closing_variance ?? cashSession?.opening_variance ?? 0;
   cashEl('latestVariance').textContent = cashMoney(variance);
   cashEl('latestVariance').className = `cash-stat-value ${Number(variance) === 0 ? '' : 'danger'}`;
+  // MVP: Hero เป็นลิ้นชักเสมอ — ถ้าไม่ใช่ v2 ให้ใช้ current_expected_cash แทน
+  if (MVP_SIMPLE) {
+    const drawerVal = positionOn ? cashSession?.drawer_balance : cashSession?.current_expected_cash;
+    if (cashSession && drawerVal != null) {
+      cashEl('drawerBalance').textContent = cashMoney(drawerVal);
+      cashEl('drawerStat').classList.remove('hidden');
+    } else if (!cashSession) {
+      cashEl('drawerBalance').textContent = cashMoney(0);
+      cashEl('drawerStat').classList.remove('hidden');
+    }
+    // MVP: สมุดย่อ 5 รายการ
+    const mvpSection = document.getElementById('mvpLedgerSection');
+    const mvpBody = document.getElementById('mvpMovementBody');
+    if (mvpSection && mvpBody) {
+      if (cashSession && cashSession.status === 'open') {
+        mvpSection.style.display = 'block';
+        const items = (cashSession.movements || []).slice(0, 5);
+        if (items.length) {
+          mvpBody.innerHTML = items.map(item => {
+            const isBank = String(item.movement_type || '').startsWith('bank_');
+            const dirLabel = isBank ? 'โอนธนาคาร' : (item.direction === 'in' ? 'เข้า' : 'ออก');
+            const dirClass = isBank ? 'bank' : item.direction;
+            return `<tr><td>${cashEscape((item.created_at || '').slice(11,16))}</td><td><span class="cash-direction ${dirClass}">${dirLabel}</span></td><td>${cashEscape(item.description)}</td><td class="text-right" style="color:${isBank ? '#1e40af' : (item.direction === 'in' ? 'var(--color-success)' : 'var(--color-danger)')}">${item.direction === 'in' ? '+' : '-'}${cashMoney(item.amount)}</td></tr>`;
+          }).join('');
+        } else {
+          mvpBody.innerHTML = '<tr><td colspan="4" class="cash-empty">ยังไม่มีรายการวันนี้</td></tr>';
+        }
+      } else {
+        mvpSection.style.display = 'none';
+      }
+    }
+  }
   renderSessionAction();
   renderCashMovements(cashSession?.movements || []);
   cashEl('requestDepositBtn').disabled = cashSession?.status !== 'open';
@@ -149,13 +183,13 @@ function renderSessionAction() {
   const body = cashEl('sessionActionBody');
   const title = cashEl('sessionActionTitle');
   if (!cashSession || !cashSession.status || cashSession.status === 'rejected') {
-    title.textContent = 'เปิดยอดประจำวัน';
+    title.textContent = MVP_SIMPLE ? '☀️ เปิดร้าน' : 'เปิดยอดประจำวัน';
     body.innerHTML = cashCountForm('open');
     bindCashCountForm('open');
     return;
   }
   if (cashSession.status === 'open') {
-    title.textContent = 'ปิดยอดประจำวัน';
+    title.textContent = MVP_SIMPLE ? '🌙 ปิดร้าน' : 'ปิดยอดประจำวัน';
     body.innerHTML = cashCountForm('close');
     bindCashCountForm('close');
     return;
@@ -188,6 +222,24 @@ function cashCountForm(mode) {
   const expected = mode === 'open'
     ? (cashSession?.drawer_balance ?? cashSession?.opening_expected ?? cashSession?.current_expected_cash ?? 0)
     : (cashSession?.current_expected_cash ?? 0);
+  if (MVP_SIMPLE) {
+    if (mode === 'open') {
+      return `<div class="cash-form-grid">
+        <div class="full" style="text-align:center;padding:12px 0">
+          <div style="font-size:13px;color:#6b7280">ยอดยกมาเมื่อวาน</div>
+          <div style="font-size:24px;font-weight:700;margin:6px 0">${cashMoney(expected)}</div>
+          <div style="font-size:12px;color:#6b7280">กดเปิดยอดเพื่อเริ่มวัน — ไม่ต้องนับใหม่</div>
+        </div>
+        <div class="cash-action-row" style="justify-content:center"><button class="btn btn-success" id="submitCashCount" style="padding:10px 24px;font-size:16px">☀️ เปิดยอดวันนี้</button></div>
+      </div>`;
+    }
+    return `<div class="cash-form-grid">
+      <div class="full" style="text-align:center;background:#f8fafc;padding:10px;border-radius:6px">ยอดที่ควรมี <strong>${cashMoney(expected)}</strong></div>
+      <div class="full"><label for="cashActual">นับเงินในลิ้นชักได้เท่าไหร่</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">กรอกยอดที่นับได้จริง</div></div>
+      <div class="full"><label for="cashReason">เหตุผล (ถ้ายอดไม่ตรง)</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="เช่น นับเกิน/ขาด เพราะ..."></textarea></div>
+    </div>
+    <div class="cash-action-row" style="justify-content:center"><button class="btn btn-primary" id="submitCashCount" style="padding:10px 24px;font-size:16px">🌙 ปิดยอดวันนี้</button></div>`;
+  }
   const expectedLabel = mode === 'open' ? 'ยอดลิ้นชักยกมาจากก่อนหน้า' : 'ยอดตามระบบตอนนี้';
   if (mode === 'open') {
     return `<div class="cash-form-grid">
@@ -222,6 +274,19 @@ function bindCashCountForm(mode) {
       if (!h || !actualInput) return;
       const expected = Number(cashSession?.current_expected_cash || 0);
       const actual = Number(actualInput.value);
+      if (MVP_SIMPLE) {
+        if (!actualInput.value || !Number.isFinite(actual)) {
+          h.textContent = 'กรอกยอดที่นับได้จริง';
+          h.style.color = '#6b7280';
+          return;
+        }
+        const variance = actual - expected;
+        const absV = Math.abs(variance);
+        if (absV < 0.01) { h.textContent = '✅ ยอดตรงกัน'; h.style.color = '#16a34a'; }
+        else if (absV <= 100) { h.textContent = `ℹ️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.abs(variance).toFixed(2)} — ใส่เหตุผลด้วย`; h.style.color = '#2563eb'; }
+        else { h.textContent = `⚠️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.abs(variance).toFixed(2)} — ต้องใส่เหตุผล`; h.style.color = '#d97706'; }
+        return;
+      }
       if (!actualInput.value || !Number.isFinite(actual)) {
         h.textContent = '💡 ส่วนต่างเกิน ฿100 ต้องรออนุมัติจากผู้จัดการ';
         h.style.color = '#6b7280';
@@ -279,10 +344,17 @@ async function reopenCashSession() {
 
 async function requestCashDeposit() {
   const amount = Number(cashEl('depositAmount').value);
-  const sourceType = cashEl('depositSourceType').value;
-  const source = cashEl('depositSource').value.trim();
-  const reason = cashEl('depositReason').value.trim();
-  if (!(amount > 0) || !source || !reason) return showNotification('กรุณากรอกข้อมูลเติมเงินให้ครบ', 'error');
+  let sourceType = cashEl('depositSourceType').value;
+  let source = cashEl('depositSource').value.trim();
+  let reason = cashEl('depositReason').value.trim();
+  if (MVP_SIMPLE) {
+    sourceType = 'reserve_transfer';
+    source = reason || 'เติมเงิน';
+    if (!(amount > 0) || !reason) return showNotification('กรุณากรอกจำนวนเงินและเหตุผล', 'error');
+    reason = reason || 'เติมเงินระหว่างวัน';
+  } else {
+    if (!(amount > 0) || !source || !reason) return showNotification('กรุณากรอกข้อมูลเติมเงินให้ครบ', 'error');
+  }
   const res = await apiRequest('cash-sessions/deposit-request', 'POST', { branch_id:Number(cashEl('cashBranch').value), amount, source_type:sourceType, source_name:source, reason });
   showNotification(res.message, res.status === 'success' ? 'success' : 'error');
   if (res.status === 'success') { cashEl('depositAmount').value=''; cashEl('depositSource').value=''; cashEl('depositReason').value=''; loadCashPage(); }
