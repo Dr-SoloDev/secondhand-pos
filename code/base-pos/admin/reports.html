@@ -62,19 +62,21 @@
           <option value="">ทุกสาขา</option>
         </select>
       </div>
-      <div class="reports-filter-field">
-        <label for="reportMonth">เดือนรายงาน</label>
-        <input type="month" id="reportMonth" class="form-control">
-      </div>
-      <div class="reports-filter-field" id="reportDateRangeField">
-        <label for="reportDateFrom">หรือเลือกช่วงวันที่</label>
-        <div class="report-date-range">
-          <input type="date" id="reportDateFrom" class="form-control" aria-label="วันที่เริ่มต้น">
-          <span class="report-date-sep">ถึง</span>
-          <input type="date" id="reportDateTo" class="form-control" aria-label="วันที่สิ้นสุด">
-          <button type="button" id="reportDateClear" class="btn btn-secondary" title="กลับไปดูตามเดือน" aria-label="ล้างช่วงวันที่">✕</button>
-        </div>
-      </div>
+       <div class="reports-filter-field">
+         <label for="reportMonth">เดือนรายงาน</label>
+         <input type="month" id="reportMonth" class="form-control" lang="th">
+         <div id="reportMonthThai" style="font-size:11px;color:#64748b;margin-top:4px;min-height:14px"></div>
+       </div>
+       <div class="reports-filter-field" id="reportDateRangeField">
+         <label for="reportDateFrom">หรือเลือกช่วงวันที่</label>
+         <div class="report-date-range">
+           <input type="date" id="reportDateFrom" class="form-control" lang="th" aria-label="วันที่เริ่มต้น">
+           <span class="report-date-sep">ถึง</span>
+           <input type="date" id="reportDateTo" class="form-control" lang="th" aria-label="วันที่สิ้นสุด">
+           <button type="button" id="reportDateClear" class="btn btn-secondary" title="กลับไปดูตามเดือน" aria-label="ล้างช่วงวันที่">✕</button>
+         </div>
+         <div id="reportDateRangeThai" style="font-size:11px;color:#64748b;margin-top:4px;min-height:14px"></div>
+       </div>
     </div>
 
     <div class="tabs" id="reportsTabs">
@@ -380,7 +382,7 @@
 
   <script src="../assets/js/config.js?v=20260815d"></script>
   <script src="../assets/js/common.js?v=20260815d"></script>
-  <script src="../assets/js/reports.js?v=20260815d"></script>
+  <script src="../assets/js/reports.js?v=20260822b"></script>
   <script src="../assets/js/animations.js?v=20260815d"></script>
   <script src="../assets/js/tabs.js?v=20260815d"></script>
   <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
