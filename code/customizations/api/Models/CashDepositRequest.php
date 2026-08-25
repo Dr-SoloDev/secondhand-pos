@@ -79,7 +79,8 @@ class CashDepositRequest extends Model
             $excess = 0.0;
             if ($sourceType === 'owner_capital' && $cashSession->hasPositionModel((int)$request['branch_id'])) {
                 $balances = $cashSession->getPositionBalances((int)$request['branch_id']);
-                $existing = (float)($balances['drawer_balance'] ?? 0) + (float)($balances['reserve_balance'] ?? 0) + (float)($balances['bank_balance'] ?? 0);
+                // โมเดลใหม่: เติมเงิน = ดึงจากเซฟ — เกินเซฟ = เพิ่มทุนใหม่ (รายรับเพิ่มทุน)
+                $existing = (float)($balances['reserve_balance'] ?? 0);
                 $excess = max(0.0, round($amount, 2) - round($existing, 2));
                 // บันทึก excess ไว้ก่อน (สำหรับรายงาน)
                 $this->db->query("UPDATE cash_deposit_requests SET excess_amount=? WHERE id=?", [round($excess, 2), (int)$id]);

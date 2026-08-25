@@ -224,26 +224,29 @@ function cashCountForm(mode) {
     : (cashSession?.current_expected_cash ?? 0);
   if (MVP_SIMPLE) {
     if (mode === 'open') {
+      const safe = Number(cashSession?.reserve_balance || 0);
       return `<div class="cash-form-grid">
         <div class="full" style="text-align:center;padding:12px 0">
-          <div style="font-size:13px;color:#6b7280">ยอดยกมาเมื่อวาน</div>
-          <div style="font-size:24px;font-weight:700;margin:6px 0">${cashMoney(expected)}</div>
-          <div style="font-size:12px;color:#6b7280">กดเปิดยอดเพื่อเริ่มวัน — ไม่ต้องนับใหม่</div>
+          <div style="font-size:13px;color:#6b7280">💰 เงินในเซฟ (เก็บจากเมื่อวาน)</div>
+          <div style="font-size:24px;font-weight:700;margin:6px 0">${cashMoney(safe)}</div>
         </div>
+        <div class="full"><label for="cashActual">ดึงจากเซฟมาใส่ลิ้นชักกี่บาท</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="${safe > 0 ? safe : ''}" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">ถ้าดึงเกินเงินในเซฟ ส่วนเกินจะนับเป็น "เพิ่มทุน" (รายรับ)</div></div>
         <div class="cash-action-row" style="justify-content:center"><button class="btn btn-success" id="submitCashCount" style="padding:10px 24px;font-size:16px">☀️ เปิดยอดวันนี้</button></div>
       </div>`;
     }
     return `<div class="cash-form-grid">
-      <div class="full" style="text-align:center;background:#f8fafc;padding:10px;border-radius:6px">ยอดที่ควรมี <strong>${cashMoney(expected)}</strong></div>
-      <div class="full"><label for="cashActual">นับเงินในลิ้นชักได้เท่าไหร่</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">กรอกยอดที่นับได้จริง</div></div>
+      <div class="full" style="text-align:center;background:#f8fafc;padding:10px;border-radius:6px">ยอดที่ควรมี <strong>${cashMoney(expected)}</strong> — ปิดยอดแล้วเงินจะถูกเก็บเข้าเซฟทั้งหมด</div>
+      <div class="full"><label for="cashActual">นับเงินในลิ้นชักได้เท่าไหร่</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">กรอกยอดที่นับได้จริง — เก็บเข้าเซฟทั้งหมด</div></div>
       <div class="full"><label for="cashReason">เหตุผล (ถ้ายอดไม่ตรง)</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="เช่น นับเกิน/ขาด เพราะ..."></textarea></div>
     </div>
-    <div class="cash-action-row" style="justify-content:center"><button class="btn btn-primary" id="submitCashCount" style="padding:10px 24px;font-size:16px">🌙 ปิดยอดวันนี้</button></div>`;
+    <div class="cash-action-row" style="justify-content:center"><button class="btn btn-primary" id="submitCashCount" style="padding:10px 24px;font-size:16px">🌙 ปิดยอดวันนี้ (เก็บเข้าเซฟ)</button></div>`;
   }
-  const expectedLabel = mode === 'open' ? 'ยอดลิ้นชักยกมาจากก่อนหน้า' : 'ยอดตามระบบตอนนี้';
+  const expectedLabel = mode === 'open' ? 'เงินในเซฟ' : 'ยอดตามระบบตอนนี้';
   if (mode === 'open') {
+    const safe = Number(cashSession?.reserve_balance || 0);
     return `<div class="cash-form-grid">
-      <div class="full cash-expected-hint">${expectedLabel}: <strong>${cashMoney(expected)}</strong> บาท — เปิดรอบต่อจากยอดนี้โดยอัตโนมัติ</div>
+      <div class="full cash-expected-hint">เงินในเซฟ: <strong>${cashMoney(safe)}</strong> บาท — ดึงมาใส่ลิ้นชักตอนเปิดวัน (เกินเซฟ = เพิ่มทุนใหม่)</div>
+      <div class="full"><label for="cashActual">ดึงจากเซฟมาใส่ลิ้นชัก</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="${safe > 0 ? safe : ''}"></div>
       <div class="cash-action-row"><button class="btn btn-success" id="submitCashCount">เปิดยอด</button></div>
     </div>`;
   }
@@ -308,10 +311,10 @@ function bindCashCountForm(mode) {
     if (actualInput) actualInput.addEventListener('input', hint);
   }
   cashEl('submitCashCount').onclick = async () => {
-    const actual = mode === 'open'
-      ? Number(cashSession?.drawer_balance ?? cashSession?.opening_expected ?? cashSession?.current_expected_cash ?? 0)
-      : Number(cashEl('cashActual').value);
-    if (mode !== 'open' && (!Number.isFinite(actual) || actual < 0)) return showNotification('กรุณาระบุยอดเงินสดที่นับได้', 'error');
+    const actual = Number(cashEl('cashActual')?.value ?? NaN);
+    if (!Number.isFinite(actual) || actual < 0) {
+      return showNotification(mode === 'open' ? 'กรุณาระบุจำนวนที่ดึงจากเซฟมาใส่ลิ้นชัก' : 'กรุณาระบุยอดเงินสดที่นับได้', 'error');
+    }
     const button = cashEl('submitCashCount');
     setButtonLoading(button, true);
     try {
