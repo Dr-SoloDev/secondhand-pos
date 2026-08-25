@@ -44,6 +44,27 @@ class Response
     }
 
     /**
+     * Escape cells that could be interpreted as formulas by Excel/Sheets.
+     * Covers =,+, -,@ prefixes including leading whitespace/BOM
+     * (e.g. " =cmd", "\u{FEFF}=1+1|cmd") — CVE-style CSV injection guard.
+     *
+     * @param array $row
+     * @return array
+     */
+    public static function spreadsheetSafeRow(array $row)
+    {
+        return array_map(static function ($cell) {
+            if (!is_string($cell)) {
+                return $cell;
+            }
+            if (preg_match('/^[\s\x{FEFF}]*[=+\-@]/u', $cell)) {
+                return "'" . $cell;
+            }
+            return $cell;
+        }, $row);
+    }
+
+    /**
      * @param $data
      * @param $filename
      */
@@ -59,12 +80,7 @@ class Response
 
         // Output rows with CSV injection protection
         foreach ($data as $row) {
-            foreach ($row as $i => $value) {
-                if (is_string($value) && preg_match('/^[=+\-@]/', $value)) {
-                    $row[$i] = "'" . $value;
-                }
-            }
-            fputcsv($output, $row);
+            fputcsv($output, self::spreadsheetSafeRow($row));
         }
 
         fclose($output);

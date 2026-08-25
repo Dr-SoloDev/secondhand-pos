@@ -840,14 +840,7 @@ class FinancialController extends Controller
 
     private function spreadsheetSafeRow(array $row)
     {
-        return array_map(function ($cell) {
-            if (!is_string($cell)) {
-                return $cell;
-            }
-            if (preg_match('/^[\s\x{FEFF}]*[=+\-@]/u', $cell)) {
-                return "'" . $cell;
-            }
-            return $cell;
-        }, $row);
+        // Delegate to shared implementation (Response) — single source of truth
+        return Response::spreadsheetSafeRow($row);
     }
 }
