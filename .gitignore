@@ -53,3 +53,7 @@ backups/
 code/base-pos/uploads/
 *.bak
 code/uploads-ui/
+
+# PHPUnit cache
+.phpunit.result.cache
+.phpunit.cache/
