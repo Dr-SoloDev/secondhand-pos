@@ -2,7 +2,7 @@
 
 | Metadata | Value |
 |:---------|:------|
-| **Status** | **Proposed** |
+| **Status** | **Approved** (2026-08-25 by CEO เทอโบ) |
 | **Author** | พี่ทรงศักดิ์ (Architect) |
 | **Approved by** | CEO (เทอโบ) |
 | **Date** | 2026-08-25 |

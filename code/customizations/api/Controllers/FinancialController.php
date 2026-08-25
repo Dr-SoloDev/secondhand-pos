@@ -332,54 +332,16 @@ class FinancialController extends Controller
     // สร้าง date filter params จาก GET
     private function getPeriodParams()
     {
-        $period   = $_GET['period']    ?? 'month';
-        $year     = intval($_GET['year']     ?? date('Y'));
-        $month    = intval($_GET['month']    ?? date('n'));
-        $dateFrom = isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : null;
-        $dateTo   = isset($_GET['date_to'])   ? $this->sanitizeInput($_GET['date_to'])   : null;
-        $branchId = $this->resolveBranchId();
-
-        // date filter สำหรับ purchase_orders (created_at)
-        if ($dateFrom && $dateTo) {
-            // ช่วงวันที่เจาะจง (รายงานตามวันที่)
-            $dateFilterPO = "DATE(po.created_at) BETWEEN ? AND ?";
-            $bindingsPO   = [$dateFrom, $dateTo];
-            $dateFilterSL = "DATE(sl.sale_date) BETWEEN ? AND ?";
-            $bindingsSL   = [$dateFrom, $dateTo];
-        } elseif ($period === 'month') {
-            $dateFilterPO = "YEAR(po.created_at) = ? AND MONTH(po.created_at) = ?";
-            $bindingsPO   = [$year, $month];
-            $dateFilterSL = "YEAR(sl.sale_date) = ? AND MONTH(sl.sale_date) = ?";
-            $bindingsSL   = [$year, $month];
-        } else {
-            $dateFilterPO = "YEAR(po.created_at) = ?";
-            $bindingsPO   = [$year];
-            $dateFilterSL = "YEAR(sl.sale_date) = ?";
-            $bindingsSL   = [$year];
-        }
-
-        // branch filter
-        $branchFilter = '';
-        if ($branchId) {
-            $branchFilter  = "AND po.branch_id = ?";
-            $bindingsPO[]  = $branchId;
-            $bindingsSL[]  = $branchId;
-        }
-
-        return [
-            'date_filter_po'  => $dateFilterPO,
-            'date_filter_sl'  => $dateFilterSL,
-            'branch_filter'   => $branchFilter,
-            'branch_filter_sl'=> $branchId ? "AND sl.branch_id = ?" : '',
-            'bindings_po'     => $bindingsPO,
-            'bindings_sl'     => $bindingsSL,
-            'branch_id_raw'   => $branchId,
-            'period_raw'      => $period,
-            'year_raw'        => $year,
-            'month_raw'       => $month,
-            'date_from_raw'   => $dateFrom,
-            'date_to_raw'     => $dateTo,
-        ];
+        // ADD-002 Phase 1: delegate ไป FinancialReportService — HTTP concerns ($_GET,
+        // sanitize, role-based branch resolution) อยู่ที่นี่ logic อยู่ที่ service
+        return (new FinancialReportService())->buildPeriodParams([
+            'period'    => $_GET['period'] ?? 'month',
+            'year'      => intval($_GET['year'] ?? date('Y')),
+            'month'     => intval($_GET['month'] ?? date('n')),
+            'date_from' => isset($_GET['date_from']) ? $this->sanitizeInput($_GET['date_from']) : null,
+            'date_to'   => isset($_GET['date_to']) ? $this->sanitizeInput($_GET['date_to']) : null,
+            'branch_id' => $this->resolveBranchId(),
+        ]);
     }
 
     // GET /api/financial/export?period=month&year=2026&month=6&branch_id=&type=purchases|salelots|expenses|summary
