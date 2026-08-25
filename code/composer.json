@@ -1,0 +1,16 @@
+{
+    "name": "solodev/scrap-pos",
+    "description": "Junk Shop POS System - Secondhand POS",
+    "type": "project",
+    "require-dev": {
+        "phpunit/phpunit": "^11"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
