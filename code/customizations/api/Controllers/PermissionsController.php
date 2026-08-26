@@ -5,7 +5,7 @@ class PermissionsController extends Controller
     {
         $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $role = (string)($this->user['role'] ?? '');
-        $isAdmin = in_array($role, ['admin', 'super_manager'], true); // TEST-MODE: super_manager = admin (ชั่วคราว)
+        $isAdmin = $role === 'admin';
         $isManager = in_array($role, ['manager', 'super_manager', 'admin'], true);
         $isMultiBranch = in_array($role, ['super_manager', 'admin'], true);
         $canManageUsers = in_array($role, ['super_manager', 'admin'], true);

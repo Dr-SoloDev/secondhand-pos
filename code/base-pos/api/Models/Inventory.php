@@ -10,7 +10,7 @@ class Inventory extends Model
      * @param $productId
      * @param null $type
      */
-    public function getTransactions($productId = null, $type = null)
+    public function getTransactions($productId = null, $type = null, $branchId = null)
     {
         $query = "SELECT t.*, p.name as product_name, p.sku, u.username
                 FROM {$this->table} t
@@ -19,6 +19,11 @@ class Inventory extends Model
 
         $conditions = [];
         $params = [];
+
+        if ($branchId !== null) {
+            $conditions[] = "t.branch_id = ?";
+            $params[] = $branchId;
+        }
 
         if ($productId) {
             $conditions[] = "t.product_id = ?";

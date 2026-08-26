@@ -75,13 +75,14 @@ class StockTransfersController extends Controller
                         return;
                     }
                     $categoryId = (int)($item['category_id'] ?? 0);
+                    $catalogId = (int)($item['catalog_id'] ?? 0);
                     $itemName = substr(trim((string)($item['item_name'] ?? '')), 0, 200);
                     $weightKg = isset($item['weight_kg']) ? (float)$item['weight_kg'] : 0;
-                    if (!$categoryId || $itemName === '' || $weightKg <= 0 || !is_finite($weightKg)) {
-                        Response::error('ข้อมูลรายการสินค้าไม่ครบ', 400);
+                    if (!$categoryId || !$catalogId || $itemName === '' || $weightKg <= 0 || !is_finite($weightKg)) {
+                        Response::error('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อก', 400);
                         return;
                     }
-                    $itemKey = $categoryId . ':' . mb_strtolower($itemName, 'UTF-8');
+                    $itemKey = $catalogId;
                     if (isset($seenItems[$itemKey])) {
                         Response::error("รายการ {$itemName} ซ้ำ กรุณารวมเป็นรายการเดียว", 400);
                         return;
@@ -90,6 +91,7 @@ class StockTransfersController extends Controller
                     $items[] = [
                         'line_no' => $index + 1,
                         'category_id' => $categoryId,
+                        'catalog_id' => $catalogId,
                         'item_name' => $itemName,
                         'weight_kg' => $weightKg,
                     ];

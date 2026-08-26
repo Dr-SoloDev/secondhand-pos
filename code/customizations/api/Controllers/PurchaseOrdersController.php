@@ -230,6 +230,10 @@ class PurchaseOrdersController extends Controller
             if (empty($item['item_name'])) {
                 Response::error('แต่ละรายการต้องมีชื่อของ', 400);
             }
+            $catalogId = !empty($item['catalog_id']) ? intval($item['catalog_id']) : 0;
+            if (!$catalogId) {
+                Response::error('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อก', 400);
+            }
             $qty = floatval($item['quantity'] ?? 1);
             $deduct = floatval($item['weight_deduction'] ?? 0);
             $unitPrice = floatval($item['unit_price'] ?? 0);
@@ -247,6 +251,7 @@ class PurchaseOrdersController extends Controller
             }
             $netQty = $qty - $deduct;
             $cleanItems[] = [
+                'catalog_id' => $catalogId,
                 'item_name' => trim((string)$item['item_name']),
                 'category_id' => !empty($item['category_id']) ? intval($item['category_id']) : null,
                 // DEPRECATED — condition_id ไม่ใช้แล้ว ใช้ weight_deduction แทน

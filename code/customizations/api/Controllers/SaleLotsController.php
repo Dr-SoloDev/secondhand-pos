@@ -88,6 +88,9 @@ class SaleLotsController extends Controller
             if (empty($item['quantity_kg'])) {
                 Response::error('แต่ละรายการต้องมีน้ำหนัก', 400);
             }
+            if (empty($item['catalog_id'])) {
+                Response::error('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อก', 400);
+            }
             if (empty($item['category_id'])) {
                 Response::error('แต่ละรายการต้องเลือกหมวดหมู่', 400);
             }
@@ -244,6 +247,24 @@ class SaleLotsController extends Controller
             Response::success('ยืนยัน Sale Lot สำเร็จ', null);
         } catch (Exception $e) {
             error_log('SaleLot confirm failed: ' . $e->getMessage());
+            Logger::logActivity(
+                $this->user['user_id'],
+                'confirm_sale_lot_failed',
+                "Failed to confirm Sale Lot ID: {$id}",
+                [
+                    'actor' => $this->user,
+                    'module' => 'sale_lots',
+                    'entity_type' => 'sale_lot',
+                    'entity_id' => $id,
+                    'entity_branch_id' => $lot['branch_id'] ?? null,
+                    'outcome' => 'failure',
+                    'reason' => $e->getMessage(),
+                    'before' => [
+                        'status' => $lot['status'] ?? null,
+                        'items' => $lot['items'] ?? [],
+                    ],
+                ]
+            );
             Response::error($e->getMessage() ?: 'ยืนยัน Sale Lot ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 400);
         }
     }

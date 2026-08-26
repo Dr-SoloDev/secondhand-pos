@@ -17,8 +17,15 @@ test_sale_lots() {
   branch_id=$(api_get "branches" | json_get "data.0.id" 2>/dev/null)
   [ -z "$branch_id" ] && branch_id=1
 
+  local suffix catalog_res catalog_id
+  suffix="$(date +%s)"
+  catalog_res=$(api_post "purchase-catalog" "{\"code\":\"QA-$suffix\",\"name\":\"QA Sale Lot $suffix\",\"category_id\":$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)}")
+  catalog_id=$(echo "$catalog_res" | json_get "data.id" 2>/dev/null)
+  assert_contains "$catalog_res" '"status":"success"' "Create unique sale-lot QA catalog"
+  assert_neq "" "$catalog_id" "Unique sale-lot QA catalog returns ID"
+
   local cat_id
-  cat_id=$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)
+  cat_id=$(api_get "purchase-catalog/item?id=$catalog_id" | json_get "data.category_id" 2>/dev/null)
   [ -z "$cat_id" ] && cat_id=1
 
   local item_name
@@ -31,6 +38,7 @@ test_sale_lots() {
     \"buyer_name\":\"Test Buyer\",
     \"sale_date\":\"$(date +%Y-%m-%d)\",
     \"items\":[{
+      \"catalog_id\":$catalog_id,
       \"item_name\":\"$item_name\",
       \"category_id\":$cat_id,
       \"quantity_kg\":0.001,
@@ -58,7 +66,7 @@ test_sale_lots() {
     \"buyer_name\":\"SEC-04 Buyer\",
     \"sale_date\":\"$(date +%Y-%m-%d)\",
     \"idempotency_key\":\"$lot_idempotency_key\",
-    \"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.001,\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.001,\"unit_price\":1}]
   }"
   lot_idempotency_first=$(api_post "sale-lots" "$lot_idempotency_payload")
   lot_idempotency_first_id=$(echo "$lot_idempotency_first" | json_get "data.id" 2>/dev/null)
@@ -80,6 +88,7 @@ test_sale_lots() {
     \"buyer_name\":\"No Category Buyer\",
     \"sale_date\":\"$(date +%Y-%m-%d)\",
     \"items\":[{
+      \"catalog_id\":$catalog_id,
       \"item_name\":\"Manual Walk-in Item\",
       \"quantity_kg\":1,
       \"unit_price\":25
@@ -90,20 +99,20 @@ test_sale_lots() {
   local negative_price negative_transport negative_expense
   negative_price=$(api_post "sale-lots" "{
     \"branch_id\":$branch_id,\"buyer_name\":\"Negative Price\",\"sale_date\":\"$(date +%Y-%m-%d)\",
-    \"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":-1}]
+    \"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":-1}]
   }")
   assert_contains "$negative_price" '"status":"error"' "Sale lot rejects negative unit price"
 
   negative_transport=$(api_post "sale-lots" "{
     \"branch_id\":$branch_id,\"buyer_name\":\"Negative Transport\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"transport_cost\":-1,
-    \"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":1}]
   }")
   assert_contains "$negative_transport" '"status":"error"' "Sale lot rejects negative transport cost"
 
   negative_expense=$(api_post "sale-lots" "{
     \"branch_id\":$branch_id,\"buyer_name\":\"Negative Expense\",\"sale_date\":\"$(date +%Y-%m-%d)\",
     \"expenses\":[{\"description\":\"invalid\",\"amount\":-1}],
-    \"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":1,\"unit_price\":1}]
   }")
   assert_contains "$negative_expense" '"status":"error"' "Sale lot rejects negative expense"
 }

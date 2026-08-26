@@ -76,8 +76,9 @@ class SaleLot extends Model
         $totalExpenses = array_sum(array_column($expenses, 'amount')) + $lot['transport_cost'];
 
         $lot['items'] = $this->db->fetchAll(
-            "SELECT sli.*, c.name AS category_name
+            "SELECT sli.*, pic.name AS catalog_name, c.name AS category_name
              FROM sale_lot_items sli
+             LEFT JOIN purchase_item_catalog pic ON pic.id = sli.catalog_id
              LEFT JOIN categories c ON sli.category_id = c.id
              WHERE sli.sale_lot_id = ?
              ORDER BY sli.id ASC",
@@ -134,6 +135,10 @@ class SaleLot extends Model
                 $catId     = intval($item['category_id'] ?? 0);
                 $itemName  = trim((string)($item['item_name'] ?? ''));
                 $catalogId = intval($item['catalog_id'] ?? 0) ?: null;
+                if (!$catalogId) {
+                    throw new Exception('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อก');
+                }
+                $this->assertValidCatalogItem($branchId, $catalogId);
 
                 if (!is_finite($qty) || $qty <= 0 || empty($itemName)) {
                     throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
@@ -147,7 +152,7 @@ class SaleLot extends Model
 
                 $subtotal = $qty * $unitPrice;
                 try {
-                    $itemCost = $this->calculateProvisionalCost($branchId, $catId, $itemName, $qty);
+                    $itemCost = $this->calculateProvisionalCost($branchId, $catalogId, $qty);
                 } catch (Exception $e) {
                     $itemCost = 0;
                 }
@@ -155,10 +160,12 @@ class SaleLot extends Model
                 $totalAmount += $subtotal;
                 $totalCost   += $itemCost;
 
+                $catalog = $this->getValidCatalogItem($branchId, $catalogId);
+
                 $preparedItems[] = [
                     'catalog_id'   => $catalogId,
-                    'item_name'    => $itemName,
-                    'category_id'  => $catId ?: null,
+                    'item_name'    => $catalog['name'],
+                    'category_id'  => $catId ?: (int)$catalog['category_id'],
                     'quantity_kg'  => $qty,
                     'unit_price'   => $unitPrice,
                     'fifo_cost'    => $itemCost,
@@ -234,6 +241,11 @@ class SaleLot extends Model
                 $catId     = intval($item['category_id'] ?? 0);
                 $itemName  = trim((string)($item['item_name'] ?? ''));
                 $catalogId = intval($item['catalog_id'] ?? 0) ?: null;
+                if (!$catalogId) {
+                    throw new Exception('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อก');
+                }
+                $this->assertValidCatalogItem((int)$lot['branch_id'], $catalogId);
+                $catalog = $this->getValidCatalogItem((int)$lot['branch_id'], $catalogId);
 
                 if (!is_finite($qty) || $qty <= 0 || empty($itemName)) {
                     throw new Exception('รายการสินค้าต้องมีชื่อสินค้าและน้ำหนักมากกว่า 0');
@@ -247,7 +259,7 @@ class SaleLot extends Model
 
                 $subtotal = $qty * $unitPrice;
                 try {
-                    $itemCost = $this->calculateProvisionalCost($branchId, $catId, $itemName, $qty);
+                    $itemCost = $this->calculateProvisionalCost($branchId, $catalogId, $qty);
                 } catch (Exception $e) {
                     $itemCost = 0;
                 }
@@ -257,8 +269,8 @@ class SaleLot extends Model
 
                 $preparedItems[] = [
                     'catalog_id'  => $catalogId,
-                    'item_name'   => $itemName,
-                    'category_id' => $catId ?: null,
+                    'item_name'   => $catalog['name'],
+                    'category_id' => $catId ?: (int)$catalog['category_id'],
                     'quantity_kg' => $qty,
                     'unit_price'  => $unitPrice,
                     'fifo_cost'   => $itemCost,
@@ -361,7 +373,7 @@ class SaleLot extends Model
             [$sale_lot_id]
         );
         $items = $this->db->fetchAll(
-            "SELECT id, category_id, item_name, quantity_kg FROM sale_lot_items WHERE sale_lot_id = ? FOR UPDATE",
+            "SELECT id, category_id, item_name, catalog_id, quantity_kg FROM sale_lot_items WHERE sale_lot_id = ? FOR UPDATE",
             [$sale_lot_id]
         );
 
@@ -370,10 +382,13 @@ class SaleLot extends Model
             if (empty($item['category_id'])) {
                 throw new Exception('แต่ละรายการต้องเลือกหมวดหมู่');
             }
+            $catalogId = (int)($item['catalog_id'] ?? 0);
+            if (!$catalogId) {
+                throw new Exception('Lot เก่านี้ยังไม่มี catalog reference กรุณา migrate/review ก่อนยืนยัน');
+            }
             $itemCost = $this->calculateCost(
                 (int)$lot['branch_id'],
-                (int)$item['category_id'],
-                $item['item_name'],
+                $catalogId,
                 (float)$item['quantity_kg']
             );
             $this->db->query(
@@ -399,17 +414,38 @@ class SaleLot extends Model
     }
 
     // คำนวณต้นทุนตาม cost_method ของสาขา (fifo หรือ weighted)
-    public function calculateCost($branch_id, $category_id, $item_name, $quantity_kg)
+    public function calculateCost($branch_id, $catalog_id, $quantity_kg)
     {
         $method = $this->getCostMethod($branch_id);
         if ($method === 'weighted') {
-            return $this->calculateWeightedAvgCost($branch_id, $category_id, $item_name, $quantity_kg);
+            return $this->calculateWeightedAvgCost($branch_id, $catalog_id, $quantity_kg);
         }
-        return $this->calculateFifoCost($branch_id, $category_id, $item_name, $quantity_kg);
+        return $this->calculateFifoCost($branch_id, $catalog_id, $quantity_kg);
+    }
+
+    private function assertValidCatalogItem(int $branchId, int $catalogId): void
+    {
+        if (!$this->db->fetchColumn("SELECT 1 FROM purchase_item_catalog WHERE id=? AND is_active=1", [$catalogId])) {
+            throw new Exception('ไม่พบสินค้าในแคตตาล็อก');
+        }
+    }
+
+    private function getValidCatalogItem(int $branchId, int $catalogId): array
+    {
+        unset($branchId);
+        $catalog = $this->db->fetch(
+            "SELECT id, category_id, name FROM purchase_item_catalog WHERE id=? AND is_active=1",
+            [$catalogId]
+        );
+        if (!$catalog) {
+            throw new Exception('ไม่พบสินค้าในแคตตาล็อก');
+        }
+
+        return $catalog;
     }
 
     // ต้นทุนประมาณการสำหรับ draft: อ่านอย่างเดียว ไม่ล็อกแถวและไม่บังคับให้สต็อกพอ
-    private function calculateProvisionalCost($branch_id, $category_id, $item_name, $quantity_kg)
+    private function calculateProvisionalCost($branch_id, $catalog_id, $quantity_kg)
     {
         $method = $this->getCostMethod($branch_id);
         if ($method === 'weighted') {
@@ -420,11 +456,10 @@ class SaleLot extends Model
                  FROM purchase_order_items poi
                  INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
                  WHERE po.branch_id = ?
-                   AND poi.category_id = ?
-                   AND poi.item_name = ?
+                   AND poi.catalog_id = ?
                    AND po.status = 'completed'
                    AND (poi.net_quantity - poi.consumed_qty) > 0",
-                [$branch_id, $category_id, $item_name]
+                [$branch_id, $catalog_id]
             );
 
             $totalQty = (float)$row['total_qty'];
@@ -442,12 +477,11 @@ class SaleLot extends Model
              FROM purchase_order_items poi
              INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
              WHERE po.branch_id = ?
-               AND poi.category_id = ?
-               AND poi.item_name = ?
+               AND poi.catalog_id = ?
                AND po.status = 'completed'
                AND (poi.net_quantity - poi.consumed_qty) > 0
-             ORDER BY po.created_at ASC",
-            [$branch_id, $category_id, $item_name]
+             ORDER BY po.created_at ASC, poi.id ASC",
+            [$branch_id, $catalog_id]
         );
 
         $remaining = (float)$quantity_kg;
@@ -466,7 +500,7 @@ class SaleLot extends Model
     }
 
     // คำนวณต้นทุนแบบถัวเฉลี่ย (Weighted Average)
-    public function calculateWeightedAvgCost($branch_id, $category_id, $item_name, $quantity_kg)
+    public function calculateWeightedAvgCost($branch_id, $catalog_id, $quantity_kg)
     {
         $row = $this->db->fetch(
             "SELECT
@@ -475,32 +509,31 @@ class SaleLot extends Model
              FROM purchase_order_items poi
              INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
              WHERE po.branch_id = ?
-               AND poi.category_id = ?
-               AND poi.item_name = ?
+               AND poi.catalog_id = ?
                AND po.status = 'completed'
                AND (poi.net_quantity - poi.consumed_qty) > 0",
-            [$branch_id, $category_id, $item_name]
+            [$branch_id, $catalog_id]
         );
 
         $totalQty   = (float)$row['total_qty'];
         $totalValue = (float)$row['total_value'];
 
         if ($totalQty <= 0) {
-            throw new Exception("สต็อกหมวดหมู่ ID {$category_id} ไม่เพียงพอ");
+            throw new Exception("สต็อก catalog ID {$catalog_id} ไม่เพียงพอ");
         }
 
         $avgPrice = $totalValue / $totalQty;
 
         // เช็คว่ามีสต็อกพอตามปริมาณที่ต้องการ
         if ($totalQty < $quantity_kg) {
-            throw new Exception("สต็อกหมวดหมู่ ID {$category_id} ไม่เพียงพอ (ขาด " . ($quantity_kg - $totalQty) . " กก.)");
+            throw new Exception("สต็อก catalog ID {$catalog_id} ไม่เพียงพอ (ขาด " . ($quantity_kg - $totalQty) . " กก.)");
         }
 
         return $avgPrice * $quantity_kg;
     }
 
     // คำนวณต้นทุน FIFO สำหรับหมวดหมู่ ปริมาณ และ item_name (ADD-001)
-    public function calculateFifoCost($branch_id, $category_id, $item_name, $quantity_kg)
+    public function calculateFifoCost($branch_id, $catalog_id, $quantity_kg)
     {
         // ดึง purchase_order_items ที่ยังมีสต็อกเหลือ เรียงตามวันเก่าสุดก่อน (FIFO)
         $rows = $this->db->fetchAll(
@@ -511,13 +544,12 @@ class SaleLot extends Model
              FROM purchase_order_items poi
              INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
              WHERE po.branch_id = ?
-               AND poi.category_id = ?
-               AND poi.item_name = ?
+               AND poi.catalog_id = ?
                AND po.status = 'completed'
                AND (poi.net_quantity - poi.consumed_qty) > 0
-             ORDER BY po.created_at ASC
+             ORDER BY po.created_at ASC, poi.id ASC
              FOR UPDATE",
-            [$branch_id, $category_id, $item_name]
+            [$branch_id, $catalog_id]
         );
 
         $remaining = (float)$quantity_kg;
@@ -533,7 +565,7 @@ class SaleLot extends Model
         }
 
         if ($remaining > 0) {
-            throw new Exception("สต็อกหมวดหมู่ ID {$category_id} ไม่เพียงพอ (ขาด {$remaining} กก.)");
+            throw new Exception("สต็อก catalog ID {$catalog_id} ไม่เพียงพอ (ขาด {$remaining} กก.)");
         }
 
         return $totalCost;
@@ -544,7 +576,7 @@ class SaleLot extends Model
     public function deductStock($sale_lot_id)
     {
         $items = $this->db->fetchAll(
-            "SELECT id, category_id, item_name, quantity_kg
+            "SELECT id, category_id, item_name, catalog_id, quantity_kg
              FROM sale_lot_items
              WHERE sale_lot_id = ? FOR UPDATE",
             [$sale_lot_id]
@@ -561,7 +593,11 @@ class SaleLot extends Model
         foreach ($items as $item) {
             $requestedQty = (float)$item['quantity_kg'];
             $categoryId = (int)$item['category_id'];
-            $itemName = $item['item_name'] ?? '';
+            $catalogId = (int)($item['catalog_id'] ?? 0);
+            if (!$catalogId) {
+                throw new Exception('Lot เก่านี้ยังไม่มี catalog reference กรุณา migrate/review ก่อนยืนยัน');
+            }
+            $itemName = trim((string)($item['item_name'] ?? ''));
 
             $existingAllocation = $this->db->fetchColumn(
                 "SELECT 1 FROM sale_lot_stock_allocations
@@ -579,9 +615,9 @@ class SaleLot extends Model
                      FROM branch_stock
                      WHERE branch_id = ?
                        AND category_id = ?
-                       AND item_name = ?
+                       AND catalog_id = ?
                      FOR UPDATE",
-                    [$lot['branch_id'], $categoryId, $itemName]
+                    [$lot['branch_id'], $categoryId, $catalogId]
                 );
                 if ($availableBranchStock + 0.000001 < $requestedQty) {
                     $short = $requestedQty - $availableBranchStock;
@@ -599,12 +635,12 @@ class SaleLot extends Model
                  INNER JOIN purchase_orders po ON poi.purchase_order_id = po.id
                  WHERE po.branch_id = ?
                    AND poi.category_id = ?
-                   AND poi.item_name = ?
+                   AND poi.catalog_id = ?
                    AND po.status = 'completed'
                    AND (poi.net_quantity - poi.consumed_qty) > 0
                   ORDER BY po.created_at ASC, poi.id ASC
                  FOR UPDATE",
-                [$lot['branch_id'], $categoryId, $itemName]
+                [$lot['branch_id'], $categoryId, $catalogId]
             );
 
             $totalAvailable = 0.0;
@@ -676,7 +712,7 @@ class SaleLot extends Model
             }
 
             $branchStock = new BranchStock();
-            $branchStock->deduct($lot['branch_id'], $categoryId, $itemName, $requestedQty);
+            $branchStock->deduct($lot['branch_id'], $categoryId, $itemName, $requestedQty, $catalogId);
             $this->db->query(
                 "UPDATE categories SET stock_kg = GREATEST(0, stock_kg - ?) WHERE id = ?",
                 [$requestedQty, $categoryId]
@@ -698,7 +734,7 @@ class SaleLot extends Model
     public function restoreStock($sale_lot_id)
     {
         $items = $this->db->fetchAll(
-            "SELECT id, category_id, item_name, quantity_kg
+            "SELECT id, category_id, item_name, catalog_id, quantity_kg
              FROM sale_lot_items
              WHERE sale_lot_id = ? FOR UPDATE",
             [$sale_lot_id]
@@ -731,12 +767,16 @@ class SaleLot extends Model
         foreach ($items as $item) {
             $toRestore = (float)$item['quantity_kg'];
             $categoryId = (int)$item['category_id'];
-            $itemName = $item['item_name'] ?? '';
+            $catalogId = (int)($item['catalog_id'] ?? 0);
+            if (!$catalogId) {
+                throw new Exception('Lot เก่านี้ยังไม่มี catalog reference กรุณาใช้เอกสารปรับปรุง');
+            }
+            $itemName = trim((string)($item['item_name'] ?? ''));
 
             // ── Branch Stock: restore per-branch per-item (ADD-001) ──
             if ($categoryId && $itemName) {
                 $branchStock = new BranchStock();
-                $branchStock->restore($lot['branch_id'], $categoryId, $itemName, $toRestore);
+                $branchStock->restore($lot['branch_id'], $categoryId, $itemName, $toRestore, $catalogId);
             }
 
             // STOCK FIX: Restore category stock (dual-write backward compat)
@@ -844,6 +884,7 @@ class SaleLot extends Model
 
         $this->db->beginTransaction();
         try {
+            $this->db->query("DELETE FROM sale_lot_stock_allocations WHERE sale_lot_id = ?", [$id]);
             $this->db->query("DELETE FROM sale_lot_items WHERE sale_lot_id = ?", [$id]);
             $this->db->query("DELETE FROM {$this->table} WHERE id = ?", [$id]);
             $this->db->commit();

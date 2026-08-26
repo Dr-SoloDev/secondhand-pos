@@ -503,6 +503,7 @@ function normalizeTransferItems(transfer) {
     return sourceItems.map((item, index) => ({
       id: Number(item.id || item.transfer_item_id || 0) || null,
       category_id: Number(item.category_id || 0) || null,
+      catalog_id: Number(item.catalog_id || 0) || null,
       category_name: item.category_name || '',
       item_name: item.item_name || `รายการ ${index + 1}`,
       weight_kg: Number(item.weight_kg ?? item.sent_weight_kg ?? item.quantity_kg ?? 0),
@@ -518,6 +519,7 @@ function normalizeTransferItems(transfer) {
     return [{
       id: null,
       category_id: Number(transfer.category_id || 0) || null,
+      catalog_id: null,
       category_name: transfer.category_name || '',
       item_name: transfer.item_name || transfer.category_name || 'รายการสินค้า',
       weight_kg: Number(transfer.weight_kg || 0),
@@ -714,6 +716,7 @@ async function loadLineItems(row, clearWeight) {
   items.filter(item => Number(item.stock_kg || 0) > 0).forEach(item => {
     const option = new Option(`${item.item_name} (${formatKg(item.stock_kg)})`, item.item_name);
     option.dataset.stockKg = String(item.stock_kg);
+    option.dataset.catalogId = String(item.catalog_id || '');
     itemSelect.appendChild(option);
   });
 
@@ -766,11 +769,12 @@ function collectTransferItems() {
     const itemSelect = row.querySelector('.transfer-line-item');
     const itemName = itemSelect.value.trim();
     const selectedOption = itemSelect.selectedOptions[0];
+    const catalogId = Number(selectedOption?.dataset.catalogId || 0);
     const availableStock = Number(selectedOption?.dataset.stockKg || 0);
     const weight = Number(row.querySelector('.transfer-line-weight').value || 0);
 
-    if (!categoryId || !itemName) {
-      throw new Error('กรุณาเลือกสินค้าให้ครบทุกรายการ');
+    if (!categoryId || !catalogId || !itemName) {
+      throw new Error('รายการนี้ยังไม่ผูกกับแคตตาล็อก กรุณา migrate/review สต็อกก่อนโอน');
     }
     if (!(weight > 0)) {
       throw new Error(`กรุณาระบุน้ำหนักของ ${itemName}`);
@@ -779,13 +783,14 @@ function collectTransferItems() {
       throw new Error(`${itemName} มีสต็อกพร้อมโอนเพียง ${formatKg(availableStock)}`);
     }
 
-    const key = `${categoryId}:${itemName}`;
+    const key = `${catalogId}`;
     if (seen.has(key)) {
       throw new Error(`${itemName} ถูกเพิ่มซ้ำ กรุณารวมเป็นรายการเดียว`);
     }
     seen.add(key);
     items.push({
       category_id: categoryId,
+      catalog_id: catalogId,
       item_name: itemName,
       weight_kg: weight,
     });

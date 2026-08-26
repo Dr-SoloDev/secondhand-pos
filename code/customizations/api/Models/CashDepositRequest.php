@@ -110,15 +110,23 @@ class CashDepositRequest extends Model
         }
     }
 
-    public function reject(int $id, int $reviewerId, string $reviewNote): void
+    public function reject(int $id, int $reviewerId, string $reviewNote, bool $allowSelfApproval = false): void
     {
         $reviewNote = trim($reviewNote);
         if ($reviewNote === '') throw new Exception('กรุณาระบุเหตุผลที่ปฏิเสธ');
-        $stmt = $this->db->query(
-            "UPDATE cash_deposit_requests SET status='rejected', reviewed_by=?, reviewed_at=NOW(), review_note=?
-             WHERE id=? AND status='pending' AND requested_by<>?",
-            [$reviewerId, substr($reviewNote, 0, 500), $id, $reviewerId]
-        );
+        if ($allowSelfApproval) {
+            $stmt = $this->db->query(
+                "UPDATE cash_deposit_requests SET status='rejected', reviewed_by=?, reviewed_at=NOW(), review_note=?
+                 WHERE id=? AND status='pending'",
+                [$reviewerId, substr($reviewNote, 0, 500), $id]
+            );
+        } else {
+            $stmt = $this->db->query(
+                "UPDATE cash_deposit_requests SET status='rejected', reviewed_by=?, reviewed_at=NOW(), review_note=?
+                 WHERE id=? AND status='pending' AND requested_by<>?",
+                [$reviewerId, substr($reviewNote, 0, 500), $id, $reviewerId]
+            );
+        }
         if (!$stmt->rowCount()) throw new Exception('ไม่สามารถปฏิเสธคำขอนี้ได้');
     }
 

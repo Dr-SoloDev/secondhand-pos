@@ -466,7 +466,12 @@ function addItemToCart() {
   };
 
   if (!name) { showNotification('กรุณากรอกชื่อสินค้า', 'error'); focusItemName(); return; }
-  if (!catalogId) { showNotification('กรุณาเลือกสินค้าจากรายการที่ระบบกำหนด', 'error'); focusItemName(); return; }
+  const parsedCatalogId = parseInt(catalogId, 10);
+  if (!parsedCatalogId || !currentCatalogItem || currentCatalogItem.id !== parsedCatalogId || currentCatalogItem.name !== name) {
+    showNotification('กรุณาเลือกสินค้าจากรายการแคตตาล็อกที่ระบบกำหนด', 'error');
+    focusItemName();
+    return;
+  }
   if (qty <= 0) { showNotification('น้ำหนักต้องมากกว่า 0', 'error'); focusItemName(); return; }
   if (deduct < 0) { showNotification('น้ำหนักหักต้องไม่ติดลบ', 'error'); focusItemName(); return; }
   if (deduct >= qty) { showNotification('น้ำหนักหักต้องน้อยกว่าน้ำหนักรวม', 'error'); focusItemName(); return; }
@@ -491,7 +496,7 @@ function addItemToCart() {
   const isIdCard = currentCatalogItem?.requiresIdCard || false;
   cart.push({
     _tempId: tempId,
-    catalog_id: parseInt(catalogId, 10),
+    catalog_id: parsedCatalogId,
     item_name: name,
     category_id: catId ? parseInt(catId, 10) : null,
     quantity: qty,

@@ -368,11 +368,12 @@ class InventoryController extends Controller
     public function getTransactions()
     {
         $this->requireAuth();
+        $branchId = $this->resolveReadBranchId();
         $productId = isset($_GET['product_id']) ? intval($_GET['product_id']) : null;
         $type = isset($_GET['type']) ? $this->sanitizeInput($_GET['type']) : null;
 
         $inventory = new Inventory();
-        $transactions = $inventory->getTransactions($productId, $type);
+        $transactions = $inventory->getTransactions($productId, $type, $branchId);
 
         Response::success('Inventory transactions retrieved', $transactions);
     }
@@ -627,7 +628,8 @@ class InventoryController extends Controller
 
         // Query item-level stock จาก branch_stock (SSoT). Null branch means all branches.
         $sql = "SELECT
-                    bs.item_name,
+                    COALESCE(bs.catalog_id, 0) AS catalog_id,
+                    MIN(bs.item_name) AS item_name,
                     ROUND(SUM(bs.stock_kg), 3) AS stock_kg,
                     CASE
                         WHEN SUM(bs.stock_kg) > 0
@@ -643,8 +645,8 @@ class InventoryController extends Controller
             $params[] = $branchId;
         }
 
-        $sql .= " GROUP BY bs.item_name
-                  ORDER BY stock_kg DESC, bs.item_name ASC";
+        $sql .= " GROUP BY COALESCE(bs.catalog_id, 0)
+                  ORDER BY stock_kg DESC, item_name ASC";
 
         $items = $this->db->fetchAll($sql, $params) ?: [];
 
@@ -654,6 +656,7 @@ class InventoryController extends Controller
             $kg = (float)$item['stock_kg'];
             $totalStockKg += $kg;
             $formattedItems[] = [
+                'catalog_id'        => (int)($item['catalog_id'] ?? 0),
                 'item_name'         => $item['item_name'],
                 'stock_kg'          => $kg,
                 'latest_unit_price' => (float)($item['latest_unit_price'] ?? 0),

@@ -3,13 +3,14 @@ test_adjustments() {
   test_section "Adjustment Documents"
 
   local branch_id=2 manager_cookie manager_login res before after expected
-  local seller_id cat_id suffix item_name po po_id po_ref lot lot_id doc_id yesterday
+  local seller_id cat_id suffix item_name catalog_res catalog_id po po_id po_ref lot lot_id doc_id yesterday
 
   ensure_cash_session_open "$branch_id"
   manager_cookie="/tmp/test_adjustment_manager_$$.cookie"
+  manager_password="${QA_MANAGER_PASSWORD:-admin}"
   manager_login=$(curl -s -c "$manager_cookie" "$API_BASE/auth/login" \
     -X POST -H 'Content-Type: application/json' \
-    -d '{"username":"manager-br02","password":"admin"}')
+    -d "{\"username\":\"manager-br02\",\"password\":\"$manager_password\"}")
   assert_contains "$manager_login" '"status":"success"' "Adjustment: Branch manager login"
 
   res=$(curl -s -b "$manager_cookie" "$API_BASE/adjustment-documents?branch_id=$branch_id")
@@ -27,11 +28,14 @@ test_adjustments() {
 
   seller_id=$(api_get "sellers" | json_get "data.0.id" 2>/dev/null)
   [ -z "$seller_id" ] && seller_id=1
-  cat_id=$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)
-  [ -z "$cat_id" ] && cat_id=1
-  suffix="$(date +%s)_$$"
+  suffix="$(date +%s)"
   item_name="QA Adjustment $suffix"
-  po=$(api_post "purchase-orders" "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",\"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity\":2,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":5}]}")
+  catalog_res=$(api_post "purchase-catalog" "{\"code\":\"QA-${suffix}\",\"name\":\"$item_name\",\"category_id\":$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)}")
+  catalog_id=$(echo "$catalog_res" | json_get "data.id" 2>/dev/null)
+  assert_contains "$catalog_res" '"status":"success"' "Adjustment: Create unique QA catalog"
+  assert_neq "" "$catalog_id" "Adjustment: Unique QA catalog returns ID"
+  cat_id=$(api_get "purchase-catalog/item?id=$catalog_id" | json_get "data.category_id" 2>/dev/null)
+  po=$(api_post "purchase-orders" "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",\"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity\":2,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":5}]}")
   po_id=$(echo "$po" | json_get "data.id" 2>/dev/null)
   po_ref=$(echo "$po" | json_get "data.reference_no" 2>/dev/null)
   assert_contains "$po" '"status":"success"' "Adjustment: Create stock source PO"
@@ -39,7 +43,7 @@ test_adjustments() {
   res=$(api_post "adjustment-documents" "{\"adjustment_type\":\"purchase_order_cancellation\",\"target_reference\":\"$po_ref\",\"reason\":\"Same-day bypass test\"}")
   assert_contains "$res" '"status":"error"' "Adjustment: Same-day PO cannot bypass cancellation approval"
 
-  lot=$(api_post "sale-lots" "{\"branch_id\":$branch_id,\"buyer_name\":\"QA Adjustment Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.2,\"unit_price\":30}]}")
+  lot=$(api_post "sale-lots" "{\"branch_id\":$branch_id,\"buyer_name\":\"QA Adjustment Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.2,\"unit_price\":30}]}")
   lot_id=$(echo "$lot" | json_get "data.id" 2>/dev/null)
   assert_contains "$lot" '"status":"success"' "Adjustment: Create Sale Lot for revenue correction"
   res=$(api_post_id "sale-lots/confirm" "$lot_id" '{}')

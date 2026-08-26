@@ -854,6 +854,10 @@ class CashSession extends Model
         if (!$this->hasPositionModel((int)($row['branch_id'] ?? 0))) return $row;
         $positions = $this->getPositionBalances((int)$row['branch_id']);
         $row['cash_model_version'] = 2;
+        if (isset($positions['baseline_id'])) {
+            $row['baseline_id'] = $positions['baseline_id'];
+            $row['baseline_effective_date'] = $positions['baseline_effective_date'];
+        }
         $row['drawer_balance'] = $positions['drawer_balance'];
         $row['reserve_balance'] = $positions['reserve_balance'];
         $row['bank_balance'] = $positions['bank_balance'] ?? 0.0;

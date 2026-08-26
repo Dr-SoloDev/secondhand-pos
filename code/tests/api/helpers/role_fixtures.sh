@@ -3,7 +3,7 @@
 
 AUTH_FIXTURE_PASSWORD="${AUTH_FIXTURE_PASSWORD:-AccessTest123!}"
 AUTH_FIXTURE_ADMIN_USER="${AUTH_FIXTURE_ADMIN_USER:-admin}"
-AUTH_FIXTURE_ADMIN_PASS="${AUTH_FIXTURE_ADMIN_PASS:-admin}"
+AUTH_FIXTURE_ADMIN_PASS="${AUTH_FIXTURE_ADMIN_PASS:-${TEST_PASS:-admin}}"
 AUTH_FIXTURE_COOKIE_DIR="${AUTH_FIXTURE_COOKIE_DIR:-/tmp/scrap_pos_auth_fixtures}"
 AUTH_FIXTURE_BRANCH_A="${AUTH_FIXTURE_BRANCH_A:-1}"
 AUTH_FIXTURE_BRANCH_B="${AUTH_FIXTURE_BRANCH_B:-2}"
@@ -96,6 +96,28 @@ role_fixture_ensure_user() {
       return 1
     }
     return 0
+  fi
+
+  rm -f "$cookie"
+
+  local existing_response existing_id update_payload
+  existing_response=$(role_fixture_get "$AUTH_FIXTURE_ADMIN_COOKIE" "users/all")
+  existing_id=$(echo "$existing_response" | json_find "data" "username" "$username" "id" 2>/dev/null || true)
+  if [ -n "$existing_id" ]; then
+    if [ -n "$branch_id" ]; then
+      update_payload="{\"status\":\"active\",\"branch_id\":$branch_id}"
+    else
+      update_payload='{"status":"active"}'
+    fi
+    update_payload="{\"user_id\":$existing_id,\"new_password\":\"$AUTH_FIXTURE_PASSWORD\"}"
+    response=$(role_fixture_post "$AUTH_FIXTURE_ADMIN_COOKIE" "users/change-password" "$update_payload")
+    echo "$response" | grep -q '"status":"success"' || return 1
+
+    role_fixture_login "$username" "$AUTH_FIXTURE_PASSWORD" "$cookie" || return 1
+    response=$(curl -s -b "$cookie" "$API_BASE/auth/verify" -X POST \
+      -H 'Content-Type: application/json' -d '{}')
+    role_fixture_check_identity "$response" "$role" "$branch_id"
+    return
   fi
 
   [ -n "${AUTH_FIXTURE_ADMIN_COOKIE:-}" ] || return 1

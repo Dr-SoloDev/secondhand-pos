@@ -165,6 +165,7 @@ class PurchaseOrder extends Model
 
             $items = $this->db->fetchAll(
                 "SELECT category_id,
+                        catalog_id,
                         item_name,
                         quantity,
                         weight_deduction,
@@ -215,7 +216,7 @@ class PurchaseOrder extends Model
 
                 // ── Branch Stock: deduct per-branch per-item (ADD-001) ──
                 $branchStock = new BranchStock();
-                $branchStock->deduct($po['branch_id'], $item['category_id'], $item['item_name'], $netQty);
+                $branchStock->deduct($po['branch_id'], $item['category_id'], $item['item_name'], $netQty, (int)($item['catalog_id'] ?? 0) ?: null);
 
                 // ── Dual-write: categories.stock_kg (backward compat) ──
                 $this->db->query(
@@ -319,11 +320,27 @@ class PurchaseOrder extends Model
                 $totalPrice = round($netQty * $unitPrice, 2);
                 $totalAmount += $totalPrice;
                 $categoryId = $item['category_id'] ?? null;
+                $catalogId = (int)($item['catalog_id'] ?? 0);
+                if (!$catalogId) {
+                    throw new Exception('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อก');
+                }
+
+                $catalog = $this->db->fetch(
+                    "SELECT id, category_id, name FROM purchase_item_catalog WHERE id = ? AND is_active = 1",
+                    [$catalogId]
+                );
+                if (!$catalog) {
+                    throw new Exception('ไม่พบสินค้าในแคตตาล็อก');
+                }
+
+                $categoryId = (int)$catalog['category_id'];
+                $itemName = trim((string)$catalog['name']);
 
                 $this->db->insert('purchase_order_items', [
                     'purchase_order_id' => $poId,
                     'product_id' => $item['product_id'] ?? null,
-                    'item_name' => $item['item_name'],
+                    'catalog_id' => $catalogId ?: null,
+                    'item_name' => $itemName,
                     'category_id' => $categoryId,
                     'condition_id' => null, // DEPRECATED — ใช้ weight_deduction แทน
                     'quantity' => $qty,
@@ -345,7 +362,14 @@ class PurchaseOrder extends Model
                 // ── Branch Stock: UPSERT per-branch per-item (ADD-001) ──
                 if ($categoryId) {
                     $branchStock = new BranchStock();
-                    $branchStock->upsert($data['branch_id'], $categoryId, $item['item_name'], $netQty, $unitPrice);
+                    $branchStock->upsert(
+                        $data['branch_id'],
+                        $categoryId,
+                        $itemName,
+                        $netQty,
+                        $unitPrice,
+                        $catalogId ?: null
+                    );
 
                     // ── Dual-write: categories.stock_kg (backward compat) ──
                     $this->db->query(

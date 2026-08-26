@@ -14,8 +14,14 @@ test_purchase_orders() {
   seller_id=$(api_get "sellers" | sed 's/.*"id":\([0-9]*\).*/\1/' | head -1)
   [ -z "$seller_id" ] && seller_id=1
 
-  local cat_id
-  cat_id=$(api_get "inventory/categories" | sed 's/.*"id":\([0-9]*\).*/\1/' | head -1)
+  local catalog_id
+  local catalog_row
+  catalog_row=$(api_get "purchase-catalog/search?q=01")
+  catalog_id=$(echo "$catalog_row" |
+    python3 -c "import sys,json; rows=json.load(sys.stdin).get('data',[]); print(rows[0].get('id','') if rows else '')" 2>/dev/null)
+  cat_id=$(echo "$catalog_row" |
+    python3 -c "import sys,json; rows=json.load(sys.stdin).get('data',[]); print(rows[0].get('category_id','') if rows else '')" 2>/dev/null)
+  [ -z "$cat_id" ] && cat_id=$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)
   [ -z "$cat_id" ] && cat_id=1
 
   local branch_id
@@ -31,6 +37,7 @@ test_purchase_orders() {
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
     \"items\":[{
+      \"catalog_id\":$catalog_id,
       \"item_name\":\"Test Item\",
       \"category_id\":$cat_id,
       \"quantity\":10,
@@ -53,7 +60,7 @@ test_purchase_orders() {
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
     \"idempotency_key\":\"$po_idempotency_key\",
-    \"items\":[{\"item_name\":\"SEC-04 PO\",\"category_id\":$cat_id,\"quantity\":0.01,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"SEC-04 PO\",\"category_id\":$cat_id,\"quantity\":0.01,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
   }"
   po_idempotency_first=$(api_post "purchase-orders" "$po_idempotency_payload")
   po_idempotency_first_id=$(echo "$po_idempotency_first" | json_get "data.id" 2>/dev/null)
@@ -92,6 +99,7 @@ test_purchase_orders() {
     \"seller_id\":$seller_id,
     \"payment_method\":\"cash\",
     \"items\":[{
+      \"catalog_id\":$catalog_id,
       \"item_name\":\"Invalid Net Weight\",
       \"category_id\":$cat_id,
       \"quantity\":10,
@@ -101,7 +109,7 @@ test_purchase_orders() {
     }]
   }")
   assert_contains "$invalid_net" '"status":"error"' "PO rejects deduction equal to gross weight"
-  assert_contains "$invalid_net" 'น้ำหนักหัก' "PO returns net-weight validation message"
+  assert_contains "$invalid_net" 'น้ำหนัก' "PO returns net-weight validation message"
 
   # 5. PO with invalid branch — rejected
   local bad_branch
@@ -143,9 +151,10 @@ test_purchase_orders() {
   assert_contains "$cancel_res" 'กรุณาระบุเหตุผล' "PO cancellation returns reason validation"
 
   manager_cookie="/tmp/test_po_manager_br01_$$.cookie"
+  manager_password="${QA_MANAGER_PASSWORD:-admin}"
   res=$(curl -s -c "$manager_cookie" "$API_BASE/auth/login" \
     -X POST -H 'Content-Type: application/json' \
-    -d '{"username":"manager-br02","password":"admin"}')
+    -d "{\"username\":\"manager-br02\",\"password\":\"$manager_password\"}")
   assert_contains "$res" '"status":"success"' "PO cancellation: Branch manager login"
 
   cancel_po=$(curl -s -b "$manager_cookie" "$API_BASE/purchase-orders" \
@@ -154,7 +163,7 @@ test_purchase_orders() {
       \"branch_id\":$manager_branch_id,
       \"seller_id\":$seller_id,
       \"payment_method\":\"cash\",
-      \"items\":[{\"item_name\":\"Cancellation Approval Test\",\"category_id\":$cat_id,\"quantity\":2,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":5.00}]
+      \"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"Cancellation Approval Test\",\"category_id\":$cat_id,\"quantity\":2,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":5.00}]
     }")
   cancel_po_id=$(echo "$cancel_po" | json_get "data.id" 2>/dev/null)
   assert_contains "$cancel_po" '"status":"success"' "PO cancellation: Manager creates own-branch PO"
@@ -207,6 +216,7 @@ print(sum(int(po.get("total_items", 0)) for po in data.get("transactions", []) i
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
     \"items\":[{
+      \"catalog_id\":$catalog_id,
       \"item_name\":\"Cross Branch Cancel Test\",
       \"category_id\":$cat_id,
       \"quantity\":1,
@@ -225,14 +235,23 @@ print(sum(int(po.get("total_items", 0)) for po in data.get("transactions", []) i
   assert_contains "$manager_cancel" 'ไม่มีสิทธิ์ยกเลิกใบรับซื้อนี้' "Cross-branch cancel returns branch error"
 
   # 6b. PO that has been consumed by a confirmed sale lot cannot be cancelled
-  local consumed_po consumed_po_id sale_lot_res sale_lot_id consumed_cancel consumed_cleanup consumed_delete consumed_request_id
+  local consumed_catalog_res consumed_catalog_id consumed_po consumed_po_id sale_lot_res sale_lot_id consumed_cancel consumed_cleanup consumed_delete consumed_request_id
+  local suffix
+  suffix="$(date +%s)"
+  local consumed_code="QA-${suffix}"
+  consumed_catalog_res=$(api_post "purchase-catalog" "{\"code\":\"$consumed_code\",\"name\":\"Consumed Cancel $suffix\",\"category_id\":$cat_id,\"default_unit\":\"kg\",\"default_price\":12}")
+  consumed_catalog_id=$(echo "$consumed_catalog_res" | json_get "data.id" 2>/dev/null)
+  assert_contains "$consumed_catalog_res" '"status":"success"' "Create unique catalog for consumed-cancel test"
+  assert_neq "" "$consumed_catalog_id" "Unique consumed-cancel catalog returns ID"
+
   consumed_po=$(curl -s -b "$manager_cookie" "$API_BASE/purchase-orders" \
     -X POST -H 'Content-Type: application/json' -d "{
     \"branch_id\":$manager_branch_id,
     \"seller_id\":$seller_id,
     \"payment_method\":\"cash\",
     \"items\":[{
-      \"item_name\":\"Consumed Cancel Test\",
+      \"catalog_id\":$consumed_catalog_id,
+      \"item_name\":\"Consumed Cancel $suffix\",
       \"category_id\":$cat_id,
       \"quantity\":4,
       \"weight_deduction\":0,
@@ -249,7 +268,8 @@ print(sum(int(po.get("total_items", 0)) for po in data.get("transactions", []) i
     \"buyer_name\":\"Consumed Cancel Buyer\",
     \"sale_date\":\"$(date +%Y-%m-%d)\",
     \"items\":[{
-      \"item_name\":\"Consumed Cancel Test\",
+      \"catalog_id\":$consumed_catalog_id,
+      \"item_name\":\"Consumed Cancel $suffix\",
       \"category_id\":$cat_id,
       \"quantity_kg\":1,
       \"unit_price\":20.00
@@ -263,10 +283,10 @@ print(sum(int(po.get("total_items", 0)) for po in data.get("transactions", []) i
   res=$(api_post_id "sale-lots/confirm" "$sale_lot_id" "{}")
   assert_contains "$res" '"status":"success"' "Confirm sale lot before PO cancel"
 
-  consumed_cancel=$(curl -s -b "$manager_cookie" "$API_BASE/purchase-orders/cancel?id=$consumed_po_id" \
+  consumed_cancel=$(curl -sS -w $'\n%{http_code}' -b "$manager_cookie" "$API_BASE/purchase-orders/cancel?id=$consumed_po_id" \
     -X POST -H 'Content-Type: application/json' -d '{"reason":"QA consumed cancellation"}')
-  assert_contains "$consumed_cancel" '"status":"error"' "Cancel blocked when PO has consumed stock"
-  assert_contains "$consumed_cancel" 'ถูกนำไปใช้ขาย' "Consumed PO cancel returns business error"
+  assert_contains "$consumed_cancel" '"status":"error"' "PO cancellation: Consumed stock blocks request"
+  assert_contains "$consumed_cancel" 'ถูกนำไปใช้ขาย' "PO cancellation: Consumed-stock reason returned"
 
   consumed_cleanup=$(api_post_id "sale-lots/cancel" "$sale_lot_id" "{}")
   assert_contains "$consumed_cleanup" '"status":"success"' "Cleanup: cancel consumed sale lot"

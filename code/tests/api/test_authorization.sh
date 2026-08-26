@@ -15,6 +15,7 @@ auth_prepare_cash_sessions() {
 
 test_authorization() {
   test_section "Authorization Matrix (v3)"
+  local auth_fixture_password="${AUTH_FIXTURE_PASSWORD:-AccessTest123!}"
 
   if ! role_fixture_prepare; then
     test_fail "AUTH fixtures: admin credential and deterministic role users are available"
@@ -36,8 +37,12 @@ test_authorization() {
   local transfer_po transfer_po_id transfer_item_name
   suffix="$(date +%s)"
 
+  local qa_catalog_id qa_catalog_code
   category_id=$(role_fixture_get "$AUTH_FIXTURE_ADMIN_COOKIE" "inventory/categories" | json_get "data.0.id" 2>/dev/null)
   [ -z "$category_id" ] && category_id=1
+  qa_catalog_code="QA-FLOW-$suffix"
+  role_fixture_post "$AUTH_FIXTURE_ADMIN_COOKIE" "purchase-catalog" "{\"code\":\"$qa_catalog_code\",\"name\":\"QA Auth Flow Stock $suffix\",\"category_id\":$category_id}" >/dev/null
+  qa_catalog_id=$(role_fixture_get "$AUTH_FIXTURE_ADMIN_COOKIE" "purchase-catalog/search?q=$qa_catalog_code" | json_get "data.0.id" 2>/dev/null)
 
   seller_response=$(role_fixture_post "$AUTH_FIXTURE_CASHIER_A_COOKIE" "sellers" \
     "{\"full_name\":\"QA Authorization Seller $suffix\",\"phone\":\"09${suffix: -8}\"}")
@@ -57,7 +62,7 @@ test_authorization() {
     \"branch_id\":$branch_a,
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
-    \"items\":[{\"item_name\":\"QA Authorization PO A $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"QA Authorization PO A $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
   }")
   po_a_id=$(auth_extract_id "$po_a")
   assert_contains "$po_a" '"status":"success"' "AUTH-02: cashier-A creates PO in Branch A"
@@ -67,7 +72,7 @@ test_authorization() {
     \"branch_id\":$branch_b,
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
-    \"items\":[{\"item_name\":\"QA Authorization Cross Branch $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"QA Authorization Cross Branch $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
   }")
   assert_contains "$cross_branch_po" '"status":"error"' "AUTH-03: cashier-A cannot create PO in Branch B"
 
@@ -99,7 +104,7 @@ test_authorization() {
       \"branch_id\":$branch_a,
       \"seller_id\":$seller_id,
       \"payment_method\":\"bank_transfer\",
-      \"items\":[{\"item_name\":\"QA Authorization Reject PO $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"QA Authorization Reject PO $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
     }")
     reject_po_id=$(auth_extract_id "$reject_po")
     if [ -n "$reject_po_id" ]; then
@@ -120,7 +125,7 @@ test_authorization() {
     \"branch_id\":$branch_b,
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
-    \"items\":[{\"item_name\":\"QA Authorization PO B $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"QA Authorization PO B $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
   }")
   po_b_id=$(auth_extract_id "$po_b")
   if [ -n "$po_b_id" ]; then
@@ -142,7 +147,7 @@ test_authorization() {
     \"branch_id\":$branch_a,
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
-    \"items\":[{\"item_name\":\"QA Authorization Self PO $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"QA Authorization Self PO $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
   }")
   po_self_id=$(auth_extract_id "$po_self")
   if [ -n "$po_self_id" ]; then
@@ -196,7 +201,7 @@ test_authorization() {
     \"branch_id\":$branch_a,
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
-    \"items\":[{\"item_name\":\"QA Authorization Admin Self PO $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"QA Authorization Admin Self PO $suffix\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
   }")
   admin_po_id=$(auth_extract_id "$admin_po")
   if [ -n "$admin_po_id" ]; then
@@ -216,7 +221,7 @@ test_authorization() {
     \"branch_id\":$branch_a,
     \"seller_id\":$seller_id,
     \"payment_method\":\"bank_transfer\",
-    \"items\":[{\"item_name\":\"$transfer_item_name\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+    \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"$transfer_item_name\",\"category_id\":$category_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
   }")
   transfer_po_id=$(auth_extract_id "$transfer_po")
   assert_contains "$transfer_po" '"status":"success"' "AUTH-17: cashier-A creates source stock for transfer"
@@ -226,9 +231,7 @@ test_authorization() {
   wrong_source_transfer=$(role_fixture_post "$AUTH_FIXTURE_CASHIER_A_COOKIE" "stock-transfers" "{
     \"from_branch_id\":$branch_b,
     \"to_branch_id\":$branch_a,
-    \"category_id\":$category_id,
-    \"item_name\":\"$transfer_item_name\",
-    \"weight_kg\":0.25,
+    \"items\":[{\"category_id\":$category_id,\"catalog_id\":$qa_catalog_id,\"item_name\":\"$transfer_item_name\",\"weight_kg\":0.25}],
     \"note\":\"QA forged source branch\"
   }")
   assert_contains "$wrong_source_transfer" '"status":"error"' "AUTH-19: cashier-A cannot create transfer from Branch B"
@@ -236,9 +239,7 @@ test_authorization() {
   transfer_response=$(role_fixture_post "$AUTH_FIXTURE_CASHIER_A_COOKIE" "stock-transfers" "{
     \"from_branch_id\":$branch_a,
     \"to_branch_id\":$branch_b,
-    \"category_id\":$category_id,
-    \"item_name\":\"$transfer_item_name\",
-    \"weight_kg\":0.5,
+    \"items\":[{\"category_id\":$category_id,\"catalog_id\":$qa_catalog_id,\"item_name\":\"$transfer_item_name\",\"weight_kg\":0.5}],
     \"note\":\"QA authorization transfer\"
   }")
   transfer_id=$(auth_extract_id "$transfer_response")
@@ -268,9 +269,7 @@ test_authorization() {
     manager_transfer=$(role_fixture_post "$AUTH_FIXTURE_MANAGER_A_COOKIE" "stock-transfers" "{
       \"from_branch_id\":$branch_a,
       \"to_branch_id\":$branch_b,
-      \"category_id\":$category_id,
-      \"item_name\":\"$transfer_item_name\",
-      \"weight_kg\":0.25,
+      \"items\":[{\"category_id\":$category_id,\"catalog_id\":$qa_catalog_id,\"item_name\":\"$transfer_item_name\",\"weight_kg\":0.25}],
       \"note\":\"QA manager cancellation flow\"
     }")
     manager_transfer_id=$(auth_extract_id "$manager_transfer")
@@ -286,7 +285,7 @@ test_authorization() {
       \"branch_id\":$branch_a,
       \"buyer_name\":\"QA W4 Manager Buyer $suffix\",
       \"sale_date\":\"$(date +%Y-%m-%d)\",
-      \"items\":[{\"item_name\":\"$transfer_item_name\",\"category_id\":$category_id,\"quantity_kg\":0.25,\"unit_price\":3}]
+      \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"$transfer_item_name\",\"category_id\":$category_id,\"quantity_kg\":0.25,\"unit_price\":3}]
     }")
     manager_lot_id=$(auth_extract_id "$manager_lot")
     assert_contains "$manager_lot" '"status":"success"' "AUTH-13: manager-A creates Sale Lot in Branch A"
@@ -294,7 +293,7 @@ test_authorization() {
       manager_lot_update=$(role_fixture_put "$AUTH_FIXTURE_MANAGER_A_COOKIE" "sale-lots/sale-lot?id=$manager_lot_id" "{
         \"buyer_name\":\"QA W4 Manager Buyer Updated $suffix\",
         \"sale_date\":\"$(date +%Y-%m-%d)\",
-        \"items\":[{\"item_name\":\"$transfer_item_name\",\"category_id\":$category_id,\"quantity_kg\":0.25,\"unit_price\":3.5}]
+        \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"$transfer_item_name\",\"category_id\":$category_id,\"quantity_kg\":0.25,\"unit_price\":3.5}]
       }")
       assert_contains "$manager_lot_update" '"status":"success"' "AUTH-13a: manager-A updates own draft Sale Lot"
 
@@ -304,7 +303,7 @@ test_authorization() {
       wrong_branch_lot_update=$(role_fixture_put "$AUTH_FIXTURE_MANAGER_B_COOKIE" "sale-lots/sale-lot?id=$manager_lot_id" "{
         \"buyer_name\":\"QA W4 Cross Branch Update\",
         \"sale_date\":\"$(date +%Y-%m-%d)\",
-        \"items\":[{\"item_name\":\"$transfer_item_name\",\"category_id\":$category_id,\"quantity_kg\":0.1,\"unit_price\":3}]
+        \"items\":[{\"catalog_id\":$qa_catalog_id,\"item_name\":\"$transfer_item_name\",\"category_id\":$category_id,\"quantity_kg\":0.1,\"unit_price\":3}]
       }")
       assert_contains "$wrong_branch_lot_update" '"status":"error"' "AUTH-14: manager-B cannot update Branch A Sale Lot"
       wrong_branch_lot_cancel=$(role_fixture_post "$AUTH_FIXTURE_MANAGER_B_COOKIE" "sale-lots/cancel" \
@@ -326,13 +325,14 @@ test_authorization() {
 
     # W4 inventory reads are branch-scoped even when a cashier forges a
     # branch_id query parameter. Create a Branch B-only marker for the check.
-    local branch_b_item_name branch_b_stock cashier_inventory own_inventory forged_inventory
+    local branch_b_item_name branch_b_stock branch_b_catalog_id cashier_inventory own_inventory forged_inventory
     branch_b_item_name="QA W4 Branch B Only $suffix"
+    branch_b_catalog_id=$(role_fixture_post "$AUTH_FIXTURE_MANAGER_B_COOKIE" "purchase-catalog" "{\"code\":\"QA-BR-B-$suffix\",\"name\":\"$branch_b_item_name\",\"category_id\":$category_id}" | json_get "data.id" 2>/dev/null)
     branch_b_stock=$(role_fixture_post "$AUTH_FIXTURE_MANAGER_B_COOKIE" "purchase-orders" "{
       \"branch_id\":$branch_b,
       \"seller_id\":$seller_id,
       \"payment_method\":\"bank_transfer\",
-      \"items\":[{\"item_name\":\"$branch_b_item_name\",\"category_id\":$category_id,\"quantity\":0.75,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
+      \"items\":[{\"catalog_id\":$branch_b_catalog_id,\"item_name\":\"$branch_b_item_name\",\"category_id\":$category_id,\"quantity\":0.75,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":1}]
     }")
     assert_contains "$branch_b_stock" '"status":"success"' "AUTH-16: create Branch B inventory fixture"
     own_inventory=$(role_fixture_get "$AUTH_FIXTURE_CASHIER_A_COOKIE" "inventory/category-items?category_id=$category_id&branch_id=$branch_a")
@@ -348,6 +348,15 @@ test_authorization() {
     manager_adjustment=$(role_fixture_post "$AUTH_FIXTURE_MANAGER_A_COOKIE" "inventory/transactions" \
       '{"product_id":1,"type":"adjustment","quantity":999,"notes":"QA forbidden manager adjustment"}')
     assert_contains "$manager_adjustment" '"status":"error"' "AUTH-17a: manager-A cannot directly adjust inventory"
+
+    local cashier_transactions super_transactions
+    cashier_transactions=$(role_fixture_get "$AUTH_FIXTURE_CASHIER_A_COOKIE" "inventory/transactions?branch_id=$branch_b")
+    assert_not_contains "$cashier_transactions" "\"branch_id\":$branch_b" \
+      "AUTH-17b: cashier-A cannot read Branch B inventory transactions"
+
+    super_transactions=$(role_fixture_get "$AUTH_FIXTURE_SUPER_COOKIE" "inventory/transactions?branch_id=$branch_b")
+    assert_contains "$super_transactions" '"status":"success"' \
+      "AUTH-17c: super-manager reads selected Branch B inventory transactions"
   else
     test_fail "AUTH-20: transfer fixture has ID"
     test_fail "AUTH-21: transfer fixture has ID"
@@ -362,7 +371,7 @@ test_authorization() {
   local deposit_cashier_a deposit_cashier_a_id deposit_manager_a deposit_manager_a_id
   local deposit_cross_branch deposit_admin_self deposit_admin_self_id
   deposit_cashier_a=$(role_fixture_post "$AUTH_FIXTURE_CASHIER_A_COOKIE" "cash-sessions/deposit-request" "{
-    \"branch_id\":$branch_a,\"amount\":11,\"source_name\":\"QA W5 cashier\",\"reason\":\"W5 approval matrix\"
+    \"branch_id\":$branch_a,\"amount\":11,\"source_type\":\"owner_capital\",\"source_name\":\"QA W5 cashier\",\"reason\":\"W5 approval matrix\"
   }")
   deposit_cashier_a_id=$(auth_extract_id "$deposit_cashier_a")
   assert_contains "$deposit_cashier_a" '"status":"success"' "AUTH-30: cashier-A requests Branch A cash deposit"
@@ -373,7 +382,7 @@ test_authorization() {
     assert_contains "$manager_deposit_approve" '"status":"success"' "AUTH-31: manager-A approves another user's Branch A deposit"
 
     deposit_cross_branch=$(role_fixture_post "$AUTH_FIXTURE_CASHIER_B_COOKIE" "cash-sessions/deposit-request" "{
-      \"branch_id\":$branch_b,\"amount\":12,\"source_name\":\"QA W5 cross\",\"reason\":\"W5 cross branch\"
+      \"branch_id\":$branch_b,\"amount\":12,\"source_type\":\"owner_capital\",\"source_name\":\"QA W5 cross\",\"reason\":\"W5 cross branch\"
     }")
     local deposit_cross_id
     deposit_cross_id=$(auth_extract_id "$deposit_cross_branch")
@@ -392,7 +401,7 @@ test_authorization() {
   fi
 
   deposit_manager_a=$(role_fixture_post "$AUTH_FIXTURE_MANAGER_A_COOKIE" "cash-sessions/deposit-request" "{
-    \"branch_id\":$branch_a,\"amount\":13,\"source_name\":\"QA W5 manager\",\"reason\":\"W5 self approval\"
+    \"branch_id\":$branch_a,\"amount\":13,\"source_type\":\"owner_capital\",\"source_name\":\"QA W5 manager\",\"reason\":\"W5 self approval\"
   }")
   deposit_manager_a_id=$(auth_extract_id "$deposit_manager_a")
   local manager_self_deposit
@@ -405,7 +414,7 @@ test_authorization() {
   fi
 
   deposit_admin_self=$(role_fixture_post "$AUTH_FIXTURE_ADMIN_COOKIE" "cash-sessions/deposit-request" "{
-    \"branch_id\":$branch_a,\"amount\":14,\"source_name\":\"QA W5 owner\",\"reason\":\"W5 owner self approval\"
+    \"branch_id\":$branch_a,\"amount\":14,\"source_type\":\"owner_capital\",\"source_name\":\"QA W5 owner\",\"reason\":\"W5 owner self approval\"
   }")
   deposit_admin_self_id=$(auth_extract_id "$deposit_admin_self")
   local admin_self_deposit
@@ -520,14 +529,14 @@ test_authorization() {
   w6_username="qa-w6-user-${suffix}-$$"
   w6_phone="qa-w6-phone-${suffix}-$$"
   super_create_user=$(role_fixture_post "$AUTH_FIXTURE_SUPER_COOKIE" "users" "{
-    \"username\":\"$w6_username\",\"password\":\"AccessTest123!\",\"phone\":\"$w6_phone\",
+    \"username\":\"$w6_username\",\"password\":\"$auth_fixture_password\",\"phone\":\"$w6_phone\",
     \"full_name\":\"QA W6 Managed User\",\"role\":\"cashier\",\"branch_id\":$branch_a,\"status\":\"active\"
   }")
   super_create_user_id=$(auth_extract_id "$super_create_user")
   assert_contains "$super_create_user" '"status":"success"' "AUTH-29: super manager creates cashier user"
 
   super_create_admin=$(role_fixture_post "$AUTH_FIXTURE_SUPER_COOKIE" "users" "{
-    \"username\":\"qa-w6-admin-${suffix}-$$\",\"password\":\"AccessTest123!\",\"phone\":\"qa-w6-admin-phone-${suffix}-$$\",
+    \"username\":\"qa-w6-admin-${suffix}-$$\",\"password\":\"$auth_fixture_password\",\"phone\":\"qa-w6-admin-phone-${suffix}-$$\",
     \"full_name\":\"QA W6 Forbidden Admin\",\"role\":\"admin\",\"status\":\"active\"
   }")
   assert_contains "$super_create_admin" '"status":"error"' "AUTH-30: super manager cannot create admin user"

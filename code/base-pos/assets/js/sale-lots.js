@@ -264,7 +264,7 @@ async function searchSlCatalog(idx, q) {
 }
 
 function selectSlCatalog(idx, catalogId, name, categoryId, price) {
-  lineItems[idx] = { ...lineItems[idx], catalog_id: catalogId, item_name: name, category_id: categoryId, unit_price: price > 0 ? price : lineItems[idx].unit_price };
+  lineItems[idx] = { ...lineItems[idx], id: null, catalog_id: catalogId, item_name: name, category_id: categoryId, unit_price: price > 0 ? price : lineItems[idx].unit_price };
   renderLineItems();
   // ปิด dropdown หลัง render
   setTimeout(() => {
@@ -418,14 +418,15 @@ async function saveLot() {
     const quantityKg = parseFloat(it.quantity_kg);
     const categoryId = parseInt(it.category_id, 10);
 
-    if (!itemName || !Number.isFinite(quantityKg) || quantityKg <= 0 || !Number.isFinite(categoryId) || categoryId <= 0) {
+    const catalogId = parseInt(it.catalog_id, 10);
+    if (!catalogId || !itemName || !Number.isFinite(quantityKg) || quantityKg <= 0 || !Number.isFinite(categoryId) || categoryId <= 0) {
       showNotification('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อกและระบุน้ำหนักมากกว่า 0', 'error');
       return;
     }
 
     validItems.push({
       ...(it.id ? { id: it.id } : {}),
-      catalog_id: it.catalog_id ? parseInt(it.catalog_id, 10) : null,
+      catalog_id: catalogId,
       item_name: itemName,
       category_id: categoryId,
       quantity_kg: quantityKg,
@@ -475,7 +476,7 @@ async function saveLot() {
   if (res.status === 'success') {
     if (editId) {
       // แก้ไขแบบร่าง — ยังไม่ตัดสต็อก (ต้องกด ✓ ยืนยันในตาราง)
-      showNotification('แก้ไข Lot สำเร็จ (แบบร่าง — ยังไม่ตัดสต็อก)', 'success');
+      showNotification('บันทึกแบบร่างแล้ว — ยังไม่ตัดสต็อก ต้องกด ✓ เพื่อยืนยันขาย', 'warning');
       document.getElementById('saleLotModal').classList.remove('show');
       editId = null;
       resetForm();
@@ -501,11 +502,9 @@ async function saveLot() {
       if (confirmRes.status === 'success') {
         showNotification('ยืนยันขาย Lot สำเร็จ (ตัดสต็อกแล้ว)', 'success');
       } else {
-        // ยืนยันไม่สำเร็จ (เช่น สต็อกไม่พอ) → ลบแบบร่างทิ้ง ไม่ให้ค้าง
-        try { await apiRequest(`sale-lots/sale-lot?id=${newLotId}`, 'DELETE'); } catch (e) {}
         errorEl.textContent = confirmRes.message || 'ยืนยันขายไม่สำเร็จ (สต็อกไม่พอ?)';
         errorEl.style.display = 'block';
-        showNotification(confirmRes.message || 'ยืนยันขายไม่สำเร็จ', 'error');
+        showNotification(`${confirmRes.message || 'ยืนยันขายไม่สำเร็จ'} — เก็บแบบร่างไว้ให้แก้ไข`, 'error');
         btn.disabled = false;
         btn.textContent = 'ยืนยันขาย (ตัดสต็อก)';
         return;

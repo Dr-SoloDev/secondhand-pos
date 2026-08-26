@@ -197,7 +197,7 @@ float_eq() {
 
 cash_reviewer_cookie() {
   local cookie="/tmp/cash_session_reviewer.cookie" username="api-cash-reviewer"
-  local password="ApiCashReview123!" login_res
+  local password="${CASH_REVIEWER_PASSWORD:-ApiCashReview123!}" login_res
   login_res=$(curl -s -c "$cookie" "$API_BASE/auth/login" \
     -X POST -H 'Content-Type: application/json' \
     -d "{\"username\":\"$username\",\"password\":\"$password\"}")
@@ -259,7 +259,7 @@ ensure_cash_session_open() {
 }
 
 ensure_cash_test_float() {
-  local branch_id="${1:-}" expected amount username cookie login_res request request_id
+  local branch_id="${1:-}" expected amount username cookie password login_res request request_id
   expected=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
   [ -z "$expected" ] && return 0
   if awk -v n="$expected" 'BEGIN { exit(n >= 10000 ? 0 : 1) }'; then
@@ -267,10 +267,11 @@ ensure_cash_test_float() {
   fi
 
   username=$(printf 'manager-br%02d' "$branch_id")
+  password="${QA_MANAGER_PASSWORD:-admin}"
   cookie="/tmp/cash_float_${branch_id}_$$.cookie"
   login_res=$(curl -s -c "$cookie" "$API_BASE/auth/login" \
     -X POST -H 'Content-Type: application/json' \
-    -d "{\"username\":\"$username\",\"password\":\"admin\"}")
+    -d "{\"username\":\"$username\",\"password\":\"$password\"}")
   echo "$login_res" | grep -q '"status":"success"' || return 0
   amount=$(awk -v n="$expected" 'BEGIN { printf "%.2f", 100000 - n }')
   request=$(curl -s -b "$cookie" "$API_BASE/cash-sessions/deposit-request" \

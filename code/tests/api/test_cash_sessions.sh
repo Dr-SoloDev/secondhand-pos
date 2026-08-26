@@ -2,22 +2,27 @@
 test_cash_sessions() {
   test_section "Daily Cash Sessions"
 
-  local branch_id=2 manager_cookie res seller_id cat_id suffix item_name
+  local branch_id=2 manager_cookie res seller_id cat_id suffix item_name catalog_res catalog_id
   local before after bank_po cash_po expense expense_id large_expense large_expense_id
   local bank_lot bank_lot_id cash_lot cash_lot_id expected session_id deposit deposit_id
 
   ensure_cash_session_open "$branch_id"
   manager_cookie="/tmp/test_cash_manager_$$.cookie"
+  manager_password="${QA_MANAGER_PASSWORD:-admin}"
   res=$(curl -s -c "$manager_cookie" "$API_BASE/auth/login" \
     -X POST -H 'Content-Type: application/json' \
-    -d '{"username":"manager-br02","password":"admin"}')
+    -d "{\"username\":\"manager-br02\",\"password\":\"$manager_password\"}")
   assert_contains "$res" '"status":"success"' "Cash session: Branch manager login"
 
   seller_id=$(api_get "sellers" | json_get "data.0.id" 2>/dev/null)
   [ -z "$seller_id" ] && seller_id=1
-  cat_id=$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)
+  suffix="$(date +%s)"
+  catalog_res=$(api_post "purchase-catalog" "{\"code\":\"QA-$suffix\",\"name\":\"QA Cash Ledger $suffix\",\"category_id\":$(api_get "inventory/categories" | json_get "data.0.id" 2>/dev/null)}")
+  catalog_id=$(echo "$catalog_res" | json_get "data.id" 2>/dev/null)
+  assert_contains "$catalog_res" '"status":"success"' "Cash ledger: Create unique QA catalog"
+  assert_neq "" "$catalog_id" "Cash ledger: Unique QA catalog returns ID"
+  cat_id=$(api_get "purchase-catalog/item?id=$catalog_id" | json_get "data.category_id" 2>/dev/null)
   [ -z "$cat_id" ] && cat_id=1
-  suffix="$(date +%s)_$$"
   item_name="QA Cash Ledger $suffix"
 
   before=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
@@ -40,14 +45,14 @@ test_cash_sessions() {
 
   bank_po=$(curl -s -b "$manager_cookie" "$API_BASE/purchase-orders" \
     -X POST -H 'Content-Type: application/json' \
-    -d "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",\"items\":[{\"item_name\":\"$item_name Bank\",\"category_id\":$cat_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":7}]}")
+    -d "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",\"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name Bank\",\"category_id\":$cat_id,\"quantity\":1,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":7}]}")
   assert_contains "$bank_po" '"status":"success"' "Cash ledger: Create bank-transfer PO"
   after=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
   if float_eq "$before" "$after"; then test_pass "Cash ledger: Bank-transfer PO does not affect drawer"; else test_fail "Cash ledger: Bank-transfer PO does not affect drawer"; fi
 
   cash_po=$(curl -s -b "$manager_cookie" "$API_BASE/purchase-orders" \
     -X POST -H 'Content-Type: application/json' \
-    -d "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"cash\",\"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity\":2,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":10}]}")
+    -d "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"cash\",\"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity\":2,\"weight_deduction\":0,\"unit\":\"kg\",\"unit_price\":10}]}")
   assert_contains "$cash_po" '"status":"success"' "Cash ledger: Create cash PO"
   after=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
   expected=$(awk -v n="$before" 'BEGIN { printf "%.2f", n - 20 }')
@@ -82,7 +87,7 @@ test_cash_sessions() {
   expected=$(awk -v n="$before" 'BEGIN { printf "%.2f", n - 600 }')
   if float_eq "$expected" "$after"; then test_pass "Expense: Approved large cash expense deducts drawer"; else test_fail "Expense: Approved large cash expense deducts drawer"; fi
 
-  bank_lot=$(api_post "sale-lots" "{\"branch_id\":$branch_id,\"buyer_name\":\"QA Bank Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.2,\"unit_price\":30}]}")
+  bank_lot=$(api_post "sale-lots" "{\"branch_id\":$branch_id,\"buyer_name\":\"QA Bank Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.2,\"unit_price\":30}]}")
   bank_lot_id=$(echo "$bank_lot" | json_get "data.id" 2>/dev/null)
   res=$(api_post_id "sale-lots/confirm" "$bank_lot_id" "{}")
   assert_contains "$res" '"status":"success"' "Sale LOT cash: Confirm bank-payment lot"
@@ -92,7 +97,7 @@ test_cash_sessions() {
   after=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
   if float_eq "$before" "$after"; then test_pass "Sale LOT cash: Bank revenue does not affect drawer"; else test_fail "Sale LOT cash: Bank revenue does not affect drawer"; fi
 
-  cash_lot=$(api_post "sale-lots" "{\"branch_id\":$branch_id,\"buyer_name\":\"QA Cash Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"items\":[{\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.2,\"unit_price\":30}]}")
+  cash_lot=$(api_post "sale-lots" "{\"branch_id\":$branch_id,\"buyer_name\":\"QA Cash Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.2,\"unit_price\":30}]}")
   cash_lot_id=$(echo "$cash_lot" | json_get "data.id" 2>/dev/null)
   res=$(api_post_id "sale-lots/confirm" "$cash_lot_id" "{}")
   assert_contains "$res" '"status":"success"' "Sale LOT cash: Confirm cash-payment lot"
@@ -116,21 +121,21 @@ test_cash_sessions() {
 
   res=$(curl -s -b "$manager_cookie" "$API_BASE/purchase-orders" \
     -X POST -H 'Content-Type: application/json' \
-    -d "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",\"items\":[{\"item_name\":\"Blocked While Closing\",\"category_id\":$cat_id,\"quantity\":1,\"unit_price\":1}]}")
+    -d "{\"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",\"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"Blocked While Closing\",\"category_id\":$cat_id,\"quantity\":1,\"unit_price\":1}]}")
   assert_contains "$res" '"status":"success"' "Cash close: Bank transaction remains available while drawer approval is pending"
 
   res=$(api_post "cash-sessions/close-approve" "{\"id\":$session_id,\"review_note\":\"QA approved variance\"}")
   assert_contains "$res" '"status":"success"' "Cash close: Admin approves another user's variance"
-  res=$(api_post "cash-sessions/reopen" "{\"id\":$session_id,\"reason\":\"Continue API tests\"}")
-  assert_contains "$res" '"status":"success"' "Cash close: Admin reopens same-day session with reason"
-
   expected=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
-  if float_eq "$approved_actual" "$expected"; then
+  if float_eq "$expected" "$(awk -v n="$approved_actual" 'BEGIN { printf "%.2f", n - 150 }')"; then
     test_pass "Cash reopen: Expected cash rebases to approved closing actual"
   else
     test_fail "Cash reopen: Expected cash rebases to approved closing actual"
+    echo "    (approved closing minus blocked bank PO cost: '$(awk -v n="$approved_actual" 'BEGIN { printf "%.2f", n - 150 }')', reopened expected: '$expected')"
     echo "    (approved closing: '$approved_actual', reopened expected: '$expected')"
   fi
+  res=$(api_post "cash-sessions/reopen" "{\"id\":$session_id,\"reason\":\"Continue API tests\"}")
+  assert_contains "$res" '"status":"success"' "Cash close: Admin reopens same-day session with reason"
   res=$(curl -s -b "$manager_cookie" "$API_BASE/cash-sessions/close" \
     -X POST -H 'Content-Type: application/json' -d "{\"branch_id\":$branch_id,\"actual_cash\":$expected}")
   assert_contains "$res" '"status":"success"' "Cash close: Exact count closes immediately"

@@ -143,14 +143,15 @@ class StockTransfer extends Model
         foreach ($items as $item) {
             $stmt = $this->db->prepare(
                 "INSERT INTO stock_transfer_items
-                   (stock_transfer_id,source_transfer_item_id,line_no,category_id,item_name,weight_kg)
-                 VALUES (?,?,?,?,?,?)"
+                   (stock_transfer_id,source_transfer_item_id,line_no,category_id,catalog_id,item_name,weight_kg)
+                 VALUES (?,?,?,?,?,?,?)"
             );
             $this->db->execute($stmt, [
                 $transferId,
                 $item['source_transfer_item_id'] ?? null,
                 $lineNo++,
                 (int)$item['category_id'],
+                !empty($item['catalog_id']) ? (int)$item['catalog_id'] : null,
                 $item['item_name'],
                 (float)$item['weight_kg'],
             ]);
@@ -218,6 +219,7 @@ class StockTransfer extends Model
             foreach ($normalizedConfirmItems as $item) {
                 $fromBranch = (int)$st['from_branch_id'];
                 $categoryId = (int)$item['category_id'];
+                $catalogId = (int)($item['catalog_id'] ?? 0);
                 $itemName = trim((string)$item['item_name']);
                 $receivedWeight = (float)$item['received_weight_kg'];
                 if ($receivedWeight <= 0) {
@@ -225,13 +227,14 @@ class StockTransfer extends Model
                 }
 
                 $lineBatches = [];
-                if ($itemName !== '') {
+                if ($catalogId || $itemName !== '') {
                     $branchStockQty = (float)$this->db->fetchColumn(
                         "SELECT stock_kg
                          FROM branch_stock
-                         WHERE branch_id = ? AND category_id = ? AND item_name = ?
+                         WHERE branch_id = ? AND category_id = ?
+                           AND {$this->stockIdentityCondition()}
                          FOR UPDATE",
-                        [$fromBranch, $categoryId, $itemName]
+                        [$fromBranch, $categoryId, $this->stockIdentityValue($catalogId, $itemName)]
                     );
                     if ($branchStockQty < $receivedWeight) {
                         throw new Exception(
@@ -242,7 +245,12 @@ class StockTransfer extends Model
                     }
                 }
 
-                $availableRows = $this->fetchAvailableSourceRows($fromBranch, $categoryId, $itemName !== '' ? $itemName : null);
+                $availableRows = $this->fetchAvailableSourceRows(
+                    $fromBranch,
+                    $categoryId,
+                    $catalogId ?: ($itemName !== '' ? $itemName : null),
+                    $catalogId > 0
+                );
                 $totalAvail = array_sum(array_column($availableRows, 'avail'));
                 if ($totalAvail < $receivedWeight) {
                     throw new Exception(
@@ -272,6 +280,11 @@ class StockTransfer extends Model
                     $lineCost += $take * (float)$row['unit_price'];
                     $remaining -= $take;
 
+                    $rowCatalogId = (int)($row['catalog_id'] ?? 0);
+                    if (!$catalogId && !$rowCatalogId) {
+                        throw new Exception('รายการโอนนี้ยังไม่มี catalog reference กรุณา migrate/review ก่อนยืนยัน');
+                    }
+
                     $sourceItemName = trim((string)($row['item_name'] ?? ''));
                     if ($sourceItemName === '') {
                         $sourceItemName = $itemName;
@@ -279,11 +292,13 @@ class StockTransfer extends Model
                     if ($sourceItemName === '') {
                         throw new Exception('ไม่พบชื่อสินค้าในสต็อกต้นทาง');
                     }
-                    $batchKey = $sourceItemName;
+                    $batchCatalogId = $catalogId ?: $rowCatalogId;
+                    $batchKey = $batchCatalogId ?: 'legacy:' . $categoryId . ':' . $sourceItemName;
                     if (!isset($lineBatches[$batchKey])) {
                         $lineBatches[$batchKey] = [
                             'item_name' => $sourceItemName,
                             'category_id' => $categoryId,
+                            'catalog_id' => $batchCatalogId ?: null,
                             'qty' => 0.0,
                             'cost' => 0.0,
                         ];
@@ -341,22 +356,24 @@ class StockTransfer extends Model
 
                     $stmt = $this->db->prepare(
                         "INSERT INTO purchase_order_items
-                           (purchase_order_id, item_name, category_id,
+                           (purchase_order_id, item_name, category_id, catalog_id,
                             quantity, unit_price, total_price, consumed_qty, unit)
-                         VALUES (?, ?, ?, ?, ?, ?, 0, 'กก.')"
+                         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'กก.')"
                     );
                     $this->db->execute($stmt, [
                         $poId,
                         $itemName,
                         (int)$batch['category_id'],
+                        !empty($batch['catalog_id']) ? (int)$batch['catalog_id'] : null,
                         $receivedWeight,
                         $unitPrice,
                         round($lineCost, 2),
                     ]);
 
                     if ($itemName !== '') {
-                        $branchStock->deduct($st['from_branch_id'], $batch['category_id'], $itemName, $receivedWeight);
-                        $branchStock->upsert($st['to_branch_id'], $batch['category_id'], $itemName, $receivedWeight, $unitPrice);
+                        $batchCatalogId = !empty($batch['catalog_id']) ? (int)$batch['catalog_id'] : null;
+                        $branchStock->deduct($st['from_branch_id'], $batch['category_id'], $itemName, $receivedWeight, $batchCatalogId);
+                        $branchStock->upsert($st['to_branch_id'], $batch['category_id'], $itemName, $receivedWeight, $unitPrice, $batchCatalogId);
                     }
                 }
             }
@@ -493,6 +510,7 @@ class StockTransfer extends Model
                 $items[] = [
                     'source_transfer_item_id' => $sourceItemId,
                     'category_id' => (int)$source['category_id'],
+                    'catalog_id' => !empty($source['catalog_id']) ? (int)$source['catalog_id'] : null,
                     'item_name' => $source['item_name'],
                     'weight_kg' => round($weight, 3),
                 ];
@@ -568,12 +586,22 @@ class StockTransfer extends Model
                     throw new Exception('ข้อมูลรายการสินค้าไม่ถูกต้อง');
                 }
                 $categoryId = (int)($item['category_id'] ?? $data['category_id'] ?? 0);
+                $catalogId = (int)($item['catalog_id'] ?? 0);
                 $itemName = trim((string)($item['item_name'] ?? ''));
                 $weightKg = (float)($item['weight_kg'] ?? 0);
-                if (!$categoryId || $itemName === '' || $weightKg <= 0 || !is_finite($weightKg)) {
-                    throw new Exception('ข้อมูลรายการสินค้าไม่ครบ');
+                if (!$categoryId || !$catalogId || $itemName === '' || $weightKg <= 0 || !is_finite($weightKg)) {
+                    throw new Exception('แต่ละรายการต้องเลือกสินค้าจากแคตตาล็อก');
                 }
-                $itemKey = $categoryId . ':' . mb_strtolower($itemName, 'UTF-8');
+                $catalog = null;
+                $catalog = $this->db->fetch(
+                    "SELECT id, category_id, name FROM purchase_item_catalog WHERE id = ? AND is_active = 1",
+                    [$catalogId]
+                );
+                if (!$catalog || (int)$catalog['category_id'] !== $categoryId) {
+                    throw new Exception('ข้อมูลแคตตาล็อกไม่ถูกต้อง');
+                }
+                $itemName = trim((string)$catalog['name']);
+                $itemKey = $catalogId;
                 if (isset($seenItems[$itemKey])) {
                     throw new Exception("รายการ {$itemName} ซ้ำ กรุณารวมเป็นรายการเดียว");
                 }
@@ -582,6 +610,7 @@ class StockTransfer extends Model
                     'line_no' => $index + 1,
                     'source_transfer_item_id' => !empty($item['source_transfer_item_id']) ? (int)$item['source_transfer_item_id'] : null,
                     'category_id' => $categoryId,
+                    'catalog_id' => $catalogId,
                     'item_name' => substr($itemName, 0, 200),
                     'weight_kg' => round($weightKg, 3),
                 ];
@@ -590,9 +619,10 @@ class StockTransfer extends Model
         }
 
         $categoryId = (int)($data['category_id'] ?? 0);
+        $catalogId = (int)($data['catalog_id'] ?? 0);
         $itemName = trim((string)($data['item_name'] ?? ''));
         $weightKg = (float)($data['weight_kg'] ?? 0);
-        if (!$categoryId || $itemName === '' || $weightKg <= 0 || !is_finite($weightKg)) {
+        if (!$categoryId || !$catalogId || $itemName === '' || $weightKg <= 0 || !is_finite($weightKg)) {
             return [];
         }
 
@@ -600,7 +630,8 @@ class StockTransfer extends Model
             'line_no' => 1,
             'source_transfer_item_id' => null,
             'category_id' => $categoryId,
-            'item_name' => substr($itemName, 0, 200),
+            'catalog_id' => $catalogId,
+            'item_name' => substr(trim((string)$itemName), 0, 200),
             'weight_kg' => round($weightKg, 3),
         ]];
     }
@@ -658,6 +689,7 @@ class StockTransfer extends Model
                 'source_transfer_item_id' => $row['source_transfer_item_id'] !== null ? (int)$row['source_transfer_item_id'] : null,
                 'line_no' => (int)$row['line_no'],
                 'category_id' => (int)$row['category_id'],
+                'catalog_id' => !empty($row['catalog_id']) ? (int)$row['catalog_id'] : null,
                 'category_name' => $row['category_name'] ?? null,
                 'item_name' => $row['item_name'],
                 'weight_kg' => (float)$row['weight_kg'],
@@ -732,6 +764,7 @@ class StockTransfer extends Model
                     'id' => $transferItem['id'],
                     'line_no' => $transferItem['line_no'],
                     'category_id' => $transferItem['category_id'],
+                    'catalog_id' => !empty($transferItem['catalog_id']) ? (int)$transferItem['catalog_id'] : null,
                     'item_name' => $transferItem['item_name'],
                     'received_weight_kg' => $receivedWeight,
                     'receive_note' => $note,
@@ -832,6 +865,7 @@ class StockTransfer extends Model
                 'id' => $transferItem['id'],
                 'line_no' => $transferItem['line_no'],
                 'category_id' => $transferItem['category_id'],
+                'catalog_id' => !empty($transferItem['catalog_id']) ? (int)$transferItem['catalog_id'] : null,
                 'item_name' => $transferItem['item_name'],
                 'received_weight_kg' => $receivedWeight,
                 'receive_note' => $note,
@@ -957,10 +991,10 @@ class StockTransfer extends Model
         return (int)$this->db->lastInsertId();
     }
 
-    private function fetchAvailableSourceRows(int $fromBranch, int $categoryId, ?string $itemName = null): array
+    private function fetchAvailableSourceRows(int $fromBranch, int $categoryId, $identity = null, bool $byCatalog = false): array
     {
         $availableSql =
-            "SELECT poi.id, poi.item_name,
+            "SELECT poi.id, poi.item_name, poi.catalog_id,
                     (poi.net_quantity - poi.consumed_qty) AS avail,
                     poi.unit_price
              FROM purchase_order_items poi
@@ -969,13 +1003,26 @@ class StockTransfer extends Model
                AND po.status = 'completed'
                AND (poi.net_quantity - poi.consumed_qty) > 0";
         $params = [$fromBranch, $categoryId];
-        if ($itemName !== null && trim($itemName) !== '') {
-            $availableSql .= " AND TRIM(poi.item_name) = ?";
-            $params[] = trim($itemName);
+        if ($byCatalog && !empty($identity)) {
+            $availableSql .= " AND poi.catalog_id = ?";
+            $params[] = (int)$identity;
+        } elseif ($identity !== null && is_string($identity) && trim($identity) !== '') {
+            $availableSql .= " AND TRIM(poi.item_name) = ? AND poi.catalog_id IS NULL";
+            $params[] = trim($identity);
         }
         $availableSql .= "
              ORDER BY po.created_at ASC, poi.id ASC FOR UPDATE";
 
         return $this->db->fetchAll($availableSql, $params) ?: [];
+    }
+
+    private function stockIdentityCondition(): string
+    {
+        return "(CASE WHEN catalog_id IS NULL THEN CONVERT(item_name USING utf8mb4) COLLATE utf8mb4_unicode_ci ELSE CONVERT(CAST(catalog_id AS CHAR) USING utf8mb4) COLLATE utf8mb4_unicode_ci END) = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
+    }
+
+    private function stockIdentityValue(int $catalogId, string $itemName): string
+    {
+        return $catalogId ? (string)$catalogId : trim($itemName);
     }
 }

@@ -28,26 +28,101 @@ class BranchStock extends Model
      * @param float  $stockKg   จำนวน kg ที่เพิ่ม
      * @param float  $unitPrice ราคาต่อหน่วยของ lot ที่เพิ่ม
      */
-    public function upsert($branchId, $categoryId, $itemName, $stockKg, $unitPrice): void
+    public function upsert($branchId, $categoryId, $itemName, $stockKg, $unitPrice, ?int $catalogId = null): void
     {
-        $stmt = $this->db->prepare(
-            "INSERT INTO branch_stock (branch_id, category_id, item_name, stock_kg, unit_price)
-             VALUES (?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE
-                 stock_kg   = stock_kg + VALUES(stock_kg),
-                 unit_price = ROUND(
-                     ((stock_kg * unit_price) + (VALUES(stock_kg) * VALUES(unit_price)))
-                     / GREATEST((stock_kg + VALUES(stock_kg)), 0.001),
-                     4
-                 ),
-                 last_updated = NOW()"
-        );
+        if (!$catalogId) {
+            $catalogId = $this->resolveCatalogId($categoryId, $itemName);
+        }
+        if ($catalogId) {
+            $stockId = (int)$this->db->fetchColumn(
+                "SELECT id FROM branch_stock
+                 WHERE branch_id = ? AND category_id = ? AND catalog_id = ?
+                 FOR UPDATE",
+                [(int)$branchId, (int)$categoryId, $catalogId]
+            );
+
+            if ($stockId) {
+                $stmt = $this->db->prepare(
+                    "UPDATE branch_stock
+                     SET item_name = ?,
+                         unit_price = ROUND(
+                             ((stock_kg * unit_price) + (? * ?))
+                             / GREATEST((stock_kg + ?), 0.001),
+                             4
+                         ),
+                         stock_kg = stock_kg + ?
+                     WHERE id = ?"
+                );
+                $this->db->execute($stmt, [
+                    trim($itemName),
+                    (float)$stockKg,
+                    (float)$unitPrice,
+                    (float)$stockKg,
+                    (float)$stockKg,
+                    $stockId,
+                ]);
+                return;
+            }
+
+            // A legacy misspelling can still occupy the table's name-based unique key.
+            // Re-key it once so all future mutations use the catalog identity.
+            $legacyStockId = (int)$this->db->fetchColumn(
+                "SELECT id FROM branch_stock
+                 WHERE branch_id = ?
+                   AND category_id = ?
+                   AND catalog_id IS NULL
+                   AND CONVERT(TRIM(item_name) USING utf8mb4) = CONVERT(? USING utf8mb4)
+                 LIMIT 1
+                 FOR UPDATE",
+                [(int)$branchId, (int)$categoryId, trim($itemName)]
+            );
+            if ($legacyStockId) {
+                $stmt = $this->db->prepare(
+                    "UPDATE branch_stock
+                     SET catalog_id = ?,
+                         item_name = ?,
+                         unit_price = ROUND(
+                             ((stock_kg * unit_price) + (? * ?))
+                             / GREATEST((stock_kg + ?), 0.001),
+                             4
+                         ),
+                         stock_kg = stock_kg + ?
+                     WHERE id = ?"
+                );
+                $this->db->execute($stmt, [
+                    $catalogId,
+                    trim($itemName),
+                    (float)$stockKg,
+                    (float)$unitPrice,
+                    (float)$stockKg,
+                    (float)$stockKg,
+                    $legacyStockId,
+                ]);
+                return;
+            }
+
+            $sql = "INSERT INTO branch_stock
+                        (branch_id, category_id, catalog_id, item_name, stock_kg, unit_price)
+                    VALUES (?, ?, ?, ?, ?, ?)";
+            $params = [(int)$branchId, (int)$categoryId, $catalogId, trim($itemName), (float)$stockKg, (float)$unitPrice];
+        } else {
+            $sql = "INSERT INTO branch_stock
+                        (branch_id, category_id, item_name, stock_kg, unit_price)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        stock_kg   = stock_kg + VALUES(stock_kg),
+                        unit_price = ROUND(
+                            ((stock_kg * unit_price) + (VALUES(stock_kg) * VALUES(unit_price)))
+                            / GREATEST((stock_kg + VALUES(stock_kg)), 0.001),
+                            4
+                        ),
+                        last_updated = NOW()";
+            $params = [(int)$branchId, (int)$categoryId, trim($itemName), (float)$stockKg, (float)$unitPrice];
+        }
+
+        $stmt = $this->db->prepare($sql);
         $this->db->execute($stmt, [
-            (int)$branchId,
-            (int)$categoryId,
-            trim($itemName),
-            (float)$stockKg,
-            (float)$unitPrice,
+            ...$params,
         ]);
     }
 
@@ -65,7 +140,7 @@ class BranchStock extends Model
      * @param string $itemName
      * @param float  $qty
      */
-    public function deduct($branchId, $categoryId, $itemName, $qty): void
+    public function deduct($branchId, $categoryId, $itemName, $qty, ?int $catalogId = null): void
     {
         $this->db->query(
             "UPDATE branch_stock
@@ -73,13 +148,8 @@ class BranchStock extends Model
                  last_updated = NOW()
              WHERE branch_id = ?
                AND category_id = ?
-               AND item_name = ?",
-            [
-                (float)$qty,
-                (int)$branchId,
-                (int)$categoryId,
-                trim($itemName),
-            ]
+               AND {$this->identityCondition()}",
+            $this->mutateParams($qty, $branchId, $categoryId, $itemName, $catalogId)
         );
     }
 
@@ -95,7 +165,7 @@ class BranchStock extends Model
      * @param string $itemName
      * @param float  $qty
      */
-    public function restore($branchId, $categoryId, $itemName, $qty): void
+    public function restore($branchId, $categoryId, $itemName, $qty, ?int $catalogId = null): void
     {
         $this->db->query(
             "UPDATE branch_stock
@@ -103,14 +173,49 @@ class BranchStock extends Model
                  last_updated = NOW()
              WHERE branch_id = ?
                AND category_id = ?
-               AND item_name = ?",
-            [
-                (float)$qty,
-                (int)$branchId,
-                (int)$categoryId,
-                trim($itemName),
-            ]
+               AND {$this->identityCondition()}",
+            $this->mutateParams($qty, $branchId, $categoryId, $itemName, $catalogId)
         );
+    }
+
+    private function mutateParams(float $qty, $branchId, $categoryId, string $itemName, ?int $catalogId): array
+    {
+        return [(float)$qty, (int)$branchId, (int)$categoryId, $this->identityValue($catalogId, $itemName)];
+    }
+
+    private function identityCondition(): string
+    {
+        return "(CASE WHEN catalog_id IS NULL THEN CONVERT(item_name USING utf8mb4) COLLATE utf8mb4_unicode_ci ELSE CONVERT(CAST(catalog_id AS CHAR) USING utf8mb4) COLLATE utf8mb4_unicode_ci END) = CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci";
+    }
+
+    private function identityValue(?int $catalogId, string $itemName)
+    {
+        return $catalogId ?: trim($itemName);
+    }
+
+    private function resolveCatalogId($categoryId, string $itemName): ?int
+    {
+        if (!$categoryId || trim($itemName) === '') return null;
+
+        $exact = (int)$this->db->fetchColumn(
+            "SELECT id FROM purchase_item_catalog
+             WHERE category_id = ?
+               AND CONVERT(TRIM(CONVERT(name USING utf8mb4)) USING utf8mb4) =
+                   CONVERT(?) USING utf8mb4
+             LIMIT 1",
+            [(int)$categoryId, trim($itemName)]
+        );
+        if ($exact) return $exact;
+
+        return (int)$this->db->fetchColumn(
+            "SELECT alias.catalog_id FROM catalog_item_aliases alias
+             JOIN purchase_item_catalog pic ON pic.id = alias.catalog_id
+             WHERE pic.category_id = ?
+               AND CONVERT(TRIM(alias.alias_name) USING utf8mb4) =
+                   CONVERT(?) USING utf8mb4
+             LIMIT 1",
+            [(int)$categoryId, trim($itemName)]
+        ) ?: null;
     }
 
     /**
@@ -123,6 +228,23 @@ class BranchStock extends Model
      */
     public function getStock($branchId, $categoryId, $itemName): ?array
     {
+        $catalogId = $this->resolveCatalogId($categoryId, $itemName);
+        if ($catalogId) {
+            $result = $this->db->fetch(
+                "SELECT *
+                 FROM branch_stock
+                 WHERE branch_id = ?
+                   AND category_id = ?
+                   AND catalog_id = ?",
+                [
+                    (int)$branchId,
+                    (int)$categoryId,
+                    $catalogId,
+                ]
+            );
+            if ($result) return $result;
+        }
+
         $result = $this->db->fetch(
             "SELECT *
              FROM branch_stock

@@ -91,7 +91,8 @@ class CashSessionsController extends Controller
         try {
             $model = new CashSession();
             $session = $this->assertSessionReviewAccess($model, $id);
-            $allowSelfApproval = ($this->user['role'] ?? '') === 'admin';
+            $role = $this->user['role'] ?? '';
+            $allowSelfApproval = in_array($role, ['admin', 'super_manager'], true);
             if ($approve) $model->approveOpen($id, $this->userId(), $note, $allowSelfApproval);
             else $model->rejectOpen($id, $this->userId(), (string)$note);
             $selfApprovalNote = $allowSelfApproval && (int)($session['opening_requested_by'] ?? 0) === $this->userId()
@@ -125,7 +126,8 @@ class CashSessionsController extends Controller
         try {
             $model = new CashSession();
             $session = $this->assertSessionReviewAccess($model, $id);
-            $allowSelfApproval = ($this->user['role'] ?? '') === 'admin';
+            $role = $this->user['role'] ?? '';
+            $allowSelfApproval = in_array($role, ['admin', 'super_manager'], true);
             $model->reviewClose($id, $this->userId(), $approve, $note, $allowSelfApproval);
             $selfApprovalNote = $allowSelfApproval && (int)($session['closing_requested_by'] ?? 0) === $this->userId()
                 ? ' self_approved:1'
@@ -220,7 +222,8 @@ class CashSessionsController extends Controller
             $request = $model->findById($id);
             if (!$request) Response::error('ไม่พบคำขอเติมเงินสด', 404);
             $this->assertDepositBranchAccess((int)$request['branch_id']);
-            $allowSelfApproval = ($this->user['role'] ?? '') === 'admin';
+            $role = $this->user['role'] ?? '';
+            $allowSelfApproval = in_array($role, ['admin', 'super_manager'], true);
             $model->approve($id, $this->userId(), $data['review_note'] ?? null, $allowSelfApproval);
             $selfApprovalNote = $allowSelfApproval && (int)($request['requested_by'] ?? 0) === $this->userId()
                 ? ' self_approved:1'
@@ -244,8 +247,13 @@ class CashSessionsController extends Controller
             $request = $model->findById($id);
             if (!$request) Response::error('ไม่พบคำขอเติมเงินสด', 404);
             $this->assertDepositBranchAccess((int)$request['branch_id']);
-            $model->reject($id, $this->userId(), $note);
-            Logger::logActivity($this->userId(), 'reject_cash_deposit', "ปฏิเสธคำขอเติมเงินสด ID:{$id}");
+            $role = $this->user['role'] ?? '';
+            $allowSelfApproval = in_array($role, ['admin', 'super_manager'], true);
+            $model->reject($id, $this->userId(), $note, $allowSelfApproval);
+            $selfApprovalNote = $allowSelfApproval && (int)($request['requested_by'] ?? 0) === $this->userId()
+                ? ' self_approved:1'
+                : '';
+            Logger::logActivity($this->userId(), 'reject_cash_deposit', "ปฏิเสธคำขอเติมเงินสด ID:{$id}" . $selfApprovalNote);
             Response::success('ปฏิเสธคำขอเติมเงินสดแล้ว');
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
