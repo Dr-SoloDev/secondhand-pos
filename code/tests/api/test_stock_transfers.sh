@@ -208,7 +208,7 @@ test_stock_transfers() {
   destination_password="${QA_MANAGER_PASSWORD:-admin}"
   res=$(curl -s -c "$destination_cookie" "$API_BASE/auth/login" \
     -X POST -H 'Content-Type: application/json' \
-    -d "{\"username\":\"manager-br$multi_destination_branch\",\"password\":\"$destination_password\"}")
+    -d "{\"username\":\"manager-br$(printf '%02d' "$multi_destination_branch")\",\"password\":\"$destination_password\"}")
   assert_contains "$res" '"status":"success"' "Transfer: Multi-item destination manager login"
 
   res=$(curl -s -b "$destination_cookie" "$API_BASE/stock-transfers/confirm" \
