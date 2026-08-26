@@ -57,3 +57,4 @@ code/uploads-ui/
 # PHPUnit cache
 .phpunit.result.cache
 .phpunit.cache/
+uploads-test/

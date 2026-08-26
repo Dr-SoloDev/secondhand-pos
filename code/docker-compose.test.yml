@@ -1,0 +1,78 @@
+# Isolated test stack — DO NOT use in production.
+# Usage:
+#   docker compose -f docker-compose.test.yml -p pos-test up -d --build
+#   API_BASE=http://localhost:8090/api/index.php bash tests/api/run.sh
+#   docker compose -f docker-compose.test.yml -p pos-test down -v
+#
+# Differences vs docker-compose.yml:
+#   - separate containers (scrap-pos-test-*), project pos-test, own volume pos-test_db_data
+#   - web on :8090, no external MySQL port (tests hit web only)
+#   - uploads isolated to ./uploads-test (keeps prod uploads clean)
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: scrap-pos-test-db
+    restart: "no"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: pos_system
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Bangkok
+    volumes:
+      - pos_test_db_data:/var/lib/mysql
+      - ./base-pos/database/pos_system.sql:/docker-entrypoint-initdb.d/00-base-schema.sql:ro
+      - ./customizations/database:/docker-entrypoint-initdb.d/pos-database:ro
+      - ./docker/mysql-init.sh:/docker-entrypoint-initdb.d/99-run-migrations.sh:ro
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile.php
+    container_name: scrap-pos-test-web
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8090:80"
+    volumes:
+      - ./base-pos:/var/www/html:rw
+      - ./customizations:/var/www/customizations:rw
+      - ./uploads-test:/var/www/html/uploads:rw
+      - ./docker/apache-config.conf:/etc/apache2/sites-available/000-default.conf:ro
+      - ./docker/ssl:/etc/apache2/ssl:ro
+      - ./docker/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/entrypoint.sh"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DB_HOST: db
+      DB_NAME: pos_system
+      DB_USER: ${MYSQL_USER}
+      DB_PASS: ${DB_PASS}
+      JWT_SECRET: ${JWT_SECRET:-test-secret-not-for-prod}
+      APP_ENV: testing
+      SELLER_ID_ENCRYPTION_KEY: ${SELLER_ID_ENCRYPTION_KEY:-}
+      LOGIN_MAX_ATTEMPTS: 100
+      LOGIN_LOCKOUT_SECONDS: 0
+      TRUST_PROXY: "false"
+      PRINT_SERVER_HOST: host.docker.internal
+      PRINT_SERVER_PORT: "9120"
+      TZ: Asia/Bangkok
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost/api/index.php/auth/verify"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  pos_test_db_data:
