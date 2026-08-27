@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>คู่มือติดตั้งเครื่องพิมพ์ความร้อน 80mm — รักษ์สะอาดรีไซเคิล</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Sarabun','Noto Sans Thai', sans-serif; max-width: 780px; margin: 0 auto; padding: 24px; color: #1e293b; line-height: 1.7; font-size: 14px; }
+  h1 { text-align: center; font-size: 22px; margin: 0 0 4px; color: #1e293b; }
+  .subtitle { text-align: center; color: #64748b; font-size: 13px; margin-bottom: 18px; }
+  .badge { display: inline-block; background: #1e293b; color: #fbbf24; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  .hero { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin: 16px 0; }
+  h2 { font-size: 16px; color: #1e293b; border-left: 4px solid #f59e0b; padding-left: 10px; margin: 22px 0 10px; }
+  h3 { font-size: 14px; color: #334155; margin: 14px 0 6px; }
+  .step { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .step-num { display: inline-block; background: #1e293b; color: #fff; width: 26px; height: 26px; border-radius: 50%; text-align: center; line-height: 26px; font-size: 13px; font-weight: 700; margin-right: 8px; }
+  .step-title { font-weight: 700; font-size: 14px; }
+  .callout { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin: 10px 0; }
+  .callout-green { background: #f0fdf4; border-color: #bbf7d0; }
+  .callout-red { background: #fef2f2; border-color: #fecaca; }
+  code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+  th { background: #1e293b; color: #fff; padding: 7px 10px; text-align: left; font-size: 12px; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .check { list-style: none; padding: 0; }
+  .check li { padding: 4px 0; }
+  .check li::before { content: "☐ "; font-size: 16px; }
+  .footer { text-align: center; color: #94a3b8; font-size: 11px; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+  @media print { body { padding: 0; } .no-print { display: none; } }
+</style>
+</head>
+<body>
+
+<h1>คู่มือติดตั้งเครื่องพิมพ์ความร้อน 80mm</h1>
+<p class="subtitle">รุ่น EasyPrint ES-8804 — สำหรับร้านรักษ์สะอาดรีไซเคิล (4 สาขา)<br>
+<span class="badge">WINDOWS 10/11</span> &nbsp; อัปเดตล่าสุด 28 ส.ค. 2569 — เทอโบ SoloCorp OS</p>
+
+<div class="hero">
+  <strong>ก่อนออกเดินทาง — เช็คว่าเอาไปครบ</strong>
+  <ul class="check">
+    <li>เครื่องพิมพ์ ES-8804 + สาย USB + อะแดปเตอร์ไฟ</li>
+    <li>กระดาษความร้อน 80mm 1-2 ม้วน</li>
+    <li>USB นี้ (มี <code>print-server-ES8804.zip</code> + คู่มือนี้)</li>
+  </ul>
+</div>
+
+<h2>ภาพรวม 5 ขั้น — ทำตามลำดับ</h2>
+<table>
+  <tr><th>ขั้น</th><th>ทำอะไร</th><th>เวลา</th></tr>
+  <tr><td><strong>1</strong></td><td>ต่อฮาร์ดแวร์</td><td>2 นาที</td></tr>
+  <tr><td><strong>2</strong></td><td>วางไฟล์</td><td>1 นาที</td></tr>
+  <tr><td><strong>3</strong></td><td>ติดตั้ง (install.bat)</td><td>2 นาที</td></tr>
+  <tr><td><strong>4</strong></td><td>ทดสอบระบบ</td><td>1 นาที</td></tr>
+  <tr><td><strong>5</strong></td><td>พิมพ์บิลจริง 3 ใบ</td><td>3 นาที</td></tr>
+</table>
+
+<div class="step">
+  <span class="step-num">1</span><span class="step-title">ต่อฮาร์ดแวร์</span>
+  <ol style="margin:8px 0 0 18px;">
+    <li>ใส่กระดาษ 80mm — <strong>ด้านเงาออกนอก</strong> (เอานิ้วขูดแล้วมีรอยดำคือด้านพิมพ์)</li>
+    <li>เสียบสาย USB จากเครื่องพิมพ์ → พอร์ต USB เครื่อง Windows</li>
+    <li>เสียบปลั๊กไฟ → เปิดสวิตช์ข้างเครื่อง → ไฟสีน้ำเงินติด + มีเสียง "ติ๊ด"</li>
+  </ol>
+  <div class="callout">💡 <strong>ทิป:</strong> Windows จะขึ้น "กำลังติดตั้งอุปกรณ์ POS-80" ที่มุมขวาล่าง — รอให้หายก่อนไปขั้นถัดไป</div>
+</div>
+
+<div class="step">
+  <span class="step-num">2</span><span class="step-title">วางไฟล์ (จาก USB นี้)</span>
+  <ol style="margin:8px 0 0 18px;">
+    <li>เสียบ USB → เปิดโฟลเดอร์ → จะเห็น <code>print-server-ES8804.zip</code> กับไฟล์นี้</li>
+    <li>ก็อป <code>print-server-ES8804.zip</code> ไว้ที่ <code>Desktop</code> ก่อน (กันไฟล์หาย)</li>
+    <li>คลิกขวา → <strong>Extract All…</strong> → เลือกที่แตกเป็น <code>C:\print-server</code><br>
+      <em>ถ้าไม่มี C:\print-server ให้สร้างโฟลเดอร์เอง: เปิด This PC → C: → คลิกขวา New Folder → ตั้งชื่อ <code>print-server</code> → แตกไฟล์ลงไป</em></li>
+    <li>เปิด <code>C:\print-server</code> ต้องเห็นไฟล์: <code>install.bat</code>, <code>print_server_http.py</code>, <code>print_receipt.py</code></li>
+  </ol>
+</div>
+
+<div class="step">
+  <span class="step-num">3</span><span class="step-title">ติดตั้ง — รัน install.bat (ครั้งเดียวพอ)</span>
+  <ol style="margin:8px 0 0 18px;">
+    <li>ใน <code>C:\print-server</code> ดับเบิลคลิก <code>install.bat</code></li>
+    <li>ถ้า Windows ถาม "Windows protected your PC" → กด <strong>More info → Run anyway</strong></li>
+    <li>หน้าต่างดำจะรันอัตโนมัติ — รอจนขึ้น <code>Done — Print server installed</code> (ประมาณ 1-2 นาที)</li>
+    <li>อย่าปิดหน้าต่างเอง — มันจะปิดเองเมื่อเสร็จ</li>
+  </ol>
+  <div class="callout-green callout">✅ <strong>เสร็จแล้วสังเกต:</strong> ที่ Taskbar มุมขวาล่างจะมีไอคอน Print Server หรือไม่มีก็ได้ — ไม่เป็นไร ขอแค่ขั้นถัดไปเปิดได้</div>
+  <div class="callout-red callout">⚠️ ถ้าติด Antivirus บล็อก → กด Allow / เพิ่ม Exception ให้ <code>C:\print-server</code></div>
+</div>
+
+<div class="step">
+  <span class="step-num">4</span><span class="step-title">ทดสอบระบบ — เปิด http://localhost:9120</span>
+  <ol style="margin:8px 0 0 18px;">
+    <li>เปิด Chrome/Edge → พิมพ์ <code>http://localhost:9120</code> → Enter</li>
+    <li>ต้องเห็นหน้า <strong>"Print Server Ready"</strong> หรือ <code>{"status":"ok"}</code></li>
+    <li>ถ้าเห็น = พร้อมพิมพ์แล้ว → ไปขั้น 5</li>
+    <li>ถ้าไม่เห็น: ปิดแล้วดับเบิลคลิก <code>C:\print-server\start.bat</code> (หรือ <code>print_server_http.py</code>) แล้วลองใหม่</li>
+  </ol>
+</div>
+
+<div class="step">
+  <span class="step-num">5</span><span class="step-title">พิมพ์บิลจริง 3 ใบ — ยืนยันว่าสมบูรณ์</span>
+  <ol style="margin:8px 0 0 18px;">
+    <li>เปิด <code>https://POS.mkxmeme.xyz</code> → Login</li>
+    <li>สร้างบิลรับซื้อใหม่: เลือกผู้ขาย → เพิ่มของ 1 รายการ → บันทึก</li>
+    <li>กดปุ่ม <strong>"พิมพ์ความร้อน"</strong> → บิลต้องออกทันที</li>
+  </ol>
+  <table>
+    <tr><th>ใบที่</th><th>ทดสอบ</th><th>ดูอะไร</th><th>ผ่าน?</th></tr>
+    <tr><td>1</td><td>บิล 1 รายการ</td><td>ตัวหนังสือคมชัด ไม่จาง ไม่ขาดเป็นเส้น</td><td>☐</td></tr>
+    <tr><td>2</td><td>บิล 5-6 รายการ</td><td>ไม่ขาดกลางหน้า กระดาษออกต่อเนื่อง</td><td>☐</td></tr>
+    <tr><td>3</td><td>บิล A4 (กดพิมพ์ A4)</td><td>มี <strong>ต้นขั้ว</strong> ล่างสุดให้ฉีก — เทียบยอดบิล vs จ่ายจริง</td><td>☐</td></tr>
+  </table>
+  <div class="callout-green callout">✅ 3 ใบผ่านหมด = <strong>ติดตั้งเสร็จสมบูรณ์</strong> พร้อมใช้งานทุกสาขา</div>
+</div>
+
+<h2>แก้ปัญหาเร็ว (ถ้าพิมพ์ไม่ออก)</h2>
+<table>
+  <tr><th>อาการ</th><th>แก้ยังไง</th></tr>
+  <tr><td>กดพิมพ์แล้วเงียบ</td><td>1) เช็คกระดาษกลับด้านไหม 2) ถอด USB เสียบใหม่ 3) รัน <code>C:\print-server\start.bat</code> อีกรอบ</td></tr>
+  <tr><td>เปิด localhost:9120 ไม่ได้</td><td>ดับเบิลคลิก <code>start.bat</code> แล้วรอ 3 วิ ค่อยรีเฟรช</td></tr>
+  <tr><td>ตัวหนังสือจาง/เส้นขาด</td><td>ถ่ายรูปบิลส่งให้เทอโบ — มีไฟล์ปรับความเข้มให้ทันที (threshold 120 + GS v0)</td></tr>
+  <tr><td>Windows บล็อก install.bat</td><td>More info → Run anyway / ปิด Antivirus ชั่วคราว</td></tr>
+  <tr><td>กระดาษไม่ออกเลย</td><td>ใส่กระดาษกลับด้านแน่นอน — กลับด้านแล้วลองใหม่</td></tr>
+</table>
+
+<h2>โน้ตสำหรับช่าง</h2>
+<ul>
+  <li>พอร์ตพิมพ์: <code>http://localhost:9120</code> — POS เรียกผ่าน JS <code>postPrintRequest('print/thermal-purchase')</code></li>
+  <li>ความกว้าง: 576 dots (80mm) — ถ้าเปลี่ยนกระดาษ 58mm ต้องแจ้ง dev</li>
+  <li>บิลมี <strong>ต้นขั้ว</strong> ล่างสุด — ให้แคชเชียร์ฉีกเก็บ เทียบยอด Offline ↔ Online ตอนปิดยอด</li>
+  <li>Log อยู่ที่ <code>C:\print-server\logs\</code> (ถ้ามี)</li>
+</ul>
+
+<div class="callout" style="text-align:center;">
+  ติดตรงไหน → ถ่ายรูปหน้าจอ + บิล ส่งให้เทอโบได้ทันที<br>
+  <strong>SoloCorp OS — เทอโบ Digital Twin</strong> | 28 ส.ค. 2569
+</div>
+
+<div class="footer">
+  รักษ์สะอาดรีไซเคิล — ระบบ POS รับซื้อของเก่า 4 สาขา จ.สุรินทร์<br>
+  ไฟล์นี้อยู่ใน USB พร้อม <code>print-server-ES8804.zip</code> — เปิดด้วย Chrome/Edge ได้ทันที
+</div>
+
+</body>
+</html>
