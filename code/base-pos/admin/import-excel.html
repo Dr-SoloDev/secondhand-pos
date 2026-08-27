@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>นำเข้า Excel - รักษ์สะอาดรีไซเคิล</title>
+  <link rel="stylesheet" href="../assets/css/main.css?v=20260815d">
+  <style>
+    .import-container { max-width: 900px; margin: 0 auto; }
+    
+    /* Upload Zone */
+    .upload-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 12px;
+      padding: 40px 20px;
+      text-align: center;
+      background: #f9fafb;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: #d97706;
+      background: #fffbeb;
+    }
+    .upload-zone-icon { font-size: 48px; margin-bottom: 12px; }
+    .upload-zone-title { font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 8px; }
+    .upload-zone-hint { font-size: 13px; color: #6b7280; }
+    .upload-zone input[type="file"] { display: none; }
+    
+    /* Import Type Selector */
+    .import-type-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin: 20px 0;
+    }
+    .import-type-card {
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .import-type-card:hover { border-color: #d97706; }
+    .import-type-card.active { border-color: #d97706; background: #fffbeb; }
+    .import-type-card-icon { font-size: 28px; margin-bottom: 8px; }
+    .import-type-card-title { font-size: 14px; font-weight: 600; color: #374151; }
+    .import-type-card-desc { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    
+    /* Branch Selector */
+    .branch-selector { margin: 16px 0; }
+    .branch-selector label { font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; display: block; }
+    
+    /* Preview Table */
+    .preview-section { margin: 20px 0; }
+    .preview-section h3 { font-size: 15px; font-weight: 600; color: #374151; margin-bottom: 12px; }
+    .preview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .preview-table th { background: #f3f4f6; padding: 8px 10px; text-align: left; font-weight: 500; border-bottom: 1px solid #e5e7eb; }
+    .preview-table td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; }
+    
+    /* Status */
+    .import-status { margin: 20px 0; padding: 16px; border-radius: 8px; }
+    .import-status.pending { background: #fef3c7; border: 1px solid #fcd34d; }
+    .import-status.processing { background: #dbeafe; border: 1px solid #93c5fd; }
+    .import-status.completed { background: #d1fae5; border: 1px solid #6ee7b7; }
+    .import-status.failed { background: #fee2e2; border: 1px solid #fca5a5; }
+    .import-status-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+    .import-status-detail { font-size: 13px; color: #4b5563; }
+    
+    /* Error List */
+    .error-list { margin-top: 12px; max-height: 200px; overflow-y: auto; }
+    .error-item { font-size: 12px; color: #dc2626; padding: 4px 0; border-bottom: 1px solid #fee2e2; }
+    
+    /* Actions */
+    .import-actions { display: flex; gap: 12px; margin-top: 20px; }
+    
+    /* History Table */
+    .history-section { margin-top: 32px; }
+    .history-section h3 { font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 12px; }
+    
+    /* Pagination */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      margin-top: 16px;
+    }
+    .pagination-btn {
+      padding: 6px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #fff;
+      color: #374151;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .pagination-btn:hover:not(:disabled) {
+      border-color: #d97706;
+      color: #d97706;
+    }
+    .pagination-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .pagination-btn.active {
+      background: #d97706;
+      border-color: #d97706;
+      color: #fff;
+    }
+    .pagination-dots {
+      padding: 0 8px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="index.html" class="sidebar-brand">
+          <img src="../assets/images/logo-icon.svg" alt="" class="sidebar-logo-icon">
+          <span>รักษ์สะอาด</span>
+        </a>
+      </div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html"><i class="icon-dashboard"></i><span>หน้าหลัก</span></a></li>
+        <li><a href="purchase-orders.html"><i class="icon-cart"></i><span>รับซื้อของ</span></a></li>
+        <li><a href="catalog.html"><i class="icon-additem"></i><span>แคตตาล็อกสินค้า</span></a></li>
+        <li><a href="sellers.html"><i class="icon-users"></i><span>จัดการผู้ขาย</span></a></li>
+        <li><a href="inventory.html"><i class="icon-product"></i><span>สินค้าคงคลัง</span></a></li>
+        <li><a href="sale-lots.html"><i class="icon-stats"></i><span>ขาย Lot</span></a></li>
+        <li><a href="reports.html"><i class="icon-report"></i><span>รายงาน</span></a></li>
+        <li class="admin-only"><a href="cash-sessions.html"><i class="icon-money"></i><span>เปิด-ปิดยอด</span></a></li>
+        <li class="admin-only"><a href="employees.html"><i class="icon-users"></i><span>พนักงาน</span></a></li>
+        <li class="admin-only"><a href="expenses.html"><i class="icon-report"></i><span>ค่าใช้จ่ายร้าน</span></a></li>
+        <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
+        <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
+        <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
+        <li class="admin-only"><a href="price-tiers.html"><i class="icon-tags"></i><span>ตั้งค่าราคา</span></a></li>
+        <li class="admin-only"><a href="import-excel.html" class="active"><i class="icon-download"></i><span>นำเข้า Excel</span></a></li>
+        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+        <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
+        <li class="admin-only"><a href="audit-log.html"><i class="icon-report"></i><span>บันทึกการใช้งาน</span></a></li>
+        <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
+      </ul>
+    </aside>
+
+    <main class="content-area">
+      <div class="topbar">
+        <div class="page-header" style="flex:1">
+          <h1>นำเข้าข้อมูลจาก Excel</h1>
+          <p>อัปโหลดไฟล์ Excel เพื่อนำเข้าข้อมูลเข้าสู่ระบบ</p>
+        </div>
+        <div class="user-dropdown">
+          <button class="user-dropdown-toggle">
+            <div class="user-avatar"><i class="icon-user"></i></div>
+            <span class="user-name" id="currentUser"></span>
+            <i class="icon-down"></i>
+          </button>
+          <div class="user-dropdown-menu">
+            <a href="#"><i class="icon-user"></i> โปรไฟล์</a>
+            <a href="settings.html"><i class="icon-settings"></i> ตั้งค่า</a>
+            <a href="#" id="logoutBtn"><i class="icon-signout"></i> ออกจากระบบ</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="import-container">
+        <!-- Step 1: เลือกประเภทการนำเข้า -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <h2 class="card-title">1. เลือกประเภทข้อมูล</h2>
+          </div>
+          <div class="card-body">
+            <div class="import-type-grid">
+              <div class="import-type-card active" data-type="purchase_items" onclick="selectImportType(this)">
+                <div class="import-type-card-icon">📦</div>
+                <div class="import-type-card-title">รายการรับซื้อ</div>
+                <div class="import-type-card-desc">นำเข้ารายการรับซื้อของเก่า</div>
+              </div>
+              <div class="import-type-card" data-type="sale_lots" onclick="selectImportType(this)">
+                <div class="import-type-card-icon">🏷️</div>
+                <div class="import-type-card-title">รายการขาย Lot</div>
+                <div class="import-type-card-desc">นำเข้ารายการขาย Lot</div>
+              </div>
+              <div class="import-type-card" data-type="sellers" onclick="selectImportType(this)">
+                <div class="import-type-card-icon">👤</div>
+                <div class="import-type-card-title">ข้อมูลผู้ขาย</div>
+                <div class="import-type-card-desc">นำเข้ารายชื่อผู้ขาย</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: เลือกสาขา -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <h2 class="card-title">2. เลือกสาขา</h2>
+          </div>
+          <div class="card-body">
+            <div class="branch-selector">
+              <label for="importBranch">สาขาที่ต้องการนำเข้าข้อมูล</label>
+              <select id="importBranch" class="form-control" style="max-width:400px">
+                <option value="">— เลือกสาขา —</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: อัปโหลดไฟล์ -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <h2 class="card-title">3. อัปโหลดไฟล์ Excel</h2>
+          </div>
+          <div class="card-body">
+            <div class="upload-zone" id="uploadZone">
+              <div class="upload-zone-icon">📄</div>
+              <div class="upload-zone-title">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์</div>
+              <div class="upload-zone-hint">รองรับไฟล์ .xlsx, .xls (ขนาดไม่เกิน 10MB)</div>
+              <input type="file" id="excelFileInput" accept=".xlsx,.xls">
+            </div>
+            
+            <!-- แสดงชื่อไฟล์ที่เลือก -->
+            <div id="selectedFileInfo" style="display:none;margin-top:12px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div>
+                  <div style="font-size:14px;font-weight:500" id="selectedFileName"></div>
+                  <div style="font-size:12px;color:#6b7280" id="selectedFileSize"></div>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="clearSelectedFile()">ลบ</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: ตัวอย่างข้อมูล -->
+        <div class="card" style="margin-top:16px;display:none" id="previewCard">
+          <div class="card-header">
+            <h2 class="card-title">4. ตัวอย่างข้อมูล (Preview)</h2>
+          </div>
+          <div class="card-body">
+            <div class="preview-section">
+              <h3>ข้อมูล 3 แถวแรก</h3>
+              <div style="overflow-x:auto">
+                <table class="preview-table" id="previewTable">
+                  <thead><tr id="previewHeader"></tr></thead>
+                  <tbody id="previewBody"></tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div class="import-actions">
+              <button class="btn btn-primary" id="startImportBtn" onclick="startImport()" disabled>
+                🚀 เริ่มนำเข้าข้อมูล
+              </button>
+              <button class="btn btn-secondary" onclick="clearAll()">ล้างทั้งหมด</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div class="import-status" id="importStatus" style="display:none">
+          <div class="import-status-title" id="importStatusTitle"></div>
+          <div class="import-status-detail" id="importStatusDetail"></div>
+          <div class="error-list" id="importErrorList"></div>
+        </div>
+
+        <!-- History -->
+        <div class="history-section">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">ประวัติการนำเข้า</h2>
+            </div>
+            <div class="card-body">
+              <!-- Search & Filter Bar -->
+              <div class="history-toolbar" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+                <div>
+                  <input type="text" id="historySearch" class="form-control" 
+                         placeholder="🔍 ค้นหาชื่อไฟล์..." 
+                         oninput="handleSearch(this.value)"
+                         style="width:250px">
+                </div>
+                <div style="display:flex;gap:12px;align-items:center">
+                  <select id="historyStatusFilter" class="form-control" onchange="handleFilterStatus(this.value)" style="width:150px">
+                    <option value="">สถานะทั้งหมด</option>
+                    <option value="completed">✅ สำเร็จ</option>
+                    <option value="failed">❌ ล้มเหลว</option>
+                    <option value="processing">⏳ กำลังประมวลผล</option>
+                    <option value="pending">🕐 รอดำเนินการ</option>
+                  </select>
+                  <select id="historyPerPage" class="form-control" onchange="handleItemsPerPage(parseInt(this.value))" style="width:100px">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Table -->
+              <div class="table-container">
+                <table class="data-table" id="historyTable">
+                  <thead>
+                    <tr>
+                      <th>วันที่นำเข้า</th>
+                      <th>ชื่อไฟล์</th>
+                      <th>ประเภท</th>
+                      <th>ผู้นำเข้า</th>
+                      <th class="text-right">ทั้งหมด</th>
+                      <th class="text-right">สำเร็จ</th>
+                      <th class="text-right">ล้มเหลว</th>
+                      <th>สถานะ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="historyBody">
+                    <tr><td colspan="8" style="text-align:center;color:#888;padding:24px">กำลังโหลด...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Pagination -->
+              <div id="historyPagination"></div>
+              <div id="historyItemsInfo" style="text-align:center;font-size:13px;color:#6b7280;margin-top:8px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="notification-container"></div>
+  <script src="../assets/js/config.js?v=20260815d"></script>
+  <script src="../assets/js/common.js?v=20260815d"></script>
+  <script src="../assets/js/import-excel.js?v=20260827a"></script>
+  <script src="../assets/js/animations.js?v=20260815d"></script>
+<div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
+</body>
+</html>

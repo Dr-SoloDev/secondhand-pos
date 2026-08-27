@@ -336,11 +336,10 @@ function formatDateForInput(date) {
 }
 
 function formatMonthLabel(year, monthIndex) {
-  const date = new Date(year, monthIndex, 1);
-  return new Intl.DateTimeFormat('th-TH', {
-    month: 'long',
-    year: 'numeric',
-  }).format(date);
+  const monthNames = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+  const startDay = 1;
+  const endDay = new Date(year, monthIndex + 1, 0).getDate();
+  return `${startDay}-${endDay} ${monthNames[monthIndex]} ${year}`;
 }
 
 function updateScopeLabels() {
@@ -513,13 +512,17 @@ function renderPurchaseItems(data, range) {
   document.getElementById('purchaseItemsScope').textContent = `${currentBranchName} · ${range.label}`;
 
   if (count === 0) {
-    renderErrorRow('purchaseItemsBody', 8, 'ไม่มีข้อมูลรับซื้อแยกสินค้าในช่วงที่เลือก');
+    renderErrorRow('purchaseItemsBody', 9, 'ไม่มีข้อมูลรับซื้อแยกสินค้าในช่วงที่เลือก');
     return;
   }
+
+  // Calculate weighted average price for total row
+  const weightedAvgPrice = totalWeight > 0 ? totalAmount / totalWeight : 0;
 
   renderTableBody('purchaseItemsBody', items.map((item) => `
     <tr>
       <td>${escapeHtml(formatDisplayDate(item.purchase_date || ''))}</td>
+      <td>${escapeHtml(formatTime(item.purchase_date || ''))}</td>
       <td>${escapeHtml(item.item_name || '-')}</td>
       <td>${escapeHtml(item.category_name || '-')}</td>
       <td class="text-right">${parseFloat(item.net_quantity || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
@@ -528,7 +531,17 @@ function renderPurchaseItems(data, range) {
       <td>${escapeHtml(item.unit || '-')}</td>
       <td class="text-right">${parseInt(item.bill_count || 0, 10).toLocaleString('th-TH')}</td>
     </tr>
-  `).join(''));
+  `).join('') +
+  // ✅ Total Row
+  `<tr class="report-total-row" style="background:#f8fafc;font-weight:600;border-top:2px solid #e2e8f0">
+    <td colspan="4" style="padding:10px">รวมทั้งหมด</td>
+    <td class="text-right" style="padding:10px">${totalWeight.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} กก.</td>
+    <td class="text-right" style="padding:10px">${formatCurrency(weightedAvgPrice)}</td>
+    <td class="text-right" style="padding:10px">${formatCurrency(totalAmount)}</td>
+    <td></td>
+    <td class="text-right" style="padding:10px">${totalBills.toLocaleString('th-TH')} บิล</td>
+  </tr>`
+  );
 }
 
 async function loadSaleLots(range) {
@@ -573,7 +586,7 @@ function renderSaleLots(items, pagination, range) {
   document.getElementById('saleLotsScope').textContent = `${currentBranchName} · ${note}`;
 
   if (count === 0) {
-    renderErrorRow('saleLotsBody', 8, 'ไม่มีข้อมูลขาย Lot ในช่วงที่เลือก');
+    renderErrorRow('saleLotsBody', 9, 'ไม่มีข้อมูลขาย Lot ในช่วงที่เลือก');
     return;
   }
 
@@ -587,6 +600,7 @@ function renderSaleLots(items, pagination, range) {
       <tr>
         <td style="font-family:monospace">${escapeHtml(item.reference_no || `SL-${item.id}`)}</td>
         <td>${escapeHtml(formatDisplayDate(item.sale_date || item.created_at))}</td>
+        <td>${escapeHtml(formatTime(item.created_at || ''))}</td>
         <td>${escapeHtml(item.buyer_name || '-')}</td>
         <td class="text-right">${formatCurrency(item.total_amount || 0)}</td>
         <td class="text-right">${revenueValue > 0 ? formatCurrency(revenueValue) : '<span class="report-muted">ยังไม่บันทึก</span>'}</td>
@@ -595,7 +609,17 @@ function renderSaleLots(items, pagination, range) {
         <td><span class="report-badge ${statusClass.className}">${escapeHtml(statusClass.label)}</span></td>
       </tr>
     `;
-  }).join(''));
+  }).join('') +
+  // ✅ Total Row
+  `<tr class="report-total-row" style="background:#f8fafc;font-weight:600;border-top:2px solid #e2e8f0">
+    <td colspan="4" style="padding:10px">รวมทั้งหมด (${count} Lot)</td>
+    <td class="text-right" style="padding:10px">-</td>
+    <td class="text-right" style="padding:10px">${formatCurrency(revenue)}</td>
+    <td class="text-right" style="padding:10px">${formatCurrency(cost)}</td>
+    <td class="text-right" style="padding:10px;${profit >= 0 ? 'color:var(--color-success)' : 'color:var(--color-danger)'}">${profit >= 0 ? '+' : ''}${formatCurrency(profit)}</td>
+    <td></td>
+  </tr>`
+  );
 }
 
 async function loadEmployeesReport() {
@@ -648,7 +672,15 @@ function renderEmployees(items) {
         <td><span class="report-badge ${statusClass}">${statusLabel}</span></td>
       </tr>
     `;
-  }).join(''));
+  }).join('') +
+  // ✅ Total Row
+  `<tr class="report-total-row" style="background:#f8fafc;font-weight:600;border-top:2px solid #e2e8f0">
+    <td colspan="3" style="padding:10px">รวมทั้งหมด (${active} active / ${inactive} inactive)</td>
+    <td class="text-right" style="padding:10px">${formatCurrency(salaryTotal)}</td>
+    <td class="text-right" style="padding:10px">-</td>
+    <td></td>
+  </tr>`
+  );
 }
 
 async function loadTaxReport() {
@@ -783,9 +815,10 @@ function exportReportCard(key) {
         ['สาขา', currentBranchName],
         ['ช่วงรายงาน', monthLabel],
         [],
-        ['วันที่', 'สินค้า', 'หมวด', 'จำนวนสุทธิ', 'ราคาเฉลี่ย/หน่วย', 'ยอดรวม', 'หน่วย', 'จำนวนบิล'],
+        ['วันที่', 'เวลา', 'สินค้า', 'หมวด', 'จำนวนสุทธิ', 'ราคาเฉลี่ย/หน่วย', 'ยอดรวม', 'หน่วย', 'จำนวนบิล'],
         ...reportState.purchaseItems.map((item) => [
           formatDisplayDate(item.purchase_date || ''),
+          formatTime(item.purchase_date || ''),
           item.item_name || '',
           item.category_name || '',
           item.net_quantity || 0,
@@ -801,7 +834,7 @@ function exportReportCard(key) {
         ['สาขา', currentBranchName],
         ['ช่วงรายงาน', monthLabel],
         [],
-        ['เลขที่', 'วันที่', 'ผู้ซื้อ', 'ยอดขาย', 'รายรับจริง', 'ต้นทุน', 'กำไร', 'สถานะ'],
+        ['เลขที่', 'วันที่', 'เวลา', 'ผู้ซื้อ', 'ยอดขาย', 'รายรับจริง', 'ต้นทุน', 'กำไร', 'สถานะ'],
         ...reportState.saleLots.map((item) => {
           const actualRevenue = parseFloat(item.actual_revenue || 0);
           const cost = parseFloat(item.total_cost || 0);
@@ -809,6 +842,7 @@ function exportReportCard(key) {
           return [
             item.reference_no || '',
             formatDisplayDate(item.sale_date || item.created_at),
+            formatTime(item.created_at || ''),
             item.buyer_name || '',
             item.total_amount || 0,
             actualRevenue > 0 ? actualRevenue : '',
@@ -882,12 +916,13 @@ function printReportCard(key) {
     return;
   }
 
+  // ✅ Safe: Write static HTML shell, then use DOM API for dynamic content
   printWindow.document.write(`
     <html lang="th">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${escapeHtml(title)}</title>
+      <title></title>
       <style>
         body { font-family: 'IBM Plex Sans Thai', sans-serif; margin: 24px; color: #1e293b; }
         h1 { margin: 0 0 8px; font-size: 22px; }
@@ -910,14 +945,27 @@ function printReportCard(key) {
         .report-empty-cell { text-align: center; color: #64748b; padding: 20px !important; }
       </style>
     </head>
-    <body>
-      <h1>${escapeHtml(title)}</h1>
-      <div class="meta">สาขา: ${escapeHtml(currentBranchName)} · ช่วงรายงาน: ${escapeHtml(getReportPeriodText(key))}</div>
-      ${clone.outerHTML}
-    </body>
+    <body></body>
     </html>
   `);
   printWindow.document.close();
+
+  // ✅ Safe: Use DOM API to set title and content
+  printWindow.document.title = title;
+  const body = printWindow.document.body;
+
+  const h1 = printWindow.document.createElement('h1');
+  h1.textContent = title;
+  body.appendChild(h1);
+
+  const meta = printWindow.document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = `สาขา: ${currentBranchName} · ช่วงรายงาน: ${getReportPeriodText(key)}`;
+  body.appendChild(meta);
+
+  // ✅ Safe: importNode copies DOM tree without executing scripts
+  const safeClone = printWindow.document.importNode(clone, true);
+  body.appendChild(safeClone);
   setTimeout(() => printWindow.print(), 400);
 }
 
@@ -1027,9 +1075,17 @@ function formatDisplayDate(value) {
     return String(value).slice(0, 10);
   }
 
-  return date.toLocaleDateString('th-TH', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+// ✅ Format time only (HH:MM)
+function formatTime(value) {
+  if (!value) return '-';
+  const normalized = String(value).includes('T') ? String(value) : `${String(value).slice(0, 10)}T00:00:00`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 }

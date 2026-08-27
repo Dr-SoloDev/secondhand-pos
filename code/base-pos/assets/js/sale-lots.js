@@ -595,77 +595,114 @@ async function viewLot(id) {
   const totalExpenses = lot.profit_breakdown?.total_expenses || otherExpenses + lotTransport;
   const netProfit = lot.profit_breakdown?.net_profit || profit - totalExpenses;
 
+  const hasHistory = Array.isArray(lot.history) && lot.history.length > 0;
   const html = `
-    <div class="receipt">
-      <h3 style="text-align:center;margin:0">รายละเอียด Lot ขาย</h3>
-      <div style="text-align:center;color:#888;margin-bottom:12px">${escapeHtml(lot.reference_no)}</div>
-      <div><strong>สาขา:</strong> ${escapeHtml(lot.branch_name || '-')}</div>
-      <div><strong>วันที่ขาย:</strong> ${lot.sale_date ? lot.sale_date.slice(0, 10) : '-'}</div>
-      <div><strong>ผู้ซื้อ:</strong> ${escapeHtml(lot.buyer_name || '-')}</div>
-      <div><strong>พนักงาน:</strong> ${escapeHtml(lot.created_by_name || '-')}</div>
-      ${lot.updated_by_name ? `<div><strong>แก้ไขโดย:</strong> ${escapeHtml(lot.updated_by_name)}</div>` : ''}
-      <div style="margin-top:4px"><strong>สถานะ:</strong> ${statusBadgeHtml(lot.status)}</div>
-      <hr>
-      <table class="data-table" style="width:100%">
-        <thead><tr><th>ชื่อสินค้า</th><th class="text-right">น้ำหนัก (กก.)</th><th class="text-right">ราคา/กก.</th><th class="text-right">รวม</th><th class="text-right">ต้นทุน</th></tr></thead>
-        <tbody>
-          ${(lot.items || []).map(it => `
-            <tr>
-              <td>${escapeHtml(it.item_name || it.category_name || '-')}</td>
-              <td class="text-right">${parseFloat(it.quantity_kg).toFixed(3)}</td>
-              <td class="text-right">${formatCurrency(it.unit_price)}</td>
-              <td class="text-right">${formatCurrency(it.subtotal)}</td>
-              <td class="text-right" style="color:var(--color-text-light)">${formatCurrency(it.fifo_cost)}</td>
-            </tr>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <!-- Header card -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
+          <div>
+            <div style="font-size:18px;font-weight:800;color:#1e293b;letter-spacing:0.4px">${escapeHtml(lot.reference_no || `SL-${lot.id}`)}</div>
+            <div style="font-size:12px;color:#64748b;margin-top:2px">Lot ขาย • ${lot.sale_date ? lot.sale_date.slice(0,10) : (lot.created_at ? lot.created_at.slice(0,10) : '-')}</div>
+          </div>
+          ${statusBadgeHtml(lot.status)}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:13px">
+          <div><div style="font-size:11px;color:#64748b;letter-spacing:0.3px">สาขา</div><div style="font-weight:600;color:#1e293b;margin-top:1px">${escapeHtml(lot.branch_name || '-')}</div></div>
+          <div><div style="font-size:11px;color:#64748b">ผู้ซื้อ</div><div style="font-weight:600;color:#1e293b;margin-top:1px">${escapeHtml(lot.buyer_name || '-')}</div></div>
+          <div><div style="font-size:11px;color:#64748b">พนักงาน</div><div style="margin-top:1px">${escapeHtml(lot.created_by_name || '-')}</div></div>
+          <div><div style="font-size:11px;color:#64748b">แก้ไขโดย</div><div style="margin-top:1px">${lot.updated_by_name ? escapeHtml(lot.updated_by_name) : '<span style="color:#94a3b8">—</span>'}</div></div>
+        </div>
+        ${lot.notes ? `<div style="margin-top:10px;padding:9px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;color:#334155"><span style="color:#64748b">หมายเหตุ:</span> ${escapeHtml(lot.notes)}</div>` : ''}
+      </div>
+
+      <!-- Items table card -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+        <div style="padding:10px 14px;font-weight:600;font-size:13px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+          <span>รายการสินค้า</span><span style="color:#64748b;font-weight:400;font-size:12px">${(lot.items||[]).length} รายการ</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="background:#f1f5f9;color:#475569;font-size:11px;letter-spacing:0.4px;text-transform:uppercase">
+              <th style="text-align:left;padding:9px 10px;font-weight:600">สินค้า</th>
+              <th style="text-align:right;padding:9px 10px;font-weight:600;white-space:nowrap">น้ำหนัก</th>
+              <th style="text-align:right;padding:9px 10px;font-weight:600;white-space:nowrap">ราคา/กก.</th>
+              <th style="text-align:right;padding:9px 10px;font-weight:600">ยอด</th>
+              <th style="text-align:right;padding:9px 10px;font-weight:600;color:#94a3b8">ต้นทุน</th>
+            </tr></thead>
+            <tbody>
+              ${(lot.items || []).map((it, i) => `
+                <tr style="background:${i%2===0?'#fff':'#f8fafc'};border-top:1px solid #f1f5f9">
+                  <td style="padding:8px 10px;font-weight:500;color:#1e293b">${escapeHtml(it.item_name || it.category_name || '-')}</td>
+                  <td style="padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums">${parseFloat(it.quantity_kg||0).toFixed(3)} <span style="color:#94a3b8;font-size:11px">กก.</span></td>
+                  <td style="padding:8px 10px;text-align:right;font-variant-numeric:tabular-nums">${formatCurrency(it.unit_price)}</td>
+                  <td style="padding:8px 10px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${formatCurrency(it.subtotal)}</td>
+                  <td style="padding:8px 10px;text-align:right;color:#94a3b8;font-variant-numeric:tabular-nums">${formatCurrency(it.fifo_cost)}</td>
+                </tr>
+              `).join('')}
+              ${(lot.items||[]).length===0 ? `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:18px">— ไม่มีรายการ —</td></tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Summary 3 cards -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:11px;color:#64748b;letter-spacing:0.3px">ยอดขายรวม</div>
+          <div style="font-size:17px;font-weight:700;color:#1e293b;margin-top:4px;font-variant-numeric:tabular-nums">${formatCurrency(lot.total_amount)}</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:11px;color:#64748b">ต้นทุนรวม</div>
+          <div style="font-size:17px;font-weight:700;color:#475569;margin-top:4px;font-variant-numeric:tabular-nums">${formatCurrency(lot.total_cost)}</div>
+        </div>
+        <div style="background:${profit>=0?'#f0fdf4':'#fef2f2'};border:1px solid ${profit>=0?'#bbf7d0':'#fecaca'};border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:11px;color:${profit>=0?'#166534':'#991b1b'}">กำไรขั้นต้น · ${marginPct}%</div>
+          <div style="font-size:17px;font-weight:700;color:${profit>=0?'#15803d':'#dc2626'};margin-top:4px;font-variant-numeric:tabular-nums">${profit>=0?'+':''}${formatCurrency(profit)}</div>
+        </div>
+      </div>
+
+      <!-- Expenses card -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-weight:600;font-size:13px;color:#1e293b;margin-bottom:8px">ค่าใช้จ่าย</div>
+        ${lotTransport > 0 ? `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:7px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;margin-bottom:6px">
+          <span style="color:#92400e">🚛 ค่าขนส่ง</span><span style="font-weight:600">${formatCurrency(lotTransport)}</span>
+        </div>` : ''}
+        ${lotExpenses.length ? lotExpenses.map((e,i) => `
+          <div style="display:flex;justify-content:space-between;font-size:13px;padding:7px 10px;background:${i%2===0?'#f8fafc':'#fff'};border-radius:6px">
+            <span style="color:#475569">${escapeHtml(e.description)}</span><span style="font-variant-numeric:tabular-nums">${formatCurrency(e.amount)}</span>
+          </div>
+        `).join('') : (lotTransport===0 ? `<div style="text-align:center;color:#94a3b8;font-size:13px;padding:6px">— ไม่มีค่าใช้จ่าย —</div>` : '')}
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:9px 10px;border-top:1px solid #e2e8f0;margin-top:8px;background:#f8fafc;border-radius:6px">
+          <span style="font-weight:600;color:#334155">รวมค่าใช้จ่าย</span><span style="font-weight:700;color:#dc2626;font-variant-numeric:tabular-nums">-${formatCurrency(totalExpenses)}</span>
+        </div>
+      </div>
+
+      <!-- Net profit hero -->
+      <div style="background:#1e293b;color:#fff;border-radius:10px;padding:16px;display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:12px;color:#94a3b8;letter-spacing:0.3px">กำไรสุทธิ</div><div style="font-size:11px;color:#64748b;margin-top:2px">หลังหักค่าใช้จ่ายทั้งหมด</div></div>
+        <div style="font-size:22px;font-weight:800;color:${netProfit>=0?'#4ade80':'#f87171'};font-variant-numeric:tabular-nums">${netProfit>=0?'+':''}${formatCurrency(netProfit)}</div>
+      </div>
+      ${hasHistory ? `
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-weight:600;font-size:13px;color:#1e293b;margin-bottom:10px">ประวัติ</div>
+        <div style="display:flex;flex-direction:column;gap:0">
+          ${lot.history.map((h, idx) => `
+            <div style="display:flex;gap:10px">
+              <div style="display:flex;flex-direction:column;align-items:center">
+                <div style="width:8px;height:8px;border-radius:50%;background:${idx===0?'#1e293b':'#cbd5e1'};margin-top:4px"></div>
+                ${idx < lot.history.length-1 ? `<div style="width:1px;flex:1;background:#e2e8f0;margin:2px 0"></div>` : ''}
+              </div>
+              <div style="padding-bottom:10px;flex:1">
+                <div style="font-size:13px;color:#1e293b">${escapeHtml(h.action || h.status || '-')}</div>
+                <div style="font-size:11px;color:#64748b">${escapeHtml(h.by || h.user || '-') } • ${h.at ? formatDateTime(h.at) : (h.created_at ? formatDateTime(h.created_at) : '-')}</div>
+                ${h.note ? `<div style="font-size:12px;color:#475569;margin-top:2px">${escapeHtml(h.note)}</div>` : ''}
+              </div>
+            </div>
           `).join('')}
-        </tbody>
-      </table>
-      <hr>
-      <div style="display:flex;justify-content:space-between">
-        <div>
-          <div style="font-size:13px;color:#888">ยอดขายรวม</div>
-          <div style="font-size:18px;font-weight:700">${formatCurrency(lot.total_amount)}</div>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:13px;color:#888">ต้นทุนรวม</div>
-          <div style="font-size:18px;font-weight:700">${formatCurrency(lot.total_cost)}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:13px;color:#888">กำไรขั้นต้น</div>
-          <div style="font-size:18px;font-weight:700;${profit >= 0 ? 'color:var(--color-success)' : 'color:var(--color-danger)'}">
-            ${profit >= 0 ? '+' : ''}${formatCurrency(profit)}
-            <span style="font-size:13px;font-weight:400">(${marginPct}%)</span>
-          </div>
-        </div>
-      </div>
-      <hr>
-      <div style="font-size:14px;font-weight:500;margin-bottom:6px">ค่าใช้จ่าย</div>
-      ${lotTransport > 0 ? `
-      <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">
-        <span style="color:var(--color-text-light)">🚛 ค่าขนส่ง</span>
-        <span>${formatCurrency(lotTransport)}</span>
-      </div>
-      ` : ''}
-      ${lotExpenses.map(e => `
-        <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">
-          <span style="color:var(--color-text-light)">${escapeHtml(e.description)}</span>
-          <span>${formatCurrency(e.amount)}</span>
-        </div>
-      `).join('')}
-      <div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-top:1px solid #ddd;margin-top:3px">
-        <span style="font-weight:500">รวมค่าใช้จ่าย</span>
-        <span style="font-weight:500;color:var(--color-danger)">-${formatCurrency(totalExpenses)}</span>
-      </div>
-      <hr>
-      <div style="display:flex;justify-content:space-between">
-        <div>
-          <div style="font-size:13px;color:#888">กำไรสุทธิ</div>
-          <div style="font-size:18px;font-weight:700;${netProfit >= 0 ? 'color:var(--color-success)' : 'color:var(--color-danger)'}">
-            ${netProfit >= 0 ? '+' : ''}${formatCurrency(netProfit)}
-          </div>
-        </div>
-      </div>
-      ${lot.notes ? `<div style="margin-top:8px"><strong>หมายเหตุ:</strong> ${escapeHtml(lot.notes)}</div>` : ''}
+      </div>` : ''}
     </div>
   `;
   document.getElementById('viewLotContent').innerHTML = html;

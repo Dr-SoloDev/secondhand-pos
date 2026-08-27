@@ -526,11 +526,18 @@ function showReceipt(saleData) {
   document.getElementById('receiptModal').classList.add('show');
 }
 
-// Print receipt
+// Print receipt — Safe: uses importNode instead of innerHTML injection
 function printReceipt() {
-  const receiptContent = document.getElementById('receipt').innerHTML;
-  const printWindow = window.open('', '_blank');
+  const receiptEl = document.getElementById('receipt');
+  if (!receiptEl) return;
 
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    showNotification('ไม่สามารถเปิดหน้าต่างพิมพ์ได้', 'error');
+    return;
+  }
+
+  // ✅ Safe: Write static HTML shell only (no user data)
   printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -549,13 +556,15 @@ function printReceipt() {
               .receipt-footer { text-align: center; margin-top: 20px; border-top: 1px dashed #000; padding-top: 10px; }
           </style>
       </head>
-      <body>
-          ${receiptContent}
-      </body>
+      <body></body>
       </html>
   `);
-
   printWindow.document.close();
+
+  // ✅ Safe: importNode copies DOM tree without executing scripts
+  const safeClone = printWindow.document.importNode(receiptEl, true);
+  printWindow.document.body.appendChild(safeClone);
+
   printWindow.focus();
   printWindow.print();
   printWindow.close();

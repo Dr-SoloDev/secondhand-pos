@@ -482,7 +482,7 @@ function printSaleReceipt(sale) {
   sale.items.forEach(item => {
     itemsHtml += `
       <tr>
-        <td>${item.product_name}</td>
+        <td>${escapeHtml(item.product_name)}</td>
         <td>${item.quantity}</td>
         <td>${formatCurrency(item.unit_price)}</td>
         <td>${formatCurrency(item.total)}</td>
@@ -587,10 +587,10 @@ function printSaleReceipt(sale) {
       </div>
 
       <div class="receipt-info">
-        <p><strong>Receipt #:</strong> ${sale.reference_no}</p>
+        <p><strong>Receipt #:</strong> ${escapeHtml(sale.reference_no)}</p>
         <p><strong>Date:</strong> ${new Date(sale.created_at.replace(' ', 'T')).toLocaleString()}</p>
-        <p><strong>Cashier:</strong> ${sale.user_full_name || sale.user_name}</p>
-        <p><strong>Customer:</strong> ${sale.customer_name || 'Walk-in Customer'}</p>
+        <p><strong>Cashier:</strong> ${escapeHtml(sale.user_full_name || sale.user_name)}</p>
+        <p><strong>Customer:</strong> ${escapeHtml(sale.customer_name || 'Walk-in Customer')}</p>
       </div>
 
       <table class="receipt-table">

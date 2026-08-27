@@ -417,8 +417,8 @@ def _draw_receipt_pil_image(po_data, include_stub=True):
     if not HAS_PIL:
         raise ImportError("Pillow not installed")
 
-    width = 384    # กว้าง 48mm @ 203dpi (Deli S420 max print width)
-    margin = 12    # ขอบซ้ายขวา 1.5mm
+    width = 576    # กว้าง 72mm @ 203dpi (80mm thermal: EasyPrint ES-8804)
+    margin = 16    # ขอบซ้ายขวา ~2mm
     content_width = width - (2 * margin)
 
     font_path = first_existing_font_path()
@@ -520,7 +520,8 @@ def _draw_receipt_pil_image(po_data, include_stub=True):
 
         def draw_text(text, x, y_pos, font):
             if draw is not None:
-                draw.text((x, y_pos), str(text), font=font, fill=0)
+                # stroke_width ทำให้ glyph หนาขึ้นแบบคม (ไม่เบลอแบบ blur/dilate)
+                draw.text((x, y_pos), str(text), font=font, fill=0, stroke_width=1, stroke_fill=0)
 
         def draw_wrapped(text, font, y_pos, line_height, align='left', max_width=content_width):
             lines = wrap_text(text, font, max_width)
@@ -633,6 +634,7 @@ def _draw_receipt_pil_image(po_data, include_stub=True):
             y = draw_rule(y, 2)
 
             y = draw_wrapped(f"เลขที่: {reference}", body_bold_font, y, 30)
+            y = draw_wrapped(f"พนักงาน: {cashier}", body_font, y, 30)
             y = draw_wrapped(f"วันที่: {created}", body_font, y, 30)
             y = draw_wrapped(f"ผู้ขาย: {seller_name}", body_bold_font, y, 30)
             if seller_id:
@@ -690,7 +692,7 @@ def _draw_receipt_pil_image(po_data, include_stub=True):
             total = safe_float(po.get('total_amount'))
             y += 2
             y = draw_pair(
-                'ยอดรวมทั้งสิ้น',
+                'รวมเงินทั้งสิ้น',
                 f"{fmt_money(total)} บาท",
                 body_bold_font,
                 heading_font,
@@ -699,8 +701,8 @@ def _draw_receipt_pil_image(po_data, include_stub=True):
             )
             y += 2
             y = draw_rule(y, 2)
-            y = draw_wrapped(f"ชำระ: {payment_label(po.get('payment_method'))}", body_font, y, 30)
-            y = draw_wrapped(f"แคชเชียร์: {cashier}", body_font, y, 30)
+            y = draw_wrapped(f"วิธีชำระเงิน: {payment_label(po.get('payment_method'))}", body_font, y, 30)
+            y = draw_wrapped(f"พนักงาน: {cashier}", body_font, y, 30)
 
             notes = receipt_value(po, ['notes'])
             if notes:
@@ -806,9 +808,37 @@ def _draw_receipt_pil_image(po_data, include_stub=True):
         return y + 14
 
     def make_section(section):
+        # Supersample 3x: render ทุกอย่างใหญ่ 3 เท่า (font/พิกัด/เส้น) →
+        # LANCZOS downscale ครั้งเดียว → threshold ต่ำ (เก็บแกนเข้ม = คมบาง)
+        ss = 3
         section_height = render_section(po_data, section, draw=None)
-        image = Image.new('1', (width, section_height), 1)
-        render_section(po_data, section, draw=ImageDraw.Draw(image))
+        big = Image.new('L', (width * ss, section_height * ss), 255)
+        # วาดด้วย font ss เท่าโดยคูณพิกัดผ่าน wrapper (layout logic ใน render_section ไม่แตะ)
+        class ScaledDraw:
+            """proxy ของ ImageDraw: คูณ coordinate/font อัตโนมัติ"""
+            def __init__(self, d, factor):
+                self._d = d
+                self._f = factor
+                self._font_cache = {}
+            def text(self, xy, text, **kw):
+                f = kw.pop('font', None)
+                if f is not None:
+                    key = (f.path, f.size * self._f)
+                    if key not in self._font_cache:
+                        self._font_cache[key] = ImageFont.truetype(f.path, f.size * self._f)
+                    kw['font'] = self._font_cache[key]
+                else:
+                    kw['font'] = None
+                kw.pop('stroke_width', None)   # supersample แทน stroke — ไม่งั้นฟุ้ง
+                kw.pop('stroke_fill', None)
+                self._d.text(tuple(v * self._f for v in xy), text, **kw)
+            def line(self, pts, **kw):
+                w = kw.pop('width', 1)
+                self._d.line(tuple(tuple(v * self._f for v in p) for p in pts), width=w * self._f, **kw)
+
+        render_section(po_data, section, draw=ScaledDraw(ImageDraw.Draw(big), ss))
+        image = big.resize((width, section_height), Image.LANCZOS)
+        image = image.point(lambda v: 0 if v < 120 else 255, mode='1')
         return image
 
     main_image = make_section('main')
@@ -877,21 +907,39 @@ def render_receipt_image(po_data, include_stub=True):
         pixels = list(img.get_flattened_data())
     else:
         pixels = list(img.getdata())
-    chunk_height = 24
+    # ══════════════════════════════════════════════════════════
+    # 2. แปลงเป็น ESC/POS raster (GS v 0 — mode 0, single-density)
+    #
+    # ใช้ GS v 0 แทน ESC * (24-dot bit image): raster mode พิมพ์ภาพต่อเนื่อง
+    # ทั้งก้อนโดยไม่มีรอยต่อระหว่างแถบ → แก้เส้นขาดแนวนอน (broken strokes)
+    # ไบต์ละ 8 จุดแนวตั้ง, แถวละ ceil(W/8) ไบต์, MSB = จุดซ้ายสุด
+    # ══════════════════════════════════════════════════════════
+    row_bytes = (W + 7) // 8
     escpos = bytearray(INIT)
-    for top in range(0, img.height, chunk_height):
-        height = min(chunk_height, img.height - top)
-        escpos += b'\x1b\x2a\x21'
-        escpos += bytes([W & 0xFF, (W >> 8) & 0xFF])
-        for px in range(W):
-            for plane in range(3):
+
+    # ── raster payload: แถวละ row_bytes ไบต์ ──
+    def raster_rows(top, height):
+        data = bytearray()
+        for row in range(top, top + height):
+            base = row * W
+            for byte_i in range(row_bytes):
                 value = 0
                 for bit in range(8):
-                    row = top + plane * 8 + bit
-                    if row < top + height and pixels[row * W + px] == 0:
+                    px = byte_i * 8 + bit
+                    if px < W and pixels[base + px] == 0:
                         value |= 1 << (7 - bit)
-                escpos.append(value)
-        escpos += b'\n'
+                data.append(value)
+        return bytes(data)
+
+    # แบ่งเป็นหลาย GS v 0 call ทีละ CHUNK_ROWS แถว (กัน firmware buffer limit)
+    # การแบ่งเกิดที่ขอบแถว pixel เสมอ → ไม่มีรอยต่อให้เห็น (ต่างจาก ESC *)
+    CHUNK_ROWS = 600
+    for top in range(0, img.height, CHUNK_ROWS):
+        height = min(CHUNK_ROWS, img.height - top)
+        escpos += GS + b'v0\x00'
+        escpos += bytes([row_bytes & 0xFF, (row_bytes >> 8) & 0xFF])
+        escpos += bytes([height & 0xFF, (height >> 8) & 0xFF])
+        escpos += raster_rows(top, height)
 
     # เผื่อพื้นที่ว่างก่อนใบมีดตัด เพื่อไม่ให้ฉีกโดนบรรทัดสุดท้าย
     escpos += FEED + b'\x04'

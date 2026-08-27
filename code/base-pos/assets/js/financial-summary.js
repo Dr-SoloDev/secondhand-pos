@@ -373,9 +373,7 @@ async function exportExcel(type) {
 
 // === Print Report ===
 function printReport() {
-  const content = document.querySelector('.page-header')?.cloneNode(true) || '';
   const cards = document.querySelectorAll('.card');
-  const cardHtml = Array.from(cards).map(card => card.outerHTML).join('\n');
 
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
@@ -383,6 +381,7 @@ function printReport() {
     return;
   }
 
+  // ✅ Safe: Write static HTML shell only
   printWindow.document.write(`
     <!DOCTYPE html>
     <html lang="th">
@@ -398,14 +397,31 @@ function printReport() {
         }
       </style>
     </head>
-    <body>
-      <h1>รายงานสรุปธุรกิจ — รักษ์สะอาดรีไซเคิล</h1>
-      ${content}
-      ${cardHtml}
-    </body>
+    <body></body>
     </html>
   `);
   printWindow.document.close();
+
+  // ✅ Safe: Use DOM API to set content
+  const body = printWindow.document.body;
+
+  const h1 = printWindow.document.createElement('h1');
+  h1.textContent = 'รายงานสรุปธุรกิจ — รักษ์สะอาดรีไซเคิล';
+  body.appendChild(h1);
+
+  // Import page header
+  const pageHeader = document.querySelector('.page-header');
+  if (pageHeader) {
+    const safeHeader = printWindow.document.importNode(pageHeader, true);
+    body.appendChild(safeHeader);
+  }
+
+  // Import cards
+  cards.forEach(card => {
+    const safeCard = printWindow.document.importNode(card, true);
+    body.appendChild(safeCard);
+  });
+
   setTimeout(() => printWindow.print(), 500);
 }
 

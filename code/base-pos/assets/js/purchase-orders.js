@@ -1127,77 +1127,120 @@ window.showReceipt = async function(id) {
     const dq = parseFloat(it.weight_deduction || 0);
     const q = parseFloat(it.quantity || 0);
     const net = Math.max(0, q - dq);
-    const bg = i % 2 === 0 ? '#fff' : '#f9f9f9';
-    return `<tr style="background:${bg}">
-      <td style="padding:4px 5px">${escapeHtml(it.item_name)}</td>
-      <td style="text-align:center;padding:4px 5px;color:#666">${dq > 0 ? dq.toFixed(2) : '-'}</td>
-      <td style="text-align:center;padding:4px 5px">${net.toFixed(2)} ${escapeHtml(it.unit)}</td>
-      <td style="text-align:right;padding:4px 5px">${formatCurrency(it.unit_price)}</td>
-      <td style="text-align:right;padding:4px 5px;font-weight:600">${formatCurrency(it.total_price)}</td>
+    const bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+    return `<tr style="background:${bg};border-top:1px solid #f1f5f9">
+      <td style="padding:7px 8px;font-weight:500;color:#1e293b">${escapeHtml(it.item_name)}</td>
+      <td style="text-align:center;padding:7px 8px;color:#94a3b8;font-size:11px">${dq > 0 ? dq.toFixed(2) : '—'}</td>
+      <td style="text-align:center;padding:7px 8px;font-variant-numeric:tabular-nums">${net.toFixed(2)} <span style="color:#94a3b8;font-size:11px">${escapeHtml(it.unit)}</span></td>
+      <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums;color:#475569">${formatCurrency(it.unit_price)}</td>
+      <td style="text-align:right;padding:7px 8px;font-weight:700;font-variant-numeric:tabular-nums;color:#1e293b">${formatCurrency(it.total_price)}</td>
     </tr>`;
   }).join('');
 
   const billBody = `
-    <div style="border:2px solid #222;border-radius:4px;padding:6px 10px;text-align:center;margin-bottom:8px">
-      <div style="font-size:18px;font-weight:800;letter-spacing:0">${escapeHtml(shopName)}</div>
-      ${storeInfoRows}
-      ${welcomeMessage ? `<div style="font-size:10.5px;color:#555;line-height:1.5;margin-top:2px">${escapeHtmlPreserveLines(welcomeMessage)}</div>` : ''}
-      <div style="font-size:16px;font-weight:800;letter-spacing:0;margin-top:4px">ใบรับซื้อของเก่า</div>
-      <div style="font-size:12px;color:#444;margin-top:2px">${escapeHtml(po.branch_name)} &nbsp;·&nbsp; สาขา ${escapeHtml(po.branch_code)}</div>
+    <!-- Header — เรียบหรู ขาวสะอาด มีเส้นทองบางๆ -->
+    <div style="text-align:center;padding:10px 0 12px;border-bottom:2px solid #1e293b;margin-bottom:12px">
+      <div style="font-size:19px;font-weight:800;letter-spacing:0.3px;color:#1e293b">${escapeHtml(shopName)}</div>
+      ${storeInfoRows ? `<div style="margin-top:4px">${storeInfoRows}</div>` : ''}
+      ${welcomeMessage ? `<div style="font-size:10.5px;color:#64748b;line-height:1.5;margin-top:4px;letter-spacing:0.2px">${escapeHtmlPreserveLines(welcomeMessage)}</div>` : ''}
+      <div style="display:inline-block;margin-top:10px;padding:4px 14px;background:#1e293b;color:#f59e0b;border-radius:20px;font-size:11px;letter-spacing:1.2px;font-weight:700">ใบรับซื้อของเก่า</div>
+      <div style="font-size:11px;color:#64748b;margin-top:6px;letter-spacing:0.3px">${escapeHtml(po.branch_name)} · สาขา ${escapeHtml(po.branch_code)}</div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:6px">
-      <span>เลขที่ <strong style="font-size:12px">${escapeHtml(po.reference_no)}</strong></span>
-      <span style="color:#555">${dt}</span>
+    <!-- Meta bar — เลขที่ + วันที่ -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px">
+      <div><span style="font-size:11px;color:#64748b;letter-spacing:0.3px">เลขที่</span> <strong style="font-size:13px;color:#1e293b;letter-spacing:0.5px;margin-left:4px">${escapeHtml(po.reference_no)}</strong></div>
+      <div style="font-size:11px;color:#475569;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:3px 10px">${dt}</div>
     </div>
-    <div style="background:#f7f7f7;border-radius:3px;padding:5px 8px;font-size:12px;margin-bottom:8px;line-height:1.7">
-      <div>ผู้ขาย &nbsp;<strong>${escapeHtml(po.seller_name)}</strong>${po.seller_id_card ? `<span style="color:#666;font-size:11px"> &nbsp;บัตร ${maskIdCard(po.seller_id_card)}</span>` : ''}</div>
-      <div style="color:#555;font-size:11px">แคชเชียร์ &nbsp;${escapeHtml(po.user_name || '-')}</div>
+    <!-- Seller card -->
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div>
+        <div style="font-size:11px;color:#64748b;letter-spacing:0.3px">ผู้ขาย</div>
+        <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:1px">${escapeHtml(po.seller_name)}${po.seller_id_card ? `<span style="font-weight:400;color:#94a3b8;font-size:11px;margin-left:6px">บัตร ${maskIdCard(po.seller_id_card)}</span>` : ''}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#64748b">แคชเชียร์</div>
+        <div style="font-size:12px;color:#334155;margin-top:1px">${escapeHtml(po.user_name || '-')}</div>
+      </div>
     </div>
+    <!-- Table — หัว slate เข้ม -->
+    <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
     <table style="width:100%;border-collapse:collapse;font-size:11.5px">
       <thead>
-        <tr style="background:#222;color:#fff">
-          <th style="text-align:left;padding:4px 5px;font-weight:600">สินค้า</th>
-          <th style="text-align:center;padding:4px 5px;font-weight:600">หัก</th>
-          <th style="text-align:center;padding:4px 5px;font-weight:600">สุทธิ</th>
-          <th style="text-align:right;padding:4px 5px;font-weight:600">ราคา/กก.</th>
-          <th style="text-align:right;padding:4px 5px;font-weight:600">รวม</th>
+        <tr style="background:#1e293b;color:#fff">
+          <th style="text-align:left;padding:8px 8px;font-weight:600;letter-spacing:0.3px;font-size:11px">สินค้า</th>
+          <th style="text-align:center;padding:8px 8px;font-weight:600;font-size:11px">หัก</th>
+          <th style="text-align:center;padding:8px 8px;font-weight:600;font-size:11px">สุทธิ</th>
+          <th style="text-align:right;padding:8px 8px;font-weight:600;font-size:11px">ราคา/กก.</th>
+          <th style="text-align:right;padding:8px 8px;font-weight:600;font-size:11px">รวม</th>
         </tr>
       </thead>
       <tbody>${itemRows}</tbody>
     </table>
-    <div style="margin-top:8px;padding:6px 8px;background:#222;color:#fff;border-radius:3px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:11px;opacity:.8">${po.payment_method === 'cash' ? 'เงินสด' : 'โอนธนาคาร'}</span>
-      <span style="font-size:15px;font-weight:800">฿ ${formatCurrency(po.total_amount)}</span>
     </div>
-    <div style="font-size:10.5px;text-align:center;margin-top:8px;color:#666;border-top:1px dashed #ccc;padding-top:6px;line-height:1.8">
-      ${shopPhone ? `ติดต่อ ${escapeHtml(shopPhone)}<br>` : ''}
-      <span style="font-size:10px">${escapeHtmlPreserveLines(receiptFooter)}</span>
+    <!-- Total hero — slate + amber -->
+    <div style="margin-top:10px;padding:12px 14px;background:#1e293b;border-radius:8px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:11px;color:#94a3b8;letter-spacing:0.5px;background:#334155;border-radius:20px;padding:4px 10px">${po.payment_method === 'cash' ? '💵 เงินสด' : '🏦 โอนธนาคาร'}</span>
+      <span style="font-size:18px;font-weight:800;color:#fbbf24;letter-spacing:0.3px">฿ ${formatCurrency(po.total_amount)}</span>
+    </div>
+    <!-- Stub — ต้นขั้วฉีกเก็บ เทียบยอดบิล vs จ่ายจริง รายวัน -->
+    <div style="margin-top:14px;border:1.5px dashed #94a3b8;border-radius:8px;padding:10px 12px;background:#f8fafc">
+      <div style="text-align:center;font-size:10px;color:#64748b;letter-spacing:0.8px;font-weight:600">✂ - - - ต้นขั้วสำหรับร้านค้า (ฉีกเก็บ • เทียบยอดรายวัน ออฟไลน์ vs ออนไลน์) - - -</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-top:8px;padding:6px 8px;background:#fff;border:1px solid #e2e8f0;border-radius:6px">
+        <div>เลขที่ <strong style="color:#1e293b">${escapeHtml(po.reference_no)}</strong> <span style="color:#94a3b8">•</span> ${dt}</div>
+        <div style="font-size:10px;color:#64748b">${escapeHtml(po.branch_name)}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;margin-top:6px">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px">ผู้ขาย: <strong>${escapeHtml(po.seller_name)}</strong></div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px">ยอดบิล: <strong style="color:#1e293b">฿ ${formatCurrency(po.total_amount)}</strong> <span style="color:#94a3b8;font-size:10px">(${po.payment_method === 'cash' ? 'เงินสด' : 'โอน'})</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">
+        <div style="background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:10px;color:#64748b;letter-spacing:0.3px">ยอดจ่ายจริง</div>
+          <div style="border-bottom:1px solid #94a3b8;height:18px;margin-top:6px"></div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:2px">฿</div>
+        </div>
+        <div style="background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:10px;color:#64748b">ผลต่าง</div>
+          <div style="border-bottom:1px solid #94a3b8;height:18px;margin-top:6px"></div>
+          <div style="font-size:10px;color:#94a3b8">+ / −</div>
+        </div>
+        <div style="background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:10px;color:#64748b">ผู้จ่าย / ลายเซ็น</div>
+          <div style="border-bottom:1px solid #1e293b;height:18px;margin-top:6px"></div>
+          <div style="font-size:10px;color:#64748b">${escapeHtml(po.user_name || '-')}</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;text-align:center;margin-top:6px;letter-spacing:0.2px">รวมต้นขั้วทั้งวันเทียบยอดลิ้นชัก • ออฟไลน์(ต้นขั้ว) ↔ ออนไลน์(ระบบ)</div>
+    </div>
+    <div style="font-size:10.5px;text-align:center;margin-top:10px;color:#94a3b8;line-height:1.8">
+      ${shopPhone ? `<span style="color:#64748b">ติดต่อ ${escapeHtml(shopPhone)}</span><br>` : ''}
+      <span style="font-size:10px;letter-spacing:0.2px">${escapeHtmlPreserveLines(receiptFooter)}</span>
     </div>`;
 
   const preciousExtra = isPrecious ? `
-    <div style="border:1px solid #333;border-radius:4px;padding:10px;margin-top:12px;font-size:12px">
-      <div style="font-weight:700;margin-bottom:6px">คำรับรองของผู้ขาย</div>
-      <div style="margin-bottom:10px">ข้าพเจ้าได้นำสินค้าที่ระบุในบิลนี้มาโดยสุจริต และยินยอมให้ทางร้านบันทึกข้อมูล</div>
-      <div style="margin-bottom:4px;font-size:11px">ลายมือชื่อ:</div>
-      <div style="border-bottom:1.5px solid #333;height:32px;margin-bottom:6px"></div>
-      <div style="font-size:10px;color:#555;margin-bottom:10px">
-        วันที่/เวลา: ${dt} &nbsp;&nbsp;&nbsp; เลขบิล: ${escapeHtml(po.reference_no)}
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-top:14px;background:#fffbeb">
+      <div style="font-weight:700;color:#92400e;font-size:12px;letter-spacing:0.3px;margin-bottom:8px">✦ คำรับรองของผู้ขาย</div>
+      <div style="font-size:11px;color:#475569;line-height:1.6;margin-bottom:10px">ข้าพเจ้าได้นำสินค้าที่ระบุในบิลนี้มาโดยสุจริต และยินยอมให้ทางร้านบันทึกข้อมูล</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:4px">ลายมือชื่อ:</div>
+      <div style="border-bottom:1.5px solid #1e293b;height:32px;margin-bottom:8px"></div>
+      <div style="font-size:10px;color:#64748b;margin-bottom:10px">
+        วันที่/เวลา: ${dt} &nbsp;&nbsp; เลขบิล: ${escapeHtml(po.reference_no)}
       </div>
-      <div style="font-size:11px;margin-bottom:8px">
+      <div style="font-size:11px;color:#475569;margin-bottom:8px">
         หลักฐานที่แนบ: &nbsp; ☐ สำเนาบัตรประชาชน &nbsp; ☐ สำเนาใบขับขี่ &nbsp; ☐ เอกสารราชการ
       </div>
-      <div style="font-size:10px;color:#c00;font-weight:600;line-height:1.5">
+      <div style="font-size:10px;color:#dc2626;font-weight:600;line-height:1.6;background:#fef2f2;border-radius:6px;padding:8px 10px">
         ทางร้านไม่รับซื้อของที่มีการลักทรัพย์โดยเด็ดขาด<br>
         ทางร้านไม่รับผิดชอบต่อสินค้าที่เกิดจากการกระทำผิดกฎหมายทุกกรณี
       </div>
     </div>
-    <div style="border:1.5px dashed #999;border-radius:4px;height:90px;margin-top:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa;flex-direction:column;gap:4px">
-      <span><i class="icon-image"></i></span>
+    <div style="border:1.5px dashed #cbd5e1;border-radius:8px;height:90px;margin-top:10px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#94a3b8;flex-direction:column;gap:4px;background:#f8fafc">
+      <span style="font-size:18px">🪪</span>
       <span>แนบสำเนาบัตรประชาชน / ภาพถ่ายที่นี่</span>
     </div>` : '';
 
   const billCopy = `
-    <div style="width:190mm;max-width:100%;padding:10px 14px;font-family:'Sarabun',sans-serif;font-size:11px;box-sizing:border-box;">
+    <div style="width:190mm;max-width:100%;padding:14px 16px;font-family:'Sarabun',sans-serif;font-size:11px;box-sizing:border-box;background:#fff">
       ${billBody}${preciousExtra}
     </div>`;
 
@@ -1205,23 +1248,26 @@ window.showReceipt = async function(id) {
     <style>
       @media print {
         @page { size: A4 portrait; margin: 8mm; }
-        /* ซ่อน UI ที่ไม่ต้องพิมพ์ */
         #viewPOModal .modal-header,
         #viewPOModal .modal-footer,
         #poQrSection,
         #poPhotoGallery { display: none !important; }
-        /* ลบ border กรอบ modal */
-        #billPrintWrap { border: none !important; }
-        /* ถ้า Type B ยาวเกิน → ขึ้นหน้าใหม่โดยอัตโนมัติ */
+        #billPrintWrap { border: none !important; box-shadow:none !important; }
         #billPrintWrap > div { page-break-inside: avoid; }
       }
     </style>
-    <div id="billPrintWrap" style="border:1px solid #ccc;width:fit-content;max-width:100%;margin:0 auto;">
-      <div>${billCopy}</div>
-    </div>
-    <div id="poPhotoGallery" style="display:none;margin-top:16px;padding:12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0">
-      <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">รูปภาพสินค้า</div>
-      <div id="poPhotoGrid" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+        <div style="font-size:12px;color:#64748b">สถานะ: ${purchaseOrderStatusBadge(po)}</div>
+        <div style="font-size:11px;color:#94a3b8">${dt}</div>
+      </div>
+      <div id="billPrintWrap" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;width:fit-content;max-width:100%;margin:0 auto;">
+        <div>${billCopy}</div>
+      </div>
+      <div id="poPhotoGallery" style="display:none;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:8px">📸 รูปภาพสินค้า</div>
+        <div id="poPhotoGrid" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
     </div>`;
   document.getElementById('viewPOModal').classList.add('show');
 

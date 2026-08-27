@@ -290,6 +290,12 @@ class Router
         $this->routes[] = ['route' => 'employees/employee',          'controller' => 'EmployeesController', 'method' => 'destroy',             'verb' => 'DELETE'];
         $this->routes[] = ['route' => 'employees/salary-expense',     'controller' => 'EmployeesController', 'method' => 'createSalaryExpense', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'employees/sso-expense',       'controller' => 'EmployeesController', 'method' => 'createSSOExpense',    'verb' => 'POST'];
+
+        // Import routes
+        $this->routes[] = ['route' => 'import/upload',   'controller' => 'ImportController', 'method' => 'upload',   'verb' => 'POST'];
+        $this->routes[] = ['route' => 'import/process',  'controller' => 'ImportController', 'method' => 'process',  'verb' => 'POST'];
+        $this->routes[] = ['route' => 'import/validate', 'controller' => 'ImportController', 'method' => 'validate', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'import/history',  'controller' => 'ImportController', 'method' => 'history',  'verb' => 'GET'];
     }
 
     public function dispatch()

@@ -289,6 +289,35 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// === Security: Masking sensitive data ===
+
+/**
+ * Mask เลขบัตรประชาชน — แสดงแค่ 4 ตัวท้าย
+ * ตัวอย่าง: 1234567890123 → 1-2345-XXXXX-XX-0123
+ */
+function maskIdCard(idCard) {
+  if (!idCard) return '-';
+  const cleaned = String(idCard).replace(/[-\s]/g, '');
+  if (cleaned.length < 4) return 'X-X';
+  const lastFour = cleaned.slice(-4);
+  const masked = cleaned.slice(0, -4).replace(/./g, 'X');
+  return masked.slice(0, 1) + '-' +
+    masked.slice(1, 5) + '-' +
+    masked.slice(5, 10) + '-' +
+    masked.slice(10) + lastFour;
+}
+
+/**
+ * Mask เบอร์โทรศัพท์ — แสดงแค่ 3 ตัวหน้าและ 3 ตัวท้าย
+ * ตัวอย่าง: 0812345678 → 081-XXX-5678
+ */
+function maskPhone(phone) {
+  if (!phone) return '-';
+  const cleaned = String(phone).replace(/[-\s]/g, '');
+  if (cleaned.length < 6) return phone || '-';
+  return cleaned.slice(0, 3) + '-XXX-' + cleaned.slice(-4);
+}
+
 function formatNumber(value, fractionDigits = 2) {
   const number = Number(value);
   if (!Number.isFinite(number)) return (0).toFixed(fractionDigits);

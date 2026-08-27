@@ -8,13 +8,17 @@
   /* ======== Thermal 80mm — browser print ผ่าน driver (Windows/CUPS) ======== */
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  @page { size: 80mm var(--page-h, 100mm); margin: 0; }
+  @page { size: 80mm auto; margin: 0; }
+
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   body {
-    font-family: 'Sarabun', 'Tahoma', 'Arial', sans-serif;
-    font-size: 11px;
-    color: #111;
+    font-family: 'Sarabun', 'Tahoma', 'Noto Sans Thai', 'Arial', sans-serif;
+    font-size: 11.5px;
+    color: #000;
     background: #f0f0f0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   /* ======== Print Controls (hidden on print) ======== */
@@ -31,7 +35,15 @@
   #btnClose { background: #e5e7eb; color: #333; }
   #printerHint { font-size: 11px; color: #b45309; background: #fef3c7; padding: 6px 10px; border-radius: 6px; }
 
-  /* ======== Thermal Sheet (80mm) ======== */
+  /* ซ่อนแถบควบคุมตอนพิมพ์ — กันเปลืองกระดาษ */
+  @media print {
+    #printControls { display: none !important; }
+    #pageWrapper { padding-top: 0 !important; }
+    body { background: #fff !important; }
+    .thermal-sheet { box-shadow: none !important; border: none !important; }
+  }
+
+  /* ======== Thermal Sheet (80mm) — คมเข้มแบบ image mode ======== */
   #pageWrapper { padding-top: 58px; }
 
   .thermal-sheet {
@@ -40,49 +52,66 @@
     margin: 0 auto;
     background: #fff;
     padding: 4mm 3mm 6mm 3mm; /* เนื้อหาจริง ~74mm */
-    font-size: 11px;
+    font-size: 11.5px;
     line-height: 1.35;
+    color: #000;
   }
 
   .t-center { text-align: center; }
   .t-right { text-align: right; }
-  .t-bold { font-weight: 700; }
+  .t-bold { font-weight: 800; }
 
-  .t-store-name { font-size: 15px; font-weight: 800; }
-  .t-doc-title { font-size: 13px; font-weight: 700; margin-top: 2px; }
-  .t-store-info { font-size: 10px; color: #444; }
+  .t-store-name { font-size: 16px; font-weight: 900; letter-spacing: 0.2px; color: #000; line-height: 1.2; }
+  .t-doc-title { font-size: 14px; font-weight: 900; margin-top: 3px; color: #000; letter-spacing: 0.3px; }
+  .t-store-info { font-size: 10.5px; color: #000; font-weight: 600; }
 
   .t-divider {
-    border-top: 1px dashed #444; margin: 4px 0;
+    border-top: 1.2px dashed #000; margin: 5px 0;
   }
-  .t-divider-solid { border-top: 1px solid #111; margin: 4px 0; }
+  .t-divider-solid { border-top: 1.5px solid #000; margin: 5px 0; }
 
-  .t-row { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; }
-  .t-row .label { color: #333; white-space: nowrap; }
-  .t-row .value { text-align: right; }
+  .t-row { display: flex; justify-content: space-between; gap: 6px; font-size: 11.5px; color: #000; }
+  .t-row .label { color: #000; white-space: nowrap; font-weight: 600; }
+  .t-row .value { text-align: right; color: #000; font-weight: 700; }
+  .t-row .value.t-bold { font-weight: 900; }
 
   .t-table { width: 100%; border-collapse: collapse; margin-top: 3px; }
   .t-table th {
-    text-align: left; font-size: 10px; border-top: 1px solid #111;
-    border-bottom: 1px solid #111; padding: 2px 0;
+    text-align: left; font-size: 10px; font-weight: 900; color: #000;
+    border-top: 1.5px solid #000;
+    border-bottom: 1.5px solid #000; padding: 3px 0;
+    letter-spacing: 0.2px;
   }
   .t-table th.t-right, .t-table td.t-right { text-align: right; }
   .t-table th.t-center, .t-table td.t-center { text-align: center; }
-  .t-table td { padding: 2px 0; font-size: 11px; vertical-align: top; }
-  .t-table .item-name { word-break: break-all; }
+  .t-table td { padding: 2.5px 0; font-size: 11.5px; vertical-align: top; color: #000; }
+  .t-table .item-name { word-break: break-all; font-weight: 700; }
 
   .t-total {
     display: flex; justify-content: space-between; align-items: center;
-    font-size: 13px; font-weight: 800; margin-top: 4px; padding-top: 3px;
-    border-top: 1px solid #111;
+    font-size: 15px; font-weight: 900; margin-top: 5px; padding-top: 4px;
+    border-top: 1.8px solid #000; color: #000; letter-spacing: 0.2px;
   }
-  .t-payment { font-size: 11px; color: #333; }
+  .t-payment { font-size: 11.5px; color: #000; font-weight: 700; }
 
-  .t-footer { font-size: 10px; color: #333; margin-top: 6px; }
+  .t-footer { font-size: 10.5px; color: #000; margin-top: 6px; font-weight: 600; }
   .t-footer .line { margin-top: 1px; }
+  .t-conditions { font-size: 9.5px; color: #000; margin-top: 6px; text-align: center; line-height: 1.4; font-weight: 600; border-top: 1px dashed #000; padding-top: 4px; }
 
   .t-qr { margin-top: 5px; }
   .t-qr img { width: 38mm; height: 38mm; image-rendering: pixelated; }
+
+  /* ====== ต้นขั้วร้าน (ฉีกเก็บ) ====== */
+  .t-gap { margin: 10mm 0 5mm 0; text-align: center; }
+  .t-gap-line { border-top: 1.8px dashed #000; position: relative; margin: 0; }
+  .t-gap-label { font-size: 10px; font-weight: 900; color: #000; background: #fff; display: inline-block; padding: 0 8px; position: relative; top: -7px; letter-spacing: 0.5px; }
+  .stub-sheet { padding-bottom: 6mm; }
+  .stub-title { font-size: 13px; font-weight: 900; text-align: center; color: #000; }
+  .stub-sub { font-size: 10px; font-weight: 700; text-align: center; color: #000; margin-bottom: 3px; }
+  .stub-table { width: 100%; border-collapse: collapse; margin-top: 3px; }
+  .stub-table th { font-size: 9.5px; font-weight: 900; border-top: 1.2px solid #000; border-bottom: 1.2px solid #000; padding: 2px 0; text-align: left; color: #000; }
+  .stub-table td { font-size: 10px; padding: 1.5px 0; color: #000; }
+  .stub-total { display: flex; justify-content: space-between; font-size: 13px; font-weight: 900; border-top: 1.5px solid #000; margin-top: 4px; padding-top: 3px; color: #000; }
 
   #loadingState { text-align: center; padding: 40px; color: #666; }
   #errorState { text-align: center; padding: 40px; color: #b91c1c; background: #fef2f2; margin: 20px; border-radius: 8px; }
@@ -146,10 +175,10 @@
       const dt = fmtDateTime(po.created_at);
       const branchLabel = [po.branch_name, po.branch_code ? `สาขา ${po.branch_code}` : ''].filter(Boolean).join(' · ');
       const shopName = po.shop_name || 'รักษ์สะอาดรีไซเคิล';
-      const shopAddress = po.shop_address || '';
+      const shopAddress = po.shop_address || 'จ.สุรินทร์ — ศูนย์รับซื้อขยะเพื่อการรีไซเคิล';
       const taxId = po.tax_id || '';
       const shopPhone = po.shop_phone || po.branch_phone || '';
-      const welcomeMessage = po.receipt_welcome_message || '';
+      const welcomeMessage = po.receipt_welcome_message || 'บริการดี ราคาดี ตาชั่งมาตรฐาน';
       const receiptFooter = po.receipt_footer || 'ขอบคุณที่ใช้บริการ';
 
       const storeLines = [
@@ -160,24 +189,40 @@
         ].filter(Boolean).join(' · ')
       ].filter(Boolean).map(l => `<div class="t-store-info">${escLines(l)}</div>`).join('');
 
-      const itemRows = (po.items || []).map(it => {
+      // รายละเอียดแบบ 2 บรรทัดต่อรายการ (เหมือนตัวอย่างคมๆ)
+      const itemRows = (po.items || []).map((it, idx) => {
         const dq = parseFloat(it.weight_deduction || 0);
         const q  = parseFloat(it.quantity || 0);
         const net = Math.max(0, q - dq);
         const name = esc(it.item_name);
-        const unit = esc(it.unit || '');
-        return `<tr>
-          <td class="item-name">${name}</td>
-          <td class="t-center" style="white-space:nowrap">${net.toFixed(2)}${unit}</td>
-          <td class="t-right">${fmtCurrency(it.unit_price)}</td>
-          <td class="t-right t-bold">${fmtCurrency(it.total_price)}</td>
-        </tr>`;
+        const unit = esc(it.unit || 'กก.');
+        const price = fmtCurrency(it.unit_price);
+        const total = fmtCurrency(it.total_price);
+        const dedLine = dq > 0 ? `ชั่ง ${q.toFixed(2)} ${unit} · หัก ${dq.toFixed(2)} ${unit}` : '';
+        return `
+          <tr><td colspan="4" style="padding-top:3px; border-top: ${idx===0?'none':'1px dashed #000'}">
+            <div style="display:flex; justify-content:space-between; font-weight:900; font-size:11.5px;"><span>${idx+1}. ${name}</span></div>
+            ${dedLine ? `<div style="font-size:10px; color:#000;">${esc(dedLine)}</div>` : ''}
+            <div style="display:flex; justify-content:space-between; font-size:10.5px;"><span>สุทธิ ${net.toFixed(2)} ${unit} × ${price}</span><span style="font-weight:900;">${total}</span></div>
+          </td></tr>`;
       }).join('') || '<tr><td colspan="4" class="t-center" style="color:#999">ไม่มีรายการสินค้า</td></tr>';
+
+      // ต้นขั้ว — ย่อสำหรับเช็คยอดตอนเย็น
+      const stubRows = (po.items || []).map((it, idx) => {
+        const dq = parseFloat(it.weight_deduction || 0);
+        const q  = parseFloat(it.quantity || 0);
+        const net = Math.max(0, q - dq);
+        const unit = esc(it.unit || 'กก.');
+        return `<tr><td>${idx+1}. ${esc(it.item_name)}</td><td class="t-center">${net.toFixed(2)}${unit}</td><td class="t-right" style="font-weight:800">${fmtCurrency(it.total_price)}</td></tr>`;
+      }).join('') || '<tr><td colspan="3" class="t-center">—</td></tr>';
 
       const paymentMap = { cash: 'เงินสด', bank: 'โอนธนาคาร', qr: 'QR Code', promptpay: 'พร้อมเพย์' };
       const payment = paymentMap[po.payment_method] || po.payment_method || 'ไม่ระบุ';
 
-      return `
+      const conditions = `กรุณาตรวจสอบความถูกต้องของรายการก่อนออกจากเคาน์เตอร์<br>ผู้รับเงิน: ${esc(po.user_name||'-')} · ติดต่อ ${esc(shopPhone||'-')} · หยุดทุกวันพฤหัสบดี`;
+
+      // ===== ส่วนลูกค้า (บน) =====
+      const mainBill = `
         <div class="t-center">
           <div class="t-store-name">${esc(shopName)}</div>
           ${storeLines}
@@ -202,9 +247,7 @@
         <table class="t-table">
           <thead>
             <tr>
-              <th>สินค้า</th>
-              <th class="t-center">สุทธิ</th>
-              <th class="t-right">ราคา</th>
+              <th>รายการ / จำนวน × ราคา</th>
               <th class="t-right">รวม</th>
             </tr>
           </thead>
@@ -212,10 +255,11 @@
         </table>
 
         <div class="t-total">
-          <span>ยอดรวม</span>
-          <span>฿ ${fmtCurrency(po.total_amount)}</span>
+          <span>รวมเงินทั้งสิ้น</span>
+          <span>฿ ${fmtCurrency(po.total_amount)} บาท</span>
         </div>
-        <div class="t-row t-payment"><span>ชำระ</span><span class="t-bold">${esc(payment)}</span></div>
+        <div class="t-row t-payment"><span>วิธีชำระเงิน</span><span class="t-bold">${esc(payment)}</span></div>
+        <div class="t-row t-payment"><span>พนักงาน</span><span>${esc(po.user_name||'-')}</span></div>
 
         ${po.is_precious_metal ? `
         <div class="t-divider-solid"></div>
@@ -230,7 +274,39 @@
         <div class="t-footer t-center">
           <div class="line">${escLines(receiptFooter)}</div>
           ${po.qr_url ? `<div class="t-qr"><img src="${esc(po.qr_url)}" alt="QR"></div>` : ''}
+        </div>
+
+        <div class="t-conditions">${conditions}</div>
+
+        <div style="text-align:center; margin-top:8px; font-size:10px; color:#000; font-weight:700;">ขอบคุณที่ใช้บริการ — มีคุณจึงมีเรา รักษ์สะอาดรีไซเคิล</div>
+        <div style="text-align:center; font-size:9px; color:#000; margin-top:2px;">ติดต่อ ${esc(shopPhone)} · เปิดทุกวัน ยกเว้นพฤหัสบดี</div>`;
+
+      // ===== ต้นขั้วร้าน (ล่าง — แคชเชียร์เก็บเช็คยอดเย็น) =====
+      const stubBill = `
+        <div class="t-gap">
+          <div class="t-gap-line"></div>
+          <div class="t-gap-label">✂️ ฉีกตามเส้น — ต้นขั้วร้าน (แคชเชียร์เก็บ)</div>
+        </div>
+        <div class="stub-sheet">
+          <div class="stub-title">${esc(shopName)}</div>
+          <div class="stub-sub">ต้นขั้วร้าน · ${esc(branchLabel)} · ${esc(dt)}</div>
+          <div class="t-divider-solid"></div>
+          <div class="t-row" style="font-size:10px;"><span class="label">เลขที่</span><span class="value" style="font-weight:900">${esc(po.reference_no)}</span></div>
+          <div class="t-row" style="font-size:10px;"><span class="label">ผู้ขาย</span><span class="value">${esc(po.seller_name||'-')}</span></div>
+          ${po.seller_id_card ? `<div class="t-row" style="font-size:9px;"><span class="label">บัตร</span><span class="value">${esc(maskId(po.seller_id_card))}</span></div>` : ''}
+          <table class="stub-table">
+            <thead><tr><th>รายการ</th><th class="t-center">สุทธิ</th><th class="t-right">รวม</th></tr></thead>
+            <tbody>${stubRows}</tbody>
+          </table>
+          <div class="stub-total"><span>ยอดรวม</span><span>฿ ${fmtCurrency(po.total_amount)} บาท</span></div>
+          <div class="t-row" style="font-size:10px; margin-top:3px;"><span>ชำระ: ${esc(payment)}</span><span style="font-weight:800">แคชเชียร์: ${esc(po.user_name||'-')}</span></div>
+          <div style="margin-top:6px; border: 1px dashed #000; padding:4px; font-size:9px; text-align:center; font-weight:700;">
+            เช็คยอดตอนเย็น: ยอดนี้ต้องตรงกับเงินสดคงเหลือ<br>ลายเซ็นแคชเชียร์: ________________
+          </div>
+          <div style="height:6mm"></div>
         </div>`;
+
+      return mainBill + stubBill;
     }
 
     async function loadAndRender() {
@@ -258,11 +334,8 @@
       document.getElementById('billSheet').innerHTML = buildThermalBill(po);
       document.getElementById('billSheet').style.display = 'block';
 
-      // ตั้งความสูงหน้ากระดาษให้พอดีกับเนื้อหาบิล (กันพิมพ์ยาวทั้งม้วน)
-      // 1mm = 96/25.4 px; เผื่อ padding/border ~4mm
-      const heightMm = Math.ceil(document.getElementById('billSheet').offsetHeight / (96 / 25.4)) + 4;
-      document.documentElement.style.setProperty('--page-h', Math.max(heightMm, 60) + 'mm');
-      console.log(`[Thermal] page height = ${heightMm}mm`);
+      // ใช้ 80mm auto — ให้ browser ตัดกระดาษพอดีเนื้อหาเอง (กันม้วนไหลยาว)
+      console.log(`[Thermal] bill height = ${document.getElementById('billSheet').offsetHeight}px`);
 
       // แสดง hint เลือกเครื่องพิมพ์ (ซ่อนตอนพิมพ์)
       document.getElementById('printerHint').style.display = '';

@@ -67,8 +67,8 @@ function renderSellersTable() {
             <tr>
                 <td>${seller.id}</td>
                 <td>${escapeHtml(seller.full_name)}</td>
-                <td>${escapeHtml(seller.phone || '-')}</td>
-                <td>${formatIdCard(seller.id_card)}</td>
+                <td>${escapeHtml(maskPhone(seller.phone))}</td>
+                <td>${escapeHtml(maskIdCard(seller.id_card))}</td>
                 <td class="text-center">${seller.total_transactions ?? '-'}</td>
                 <td class="text-right">${formatNumber(seller.total_amount)}</td>
                 <td>${lastTransaction}</td>
@@ -224,8 +224,8 @@ async function viewSeller(id) {
     }
 
     // ---- INFO GRID ----
-    document.getElementById('viewSellerIdCard').textContent = formatIdCard(seller.id_card) || '-';
-    document.getElementById('viewSellerPhone').textContent = seller.phone || '-';
+    document.getElementById('viewSellerIdCard').textContent = maskIdCard(seller.id_card);
+    document.getElementById('viewSellerPhone').textContent = maskPhone(seller.phone);
     document.getElementById('viewSellerVehicle').textContent = seller.vehicle_plate || '-';
     document.getElementById('viewSellerVehicleType').textContent = seller.vehicle_type || '-';
     document.getElementById('viewSellerAddress').textContent = seller.address || '-';
@@ -299,21 +299,21 @@ function renderPoCard(po) {
         ? `<span class="badge badge-warning" style="font-size:10px;padding:1px 6px">${escapeHtml(po.status)}</span>`
         : '';
 
-    // Items table
+    // Items table — ปรับ header ให้ตรง Lot (slate เข้ม สลับสีแถว)
     let itemsHtml = '';
     if (po.items && po.items.length) {
         itemsHtml = `
-            <table class="po-items-table">
+            <table class="po-items-table" style="width:100%;border-collapse:collapse;font-size:13px">
                 <thead>
-                    <tr>
-                        <th>รายการ <span class="item-meta">(📸 ถ้ามีรูป)</span></th>
-                        <th class="col-qty">จำนวน</th>
-                        <th class="col-price">ราคา/หน่วย</th>
-                        <th class="col-total">รวม</th>
+                    <tr style="background:#f1f5f9;color:#475569;font-size:11px;letter-spacing:0.3px;text-transform:uppercase">
+                        <th style="text-align:left;padding:8px 10px;font-weight:600">รายการ <span style="font-weight:400;color:#94a3b8">(📸 ถ้ามีรูป)</span></th>
+                        <th class="col-qty" style="text-align:center;padding:8px 10px;font-weight:600">จำนวน</th>
+                        <th class="col-price" style="text-align:right;padding:8px 10px;font-weight:600">ราคา/หน่วย</th>
+                        <th class="col-total" style="text-align:right;padding:8px 10px;font-weight:600">รวม</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${po.items.map(item => {
+                    ${po.items.map((item, i) => {
                         const qty = parseFloat(item.quantity);
                         const ded = parseFloat(item.weight_deduction || 0);
                         const qtyDisplay = ded > 0
@@ -331,16 +331,16 @@ function renderPoCard(po) {
                                 ? `<div class="item-photo-thumbs"><img src="${escapeHtml(item.photo_path)}" class="item-photo-thumb" onclick="expandPhoto(this)" title="รูปสินค้าชิ้นนี้"></div>`
                                 : '');
 
-                        return `<tr>
-                            <td class="item-name">
+                        return `<tr style="background:${i%2===0?'#fff':'#f8fafc'};border-top:1px solid #f1f5f9">
+                            <td class="item-name" style="padding:8px 10px">
                                 ${escapeHtml(item.item_name)}
-                                ${item.category_name ? `<span class="item-meta"> · ${escapeHtml(item.category_name)}</span>` : ''}
-                                ${item.notes ? `<div class="item-notes">${escapeHtml(item.notes)}</div>` : ''}
+                                ${item.category_name ? `<span style="color:#64748b;font-size:12px"> · ${escapeHtml(item.category_name)}</span>` : ''}
+                                ${item.notes ? `<div style="font-size:11px;color:#64748b;margin-top:2px">${escapeHtml(item.notes)}</div>` : ''}
                                 ${itemPhotosHtml}
                             </td>
-                            <td class="text-center">${qtyDisplay} ${escapeHtml(item.unit)}</td>
-                            <td class="text-right">${formatNumber(item.unit_price)}</td>
-                            <td class="text-right"><strong>${formatNumber(item.total_price)}</strong></td>
+                            <td class="text-center" style="padding:8px 10px;font-variant-numeric:tabular-nums">${qtyDisplay} ${escapeHtml(item.unit)}</td>
+                            <td class="text-right" style="padding:8px 10px;font-variant-numeric:tabular-nums">${formatNumber(item.unit_price)}</td>
+                            <td class="text-right" style="padding:8px 10px;font-variant-numeric:tabular-nums"><strong>${formatNumber(item.total_price)}</strong></td>
                         </tr>`;
                     }).join('')}
                 </tbody>
@@ -727,8 +727,8 @@ async function searchSellerAutocomplete(q) {
         const div = document.createElement('div');
         div.className = 'seller-item' + (s.is_blacklisted ? ' seller-item--blacklisted' : '');
         const tierLabel = 'บิล ' + (s.tier_level || 1);
-        const phoneFmt = s.phone ? ' · ' + escapeHtml(s.phone) : '';
-        const idCardFmt = s.national_id ? ' · ' + formatIdCard(s.national_id) : '';
+        const phoneFmt = s.phone ? ' · ' + escapeHtml(maskPhone(s.phone)) : '';
+        const idCardFmt = s.national_id ? ' · ' + escapeHtml(maskIdCard(s.national_id)) : '';
         const blacklistIcon = s.is_blacklisted ? ' ⛔' : '';
         div.innerHTML = `
             <div class="seller-item__name">
