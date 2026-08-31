@@ -200,7 +200,8 @@ class CashSession extends Model
 
     /**
      * Simple daily drawer open: insert amount = drawer balance. No carry-forward.
-     * If session already open/pending from same day, reset it to fresh open with new amount.
+     * เปิดได้ครั้งเดียวต่อวัน — ถ้าเงินระหว่างวันไม่พอให้ใช้ "เติมเงินเข้าลิ้นชัก" แทน
+     * (ห้ามเปิดทับ/ล้าง movement เพราะจะลบประวัติซื้อสดที่จ่ายเงินออกไปแล้ว)
      */
     public function openDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
@@ -221,9 +222,12 @@ class CashSession extends Model
                  WHERE branch_id = ? AND business_date = CURDATE() FOR UPDATE",
                 [$branchId]
             );
+            if ($existing && ($existing['status'] ?? '') !== 'rejected') {
+                throw new Exception('สาขานี้เปิดยอดประจำวันนี้ไปแล้ว ถ้าเงินสดไม่พอให้ใช้ "เติมเงินเข้าลิ้นชัก"');
+            }
 
-            if ($existing && in_array($existing['status'] ?? '', ['pending_open','open','pending_close'], true)) {
-                // Session is active — reset to fresh open with new amount, clear old movements
+            if ($existing) {
+                // Rejected session — เปิดใหม่ได้ (ยังไม่มีรายการเงินเกิดขึ้น)
                 $sessionId = (int)$existing['id'];
                 $this->db->query(
                     "UPDATE cash_sessions
@@ -234,27 +238,6 @@ class CashSession extends Model
                          last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
                      WHERE id=?",
                     [$actualCash, $reason, $userId, $userId, $sessionId]
-                );
-                $this->db->query(
-                    "DELETE FROM cash_movements WHERE cash_session_id=?",
-                    [$sessionId]
-                );
-            } elseif ($existing) {
-                // Closed or rejected — reuse and reset to open
-                $sessionId = (int)$existing['id'];
-                $this->db->query(
-                    "UPDATE cash_sessions
-                     SET status='open', opening_expected=0, opening_actual=?, opening_reason=?,
-                         opening_requested_by=?, opened_by=?, opened_at=NOW(),
-                         closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
-                         closing_requested_by=NULL, closed_by=NULL, closed_at=NULL,
-                         last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
-                     WHERE id=?",
-                    [$actualCash, $reason, $userId, $userId, $sessionId]
-                );
-                $this->db->query(
-                    "DELETE FROM cash_movements WHERE cash_session_id=?",
-                    [$sessionId]
                 );
             } else {
                 $stmt = $this->db->prepare(
@@ -571,7 +554,7 @@ class CashSession extends Model
 
     /**
      * Simple daily drawer open for position model branches.
-     * Sets opening_actual directly, no reserve/capital logic.
+     * Sets opening_actual directly, no reserve/capital logic. เปิดได้ครั้งเดียวต่อวัน
      */
     private function openPositionDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
@@ -585,8 +568,12 @@ class CashSession extends Model
                  WHERE branch_id=? AND business_date=CURDATE() FOR UPDATE",
                 [$branchId]
             );
+            if ($existing && ($existing['status'] ?? '') !== 'rejected') {
+                throw new Exception('สาขานี้เปิดยอดประจำวันนี้ไปแล้ว ถ้าเงินสดไม่พอให้ใช้ "เติมเงินเข้าลิ้นชัก"');
+            }
 
-            if ($existing && in_array($existing['status'] ?? '', ['pending_open','open','pending_close'], true)) {
+            if ($existing) {
+                // Rejected session — เปิดใหม่ได้ (ยังไม่มีรายการเงินเกิดขึ้น)
                 $sessionId = (int)$existing['id'];
                 $this->db->query(
                     "UPDATE cash_sessions
@@ -597,26 +584,6 @@ class CashSession extends Model
                          last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
                      WHERE id=?",
                     [$actualCash, $reason, $userId, $userId, $sessionId]
-                );
-                $this->db->query(
-                    "DELETE FROM cash_movements WHERE cash_session_id=?",
-                    [$sessionId]
-                );
-            } elseif ($existing) {
-                $sessionId = (int)$existing['id'];
-                $this->db->query(
-                    "UPDATE cash_sessions
-                     SET status='open', cash_model_version=2, opening_expected=0, opening_actual=?,
-                         opening_reason=?, opening_requested_by=?, opened_by=?, opened_at=NOW(),
-                         closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
-                         closing_requested_by=NULL, closed_by=NULL, closed_at=NULL,
-                         last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
-                     WHERE id=?",
-                    [$actualCash, $reason, $userId, $userId, $sessionId]
-                );
-                $this->db->query(
-                    "DELETE FROM cash_movements WHERE cash_session_id=?",
-                    [$sessionId]
                 );
             } else {
                 $stmt = $this->db->prepare(

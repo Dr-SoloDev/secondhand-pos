@@ -78,24 +78,29 @@ test_cash_position() {
     echo "    (drawer=$drawer expected=$expected)"
   fi
 
-  # ── Open again same day with fresh amount ──
+  # ── Second open same day must be rejected (open once per day; top-up instead) ──
   res=$(api_post "cash-sessions/open" "{\"branch_id\":$branch,\"actual_cash\":40000,\"reason\":\"Re-open fresh\"}")
-  assert_contains "$res" '"status":"success"' "Cash position: Open again same day"
+  assert_contains "$res" '"status":"error"' "Cash position: Second open same day is rejected"
+  assert_contains "$res" 'เปิดยอดประจำวันนี้ไปแล้ว' "Cash position: Rejection tells cashier to top up"
+
+  # ── Admin reopen continues the same round (movements preserved, nothing wiped) ──
+  res=$(api_post "cash-sessions/reopen" "{\"id\":$session_id,\"reason\":\"QA reopen same day\"}")
+  assert_contains "$res" '"status":"success"' "Cash position: Admin reopens closed session"
 
   drawer=$(api_get "cash-sessions/current?branch_id=$branch" | json_get "data.drawer_balance" 2>/dev/null)
   expected=$(api_get "cash-sessions/current?branch_id=$branch" | json_get "data.current_expected_cash" 2>/dev/null)
-  if float_eq 40000 "$drawer" && float_eq 40000 "$expected"; then
-    test_pass "Cash position: Fresh open ignores previous round"
+  if float_eq 25000 "$drawer" && float_eq 25000 "$expected"; then
+    test_pass "Cash position: Reopen keeps ledger (open 20000 + deposit 15000 - PO 10000)"
   else
-    test_fail "Cash position: Fresh open ignores previous round"
+    test_fail "Cash position: Reopen keeps ledger (open 20000 + deposit 15000 - PO 10000)"
     echo "    (drawer=$drawer expected=$expected)"
   fi
 
   # ── Close with variance → needs reason ──
-  res=$(api_post "cash-sessions/close" "{\"branch_id\":$branch,\"actual_cash\":39950}")
+  res=$(api_post "cash-sessions/close" "{\"branch_id\":$branch,\"actual_cash\":24950}")
   assert_contains "$res" '"status":"error"' "Cash position: Close with variance requires reason"
 
-  res=$(api_post "cash-sessions/close" "{\"branch_id\":$branch,\"actual_cash\":39950,\"reason\":\"นับขาด\"}")
+  res=$(api_post "cash-sessions/close" "{\"branch_id\":$branch,\"actual_cash\":24950,\"reason\":\"นับขาด\"}")
   assert_contains "$res" '"status":"success"' "Cash position: Close with variance + reason"
 
   status=$(api_get "cash-sessions/current?branch_id=$branch" | json_get "data.status" 2>/dev/null)
@@ -107,8 +112,9 @@ test_cash_position() {
   fi
 
   # ── Large variance → pending approval ──
-  res=$(api_post "cash-sessions/open" "{\"branch_id\":$branch,\"actual_cash\":50000,\"reason\":\"For large variance test\"}")
-  res=$(api_post "cash-sessions/close" "{\"branch_id\":$branch,\"actual_cash\":48000,\"reason\":\"นับขาดเยอะ\"}")
+  res=$(api_post "cash-sessions/reopen" "{\"id\":$session_id,\"reason\":\"QA large variance setup\"}")
+  assert_contains "$res" '"status":"success"' "Cash position: Admin reopens for large variance round"
+  res=$(api_post "cash-sessions/close" "{\"branch_id\":$branch,\"actual_cash\":23000,\"reason\":\"นับขาดเยอะ\"}")
   status=$(api_get "cash-sessions/current?branch_id=$branch" | json_get "data.status" 2>/dev/null)
   if [ "$status" = "pending_close" ]; then
     test_pass "Cash position: Large variance requires approval"

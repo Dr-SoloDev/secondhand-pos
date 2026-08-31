@@ -63,7 +63,7 @@ class CashSessionTest extends TestCase
     {
         $db->onFetchColumn('SELECT id FROM cash_position_baselines', 5)          // hasPositionModel
            ->onFetch('SELECT * FROM cash_sessions',                              // assertOpen
-               ['id' => 10, 'branch_id' => 1, 'status' => 'open'])
+               ['id' => 10, 'branch_id' => 1, 'status' => 'open', 'opening_actual' => 100.0])
            ->onFetch('SELECT * FROM cash_position_baselines',                    // getPositionBalances
                $this->baseline($drawer, $reserve))
            ->onFetchAll('balance_effect IS NOT NULL', []);                       // ไม่มี movement สะสม
@@ -90,17 +90,16 @@ class CashSessionTest extends TestCase
 
     // ---------- openPositionDay ----------
 
-    public function testOpenPositionDayResetsActiveSessionInsteadOfRejecting(): void
+    public function testOpenPositionDayRejectsSecondOpenSameDay(): void
     {
-        // Active session → resets to fresh open (not rejected)
+        // เปิดได้ครั้งเดียวต่อวัน — เปิดซ้ำต้องถูกปฏิเสธ ให้ใช้เติมเงินแทน (ห้ามล้าง movement)
         $db = new FakeCashSessionDb();
-        $db->onFetch('business_date=CURDATE()', ['id' => 99, 'status' => 'open'])
-           ->onFetchColumn('SUM(CASE', 0);
+        $db->onFetch('business_date=CURDATE()', ['id' => 99, 'status' => 'open']);
         $session = $this->makeSession($db);
 
-        $result = $this->invokePrivate($session, 'openPositionDay', [1, 700.0, null, 9]);
-        $this->assertSame('open', $result['status']);
-        $this->assertSame(700.0, $result['drawer_balance']);
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('เปิดยอดประจำวันนี้ไปแล้ว');
+        $this->invokePrivate($session, 'openPositionDay', [1, 700.0, null, 9]);
     }
 
     public function testOpenPositionDaySetsOpeningAmountDirectly(): void
