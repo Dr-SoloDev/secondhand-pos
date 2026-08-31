@@ -392,13 +392,33 @@ class CashSession extends Model
             if (!$allowSelfApproval && (int)$session['closing_requested_by'] === $reviewerId) {
                 throw new Exception('ผู้ขอปิดยอดไม่สามารถอนุมัติรายการตัวเองได้');
             }
-            $newStatus = $approve ? 'closed' : 'open';
-            $this->db->query(
-                "UPDATE cash_sessions SET status=?, closed_by=?, closed_at=?,
+            if ($approve) {
+                // Approved: set status to closed and move counted cash to safe
+                $this->db->query(
+                    "UPDATE cash_sessions SET status='closed', closed_by=?, closed_at=?,
+                            last_reviewed_by=?, last_reviewed_at=NOW(), last_review_note=? WHERE id=?",
+                    [$reviewerId, date('Y-m-d H:i:s'), $reviewerId, $reviewNote, $sessionId]
+                );
+                // v2: Move counted cash into safe now that close is approved
+                $closingActual = (float)$session['closing_actual'];
+                if ((int)($session['cash_model_version'] ?? 1) === 2 && $closingActual > 0) {
+                    $this->insertPositionMovement(
+                        $sessionId, (int)$session['branch_id'], 'out', 'transfer', $closingActual,
+                        'drawer', 'business_reserve', 'closing_to_safe', $sessionId,
+                        'เก็บเงินนับได้เข้าเซฟตอนปิดยอด (อนุมัติแล้ว)', $reviewerId
+                    );
+                }
+            } else {
+                // Rejected: revert to open and clear closing fields so they don't bleed into UI
+                $this->db->query(
+                    "UPDATE cash_sessions SET status='open',
+                        closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
+                        closing_requested_by=NULL, closing_transfer_amount=0,
+                        closed_by=NULL, closed_at=NULL,
                         last_reviewed_by=?, last_reviewed_at=NOW(), last_review_note=? WHERE id=?",
-                [$newStatus, $approve ? $reviewerId : null, $approve ? date('Y-m-d H:i:s') : null,
-                 $reviewerId, $reviewNote, $sessionId]
-            );
+                    [$reviewerId, $reviewNote, $sessionId]
+                );
+            }
             $this->addEvent($sessionId, $approve ? 'close_approved' : 'close_rejected',
                 (float)$session['closing_expected'], (float)$session['closing_actual'], (float)$session['closing_variance'],
                 $reviewNote, (int)$session['closing_requested_by'], $reviewerId);
@@ -784,8 +804,11 @@ class CashSession extends Model
                  $actualCash,
                  (int)$session['id']]
             );
-            // โมเดลใหม่: เก็บเงินที่นับได้เข้าเซฟทั้งหมด (ลิ้นชักว่างตอนเช้าจะดึงจากเซฟใหม่)
-            if ($actualCash > 0) {
+            // Move counted cash into safe:
+            // - Immediate close (no approval): create movement now
+            // - Pending close (approval needed): movement is created in reviewClose() on approve
+            //   to avoid moving money before approval
+            if (!$requiresApproval && $actualCash > 0) {
                 $this->insertPositionMovement(
                     (int)$session['id'], $branchId, 'out', 'transfer', $actualCash,
                     'drawer', 'business_reserve', 'closing_to_safe', (int)$session['id'],
