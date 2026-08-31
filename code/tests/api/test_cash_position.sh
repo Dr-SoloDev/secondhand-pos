@@ -6,10 +6,21 @@ test_cash_position() {
   local branch=2 res session_id deposit deposit_id
   local drawer expected status
 
-  # Close any existing session first
-  curl -s -b "$COOKIE_JAR" "$API_BASE/cash-sessions/close" \
+  # Purge any existing session for this branch today (needed after cash_sessions test leaves session open)
+  local db_host=${DB_HOST:-localhost}
+  local db_user=${DB_USER:-root}
+  local db_pass=${DB_PASS:-rootpass}
+  docker exec scrap-pos-db mysql -h 127.0.0.1 -u "$db_user" -p"$db_pass" pos_system -e "
+    SET FOREIGN_KEY_CHECKS=0;
+    DELETE FROM cash_deposit_requests WHERE cash_session_id IN (SELECT id FROM cash_sessions WHERE branch_id=$branch AND business_date=CURDATE());
+    DELETE FROM cash_movements WHERE cash_session_id IN (SELECT id FROM cash_sessions WHERE branch_id=$branch AND business_date=CURDATE());
+    DELETE FROM cash_sessions WHERE branch_id=$branch AND business_date=CURDATE();
+    SET FOREIGN_KEY_CHECKS=1;
+  " 2>/dev/null
+  # Re-init baseline for this branch
+  curl -s -b "$COOKIE_JAR" "$API_BASE/cash-sessions/init-baseline" \
     -X POST -H 'Content-Type: application/json' \
-    -d "{\"branch_id\":$branch,\"actual_cash\":0,\"reason\":\"Test reset\"}" >/dev/null 2>&1
+    -d "{\"branch_id\":$branch}" >/dev/null 2>&1
 
   # ── Open: insert amount directly = drawer balance ──
   res=$(api_post "cash-sessions/open" "{\"branch_id\":$branch,\"actual_cash\":20000}")

@@ -35,7 +35,7 @@ The **Cash Sessions** feature provides daily cash balance tracking and verificat
                 ├─→ Status = OPEN
                 │
                 └─→ If session was closed/reopened same day:
-                    └─→ Old movements are CLEARED
+                    └─→ ❌ Blocked — "เปิดยอดประจำวันนี้ไปแล้ว" (use เติมเงิน)
 ```
 
 **Simple model:** Insert amount = drawer balance. No carry-forward from previous day.
@@ -95,26 +95,20 @@ PENDING_CLOSE ──[approve]──> CLOSED  (closed_by = approver, closed_at = 
 - Cannot self-approve (opened_requested_by ≠ opened_by)
 - Rejection reason required
 - Audit trail recorded in cash_session_events
-
 ### 4. Reopen / Re-open Same Day
 
-**Actor:** Any authorized user  
-**Condition:** Session is closed or active
+**Actor:** Any authorized user (reopen requires `admin` + reason)
 
-In the simple model, you can also **open again** directly (the system resets the session automatically):
+**Rule:** เปิดได้ครั้งเดียวต่อวัน — ถ้าเปิดไปแล้วจะ `throw 'สาขานี้เปิดยอดประจำวันนี้ไปแล้ว ถ้าเงินสดไม่พอให้ใช้ "เติมเงินเข้าลิ้นชัก"'` (`CashSession.php:220-227`)
 
 ```
-OPEN (closed) ──[open again]──> OPEN (fresh, old movements cleared)
+OPEN ──[open again same day]──> ❌ Blocked (ต้องใช้ เติมเงิน)
+CLOSED ──[reopen]──> OPEN  (reason recorded, movements preserved)
 ```
 
-Or use the explicit reopen endpoint:
-```
-CLOSED ──[reopen]──> OPEN  (reason recorded)
-```
+**Key behavior:** `reopenSameDay()` **ไม่ลบ** `cash_movements` / `cash_deposit_requests` — ยอด `drawer = opening_actual + ledger_total` ยังคงเดิม (`test_cash_position.sh:97-108` ยืนยัน `drawer 25000` หลัง reopen)
 
-**Key behavior:** When opening again same day, old movements are **deleted** and the new opening amount is used.
-
-**Note:** Cross-day reopening creates a new session via `openDay()`.
+**Note:** Cross-day reopening creates a new session via `openDay()` with `opening_expected=0`.
 
 ### 5. Cash Deposit Requests (เติมเงินสด)
 
