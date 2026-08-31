@@ -252,9 +252,7 @@ ensure_cash_session_open() {
       return ;;
   esac
 
-  actual=$(api_get "cash-sessions?branch_id=$branch_id" | python3 -c "import sys,json; d=json.load(sys.stdin); rows=d.get('data',{}).get('items',[]); print(rows[0].get('closing_actual') or 0 if rows else 0)" 2>/dev/null)
-  [ -z "$actual" ] && actual=0
-  api_post "cash-sessions/open" "{\"branch_id\":$branch_id,\"actual_cash\":$actual,\"reason\":\"API test setup\"}" >/dev/null
+  api_post "cash-sessions/open" "{\"branch_id\":$branch_id,\"actual_cash\":100000,\"reason\":\"API test setup\"}" >/dev/null
   ensure_cash_test_float "$branch_id"
 }
 

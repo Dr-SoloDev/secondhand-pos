@@ -141,36 +141,15 @@ function renderCashSession() {
   const variance = cashSession?.closing_variance ?? cashSession?.opening_variance ?? 0;
   cashEl('latestVariance').textContent = cashMoney(variance);
   cashEl('latestVariance').className = `cash-stat-value ${Number(variance) === 0 ? '' : 'danger'}`;
-  // MVP: Hero เป็นลิ้นชักเสมอ — ถ้าไม่ใช่ v2 ให้ใช้ current_expected_cash แทน
   if (MVP_SIMPLE) {
-    const drawerVal = positionOn ? cashSession?.drawer_balance : cashSession?.current_expected_cash;
-    if (cashSession && drawerVal != null) {
+    // แสดงเงินในลิ้นชัก = ยอดเปิด + เติม − ซื้อ − ค่าใช้จ่าย
+    const drawerVal = cashSession?.current_expected_cash ?? 0;
+    if (cashSession && cashSession.status) {
       cashEl('drawerBalance').textContent = cashMoney(drawerVal);
       cashEl('drawerStat').classList.remove('hidden');
-    } else if (!cashSession) {
+    } else {
       cashEl('drawerBalance').textContent = cashMoney(0);
       cashEl('drawerStat').classList.remove('hidden');
-    }
-    // MVP: สมุดย่อ 5 รายการ
-    const mvpSection = document.getElementById('mvpLedgerSection');
-    const mvpBody = document.getElementById('mvpMovementBody');
-    if (mvpSection && mvpBody) {
-      if (cashSession && cashSession.status === 'open') {
-        mvpSection.style.display = 'block';
-        const items = (cashSession.movements || []).slice(0, 5);
-        if (items.length) {
-          mvpBody.innerHTML = items.map(item => {
-            const isBank = String(item.movement_type || '').startsWith('bank_');
-            const dirLabel = isBank ? 'โอนธนาคาร' : (item.direction === 'in' ? 'เข้า' : 'ออก');
-            const dirClass = isBank ? 'bank' : item.direction;
-            return `<tr><td>${cashEscape((item.created_at || '').slice(11,16))}</td><td><span class="cash-direction ${dirClass}">${dirLabel}</span></td><td>${cashEscape(item.description)}</td><td class="text-right" style="color:${isBank ? '#1e40af' : (item.direction === 'in' ? 'var(--color-success)' : 'var(--color-danger)')}">${item.direction === 'in' ? '+' : '-'}${cashMoney(item.amount)}</td></tr>`;
-          }).join('');
-        } else {
-          mvpBody.innerHTML = '<tr><td colspan="4" class="cash-empty">ยังไม่มีรายการวันนี้</td></tr>';
-        }
-      } else {
-        mvpSection.style.display = 'none';
-      }
     }
   }
   renderSessionAction();
@@ -219,43 +198,19 @@ function renderSessionAction() {
 }
 
 function cashCountForm(mode) {
-  const expected = mode === 'open'
-    ? (cashSession?.drawer_balance ?? cashSession?.opening_expected ?? cashSession?.current_expected_cash ?? 0)
-    : (cashSession?.current_expected_cash ?? 0);
-  if (MVP_SIMPLE) {
-    if (mode === 'open') {
-      const safe = Number(cashSession?.reserve_balance || 0);
-      return `<div class="cash-form-grid">
-        <div class="full" style="text-align:center;padding:12px 0">
-          <div style="font-size:13px;color:#6b7280">💰 เงินในเซฟ (เก็บจากเมื่อวาน)</div>
-          <div style="font-size:24px;font-weight:700;margin:6px 0">${cashMoney(safe)}</div>
-        </div>
-        <div class="full"><label for="cashActual">ดึงจากเซฟมาใส่ลิ้นชักกี่บาท</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="${safe > 0 ? safe : ''}" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">ถ้าดึงเกินเงินในเซฟ ส่วนเกินจะนับเป็น "เพิ่มทุน" (รายรับ)</div></div>
-        <div class="cash-action-row" style="justify-content:center"><button class="btn btn-success" id="submitCashCount" style="padding:10px 24px;font-size:16px">☀️ เปิดยอดวันนี้</button></div>
-      </div>`;
-    }
-    return `<div class="cash-form-grid">
-      <div class="full" style="text-align:center;background:#f8fafc;padding:10px;border-radius:6px">ยอดที่ควรมี <strong>${cashMoney(expected)}</strong> — ปิดยอดแล้วเงินจะถูกเก็บเข้าเซฟทั้งหมด</div>
-      <div class="full"><label for="cashActual">นับเงินในลิ้นชักได้เท่าไหร่</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">กรอกยอดที่นับได้จริง — เก็บเข้าเซฟทั้งหมด</div></div>
-      <div class="full"><label for="cashReason">เหตุผล (ถ้ายอดไม่ตรง)</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="เช่น นับเกิน/ขาด เพราะ..."></textarea></div>
-    </div>
-    <div class="cash-action-row" style="justify-content:center"><button class="btn btn-primary" id="submitCashCount" style="padding:10px 24px;font-size:16px">🌙 ปิดยอดวันนี้ (เก็บเข้าเซฟ)</button></div>`;
-  }
-  const expectedLabel = mode === 'open' ? 'เงินในเซฟ' : 'ยอดตามระบบตอนนี้';
+  const expected = cashSession?.current_expected_cash ?? 0;
   if (mode === 'open') {
-    const safe = Number(cashSession?.reserve_balance || 0);
     return `<div class="cash-form-grid">
-      <div class="full cash-expected-hint">เงินในเซฟ: <strong>${cashMoney(safe)}</strong> บาท — ดึงมาใส่ลิ้นชักตอนเปิดวัน (เกินเซฟ = เพิ่มทุนใหม่)</div>
-      <div class="full"><label for="cashActual">ดึงจากเซฟมาใส่ลิ้นชัก</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="${safe > 0 ? safe : ''}"></div>
-      <div class="cash-action-row"><button class="btn btn-success" id="submitCashCount">เปิดยอด</button></div>
+      <div class="full"><label for="cashActual">ใส่ยอดเงินที่จะเปิดลิ้นชักวันนี้</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="" style="font-size:18px;text-align:center"><div style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">ใส่เท่าไหร่ = ลิ้นชักมีเท่านั้น ไม่ยกยอดวันก่อน</div></div>
+      <div class="cash-action-row" style="justify-content:center"><button class="btn btn-success" id="submitCashCount" style="padding:10px 24px;font-size:16px">☀️ เปิดยอดวันนี้</button></div>
     </div>`;
   }
   return `<div class="cash-form-grid">
-    <div class="full cash-expected-hint">${expectedLabel}: <strong>${cashMoney(expected)}</strong></div>
-    <div class="full"><label for="cashActual">ยอดเงินสดที่นับได้</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value=""><div id="closeVarianceHint" style="font-size:11px;color:#6b7280;margin-top:4px">💡 ส่วนต่างเกิน ฿100 ต้องรออนุมัติจากผู้จัดการ</div></div>
-    <div class="full"><label for="cashReason">เหตุผลเมื่อยอดไม่ตรง</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="จำเป็นเมื่อยอดนับไม่ตรงกับยอดตามระบบ"></textarea></div>
+    <div class="full" style="text-align:center;background:#f8fafc;padding:10px;border-radius:6px">ยอดที่ควรมี <strong>${cashMoney(expected)}</strong> (เปิดวัน + เติมเงิน − ซื้อของ − ค่าใช้จ่าย)</div>
+    <div class="full"><label for="cashActual">นับเงินในลิ้นชักได้เท่าไหร่</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">กรอกยอดที่นับได้จริง</div></div>
+    <div class="full"><label for="cashReason">เหตุผล (ถ้ายอดไม่ตรง)</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="เช่น นับเกิน/ขาด เพราะ..."></textarea></div>
   </div>
-  <div class="cash-action-row"><button class="btn btn-primary" id="submitCashCount">ปิดยอด</button></div>`;
+  <div class="cash-action-row" style="justify-content:center"><button class="btn btn-primary" id="submitCashCount" style="padding:10px 24px;font-size:16px">🌙 ปิดยอดวันนี้</button></div>`;
 }
 
 function updateDepositPlaceholder() {

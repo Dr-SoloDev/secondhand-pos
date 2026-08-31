@@ -38,6 +38,7 @@ class CashSession extends Model
         foreach ($rows as &$row) {
             $row['ledger_total'] = $this->movementTotal((int)$row['id']);
             $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
+            $row['drawer_balance'] = $row['current_expected_cash'];
         }
         unset($row);
         return $rows;
@@ -69,29 +70,21 @@ class CashSession extends Model
                 return $row;
             }
 
-            // No session yet today — still return expected carry-forward so the open form can show it.
             $branchName = $this->db->fetchColumn(
                 "SELECT name FROM branches WHERE id = ?",
                 [$branchId]
             );
-            $previousClosing = $this->db->fetchColumn(
-                "SELECT closing_actual FROM cash_sessions
-                 WHERE branch_id = ? AND status = 'closed' AND business_date < CURDATE()
-                 ORDER BY business_date DESC LIMIT 1",
-                [$branchId]
-            );
-            $expected = round((float)($previousClosing ?? 0), 2);
             $result = [
                 'id' => null,
                 'branch_id' => $branchId,
                 'branch_name' => $branchName ?: null,
                 'business_date' => date('Y-m-d'),
                 'status' => null,
-                'opening_expected' => $expected,
+                'opening_expected' => 0,
                 'opening_actual' => null,
                 'opening_variance' => null,
                 'ledger_total' => 0,
-                'current_expected_cash' => $expected,
+                'current_expected_cash' => 0,
                 'movements' => [],
             ];
             return $this->applyPositionFields($result);
@@ -102,10 +95,6 @@ class CashSession extends Model
         return $this->applyPositionFields($row);
     }
 
-    /**
-     * Position model is opt-in per branch after an owner-approved cutover baseline.
-     * Legacy branches intentionally keep the pre-WF-06 behavior until initialized.
-     */
     public function hasPositionModel(int $branchId): bool
     {
         return (bool)$this->db->fetchColumn(
@@ -209,6 +198,10 @@ class CashSession extends Model
         }
     }
 
+    /**
+     * Simple daily drawer open: insert amount = drawer balance. No carry-forward.
+     * If session already open/pending from same day, reset it to fresh open with new amount.
+     */
     public function openDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
         if (!is_finite($actualCash) || $actualCash < 0) {
@@ -221,68 +214,63 @@ class CashSession extends Model
 
         $this->db->beginTransaction();
         try {
-            $unfinished = $this->db->fetch(
-                "SELECT id, business_date, status FROM cash_sessions
-                 WHERE branch_id = ? AND status IN ('pending_open','open','pending_close')
-                 ORDER BY business_date DESC LIMIT 1 FOR UPDATE",
-                [$branchId]
-            );
-            if ($unfinished) {
-                throw new Exception('สาขานี้มีรอบประจำวันที่ยังดำเนินการไม่เสร็จ');
-            }
-
-            $previousClosing = $this->db->fetchColumn(
-                "SELECT closing_actual FROM cash_sessions
-                 WHERE branch_id = ? AND status = 'closed' AND business_date < CURDATE()
-                 ORDER BY business_date DESC LIMIT 1 FOR UPDATE",
-                [$branchId]
-            );
-            $expected = round((float)($previousClosing ?? 0), 2);
             $actualCash = round($actualCash, 2);
-            $variance = round($actualCash - $expected, 2);
-            if (abs($variance) > 0.009 && $reason === null) {
-                throw new Exception('ยอดเงินจริงไม่ตรงยอดยกมา กรุณาระบุเหตุผล');
-            }
-            $requiresApproval = abs($variance) > self::VARIANCE_APPROVAL_THRESHOLD;
-            $status = $requiresApproval ? 'pending_open' : 'open';
 
             $existing = $this->db->fetch(
                 "SELECT id, status FROM cash_sessions
                  WHERE branch_id = ? AND business_date = CURDATE() FOR UPDATE",
                 [$branchId]
             );
-            if ($existing && ($existing['status'] ?? '') !== 'rejected') {
-                throw new Exception('สาขานี้เปิดรอบประจำวันนี้ไปแล้ว');
-            }
 
-            if ($existing) {
+            if ($existing && in_array($existing['status'] ?? '', ['pending_open','open','pending_close'], true)) {
+                // Session is active — reset to fresh open with new amount, clear old movements
                 $sessionId = (int)$existing['id'];
                 $this->db->query(
                     "UPDATE cash_sessions
-                     SET status=?, opening_expected=?, opening_actual=?, opening_reason=?,
-                         opening_requested_by=?, opened_by=?, opened_at=?,
+                     SET status='open', opening_expected=0, opening_actual=?, opening_reason=?,
+                         opening_requested_by=?, opened_by=?, opened_at=NOW(),
+                         closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
+                         closing_requested_by=NULL, closed_by=NULL, closed_at=NULL,
                          last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
                      WHERE id=?",
-                    [$status, $expected, $actualCash, $reason, $userId,
-                     $requiresApproval ? null : $userId, $requiresApproval ? null : date('Y-m-d H:i:s'), $sessionId]
+                    [$actualCash, $reason, $userId, $userId, $sessionId]
+                );
+                $this->db->query(
+                    "DELETE FROM cash_movements WHERE cash_session_id=?",
+                    [$sessionId]
+                );
+            } elseif ($existing) {
+                // Closed or rejected — reuse and reset to open
+                $sessionId = (int)$existing['id'];
+                $this->db->query(
+                    "UPDATE cash_sessions
+                     SET status='open', opening_expected=0, opening_actual=?, opening_reason=?,
+                         opening_requested_by=?, opened_by=?, opened_at=NOW(),
+                         closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
+                         closing_requested_by=NULL, closed_by=NULL, closed_at=NULL,
+                         last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
+                     WHERE id=?",
+                    [$actualCash, $reason, $userId, $userId, $sessionId]
+                );
+                $this->db->query(
+                    "DELETE FROM cash_movements WHERE cash_session_id=?",
+                    [$sessionId]
                 );
             } else {
                 $stmt = $this->db->prepare(
                     "INSERT INTO cash_sessions
                        (branch_id,business_date,status,opening_expected,opening_actual,opening_reason,
                         opening_requested_by,opened_by,opened_at)
-                     VALUES (?,CURDATE(),?,?,?,?,?,?,?)"
+                     VALUES (?,CURDATE(),'open',?,?,?,?,?,?)"
                 );
                 $this->db->execute($stmt, [
-                    $branchId, $status, $expected, $actualCash, $reason, $userId,
-                    $requiresApproval ? null : $userId,
-                    $requiresApproval ? null : date('Y-m-d H:i:s'),
+                    $branchId, 0, $actualCash, $reason, $userId, $userId, date('Y-m-d H:i:s'),
                 ]);
                 $sessionId = (int)$this->db->lastInsertId();
             }
-            $this->addEvent($sessionId, $requiresApproval ? 'open_requested' : 'opened', $expected, $actualCash, $variance, $reason, $userId);
+            $this->addEvent($sessionId, 'opened', 0, $actualCash, 0, $reason, $userId);
             $this->db->commit();
-            return ['id' => $sessionId, 'status' => $status, 'expected_cash' => $expected, 'variance' => $variance];
+            return ['id' => $sessionId, 'status' => 'open', 'expected_cash' => $actualCash, 'variance' => 0];
         } catch (Exception $e) {
             $this->db->rollBack();
             throw $e;
@@ -331,6 +319,9 @@ class CashSession extends Model
         }
     }
 
+    /**
+     * Simple daily drawer close: record variance, no auto-transfer.
+     */
     public function closeDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
         if (!is_finite($actualCash) || $actualCash < 0) {
@@ -393,23 +384,12 @@ class CashSession extends Model
                 throw new Exception('ผู้ขอปิดยอดไม่สามารถอนุมัติรายการตัวเองได้');
             }
             if ($approve) {
-                // Approved: set status to closed and move counted cash to safe
                 $this->db->query(
                     "UPDATE cash_sessions SET status='closed', closed_by=?, closed_at=?,
                             last_reviewed_by=?, last_reviewed_at=NOW(), last_review_note=? WHERE id=?",
                     [$reviewerId, date('Y-m-d H:i:s'), $reviewerId, $reviewNote, $sessionId]
                 );
-                // v2: Move counted cash into safe now that close is approved
-                $closingActual = (float)$session['closing_actual'];
-                if ((int)($session['cash_model_version'] ?? 1) === 2 && $closingActual > 0) {
-                    $this->insertPositionMovement(
-                        $sessionId, (int)$session['branch_id'], 'out', 'transfer', $closingActual,
-                        'drawer', 'business_reserve', 'closing_to_safe', $sessionId,
-                        'เก็บเงินนับได้เข้าเซฟตอนปิดยอด (อนุมัติแล้ว)', $reviewerId
-                    );
-                }
             } else {
-                // Rejected: revert to open and clear closing fields so they don't bleed into UI
                 $this->db->query(
                     "UPDATE cash_sessions SET status='open',
                         closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
@@ -444,26 +424,6 @@ class CashSession extends Model
             if ($session['business_date'] !== date('Y-m-d')) {
                 throw new Exception('เปิดยอดใหม่ได้เฉพาะวันเดียวกัน หลังเปลี่ยนวันให้ใช้เอกสารปรับปรุง');
             }
-            if ((int)($session['cash_model_version'] ?? 1) === 2) {
-                $this->db->query(
-                    "UPDATE cash_sessions
-                     SET status='open', closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
-                         closing_requested_by=NULL, closed_by=NULL, closed_at=NULL, closing_transfer_amount=0,
-                         last_reviewed_by=?, last_reviewed_at=NOW(), last_review_note=?
-                     WHERE id=?",
-                    [$adminId, $reason, $sessionId]
-                );
-                $this->addEvent($sessionId, 'reopened', (float)$session['closing_expected'],
-                    (float)$session['closing_actual'], (float)$session['closing_variance'], $reason, $adminId, $adminId);
-                $this->db->commit();
-                return;
-            }
-            $currentExpected = round(
-                (float)$session['opening_actual'] + $this->movementTotal($sessionId),
-                2
-            );
-            $closingActual = round((float)$session['closing_actual'], 2);
-            $rebaseAmount = round($closingActual - $currentExpected, 2);
             $this->db->query(
                 "UPDATE cash_sessions
                  SET status='open', closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
@@ -472,22 +432,6 @@ class CashSession extends Model
                  WHERE id=?",
                 [$adminId, $reason, $sessionId]
             );
-            if (abs($rebaseAmount) > 0.009) {
-                $this->db->query(
-                    "INSERT INTO cash_movements
-                       (cash_session_id,branch_id,direction,movement_type,amount,reference_type,reference_id,description,recorded_by)
-                     VALUES (?,?,?,?,?,'cash_session_reopen',NULL,?,?)",
-                    [
-                        $sessionId,
-                        (int)$session['branch_id'],
-                        $rebaseAmount > 0 ? 'in' : 'out',
-                        'session_reopen_rebase',
-                        abs($rebaseAmount),
-                        'ปรับฐานยอดหลังเปิดรอบใหม่จากยอดปิดที่อนุมัติ',
-                        $adminId,
-                    ]
-                );
-            }
             $this->addEvent($sessionId, 'reopened', (float)$session['closing_expected'],
                 (float)$session['closing_actual'], (float)$session['closing_variance'], $reason, $adminId, $adminId);
             $this->db->commit();
@@ -510,18 +454,14 @@ class CashSession extends Model
         return $session;
     }
 
-    /**
-     * WF-06 v2.1: cash PO/expense must have enough cash in the drawer.
-     * Throws a clear message so the cashier knows to top up the drawer first.
-     */
     public function assertDrawerSufficient(int $branchId, float $amount): void
     {
         if (!$this->hasPositionModel($branchId)) return;
-        $this->assertOpen($branchId);
-        $positions = $this->getPositionBalances($branchId);
-        if ($positions['drawer_balance'] + 0.0001 < round($amount, 2)) {
+        $session = $this->assertOpen($branchId);
+        $drawerBalance = round((float)$session['opening_actual'] + $this->movementTotal((int)$session['id']), 2);
+        if ($drawerBalance + 0.0001 < round($amount, 2)) {
             throw new Exception('เงินสดในลิ้นชักไม่เพียงพอ กรุณาเติมเงินเข้าลิ้นชักก่อน (ยอดลิ้นชัก ' .
-                number_format($positions['drawer_balance'], 2) . ' บาท)');
+                number_format($drawerBalance, 2) . ' บาท)');
         }
     }
 
@@ -537,14 +477,8 @@ class CashSession extends Model
             return $this->recordPositionMovement(
                 $branchId,
                 $direction === 'in' ? 'increase' : 'decrease',
-                $amount,
-                $source,
-                $destination,
-                $type,
-                $referenceType,
-                $referenceId,
-                $description,
-                $userId
+                $amount, $source, $destination,
+                $type, $referenceType, $referenceId, $description, $userId
             );
         }
         $session = $this->assertOpen($branchId);
@@ -601,11 +535,6 @@ class CashSession extends Model
         return (int)$this->db->lastInsertId();
     }
 
-    /**
-     * Manual cash-out of the drawer during the day (owner takes money to the safe
-     * or back to the owner). Internal transfer — total unchanged unless destination
-     * is external (owner withdrawal, then total decreases).
-     */
     public function transferDrawerOut(int $branchId, float $amount, string $destination,
         string $description, int $userId, int $referenceId = 0,
         string $referenceType = 'cash_position'): int
@@ -616,8 +545,8 @@ class CashSession extends Model
             throw new Exception('ปลายทางของเงินไม่ถูกต้อง');
         }
         $session = $this->assertOpen($branchId);
-        $positions = $this->getPositionBalances($branchId);
-        if ($positions['drawer_balance'] + 0.0001 < $amount) {
+        $drawerBalance = round((float)$session['opening_actual'] + $this->movementTotal((int)$session['id']), 2);
+        if ($drawerBalance + 0.0001 < $amount) {
             throw new Exception('เงินสดในลิ้นชักไม่เพียงพอสำหรับย้ายออก');
         }
         $effect = $destination === 'business_reserve' ? 'transfer' : 'decrease';
@@ -628,135 +557,81 @@ class CashSession extends Model
         );
     }
 
+    /**
+     * Simple deposit: just add cash to the drawer via movement.
+     */
     public function fundDrawer(int $branchId, float $amount, string $sourceType,
         int $referenceId, string $description, int $userId, float $excess = 0.0): int
     {
-        if (!$this->hasPositionModel($branchId)) {
-            return $this->recordMovement(
-                $branchId, 'in', 'cash_deposit', $amount,
-                'cash_deposit_request', $referenceId, $description, $userId
-            );
-        }
-        if (!in_array($sourceType, ['reserve_transfer', 'owner_capital'], true)) {
-            throw new Exception('กรุณาระบุว่าเป็นเงินสำรองเดิมหรือเงินทุนใหม่');
-        }
-        $session = $this->assertOpen($branchId);
-        $positions = $this->getPositionBalances($branchId);
-        if ($sourceType === 'reserve_transfer') {
-            if ($positions['reserve_balance'] + 0.0001 < $amount) {
-                throw new Exception('เงินสำรองของกิจการไม่เพียงพอสำหรับนำเข้าลิ้นชัก');
-            }
-            return $this->insertPositionMovement(
-                (int)$session['id'], $branchId, 'in', 'transfer', $amount,
-                'business_reserve', 'drawer', 'cash_reserve_transfer', $referenceId,
-                $description, $userId, 'cash_deposit_request'
-            );
-        }
-        // owner_capital: แยก base (เงินเดิมในระบบ — ดึงจากเซฟ/ลิ้นชัก) กับ excess (เงินใหม่ — นับรายรับเพิ่มทุน)
-        // สำคัญ: base ต้องหักออกจากเงินเดิมในระบบด้วย (เซฟก่อน) ไม่งั้นนับเงินซ้ำ 2 ที่
-        $excess = max(0.0, round($excess, 2));
-        $base = max(0.0, round($amount, 2) - $excess);
-        $lastId = 0;
-        // ส่วน base: ดึงจากเงินเดิมในระบบ — เซฟ (reserve) ก่อน → บันทึกเป็น transfer (ย้ายจากเซฟมาลิ้นชัก)
-        $fromReserve = min(round($positions['reserve_balance'] ?? 0, 2), $base);
-        if ($fromReserve > 0) {
-            $lastId = $this->insertPositionMovement(
-                (int)$session['id'], $branchId, 'in', 'transfer', $fromReserve,
-                'business_reserve', 'drawer', 'owner_capital_base', $referenceId,
-                $description . ' (จากเงินเดิมในเซฟ)', $userId, 'cash_deposit_request', 0
-            );
-        }
-        // base ส่วนที่เหลือ (มาจากนอกระบบแต่ไม่เกินทุนเดิม — เช่น เติมทดแทนที่ใช้ไปกับรับซื้อ) → increase แต่ไม่นับรายรับ
-        $baseExternal = $base - $fromReserve;
-        if ($baseExternal > 0) {
-            $lastId = $this->insertPositionMovement(
-                (int)$session['id'], $branchId, 'in', 'increase', $baseExternal,
-                'external', 'drawer', 'owner_capital_base_ext', $referenceId,
-                $description . ' (ทุนเดิม)', $userId, 'cash_deposit_request', 0
-            );
-        }
-        // ส่วน excess: เงินใหม่จริง → นับรายรับเพิ่มทุน
-        if ($excess > 0) {
-            $lastId = $this->insertPositionMovement(
-                (int)$session['id'], $branchId, 'in', 'increase', $excess,
-                'external', 'drawer', 'owner_capital_excess', $referenceId,
-                $description . ' (เพิ่มทุน)', $userId, 'cash_deposit_request', $excess
-            );
-        }
-        return $lastId;
+        return $this->recordMovement(
+            $branchId, 'in', 'cash_deposit', $amount,
+            'cash_deposit_request', $referenceId, $description, $userId
+        );
     }
 
+    /**
+     * Simple daily drawer open for position model branches.
+     * Sets opening_actual directly, no reserve/capital logic.
+     */
     private function openPositionDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
         $reason = $this->normalizeReason($reason);
         $this->db->beginTransaction();
         try {
-            $unfinished = $this->db->fetch(
-                "SELECT id FROM cash_sessions
-                 WHERE branch_id=? AND status IN ('pending_open','open','pending_close')
-                 ORDER BY business_date DESC LIMIT 1 FOR UPDATE",
-                [$branchId]
-            );
-            if ($unfinished) throw new Exception('สาขานี้มีรอบประจำวันที่ยังดำเนินการไม่เสร็จ');
+            $actualCash = round($actualCash, 2);
 
             $existing = $this->db->fetch(
                 "SELECT id, status FROM cash_sessions
                  WHERE branch_id=? AND business_date=CURDATE() FOR UPDATE",
                 [$branchId]
             );
-            if ($existing && ($existing['status'] ?? '') !== 'rejected') {
-                throw new Exception('สาขานี้เปิดรอบประจำวันนี้ไปแล้ว');
-            }
 
-            $positions = $this->getPositionBalances($branchId);
-            // โมเดลใหม่: actualCash = จำนวนที่ต้องการดึงจากเซฟมาใส่ลิ้นชักตอนเปิดวัน
-            $actualCash = round($actualCash, 2);
-            $reserveBalance = round($positions['reserve_balance'] ?? 0, 2);
-            $reserveTransfer = min($reserveBalance, $actualCash); // ดึงจากเซฟได้เท่านี้
-            $capitalInjection = round($actualCash - $reserveTransfer, 2); // เกินเซฟ = เพิ่มทุนใหม่ (รายรับเพิ่มทุน)
-            $sessionId = $existing ? (int)$existing['id'] : 0;
-
-            if ($sessionId) {
+            if ($existing && in_array($existing['status'] ?? '', ['pending_open','open','pending_close'], true)) {
+                $sessionId = (int)$existing['id'];
                 $this->db->query(
                     "UPDATE cash_sessions
-                     SET status='open', cash_model_version=2, opening_expected=?, opening_actual=?,
+                     SET status='open', cash_model_version=2, opening_expected=0, opening_actual=?,
                          opening_reason=?, opening_requested_by=?, opened_by=?, opened_at=NOW(),
-                         opening_transfer_amount=?, opening_capital_amount=?,
+                         closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
+                         closing_requested_by=NULL, closed_by=NULL, closed_at=NULL,
                          last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
                      WHERE id=?",
-                    [$actualCash, $actualCash, $reason, $userId, $userId, $reserveTransfer, $capitalInjection, $sessionId]
+                    [$actualCash, $reason, $userId, $userId, $sessionId]
+                );
+                $this->db->query(
+                    "DELETE FROM cash_movements WHERE cash_session_id=?",
+                    [$sessionId]
+                );
+            } elseif ($existing) {
+                $sessionId = (int)$existing['id'];
+                $this->db->query(
+                    "UPDATE cash_sessions
+                     SET status='open', cash_model_version=2, opening_expected=0, opening_actual=?,
+                         opening_reason=?, opening_requested_by=?, opened_by=?, opened_at=NOW(),
+                         closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
+                         closing_requested_by=NULL, closed_by=NULL, closed_at=NULL,
+                         last_reviewed_by=NULL, last_reviewed_at=NULL, last_review_note=NULL
+                     WHERE id=?",
+                    [$actualCash, $reason, $userId, $userId, $sessionId]
+                );
+                $this->db->query(
+                    "DELETE FROM cash_movements WHERE cash_session_id=?",
+                    [$sessionId]
                 );
             } else {
                 $stmt = $this->db->prepare(
                     "INSERT INTO cash_sessions
                        (branch_id,business_date,status,cash_model_version,opening_expected,opening_actual,
-                        opening_reason,opening_requested_by,opened_by,opened_at,opening_transfer_amount,opening_capital_amount)
-                     VALUES (?,CURDATE(),'open',2,?,?,?,?,?,NOW(),?,?)"
+                        opening_reason,opening_requested_by,opened_by,opened_at)
+                     VALUES (?,CURDATE(),'open',2,0,?,?,?,?,NOW())"
                 );
                 $this->db->execute($stmt, [
-                    $branchId, $actualCash, $actualCash, $reason, $userId, $userId,
-                    $reserveTransfer, $capitalInjection,
+                    $branchId, $actualCash, $reason, $userId, $userId,
                 ]);
                 $sessionId = (int)$this->db->lastInsertId();
             }
 
-            if ($reserveTransfer > 0) {
-                $this->insertPositionMovement(
-                    $sessionId, $branchId, 'in', 'transfer', $reserveTransfer,
-                    'business_reserve', 'drawer', 'cash_session_open_transfer', $sessionId,
-                    'ดึงเงินจากเซฟมาใส่ลิ้นชักตอนเปิดวัน', $userId
-                );
-            }
-            if ($capitalInjection > 0) {
-                // เกินเงินในเซฟ = เงินใหม่จาก Owner → นับรายรับเพิ่มทุน
-                $this->insertPositionMovement(
-                    $sessionId, $branchId, 'in', 'increase', $capitalInjection,
-                    'external', 'drawer', 'owner_capital_excess', $sessionId,
-                    'เพิ่มทุนใหม่จาก Owner ตอนเปิดวัน (เกินเงินในเซฟ)', $userId,
-                    'cash_session', $capitalInjection
-                );
-            }
-            $this->addEvent($sessionId, 'opened', $actualCash, $actualCash, 0, $reason, $userId);
+            $this->addEvent($sessionId, 'opened', 0, $actualCash, 0, $reason, $userId);
             $this->db->commit();
             return [
                 'id' => $sessionId,
@@ -764,8 +639,6 @@ class CashSession extends Model
                 'expected_cash' => $actualCash,
                 'variance' => 0.0,
                 'drawer_balance' => $actualCash,
-                'reserve_transfer' => $reserveTransfer,
-                'capital_injection' => $capitalInjection,
             ];
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -773,6 +646,10 @@ class CashSession extends Model
         }
     }
 
+    /**
+     * Simple daily drawer close for position model branches.
+     * Records variance only, no auto-transfer to safe.
+     */
     private function closePositionDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
         $reason = $this->normalizeReason($reason);
@@ -784,8 +661,7 @@ class CashSession extends Model
                 [$branchId]
             );
             if (!$session) throw new Exception('สาขานี้ยังไม่มีรอบประจำวันที่เปิดอยู่');
-            $positions = $this->getPositionBalances($branchId);
-            $expected = round($positions['drawer_balance'], 2);
+            $expected = round((float)$session['opening_actual'] + $this->movementTotal((int)$session['id']), 2);
             $actualCash = round($actualCash, 2);
             $variance = round($actualCash - $expected, 2);
             if (abs($variance) > 0.009 && $reason === null) {
@@ -796,34 +672,19 @@ class CashSession extends Model
             $this->db->query(
                 "UPDATE cash_sessions
                  SET status=?, cash_model_version=2, closing_expected=?, closing_actual=?, closing_reason=?,
-                      closing_requested_by=?, closed_by=?, closed_at=?, closing_transfer_amount=?
+                      closing_requested_by=?, closed_by=?, closed_at=?
                  WHERE id=?",
                 [$status, $expected, $actualCash, $reason, $userId,
                  $requiresApproval ? null : $userId,
                  $requiresApproval ? null : date('Y-m-d H:i:s'),
-                 $actualCash,
                  (int)$session['id']]
             );
-            // Move counted cash into safe:
-            // - Immediate close (no approval): create movement now
-            // - Pending close (approval needed): movement is created in reviewClose() on approve
-            //   to avoid moving money before approval
-            if (!$requiresApproval && $actualCash > 0) {
-                $this->insertPositionMovement(
-                    (int)$session['id'], $branchId, 'out', 'transfer', $actualCash,
-                    'drawer', 'business_reserve', 'closing_to_safe', (int)$session['id'],
-                    'เก็บเงินนับได้เข้าเซฟตอนปิดยอด', $userId
-                );
-            }
             $this->addEvent((int)$session['id'], $requiresApproval ? 'close_requested' : 'closed',
                 $expected, $actualCash, $variance, $reason, $userId);
             $this->db->commit();
             return [
                 'id' => (int)$session['id'], 'status' => $status,
                 'expected_cash' => $expected, 'variance' => $variance,
-                'drawer_balance' => round($expected - $actualCash, 2),
-                'reserve_transfer' => $actualCash,
-                'closing_transfer_amount' => $actualCash,
             ];
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -836,8 +697,8 @@ class CashSession extends Model
         int $referenceId, string $description, int $userId): int
     {
         $session = $this->assertOpen($branchId);
-        $positions = $this->getPositionBalances($branchId);
-        if ($source === 'drawer' && $positions['drawer_balance'] + 0.0001 < $amount) {
+        $drawerBalance = round((float)$session['opening_actual'] + $this->movementTotal((int)$session['id']), 2);
+        if ($source === 'drawer' && $drawerBalance + 0.0001 < $amount) {
             throw new Exception('เงินสดในลิ้นชักไม่เพียงพอ กรุณาเติมเงินเข้าลิ้นชักก่อน');
         }
         return $this->insertPositionMovement(
@@ -874,22 +735,18 @@ class CashSession extends Model
 
     private function applyPositionFields(array $row): array
     {
-        if (!$this->hasPositionModel((int)($row['branch_id'] ?? 0))) return $row;
-        $positions = $this->getPositionBalances((int)$row['branch_id']);
-        $row['cash_model_version'] = 2;
-        if (isset($positions['baseline_id'])) {
-            $row['baseline_id'] = $positions['baseline_id'];
-            $row['baseline_effective_date'] = $positions['baseline_effective_date'];
+        $ledgerTotal = !empty($row['id']) ? $this->movementTotal((int)$row['id']) : 0;
+        $expectedCash = round((float)($row['opening_actual'] ?? 0) + $ledgerTotal, 2);
+        $row['current_expected_cash'] = $expectedCash;
+        // Simple daily drawer: drawer_balance = current_expected_cash
+        $row['drawer_balance'] = $expectedCash;
+        if ($this->hasPositionModel((int)($row['branch_id'] ?? 0))) {
+            $row['cash_model_version'] = 2;
+            $positions = $this->getPositionBalances((int)$row['branch_id']);
+            $row['reserve_balance'] = $positions['reserve_balance'];
+            $row['bank_balance'] = $positions['bank_balance'] ?? 0.0;
+            $row['business_total_cash'] = $positions['business_total_cash'];
         }
-        $row['drawer_balance'] = $positions['drawer_balance'];
-        $row['reserve_balance'] = $positions['reserve_balance'];
-        $row['bank_balance'] = $positions['bank_balance'] ?? 0.0;
-        $row['business_total_cash'] = $positions['business_total_cash'];
-        $row['current_expected_cash'] = $positions['drawer_balance'];
-        $row['ledger_total'] = round(
-            $positions['drawer_balance'] - (float)($row['opening_actual'] ?? 0),
-            2
-        );
         return $row;
     }
 
@@ -916,7 +773,7 @@ class CashSession extends Model
         return round((float)$this->db->fetchColumn(
             "SELECT COALESCE(SUM(CASE WHEN direction='in' THEN amount ELSE -amount END),0)
              FROM cash_movements WHERE cash_session_id=?
-               AND (movement_type IS NULL OR movement_type NOT LIKE 'bank\\_%')",
+               AND (movement_type IS NULL OR movement_type NOT LIKE 'bank\\\\_%')",
             [$sessionId]
         ), 2);
     }

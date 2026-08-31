@@ -1,38 +1,30 @@
 # Cash Sessions Feature — Quick Reference Guide
 
-## Daily Workflow (ผู้ประกอบการรายวัน)
+## Daily Workflow (Simple Daily Drawer)
 
 ### Morning — Opening (เปิดยอด)
 
 1. 📊 **Login** to Admin → "เปิด-ปิดยอด"
 2. 🏪 **Select Branch** (dropdown)
-3. 💵 **Count physical cash** in drawer
-4. ➕ **Enter amount** in form
-5. ❓ **Add reason** (if different from expected)
-6. ✅ **Click "เปิดยอด"**
+3. 💵 **Enter the amount** to put in the drawer
+4. ✅ **Click "เปิดยอด"**
 
-**Expected values shown:**
-- **ยอดยกมาจากวันก่อน** = yesterday's closing cash
-- If no match → **requires reason**
-- If difference > ₿100 → **pending admin approval**
+**Simple model:**
+- ใส่เท่าไหร่ = ลิ้นชักมีเท่านั้น
+- **ไม่ยกยอดวันก่อน** — เริ่มใหม่ทุกเช้า
+- ถ้าปิดแล้วเปิดใหม่วันเดียวกัน → ล้าง movement เก่าอัตโนมัติ
 
 ---
 
-### During Day — Deposit Requests (เติมเงินสด)
+### During Day — Cash Operations
 
-**When you need more cash float:**
+**ซื้อของเงินสด / ค่าใช้จ่าย:** ระบบตัดจากลิ้นชักอัตโนมัติ
 
-1. 💳 **Stay on Cash Sessions page**
-2. **Fill deposit form:**
-   - Amount (e.g., 5,000฿)
-   - Source (e.g., "owner", "float replenishment")
-   - Reason
-3. ✅ **Click "ส่งคำขอเติมเงิน"**
-4. ⏳ **Wait for admin approval**
-
-**Once approved:**
-- Cash automatically added to drawer
-- Ledger updated instantly
+**เติมเงินสด (เมื่อลิ้นชักไม่พอ):**
+1. 💳 Stay on Cash Sessions page
+2. 📝 Fill deposit form (จำนวน + เหตุผล)
+3. ✅ Click "ส่งคำขอเติมเงิน"
+4. ⏳ รอ admin อนุมัติ
 
 ---
 
@@ -40,14 +32,16 @@
 
 1. 💵 **Count all cash** in drawer
 2. 🔢 **System shows expected balance:**
-   - Opening + all deposits − all expenses
+   - ยอดเปิด + เติมเงิน − ซื้อของ − ค่าใช้จ่าย
 3. 📝 **Enter counted amount**
 4. ❓ **Reason** (if doesn't match)
 5. ✅ **Click "ปิดยอด"**
 
-**If variance > ₿100:**
+**If variance > 100:**
 - Status = "รออนุมัติปิดยอด"
 - Admin must approve/reject
+
+**No auto-transfer:** เงินค้างในลิ้นชัก ไม่ย้ายเข้าเซฟ
 
 ---
 
@@ -74,8 +68,8 @@
 | 🟡 รออนุมัติเปิดยอด | Waiting admin | Nothing (wait) |
 | 🟢 เปิดทำการ | Running | Close, Deposits |
 | 🟡 รออนุมัติปิดยอด | Close pending | Nothing (wait) |
-| 🔵 ปิดยอดแล้ว | Done | Reopen (admin only, same-day) |
-| ⚫ ปฏิเสธ | Rejected | Reopen with new submission |
+| 🔵 ปิดยอดแล้ว | Done | Open again (auto-reset) |
+| ⚫ ปฏิเสธ | Rejected | Open again |
 
 ---
 
@@ -194,59 +188,75 @@ Reason: Why late entry
 
 | Threshold | Value | Impact |
 |-----------|-------|--------|
-| Variance threshold | ₿100.00 | Triggers approval requirement |
-| Minimum variance | ₿0.01 | Requires reason if exceeded |
+| Variance approval threshold | ฿100.00 | > 100 → requires admin approval |
+| Minimum variance for reason | ฿0.01 | ≠ 0 → requires reason |
 | Max reason length | 500 chars | Text field limit |
-| Session limit | 1 per branch/day | Only one active session |
+| Session limit | 1 per branch/day | Only one active (but can reset) |
 
 ---
 
 ## Common Scenarios
 
-### Scenario 1: Opening with ₿50 shortage
+### Scenario 1: เปิดวัน 50,000
 
 ```
-Yesterday's close:  ฿10,000
-Counted today:      ฿9,950
-Variance:           -₿50 ✓ (< ₿100)
+ใส่ตอนเปิด: ฿50,000
+ลิ้นชัก = ฿50,000
 
-→ Status: OPEN (auto-approved)
-→ No admin needed
+→ Status: OPEN
+→ ไม่ต้องกรอกยอดยืนยัน
 ```
 
-### Scenario 2: Opening with ₿200 overage
+### Scenario 2: ซื้อของ + เติมเงิน
 
 ```
-Expected:  ฿10,000
-Counted:   ฿10,200
-Variance:  +฿200 ✗ (> ₿100)
+เปิดวัน: ฿50,000
+ซื้อของ: −฿20,000 → ลิ้นชัก = ฿30,000
+เติมเงิน: +฿10,000 → ลิ้นชัก = ฿40,000
 
-→ Status: PENDING_OPEN
-→ Admin must approve/reject
-→ Reason required: "owner added float"
+→ ลิ้นชักตามระบบ = ฿40,000
 ```
 
-### Scenario 3: During day, cashier runs short
+### Scenario 3: ปิดยอด ตรง
 
 ```
-System shows: ฿8,500 available
-Needs:        ฿10,000 for large customer
-Requests:     ฿5,000 deposit
+ยอดตามระบบ: ฿40,000
+นับจริง:     ฿40,000
+Variance:     0
 
-→ Request sent, awaits admin approval
-→ Once approved: +฿5,000 in drawer
-→ Now has ฿13,500
+→ Status: CLOSED (ทันที)
 ```
 
-### Scenario 4: End of day, ฿300 missing
+### Scenario 4: ปิดยอด ขาด 300
 
 ```
-Expected: ฿13,200
-Counted:  ฿12,900
-Variance: -฿300 ✓ (< ₿100)
+ยอดตามระบบ: ฿40,000
+นับจริง:     ฿39,700
+Variance:     −฿300
 
-→ Status: CLOSED (auto-approved)
-→ Note recorded: "counted as -฿300"
+→ ต้องใส่เหตุผล
+→ Status: CLOSED (auto-approved, < 100)
+```
+
+### Scenario 5: ปิดยอด ขาด 1,500
+
+```
+ยอดตามระบบ: ฿40,000
+นับจริง:     ฿38,500
+Variance:     −฿1,500
+
+→ Status: PENDING_CLOSE (ต้องรออนุมัติ)
+→ Admin อนุมัติ/ปฏิเสธ
+```
+
+### Scenario 6: เปิดใหม่วันเดียวกัน
+
+```
+ปิดยอดเช้า → เปิดรอบบ่าย
+ใส่ใหม่: ฿30,000
+clear old movements + เริ่มใหม่
+
+→ ลิ้นชัก = ฿30,000 (ไม่ยกจากเช้า)
 ```
 
 ### Scenario 5: Mistake — need to fix yesterday's sale lot amount

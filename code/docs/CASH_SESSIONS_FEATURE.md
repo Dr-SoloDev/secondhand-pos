@@ -1,8 +1,8 @@
-# Cash Sessions Feature — Daily Branch Cash Control System
+# Cash Sessions Feature — Simple Daily Drawer
 
-**Status:** ✅ Implementation Complete (v1.0)  
-**Last Updated:** 4 August 2026  
-**Author:** Copilot
+**Status:** ✅ Implementation Complete (v2.0 — Simple Daily Drawer)  
+**Last Updated:** 31 สิงหาคม 2569  
+**Author:** SoloDev / Codebuff
 
 ---
 
@@ -23,57 +23,61 @@ The **Cash Sessions** feature provides daily cash balance tracking and verificat
 ### 1. Daily Opening (เปิดยอด)
 
 **Actor:** Cashier / Manager / Admin  
-**Precondition:** No unfinished session for today exists  
+**Precondition:** None (can open anytime)  
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Cashier counts physical cash and submits opening balance        │
+│ Cashier enters the amount to put in the drawer                  │
 └───────────────┬─────────────────────────────────────────────────┘
                 │
-                ├─→ Expected cash = yesterday's closing_actual
+                ├─→ opening_actual = entered amount
+                ├─→ opening_expected = 0 (no carry-forward)
+                ├─→ Status = OPEN
                 │
-                ├─→ Variance = actual_cash − expected
-                │
-                ├─→ If |variance| ≤ ₿100.00
-                │   └─→ Status = OPEN (immediate)
-                │
-                └─→ Else (|variance| > ₿100.00)
-                    └─→ Status = PENDING_OPEN (awaits admin approval)
+                └─→ If session was closed/reopened same day:
+                    └─→ Old movements are CLEARED
 ```
 
+**Simple model:** Insert amount = drawer balance. No carry-forward from previous day.
+
 **Database State:**
-- `cash_sessions.opening_actual` = counted amount
-- `cash_sessions.opening_variance` = actual − expected
-- `cash_sessions.opened_at` = NOW() (if no approval needed)
-- `cash_session_events` record = "open_requested" or "opened"
+- `cash_sessions.opening_actual` = entered amount
+- `cash_sessions.opening_expected` = 0
+- `cash_sessions.opened_at` = NOW()
+- `cash_session_events` record = "opened"
 
 ### 2. Daily Closing (ปิดยอด)
 
 **Precondition:** Session status = OPEN  
-**Expected Cash** = opening_actual + sum(cash_movements.in) − sum(cash_movements.out)
+**Expected Cash** = opening_actual + movement_total  
+**No auto-transfer** — money stays in drawer
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ Cashier counts physical cash and submits closing balance        │
 └───────────────┬─────────────────────────────────────────────────┘
                 │
-                ├─→ Expected = opening_actual + ledger_total
-                │
+                ├─→ Expected = opening_actual + movement_total
                 ├─→ Variance = actual − expected
                 │
-                ├─→ If |variance| ≤ ₿100.00
+                ├─→ If variance = 0
                 │   └─→ Status = CLOSED (immediate)
                 │
-                └─→ Else
+                ├─→ If 0 < |variance| ≤ 100
+                │   └─→ Status = CLOSED (reason required)
+                │
+                └─→ If |variance| > 100
                     └─→ Status = PENDING_CLOSE (awaits approval)
 ```
 
+**Key difference from old model:** Close does NOT move money. No auto-transfer to safe.
+
 **Cash Movement Tracking:**
-- All POs with `payment_method = "cash"` record a "cash_movement"
-- Approved cash deposit requests record "cash_deposit" movement (in)
-- Sale lots with `revenue_payment_method = "cash"` record "sale_revenue" movement
-- Expense payments with `payment_method = "cash"` record "expense" movement
-- Adjustment documents record movements for corrections
+- POs with `payment_method = "cash"` → OUT movement (deducts drawer)
+- Deposit requests (approved) → IN movement (adds drawer)
+- Sale lots with `payment_method = "cash"` → IN movement (adds drawer)
+- Expenses with `payment_method = "cash"` → OUT movement (deducts drawer)
+- Bank transfers → bank_net (does NOT touch drawer)
 
 ### 3. Variance Approval Flow (≥ ₿100)
 
@@ -92,18 +96,25 @@ PENDING_CLOSE ──[approve]──> CLOSED  (closed_by = approver, closed_at = 
 - Rejection reason required
 - Audit trail recorded in cash_session_events
 
-### 4. Reopen Same-Day Session
+### 4. Reopen / Re-open Same Day
 
-**Actor:** Admin only  
-**Condition:** Closed session must be same business_date
+**Actor:** Any authorized user  
+**Condition:** Session is closed or active
 
-Reopens a closed session to same-day status = OPEN (e.g., for correction before cut-off).
+In the simple model, you can also **open again** directly (the system resets the session automatically):
 
 ```
-CLOSED ──[reopen]──> OPEN  (last_reviewed_by = admin, reason = recorded)
+OPEN (closed) ──[open again]──> OPEN (fresh, old movements cleared)
 ```
 
-**Note:** Cross-day reopening must use **Adjustment Documents**.
+Or use the explicit reopen endpoint:
+```
+CLOSED ──[reopen]──> OPEN  (reason recorded)
+```
+
+**Key behavior:** When opening again same day, old movements are **deleted** and the new opening amount is used.
+
+**Note:** Cross-day reopening creates a new session via `openDay()`.
 
 ### 5. Cash Deposit Requests (เติมเงินสด)
 

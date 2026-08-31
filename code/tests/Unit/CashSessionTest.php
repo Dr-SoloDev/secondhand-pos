@@ -11,15 +11,15 @@ use ReflectionProperty;
 use stdClass;
 
 /**
- * Unit tests for CashSession daily cash-cycle logic (WF-06 cash position model v2).
+ * Unit tests for CashSession daily cash-cycle logic.
  *
- * Critical paths covered (จาก git history — จุดที่เคย bug):
- * - เติมเงินดึงจากเซฟเท่านั้น + transfer หัก reserve จริง (กันนับเงินซ้ำที่เซฟ+ลิ้นชัก)
- * - owner_capital: เติมเกินทุนเดิม → แยก base/excess, excess = รายรับเพิ่มทุน
- * - เปิดวัน: ดึงจากเซฟก่อน ส่วนเกิน = capital injection
- * - ปิดยอด: เก็บเงินเข้าเซฟทั้งหมด (ลิ้นชักว่างตอนเช้าจะดึงใหม่)
+ * Simple daily drawer model:
+ * - เปิดวัน = ใส่เท่าไหร่ = ลิ้นชักเท่านั้น (ไม่ยกยอดวันก่อน)
+ * - ระหว่างวัน = ซื้อ = ตัดลิ้นชัก / เติมเงิน = เพิ่มลิ้นชัก
+ * - ปิดยอด = นับจริง vs ยอดตามระบบ = variance, ไม่ย้ายเงิน
+ * - เช้าใหม่ = เริ่มใหม่ ไม่เก็บยอดปิด
  * - variance ต้องมีเหตุผล / เกิน threshold 100 → pending approval
- * - idempotency ของ movement insert (กันบันทึกซ้ำ/อนุมัติซ้ำ)
+ * - idempotency ของ movement insert
  * - ห้าม self-approval
  *
  * Strategy: ห้ามแก้ production code → subclass injection ผ่าน Reflection
@@ -71,115 +71,14 @@ class CashSessionTest extends TestCase
 
     // ---------- fundDrawer ----------
 
-    public function testFundDrawerRejectsInvalidSourceType(): void
+    public function testFundDrawerSimpleDepositAddsToDrawer(): void
     {
-        // sourceType ต้องเป็น reserve_transfer หรือ owner_capital เท่านั้น
-        $db = new FakeCashSessionDb();
-        $db->onFetchColumn('SELECT id FROM cash_position_baselines', 5);
-        $session = $this->makeSession($db);
-
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('กรุณาระบุว่าเป็นเงินสำรองเดิมหรือเงินทุนใหม่');
-        $session->fundDrawer(1, 500.0, 'mystery_source', 42, 'desc', 9);
-    }
-
-    public function testFundDrawerReserveTransferRejectsWhenReserveInsufficient(): void
-    {
-        // เติมเงินแบบ reserve_transfer ต้องดึงจากเซฟเท่านั้น — เซฟไม่พอต้อง throw
+        // Simple model: fundDrawer แค่เพิ่มเงินเข้าลิ้นชัก
         $db = new FakeCashSessionDb();
         $this->scriptActiveBranch($db, drawer: 100.0, reserve: 200.0);
         $session = $this->makeSession($db);
 
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('เงินสำรองของกิจการไม่เพียงพอ');
-        $session->fundDrawer(1, 300.0, 'reserve_transfer', 42, 'desc', 9);
-    }
-
-    public function testFundDrawerReserveTransferMovesMoneyFromSafeToDrawerOnly(): void
-    {
-        // reserve_transfer = transfer จากเซฟ → ลิ้นชัก (ไม่มี increase รวมยอดธุรกิจ)
-        $db = new FakeCashSessionDb();
-        $this->scriptActiveBranch($db, drawer: 100.0, reserve: 200.0);
-        $session = $this->makeSession($db);
-
-        $id = $session->fundDrawer(1, 80.0, 'reserve_transfer', 42, 'เติมเงินจากเซฟ', 9);
-
-        $this->assertGreaterThan(0, $id);
-        $movements = $db->decodedMovements();
-        $this->assertCount(1, $movements);
-        $m = $movements[0];
-        $this->assertSame('cash_reserve_transfer', $m['type']);
-        $this->assertSame('transfer', $m['effect']);
-        $this->assertSame('in', $m['direction']);
-        $this->assertSame('business_reserve', $m['source']);
-        $this->assertSame('drawer', $m['destination']);
-        $this->assertSame(80.0, $m['amount']);
-        $this->assertSame(0.0, $m['excess'], 'reserve_transfer ต้องไม่นับเป็นรายรับเพิ่มทุน');
-    }
-
-    public function testFundDrawerOwnerCapitalSplitsBaseFromReserveAndExcessAsNewCapitalIncome(): void
-    {
-        // เติม 500 (excess 200) ขณะเซฟมี 300:
-        // base 300 ดึงจากเซฟเป็น transfer (หัก reserve จริง — กันนับซ้ำ 2 ที่),
-        // excess 200 เป็น increase จาก external + excess_amount 200 (รายรับเพิ่มทุน)
-        $db = new FakeCashSessionDb();
-        $this->scriptActiveBranch($db, drawer: 50.0, reserve: 300.0);
-        $session = $this->makeSession($db);
-
-        $id = $session->fundDrawer(1, 500.0, 'owner_capital', 42, 'Owner เติมเงิน', 9, 200.0);
-
-        $this->assertGreaterThan(0, $id);
-        $movements = $db->decodedMovements();
-        $this->assertCount(2, $movements);
-
-        $base = $movements[0];
-        $this->assertSame('owner_capital_base', $base['type']);
-        $this->assertSame('transfer', $base['effect'], 'base ต้องหักออกจากเซฟ (transfer) ไม่ใช่ increase');
-        $this->assertSame('business_reserve', $base['source']);
-        $this->assertSame('drawer', $base['destination']);
-        $this->assertSame(300.0, $base['amount']);
-
-        $excess = $movements[1];
-        $this->assertSame('owner_capital_excess', $excess['type']);
-        $this->assertSame('increase', $excess['effect']);
-        $this->assertSame('external', $excess['source']);
-        $this->assertSame(200.0, $excess['amount']);
-        $this->assertSame(200.0, $excess['excess'], 'excess_amount ต้องถูกบันทึกเพื่อนับรายรับเพิ่มทุน');
-    }
-
-    public function testFundDrawerOwnerCapitalBaseBeyondReserveRecordedAsIncreaseNotRevenue(): void
-    {
-        // เติม 500 ไม่ระบุ excess ขณะเซฟมีแค่ 200:
-        // 200 จากเซฟ (transfer) + base ส่วนที่เหลือ 300 เป็น increase "ทุนเดิม"
-        // → ห้ามมี owner_capital_excess (ไม่นับรายรับซ้ำ) ← regression ของ bug MVP
-        $db = new FakeCashSessionDb();
-        $this->scriptActiveBranch($db, drawer: 20.0, reserve: 200.0);
-        $session = $this->makeSession($db);
-
-        $id = $session->fundDrawer(1, 500.0, 'owner_capital', 43, 'เติมทดแทนที่ใช้ไป', 9);
-
-        $this->assertGreaterThan(0, $id);
-        $movements = $db->decodedMovements();
-        $this->assertCount(2, $movements);
-        $this->assertSame('owner_capital_base', $movements[0]['type']);
-        $this->assertSame('transfer', $movements[0]['effect']);
-        $this->assertSame(200.0, $movements[0]['amount']);
-        $this->assertSame('owner_capital_base_ext', $movements[1]['type']);
-        $this->assertSame('increase', $movements[1]['effect']);
-        $this->assertSame(300.0, $movements[1]['amount']);
-        $this->assertSame(0.0, $movements[1]['excess'], 'base_ext เป็นทุนเดิม ห้ามนับเป็นรายรับเพิ่มทุน');
-    }
-
-    public function testFundDrawerLegacyBranchFallsBackToSimpleDepositMovement(): void
-    {
-        // สาขาที่ยังไม่เปิด position model → บันทึก cash_deposit ปกติ (legacy path)
-        $db = new FakeCashSessionDb();
-        $db->onFetchColumn('SELECT id FROM cash_position_baselines', null)       // hasPositionModel = false (x2)
-           ->onFetch('SELECT * FROM cash_sessions',
-               ['id' => 11, 'branch_id' => 1, 'status' => 'open', 'opening_actual' => 100.0]);
-        $session = $this->makeSession($db);
-
-        $id = $session->fundDrawer(1, 500.0, 'owner_capital', 44, 'เติมเงิน (legacy)', 9);
+        $id = $session->fundDrawer(1, 500.0, 'owner_capital', 42, 'เติมเงิน', 9);
 
         $this->assertGreaterThan(0, $id);
         $legacy = $db->legacyMovements();
@@ -191,87 +90,61 @@ class CashSessionTest extends TestCase
 
     // ---------- openPositionDay ----------
 
-    public function testOpenPositionDayRejectsWhenUnfinishedSessionExists(): void
+    public function testOpenPositionDayResetsActiveSessionInsteadOfRejecting(): void
     {
-        // มีรอบค้าง (pending_open/open/pending_close) → ห้ามเปิดรอบใหม่
+        // Active session → resets to fresh open (not rejected)
         $db = new FakeCashSessionDb();
-        $db->onFetch("status IN ('pending_open','open','pending_close')",
-            ['id' => 99, 'status' => 'open']);
+        $db->onFetch('business_date=CURDATE()', ['id' => 99, 'status' => 'open'])
+           ->onFetchColumn('SUM(CASE', 0);
         $session = $this->makeSession($db);
 
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('สาขานี้มีรอบประจำวันที่ยังดำเนินการไม่เสร็จ');
-        $this->invokePrivate($session, 'openPositionDay', [1, 700.0, null, 9]);
+        $result = $this->invokePrivate($session, 'openPositionDay', [1, 700.0, null, 9]);
+        $this->assertSame('open', $result['status']);
+        $this->assertSame(700.0, $result['drawer_balance']);
     }
 
-    public function testOpenPositionDayDrawsReserveFirstAndCountsRemainderAsCapitalInjection(): void
+    public function testOpenPositionDaySetsOpeningAmountDirectly(): void
     {
-        // เช้าเปิดวันขอ 700 แต่เซฟมี 500 → ดึงเซฟ 500 เป็น transfer,
-        // ส่วนเกิน 200 = เงินใหม่จาก Owner (capital injection, รายรับเพิ่มทุน)
+        // เปิดวัน = ใส่เท่าไหร่ = ลิ้นชักเท่านั้น ไม่ยกยอด ไม่ reserve/capital
         $db = new FakeCashSessionDb();
-        $db->onFetch("status IN ('pending_open','open','pending_close')", null)
-           ->onFetch('business_date=CURDATE()', null)                            // ไม่มีรอบค้างวันนี้
-           ->onFetch('SELECT * FROM cash_position_baselines', $this->baseline(0.0, 500.0))
-           ->onFetchAll('balance_effect IS NOT NULL', []);
+        $db->onFetch('business_date=CURDATE()', null)
+           ->onFetchColumn('SUM(CASE', 0);
         $session = $this->makeSession($db);
 
-        /** @var array $result */
         $result = $this->invokePrivate($session, 'openPositionDay', [1, 700.0, 'เปิดวัน', 9]);
 
         $this->assertSame('open', $result['status']);
-        $this->assertSame(500.0, $result['reserve_transfer'], 'ต้องดึงจากเซฟได้เท่าที่เซฟมี');
-        $this->assertSame(200.0, $result['capital_injection'], 'ส่วนเกินเซฟ = เพิ่มทุนใหม่');
         $this->assertSame(700.0, $result['drawer_balance']);
-
+        // Simple model: no movement at open — opening_actual IS the drawer balance
         $movements = $db->decodedMovements();
-        $this->assertCount(2, $movements);
-        $this->assertSame('cash_session_open_transfer', $movements[0]['type']);
-        $this->assertSame('transfer', $movements[0]['effect']);
-        $this->assertSame(500.0, $movements[0]['amount']);
-        $this->assertSame('owner_capital_excess', $movements[1]['type']);
-        $this->assertSame('increase', $movements[1]['effect']);
-        $this->assertSame(200.0, $movements[1]['excess']);
+        $this->assertCount(0, $movements);
     }
 
     // ---------- closePositionDay ----------
 
-    public function testClosePositionDaySweepsAllCountedCashIntoSafe(): void
+    public function testClosePositionDayRecordsVarianceWithoutTransfer(): void
     {
-        // ปิดยอด: นับได้ 800 ตรงลิ้นชัก → เก็บเข้าเซฟทั้งหมด (closing_to_safe)
-        // ลิ้นชักว่าง 0 เช้าวันถัดไปจะดึงจากเซฟใหม่ — ห้ามนับเงินซ้ำ 2 ตำแหน่ง
+        // ปิดยอด: นับได้ 800 ตรงลิ้นชัก → บันทึก variance = 0 ไม่ย้ายเงิน
         $db = new FakeCashSessionDb();
-        $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open'])
-           ->onFetch('SELECT * FROM cash_position_baselines', $this->baseline(800.0, 300.0))
-           ->onFetchAll('balance_effect IS NOT NULL', []);
+        $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open', 'opening_actual' => 800.0])
+           ->onFetchColumn('SUM(CASE', 0);  // movementTotal = 0
         $session = $this->makeSession($db);
 
-        /** @var array $result */
         $result = $this->invokePrivate($session, 'closePositionDay', [1, 800.0, null, 9]);
 
         $this->assertSame('closed', $result['status']);
         $this->assertSame(800.0, $result['expected_cash']);
         $this->assertSame(0.0, $result['variance']);
-        $this->assertSame(0.0, $result['drawer_balance'], 'หลังปิดยอดลิ้นชักต้องว่าง');
-        $this->assertSame(800.0, $result['closing_transfer_amount']);
-
+        // ไม่มี movement — ปิดยอดไม่ย้ายเงิน
         $movements = $db->decodedMovements();
-        $this->assertCount(1, $movements);
-        $m = $movements[0];
-        $this->assertSame('closing_to_safe', $m['type']);
-        $this->assertSame('out', $m['direction']);
-        $this->assertSame('transfer', $m['effect'], 'ย้ายลิ้นชัก → เซฟ ต้องเป็น transfer ไม่ใช่ decrease');
-        $this->assertSame('drawer', $m['source']);
-        $this->assertSame('business_reserve', $m['destination']);
-        $this->assertSame(800.0, $m['amount']);
+        $this->assertCount(0, $movements);
     }
 
     public function testClosePositionDayRequiresReasonOnVariance(): void
     {
-        // นับได้ 750 แต่ระบบคาด 800 → ต่างเล็กน้อยแต่ต้องระบุเหตุผล
         $db = new FakeCashSessionDb();
-        $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open'])
-           ->onFetch('SELECT * FROM cash_position_baselines', $this->baseline(800.0, 300.0))
-           ->onFetchAll('balance_effect IS NOT NULL', []);
+        $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open', 'opening_actual' => 800.0])
+           ->onFetchColumn('SUM(CASE', 0);
         $session = $this->makeSession($db);
 
         $this->expectException(\Exception::class);
@@ -281,16 +154,12 @@ class CashSessionTest extends TestCase
 
     public function testClosePositionDayLargeVarianceRequiresApprovalBeforeClosing(): void
     {
-        // ต่างเกิน threshold (100) → ต้องเป็น pending_close รออนุมัติ ไม่ปิดเอง
         $db = new FakeCashSessionDb();
-        $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open'])
-           ->onFetch('SELECT * FROM cash_position_baselines', $this->baseline(800.0, 300.0))
-           ->onFetchAll('balance_effect IS NOT NULL', []);
+        $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open', 'opening_actual' => 800.0])
+           ->onFetchColumn('SUM(CASE', 0);
         $session = $this->makeSession($db);
 
-        /** @var array $result */
         $result = $this->invokePrivate($session, 'closePositionDay', [1, 600.0, 'เหตุผลที่ยอดขาด', 9]);
-
         $this->assertSame('pending_close', $result['status']);
         $this->assertSame(-200.0, $result['variance']);
     }
@@ -423,13 +292,18 @@ class FakeCashSessionDb
         }, $this->insertedMovements);
     }
 
-    /** Legacy recordMovement INSERT (9 columns) */
+    /** Movements that are simple cash_deposit (used by fundDrawer legacy + position model) */
     public function legacyMovements(): array
     {
         return array_map(static function (array $row): array {
             $p = $row['params'];
+            // 14-col position INSERT: movement_type = $p[8], direction = $p[2], amount = $p[6]
+            // 9-col legacy INSERT: movement_type = $p[3], direction = $p[2], amount = $p[4]
+            $isPosition = str_contains($row['sql'], 'source_location');
+            if ($isPosition) {
+                return ['type' => $p[8], 'direction' => $p[2], 'amount' => (float)$p[6]];
+            }
             return ['type' => $p[3], 'direction' => $p[2], 'amount' => (float)$p[4]];
-        }, array_values(array_filter($this->insertedMovements,
-            static fn (array $r): bool => str_contains($r['sql'], '(cash_session_id,branch_id,direction,movement_type'))));
+        }, $this->insertedMovements);
     }
 }
