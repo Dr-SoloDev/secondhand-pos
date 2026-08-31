@@ -89,6 +89,25 @@ class CashSession extends Model
             ];
             return $this->applyPositionFields($result);
         }
+        // After close: return blank state (ไม่แสดงตัวเลขเก่า)
+        if (($row['status'] ?? '') === 'closed') {
+            $branchName = $row['branch_name'] ?? null;
+            $result = [
+                'id' => null,
+                'branch_id' => $branchId,
+                'branch_name' => $branchName,
+                'business_date' => date('Y-m-d'),
+                'status' => null,
+                'opening_expected' => 0,
+                'opening_actual' => null,
+                'opening_variance' => null,
+                'ledger_total' => 0,
+                'current_expected_cash' => 0,
+                'movements' => [],
+            ];
+            return $this->applyPositionFields($result);
+        }
+
         $row['ledger_total'] = $this->movementTotal((int)$row['id']);
         $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
         $row['movements'] = $this->getMovements((int)$row['id']);
