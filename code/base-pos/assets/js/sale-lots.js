@@ -72,7 +72,7 @@ async function loadBranches() {
 }
 
 async function loadCategories() {
-  const res = await apiRequest('price-tiers');
+  const res = await apiRequest('purchase-catalog?include_inactive=true');
   if (res.status === 'success') {
     categories = res.data || [];
   }

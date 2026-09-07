@@ -211,9 +211,6 @@ class Router
         $this->routes[] = ['route' => 'item-conditions', 'controller' => 'ItemConditionsController', 'method' => 'getConditions', 'verb' => 'GET'];
 
         // Price Tiers routes
-        $this->routes[] = ['route' => 'price-tiers', 'controller' => 'PriceTiersController', 'method' => 'getPriceTiers', 'verb' => 'GET'];
-        $this->routes[] = ['route' => 'price-tiers', 'controller' => 'PriceTiersController', 'method' => 'createCatalogItem', 'verb' => 'POST'];
-        $this->routes[] = ['route' => 'price-tiers/category', 'controller' => 'PriceTiersController', 'method' => 'updatePriceTiers', 'verb' => 'PUT'];
 
         // Purchase Item Catalog routes
         $this->routes[] = ['route' => 'purchase-catalog', 'controller' => 'PurchaseItemCatalogController', 'method' => 'getCatalog', 'verb' => 'GET'];
