@@ -26,7 +26,6 @@ class PermissionsController extends Controller
             'financial-summary.html' => $isManager,
             'stock-transfers.html' => true,
             'price-board.html' => true,
-            'price-tiers.html' => $isAdmin,
             'branches.html' => $isAdmin,
             'users.html' => $canManageUsers,
             'audit-log.html' => $isAdmin,
