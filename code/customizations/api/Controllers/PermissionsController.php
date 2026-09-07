@@ -11,7 +11,7 @@ class PermissionsController extends Controller
         $canManageUsers = in_array($role, ['super_manager', 'admin'], true);
 
         $pages = [
-            'index.html' => true,
+            'index.html' => $isManager,
             'purchase-orders.html' => true,
             'catalog.html' => true,
             'sellers.html' => true,
