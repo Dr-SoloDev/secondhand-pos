@@ -177,7 +177,11 @@ function guardCurrentPage(permissions) {
   const page = window.location.pathname.split('/').pop() || 'index.html';
   const pages = permissions?.pages || {};
   if (Object.prototype.hasOwnProperty.call(pages, page) && !pages[page]) {
-    window.location.replace(`${basePath}/admin/index.html?forbidden=1`);
+    if (window.location.search.includes('forbidden')) return;
+    const role = permissions?.role;
+    // cashier ไม่มีสิทธิ์ index.html -> พาไปหน้าแรกที่ทำได้
+    const fallback = role === 'cashier' ? 'purchase-orders.html' : (Object.entries(pages).find(([k,v]) => v)?.[0] || 'purchase-orders.html');
+    window.location.replace(`${basePath}/admin/${fallback}?forbidden=1`);
   }
 }
 
