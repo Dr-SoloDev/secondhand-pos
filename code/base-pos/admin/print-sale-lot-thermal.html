@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ใบขาย Lot (Thermal)</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  @page { size:80mm auto; margin:0; }
+  body { font-family:'Sarabun','Tahoma','Noto Sans Thai',Arial,sans-serif; font-size:11.5px; color:#000; background:#eee; }
+  #printControls { position:fixed; top:0; left:0; right:0; z-index:10; display:flex; gap:10px; align-items:center; padding:10px 16px; background:#fff; border-bottom:1px solid #ddd; }
+  #printControls button { border:0; border-radius:6px; padding:8px 16px; cursor:pointer; font-size:13px; }
+  #btnPrint { background:#16a34a; color:#fff; } #btnClose { background:#e5e7eb; color:#222; } #refNo { color:#666; font-size:12px; }
+  #page { padding-top:58px; } .sheet { width:80mm; margin:0 auto; padding:4mm 3mm 12mm; background:#fff; line-height:1.35; }
+  .center{text-align:center}.right{text-align:right}.bold{font-weight:800}.store{font-size:16px;font-weight:900;line-height:1.2}.title{font-size:14px;font-weight:900;margin-top:3px}.info{font-size:10.5px;font-weight:600}.divider{border-top:1.2px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;gap:6px}.label{font-weight:600;white-space:nowrap}.value{text-align:right;font-weight:700}.items{width:100%;border-collapse:collapse;margin-top:3px}.items th{font-size:10px;text-align:left;border-top:1.5px solid #000;border-bottom:1.5px solid #000;padding:3px 0}.items th:last-child,.items td:last-child{text-align:right}.items td{padding:3px 0;vertical-align:top}.item-name{font-weight:800}.sub{font-size:10px;display:flex;justify-content:space-between}.total{display:flex;justify-content:space-between;font-size:15px;font-weight:900;border-top:1.8px solid #000;margin-top:5px;padding-top:4px}.footer{margin-top:6px;border-top:1px dashed #000;padding-top:4px;font-size:10px;text-align:center;font-weight:600}
+  #loading,#error { width:80mm;margin:0 auto;padding:30px;background:#fff;text-align:center; } #error{color:#b91c1c;display:none}
+  @media print { #printControls{display:none!important} #page{padding-top:0!important} body{background:#fff}.sheet{margin:0} }
+</style>
+</head>
+<body>
+<div id="printControls"><button id="btnPrint" onclick="window.print()">🖨️ พิมพ์</button><button id="btnClose" onclick="window.close()">ปิด</button><span id="refNo"></span></div>
+<div id="page"><div id="loading">กำลังโหลดข้อมูล...</div><div id="error"></div><div id="sheet" class="sheet" style="display:none"></div></div>
+<script src="../assets/js/config.js"></script>
+<script>
+const money=v=>(parseFloat(v)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const lines=v=>esc(v).replace(/\r?\n/g,'<br>');
+function dateTH(v){if(!v)return '-';const d=new Date(v);if(isNaN(d))return v;return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()+543}`}
+function dateTimeTH(v){if(!v)return '-';const d=new Date(v);if(isNaN(d))return v;return `${dateTH(v)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}
+function render(lot,shop){
+ const name=shop.shop_name||lot.shop_name||'รักษ์สะอาดรีไซเคิล', phone=shop.shop_phone||shop.branch_phone||lot.shop_phone||lot.branch_phone||'', branch=[lot.branch_name||shop.branch_name, lot.branch_code ? `สาขา ${lot.branch_code}` : ''].filter(Boolean).join(' · '), total=parseFloat(lot.total_amount)||0;
+ const rows=(lot.items||[]).map((it,i)=>{const q=parseFloat(it.quantity_kg??it.quantity??0), p=parseFloat(it.unit_price)||0, sum=parseFloat(it.subtotal??q*p);return `<tr><td><div class="item-name">${i+1}. ${esc(it.item_name||it.category_name||'-')}</div><div class="sub"><span>${q.toFixed(3)} กก. × ${money(p)}</span><span class="bold">${money(sum)}</span></div></td></tr>`}).join('')||'<tr><td class="center">ไม่มีรายการสินค้า</td></tr>';
+ document.getElementById('refNo').textContent=`เลขที่: ${lot.reference_no||`SL-${lot.id}`}`;
+ document.title=`ใบขาย Lot ${lot.reference_no||lot.id}`;
+ const address=shop.shop_address||lot.shop_address||'';
+ document.getElementById('sheet').innerHTML=`<div class="center"><div class="store">${esc(name)}</div>${address?`<div class="info">${lines(address)}</div>`:''}${phone?`<div class="info">โทร ${esc(phone)}</div>`:''}<div class="title">ใบขาย Lot</div>${branch?`<div class="info">${esc(branch)}</div>`:''}</div><div class="divider"></div><div class="row"><span class="label">เลขที่</span><span class="value bold">${esc(lot.reference_no||`SL-${lot.id}`)}</span></div><div class="row"><span class="label">วันที่ขาย</span><span class="value">${esc(dateTH(lot.sale_date))}</span></div><div class="row"><span class="label">ผู้ซื้อ</span><span class="value bold">${esc(lot.buyer_name||'-')}</span></div><div class="row"><span class="label">พนักงาน</span><span class="value">${esc(lot.created_by_name||'-')}</span></div><div class="divider"></div><table class="items"><thead><tr><th>รายการ / จำนวน × ราคา</th></tr></thead><tbody>${rows}</tbody></table><div class="total"><span>รวมเงินทั้งสิ้น</span><span>฿ ${money(total)} บาท</span></div>${lot.notes?`<div class="divider"></div><div class="row"><span class="label">หมายเหตุ</span><span class="value">${lines(lot.notes)}</span></div>`:''}<div class="footer">${shop.receipt_footer?lines(shop.receipt_footer):'ขอบคุณที่ใช้บริการ'}${phone?`<br>ติดต่อ ${esc(phone)}`:''}</div>`;
+ document.getElementById('loading').style.display='none';document.getElementById('sheet').style.display='block';if(new URLSearchParams(location.search).get('auto')==='1')setTimeout(()=>window.print(),300);
+}
+async function load(){const id=new URLSearchParams(location.search).get('id');if(!id){fail('ไม่พบข้อมูล Lot ขาย');return}try{const [a,b]=await Promise.all([fetch(`${window.apiPath}/sale-lots/sale-lot?id=${encodeURIComponent(id)}`,{credentials:'include'}),fetch(`${window.apiPath}/settings/store`,{credentials:'include'}).catch(()=>null)]);if(a.status===401){location.href='../index.html';return}const lot=await a.json();if(!a.ok||lot.status!=='success'||lot.data?.status!=='confirmed'){fail('ไม่พบ Lot ที่ยืนยันแล้ว');return}let shop={};if(b?.ok){const s=await b.json();shop=s.data||{}}render(lot.data,shop)}catch(e){fail('ไม่สามารถโหลดข้อมูล Lot ได้')}}
+function fail(m){document.getElementById('loading').style.display='none';const e=document.getElementById('error');e.textContent=m;e.style.display='block'}load();
+</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>
+</body>
+</html>
