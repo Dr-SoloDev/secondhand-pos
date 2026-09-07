@@ -6,7 +6,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function getCatalog()
     {
-        $this->requireAuth();
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $model = new PurchaseItemCatalog();
         $includeInactive = isset($_GET['include_inactive']) && $_GET['include_inactive'] === 'true';
         Response::success('ดึงรายการสินค้าสำเร็จ', $model->getAll($includeInactive));
@@ -17,7 +17,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function searchCatalog()
     {
-        $this->requireAuth();
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $q = trim($_GET['q'] ?? '');
         if ($q === '') {
             Response::success('ok', []);
@@ -32,7 +32,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function getItem()
     {
-        $this->requireAuth();
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $id = $_GET['id'] ?? null;
         if (!$id) {
             Response::error('กรุณาระบุ ID', 400);
@@ -50,7 +50,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function createItem()
     {
-        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = $this->getRequestData();
         $model = new PurchaseItemCatalog();
         try {
@@ -74,7 +74,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function updateItem($id = null)
     {
-        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         if (!$id) {
             $data = $this->getRequestData();
             $id = $data['id'] ?? null;
@@ -136,7 +136,7 @@ class PurchaseItemCatalogController extends Controller
      */
     public function updateCategory()
     {
-        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
         $data = json_decode(file_get_contents('php://input'), true);
         $catalogId = $data['catalog_id'] ?? null;
         $categoryId = $data['category_id'] ?? null;
