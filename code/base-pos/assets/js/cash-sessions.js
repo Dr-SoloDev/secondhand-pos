@@ -241,8 +241,8 @@ function bindCashCountForm(mode) {
         const variance = actual - expected;
         const absV = Math.abs(variance);
         if (absV < 0.01) { h.textContent = '✅ ยอดตรงกัน'; h.style.color = '#16a34a'; }
-        else if (absV <= 100) { h.textContent = `ℹ️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.abs(variance).toFixed(2)} — ใส่เหตุผลด้วย`; h.style.color = '#2563eb'; }
-        else { h.textContent = `⚠️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.abs(variance).toFixed(2)} — ต้องใส่เหตุผล`; h.style.color = '#d97706'; }
+        else if (absV <= 100) { h.textContent = `ℹ️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ใส่เหตุผลด้วย`; h.style.color = '#2563eb'; }
+        else { h.textContent = `⚠️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ต้องใส่เหตุผล`; h.style.color = '#d97706'; }
         return;
       }
       if (!actualInput.value || !Number.isFinite(actual)) {
@@ -253,10 +253,10 @@ function bindCashCountForm(mode) {
       const variance = actual - expected;
       const absV = Math.abs(variance);
       if (absV > 100) {
-        h.textContent = `⚠️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.abs(variance).toFixed(2)} — ต้องรออนุมัติ`;
+        h.textContent = `⚠️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ต้องรออนุมัติ`;
         h.style.color = '#d97706';
       } else if (absV > 0.009) {
-        h.textContent = `ℹ️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.abs(variance).toFixed(2)} — ต้องระบุเหตุผล`;
+        h.textContent = `ℹ️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ต้องระบุเหตุผล`;
         h.style.color = '#2563eb';
       } else {
         h.textContent = '✅ ยอดตรงกัน';

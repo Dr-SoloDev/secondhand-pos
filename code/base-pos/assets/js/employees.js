@@ -243,8 +243,8 @@ function openSalaryModal(id) {
     document.getElementById('salaryAmount').value = emp.salary;
     if (emp.social_security_rate > 0 && emp.social_security_number) {
       const ssoEmployee = emp.salary * (emp.social_security_rate / 100);
-      document.getElementById('salaryAmount').value = (emp.salary - ssoEmployee).toFixed(2);
-      document.getElementById('salarySSOAmount').value = ssoEmployee.toFixed(2);
+      document.getElementById('salaryAmount').value = Math.round(emp.salary - ssoEmployee).toString();
+      document.getElementById('salarySSOAmount').value = Math.round(ssoEmployee).toString();
     }
   } else {
     document.getElementById('salaryAmount').value = '';
@@ -263,7 +263,7 @@ function fillSalaryAmount() {
       const ssoEmployee = emp.salary * (emp.social_security_rate / 100);
       amount = emp.salary - ssoEmployee;
     }
-    document.getElementById('salaryAmount').value = amount.toFixed(2);
+    document.getElementById('salaryAmount').value = Math.round(amount).toString();
   }
 }
 
@@ -316,8 +316,8 @@ async function saveSalaryExpense() {
 }
 
 function formatCurrency(n) {
-  if (n == null || isNaN(n)) return '฿0.00';
-  return '฿' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (n == null || isNaN(n)) return '฿0';
+  return '฿' + Math.round(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 function escapeHtml(text) {
