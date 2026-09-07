@@ -217,7 +217,7 @@ function buildTierButtons(tierPrices) {
     const tp = tierPrices[i];
     const label = `บิล${i + 1}`;
     // เว้นบรรทัดที่ 2 ไว้เสมอ (แม้ไม่มีราคา) ปุ่มจะไม่เปลี่ยนความสูงตอนเลือก/ไม่เลือกสินค้า
-    const priceStr = tp?.price > 0 ? `\n${parseFloat(tp.price).toFixed(2)} ฿` : '\n ';
+    const priceStr = tp?.price > 0 ? `\n${Math.round(parseFloat(tp.price)).toString()} ฿` : '\n ';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'global-tier-btn';
@@ -420,7 +420,7 @@ function updatePriceDisplay(price) {
     el.textContent = '—';
     el.style.color = '#999';
   }
-  document.getElementById('itemUnitPrice').value = price.toFixed(2);
+  document.getElementById('itemUnitPrice').value = Math.round(price).toString();
 }
 
 // ===== Item Total Preview =====

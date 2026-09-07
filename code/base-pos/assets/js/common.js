@@ -332,8 +332,9 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('th-TH', {
     style: 'currency',
     currency: 'THB',
-    minimumFractionDigits: 2
-  }).format(amount);
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(Math.round(amount));
 }
 
 function showNotification(message, type = 'info') {
