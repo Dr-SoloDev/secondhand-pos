@@ -48,6 +48,16 @@ async function refreshCategoryStock() {
 
 async function initStock() {
   try {
+    // PRD cashier: ล็อคสาขาตัวเอง
+    try {
+      const u = JSON.parse(localStorage.getItem('posUser') || '{}');
+      if (u.role === 'cashier' && u.branch_id) {
+        setTimeout(() => {
+          const sel = document.getElementById('branchFilterStock');
+          if (sel) { sel.value = String(u.branch_id); sel.style.display = 'none'; const label = sel.closest('.form-group'); if(label) label.style.display='none'; }
+        }, 100);
+      }
+    } catch(e) {}
     const branchRes = await apiRequest('branches');
     if (branchRes.status === 'success') {
       branches = branchRes.data;

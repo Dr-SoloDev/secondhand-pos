@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   if (!hasAppPermission('actions.catalog.manage_categories', catalogPermissions)) {
     document.getElementById('manageCategories').style.display = 'none';
   }
+  if (!hasAppPermission('actions.catalog.create', catalogPermissions)) {
+    document.getElementById('addProductBtn').style.display = 'none';
+  }
   await initCatalog();
 
   document.getElementById('productSearch').addEventListener('input', filterCatalogItems);
@@ -108,7 +111,7 @@ function renderCatalogItems(items) {
         </span>
       </td>
       <td class="actions">
-        <button class="btn btn-sm btn-info edit-catalog" data-id="${item.id}"><i class="icon-edit"></i></button>
+        ${hasAppPermission('actions.catalog.update', catalogPermissions) ? `<button class="btn btn-sm btn-info edit-catalog" data-id="${item.id}"><i class="icon-edit"></i></button>` : '<span style="color:#94a3b8;font-size:12px">ดูอย่างเดียว</span>'}
         ${hasAppPermission('actions.catalog.delete', catalogPermissions)
           ? `<button class="btn btn-sm btn-danger delete-catalog" data-id="${item.id}"><i class="icon-delete"></i></button>`
           : ''}

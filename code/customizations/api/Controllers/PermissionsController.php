@@ -44,7 +44,7 @@ class PermissionsController extends Controller
                     'review_cancel' => $isManager, 'self_approve' => $isAdmin,
                 ],
                 'catalog' => [
-                    'read' => true, 'create' => true, 'update' => true,
+                    'read' => true, 'create' => $isManager, 'update' => $isManager,
                     'manage_categories' => $isManager, 'delete' => $isAdmin,
                 ],
                 'sellers' => [

@@ -337,6 +337,24 @@ function formatCurrency(amount) {
   }).format(Math.round(amount));
 }
 
+
+// PRD cashier: ซ่อน dropdown สาขา + เมนูโอนสต็อก สำหรับ cashier
+function hideBranchSelectorForCashier() {
+  try {
+    const u = JSON.parse(localStorage.getItem('posUser') || '{}');
+    if (u.role === 'cashier') {
+      document.querySelectorAll('#branchSelect, #branchFilter, select[name="branch_id"]').forEach(el => {
+        if (el.id === 'branchSelect' || el.id === 'branchFilter') {
+          const wrapper = el.closest('.form-group') || el.parentElement;
+          if (wrapper) wrapper.style.display = 'none';
+          el.style.display = 'none';
+        }
+      });
+      document.querySelectorAll('a[href="stock-transfers.html"]').forEach(a => { const li=a.closest('li'); if(li) li.style.display='none'; });
+    }
+  } catch(e) {}
+}
+document.addEventListener('DOMContentLoaded', hideBranchSelectorForCashier);
 function showNotification(message, type = 'info') {
   const container = getNotificationContainer();
 
