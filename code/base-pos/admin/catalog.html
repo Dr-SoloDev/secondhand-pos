@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>แคตตาล็อกสินค้า - รักษ์สะอาดรีไซเคิล</title>
+    <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#00D4D4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="รักษ์สะอาด">
   <link rel="stylesheet" href="../assets/css/main.css?v=20260815d">
 </head>
 <body>
@@ -28,8 +35,7 @@
         <li class="admin-only"><a href="financial-summary.html"><i class="icon-stats"></i><span>สรุปธุรกิจ</span></a></li>
         <li class="admin-only"><a href="stock-transfers.html"><i class="icon-store"></i><span>โอนสต็อก</span></a></li>
         <li class="admin-only"><a href="price-board.html"><i class="icon-stats"></i><span>บอร์ดราคา</span></a></li>
-        <li class="admin-only"><a href="price-tiers.html"><i class="icon-tags"></i><span>ตั้งค่าราคา</span></a></li>
-        <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
+                <li><a href="branches.html"><i class="icon-store"></i><span>จัดการสาขา</span></a></li>
         <li><a href="users.html"><i class="icon-users"></i><span>ผู้ใช้งาน</span></a></li>
         <li class="admin-only"><a href="audit-log.html"><i class="icon-report"></i><span>บันทึกการใช้งาน</span></a></li>
         <li><a href="settings.html"><i class="icon-settings"></i><span>ตั้งค่า</span></a></li>
@@ -201,5 +207,6 @@
   <script src="../assets/js/catalog.js?v=20260712"></script>
   <script src="../assets/js/animations.js?v=20260815d"></script>
 <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>
 </body>
 </html>
