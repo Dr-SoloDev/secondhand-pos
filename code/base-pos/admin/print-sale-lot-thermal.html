@@ -22,7 +22,7 @@
 <div id="page"><div id="loading">กำลังโหลดข้อมูล...</div><div id="error"></div><div id="sheet" class="sheet" style="display:none"></div></div>
 <script src="../assets/js/config.js"></script>
 <script>
-const money=v=>(parseFloat(v)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=v=>Math.round(parseFloat(v)||0).toLocaleString('th-TH',{minimumFractionDigits:0,maximumFractionDigits:0});
 const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const lines=v=>esc(v).replace(/\r?\n/g,'<br>');
 function dateTH(v){if(!v)return '-';const d=new Date(v);if(isNaN(d))return v;return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()+543}`}

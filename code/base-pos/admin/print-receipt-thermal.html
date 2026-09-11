@@ -135,8 +135,8 @@
   <script src="../assets/js/config.js"></script>
   <script>
     function fmtCurrency(v) {
-      const n = parseFloat(v) || 0;
-      return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const n = Math.round(parseFloat(v) || 0);
+      return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
 
     function fmtDateTime(s) {
