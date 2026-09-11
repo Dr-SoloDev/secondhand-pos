@@ -398,7 +398,7 @@ async function openModal(id) {
 async function saveLot() {
   const buyerName = document.getElementById('buyerName').value.trim();
   const saleDate = document.getElementById('saleDate').value;
-  const branchId = document.getElementById('branchSelect').value;
+  const branchId = (()=>{ try{ const u=JSON.parse(localStorage.getItem('posUser')||'{}'); if(u.role==='cashier'&&u.branch_id) return String(u.branch_id); }catch(e){} return document.getElementById('branchSelect').value; })();
   const notes = document.getElementById('lotNotes').value.trim();
 
   const errorEl = document.getElementById('saveError');
