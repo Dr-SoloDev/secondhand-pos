@@ -138,6 +138,10 @@
       const n = Math.round(parseFloat(v) || 0);
       return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
+    function fmtPrice(v) {
+      const n = parseFloat(v) || 0;
+      return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
     function fmtDateTime(s) {
       if (!s) return '-';
@@ -196,7 +200,7 @@
         const net = Math.max(0, q - dq);
         const name = esc(it.item_name);
         const unit = esc(it.unit || 'กก.');
-        const price = fmtCurrency(it.unit_price);
+        const price = fmtPrice(it.unit_price);
         const total = fmtCurrency(it.total_price);
         const dedLine = dq > 0 ? `ชั่ง ${q.toFixed(2)} ${unit} · หัก ${dq.toFixed(2)} ${unit}` : '';
         return `

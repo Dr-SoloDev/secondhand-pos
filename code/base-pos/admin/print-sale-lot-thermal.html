@@ -23,13 +23,14 @@
 <script src="../assets/js/config.js"></script>
 <script>
 const money=v=>Math.round(parseFloat(v)||0).toLocaleString('th-TH',{minimumFractionDigits:0,maximumFractionDigits:0});
+const moneyPrice=v=>(parseFloat(v)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const lines=v=>esc(v).replace(/\r?\n/g,'<br>');
 function dateTH(v){if(!v)return '-';const d=new Date(v);if(isNaN(d))return v;return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()+543}`}
 function dateTimeTH(v){if(!v)return '-';const d=new Date(v);if(isNaN(d))return v;return `${dateTH(v)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`}
 function render(lot,shop){
  const name=shop.shop_name||lot.shop_name||'รักษ์สะอาดรีไซเคิล', phone=shop.shop_phone||shop.branch_phone||lot.shop_phone||lot.branch_phone||'', branch=[lot.branch_name||shop.branch_name, lot.branch_code ? `สาขา ${lot.branch_code}` : ''].filter(Boolean).join(' · '), total=parseFloat(lot.total_amount)||0;
- const rows=(lot.items||[]).map((it,i)=>{const q=parseFloat(it.quantity_kg??it.quantity??0), p=parseFloat(it.unit_price)||0, sum=parseFloat(it.subtotal??q*p);return `<tr><td><div class="item-name">${i+1}. ${esc(it.item_name||it.category_name||'-')}</div><div class="sub"><span>${q.toFixed(3)} กก. × ${money(p)}</span><span class="bold">${money(sum)}</span></div></td></tr>`}).join('')||'<tr><td class="center">ไม่มีรายการสินค้า</td></tr>';
+ const rows=(lot.items||[]).map((it,i)=>{const q=parseFloat(it.quantity_kg??it.quantity??0), p=parseFloat(it.unit_price)||0, sum=parseFloat(it.subtotal??q*p);return `<tr><td><div class="item-name">${i+1}. ${esc(it.item_name||it.category_name||'-')}</div><div class="sub"><span>${q.toFixed(3)} กก. × ${moneyPrice(p)}</span><span class="bold">${money(sum)}</span></div></td></tr>`}).join('')||'<tr><td class="center">ไม่มีรายการสินค้า</td></tr>';
  document.getElementById('refNo').textContent=`เลขที่: ${lot.reference_no||`SL-${lot.id}`}`;
  document.title=`ใบขาย Lot ${lot.reference_no||lot.id}`;
  const address=shop.shop_address||lot.shop_address||'';

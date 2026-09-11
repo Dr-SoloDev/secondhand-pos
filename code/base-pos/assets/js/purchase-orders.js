@@ -217,7 +217,7 @@ function buildTierButtons(tierPrices) {
     const tp = tierPrices[i];
     const label = `บิล${i + 1}`;
     // เว้นบรรทัดที่ 2 ไว้เสมอ (แม้ไม่มีราคา) ปุ่มจะไม่เปลี่ยนความสูงตอนเลือก/ไม่เลือกสินค้า
-    const priceStr = tp?.price > 0 ? `\n${Math.round(parseFloat(tp.price)).toString()} ฿` : '\n ';
+    const priceStr = tp?.price > 0 ? `\n${parseFloat(tp.price).toFixed(2)} ฿` : '\n ';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'global-tier-btn';
@@ -329,7 +329,7 @@ async function searchCatalogImmediate(q) {
     div.className = 'seller-item';
     div.style.cursor = 'pointer';
     const priceHint = it.default_price > 0
-      ? ` · ${formatCurrency(it.default_price)}/${escapeHtml(it.default_unit || 'ชิ้น')}`
+      ? ` · ${Number(it.default_price).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}/${escapeHtml(it.default_unit || 'ชิ้น')}`
       : '';
     const catHint = it.category_name ? `(${escapeHtml(it.category_name)})` : '';
     div.innerHTML = `<strong>${escapeHtml(it.code)}</strong> — ${escapeHtml(it.name)}
@@ -413,14 +413,14 @@ function focusNextField() {
 function updatePriceDisplay(price) {
   const el = document.getElementById('itemPriceDisplay');
   if (price > 0) {
-    el.textContent = formatCurrency(price);
+    el.textContent = Number(price).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2});
     el.style.color = '#059669';
     el.style.fontWeight = '700';
   } else {
     el.textContent = '—';
     el.style.color = '#999';
   }
-  document.getElementById('itemUnitPrice').value = Math.round(price).toString();
+  document.getElementById('itemUnitPrice').value = price.toFixed(2);
 }
 
 // ===== Item Total Preview =====
@@ -572,7 +572,7 @@ function renderCart() {
         <td class="text-right">${it.quantity.toFixed(2)}</td>
         <td class="text-right" style="color:#dc3545">${it.weight_deduction > 0 ? it.weight_deduction.toFixed(2) : '-'}</td>
         <td class="text-right">${net.toFixed(2)}</td>
-        <td class="text-right">${formatCurrency(it.unit_price)}</td>
+        <td class="text-right">${Number(it.unit_price).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
         <td class="text-right"><strong>${formatCurrency(it.total_price)}</strong></td>
         <td style="text-align:center">
           <button class="btn-photo-picker btn-photo-picker-sm ${hasPhoto ? 'has-photo' : ''}"
@@ -1132,7 +1132,7 @@ window.showReceipt = async function(id) {
       <td style="padding:7px 8px;font-weight:500;color:#1e293b">${escapeHtml(it.item_name)}</td>
       <td style="text-align:center;padding:7px 8px;color:#94a3b8;font-size:11px">${dq > 0 ? dq.toFixed(2) : '—'}</td>
       <td style="text-align:center;padding:7px 8px;font-variant-numeric:tabular-nums">${net.toFixed(2)} <span style="color:#94a3b8;font-size:11px">${escapeHtml(it.unit)}</span></td>
-      <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums;color:#475569">${formatCurrency(it.unit_price)}</td>
+      <td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums;color:#475569">${Number(it.unit_price).toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
       <td style="text-align:right;padding:7px 8px;font-weight:700;font-variant-numeric:tabular-nums;color:#1e293b">${formatCurrency(it.total_price)}</td>
     </tr>`;
   }).join('');

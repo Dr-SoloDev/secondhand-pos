@@ -277,6 +277,10 @@
       const n = Math.round(parseFloat(v) || 0);
       return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
+    function fmtPrice(v) {
+      const n = parseFloat(v) || 0;
+      return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
     function fmtDateTime(s) {
       if (!s) return '-';
@@ -329,7 +333,7 @@
           <td>${esc(it.item_name)}</td>
           <td class="ta-c" style="color:#666">${dq > 0 ? dq.toFixed(2) : '-'}</td>
           <td class="ta-c">${net.toFixed(2)} ${esc(it.unit || '')}</td>
-          <td class="ta-r">${fmtCurrency(it.unit_price)}</td>
+          <td class="ta-r">${fmtPrice(it.unit_price)}</td>
           <td class="ta-r" style="font-weight:600">${fmtCurrency(it.total_price)}</td>
         </tr>`;
       }).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;padding:8px">ไม่มีรายการสินค้า</td></tr>';

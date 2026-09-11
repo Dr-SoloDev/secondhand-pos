@@ -293,6 +293,10 @@
       const n = Math.round(parseFloat(v) || 0);
       return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     }
+    function fmtPrice(v) {
+      const n = parseFloat(v) || 0;
+      return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
     function fmtDate(s) {
       if (!s) return '-';
@@ -378,7 +382,7 @@
         return `<tr style="background:${bg}">
           <td>${esc(it.item_name || it.category_name || '-')}</td>
           <td class="ta-c">${qty.toFixed(2)}</td>
-          <td class="ta-r">${fmtCurrency(price)}</td>
+          <td class="ta-r">${fmtPrice(price)}</td>
           <td class="ta-r" style="font-weight:600">${fmtCurrency(subtotal)}</td>
           <td class="ta-r" style="color:#6b7280">${fmtCurrency(fifoCost)}</td>
         </tr>`;
