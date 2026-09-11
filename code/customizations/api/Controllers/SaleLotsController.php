@@ -4,7 +4,7 @@ class SaleLotsController extends Controller
     // ดึงรายการ Sale Lots ทั้งหมด รองรับกรองตาม branch, status และช่วงวันที่
     public function index()
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
 
         $filters = [
             'branch_id' => isset($_GET['branch_id']) ? intval($_GET['branch_id']) : null,
@@ -25,7 +25,7 @@ class SaleLotsController extends Controller
     // ดึง Sale Lot เดียวพร้อมรายการสินค้าและข้อมูลกำไร
     public function show($id)
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -40,7 +40,7 @@ class SaleLotsController extends Controller
     // สร้าง Sale Lot ใหม่เป็น draft เท่านั้น ยังไม่ตัดสต็อกจนกว่าจะ confirm
     public function store()
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         $data = $this->getRequestData();
 
         // Idempotency check — ป้องกัน Sale Lot ซ้ำ
@@ -143,7 +143,7 @@ class SaleLotsController extends Controller
     // อัปเดต Sale Lot ได้เฉพาะ draft; confirmed ต้องยกเลิกหรือสร้าง Lot ใหม่
     public function update($id)
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -219,7 +219,7 @@ class SaleLotsController extends Controller
     // ยืนยัน Sale Lot เปลี่ยนสถานะเป็น confirmed และตัดสต็อก
     public function confirm($id)
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -272,7 +272,7 @@ class SaleLotsController extends Controller
     // ยกเลิก Sale Lot เปลี่ยนสถานะเป็น cancelled และคืนสต็อก (BUG-05 FIX)
     public function cancel($id)
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();
@@ -307,7 +307,7 @@ class SaleLotsController extends Controller
     // บันทึกรายรับจริงจากบิลศูนย์รับซื้อ (เฉพาะ lot ที่ confirmed แล้ว)
     public function recordRevenue($id)
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $data = $this->getRequestData();
@@ -359,7 +359,7 @@ class SaleLotsController extends Controller
     // ลบ Sale Lot ได้เฉพาะสถานะ draft เท่านั้น
     public function destroy($id)
     {
-        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $this->requireAuth(['admin', 'cashier', 'manager', 'super_manager']);
         if (!$id) Response::error('ต้องระบุ Sale Lot ID', 400);
 
         $model = new SaleLot();

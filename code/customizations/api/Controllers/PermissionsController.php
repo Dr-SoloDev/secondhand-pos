@@ -17,7 +17,7 @@ class PermissionsController extends Controller
             'sellers.html' => true,
             'seller-history.html' => true,
             'inventory.html' => true,
-            'sale-lots.html' => $isManager,
+            'sale-lots.html' => true,
             'sales.html' => $isManager,
             'reports.html' => true,
             'cash-sessions.html' => true,
@@ -52,7 +52,7 @@ class PermissionsController extends Controller
                     'blacklist' => $isManager,
                 ],
                 'inventory' => ['read' => true, 'direct_adjust' => $isAdmin],
-                'sale_lots' => ['read' => $isManager, 'manage' => $isManager],
+                'sale_lots' => ['read' => true, 'manage' => true],
                 'employees' => [
                     'read' => $isManager, 'manage' => $isManager,
                     'delete' => in_array($role, ['super_manager', 'admin'], true),

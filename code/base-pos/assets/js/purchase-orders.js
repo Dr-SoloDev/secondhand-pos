@@ -771,7 +771,7 @@ async function savePurchaseOrder() {
   const idempotencyKey = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 
   const payload = {
-    branch_id: parseInt(document.getElementById('branchSelect').value, 10),
+    branch_id: (()=>{ try{ const u=JSON.parse(localStorage.getItem('posUser')||'{}'); if(u.role==='cashier'&&u.branch_id) return parseInt(u.branch_id,10); }catch(e){} return parseInt(document.getElementById('branchSelect').value, 10); })(),
     seller_id: selectedSeller.id,
     payment_method: document.getElementById('paymentMethod').value,
     notes: document.getElementById('poNotes').value.trim(),
