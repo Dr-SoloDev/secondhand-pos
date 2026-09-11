@@ -912,7 +912,7 @@ function clearAll() {
 async function loadRecentPOs() {
   const tbody = document.querySelector('#recentPOTable tbody');
   showTableLoading(tbody, 8, 4);
-  const branchId = document.getElementById('branchSelect')?.value;
+  const branchId = (()=>{ try{ const u=JSON.parse(localStorage.getItem('posUser')||'{}'); if(u.role==='cashier'&&u.branch_id) return String(u.branch_id); }catch(e){} return document.getElementById('branchSelect')?.value; })();
   const qs = branchId ? `?limit=10&branch_id=${encodeURIComponent(branchId)}` : `?limit=10`;
   const res = await apiRequest(`purchase-orders${qs}`);
   if (res.status !== 'success') {
@@ -1015,7 +1015,7 @@ async function loadPOCancellationRequests() {
   queue.classList.remove('hidden');
   const tbody = document.querySelector('#poCancellationTable tbody');
   showTableLoading(tbody, 7, 4);
-  const branchId = document.getElementById('branchSelect')?.value;
+  const branchId = (()=>{ try{ const u=JSON.parse(localStorage.getItem('posUser')||'{}'); if(u.role==='cashier'&&u.branch_id) return String(u.branch_id); }catch(e){} return document.getElementById('branchSelect')?.value; })();
   const qs = branchId ? `?status=pending&branch_id=${encodeURIComponent(branchId)}` : `?status=pending`;
   const response = await apiRequest(`purchase-orders/cancellation-requests${qs}`, 'GET');
   if (response.status !== 'success') {
