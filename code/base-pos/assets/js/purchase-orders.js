@@ -346,7 +346,7 @@ async function searchCatalogImmediate(q) {
 // item มาจาก API response โดยตรง (object ที่มี tier_prices เป็น array แน่ๆ)
 function selectCatalogItem(item) {
   const tierPrices = Array.isArray(item.tier_prices)
-    ? [...item.tier_prices].sort((a, b) => (a.price || 0) - (b.price || 0))
+    ? [...item.tier_prices]
     : [];
 
   // เก็บ state
