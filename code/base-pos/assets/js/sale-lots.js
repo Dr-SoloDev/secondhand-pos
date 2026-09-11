@@ -398,14 +398,14 @@ async function openModal(id) {
 async function saveLot() {
   const buyerName = document.getElementById('buyerName').value.trim();
   const saleDate = document.getElementById('saleDate').value;
-  const branchId = (()=>{ try{ const u=JSON.parse(localStorage.getItem('posUser')||'{}'); if(u.role==='cashier'&&u.branch_id) return String(u.branch_id); }catch(e){} return document.getElementById('branchSelect').value; })();
+  let branchId = (()=>{ try{ const u=JSON.parse(localStorage.getItem('posUser')||'{}'); if(u.role==='cashier'&&u.branch_id) return String(u.branch_id); }catch(e){} return document.getElementById('branchSelect').value; })();
   const notes = document.getElementById('lotNotes').value.trim();
 
   const errorEl = document.getElementById('saveError');
   errorEl.style.display = 'none';
 
   if (!buyerName) { showNotification('กรุณากรอกชื่อผู้ซื้อ', 'error'); return; }
-  if (!branchId) { showNotification('กรุณาเลือกสาขา', 'error'); return; }
+  if (!branchId) { try{ const u=JSON.parse(localStorage.getItem('posUser')||'{}'); if(u.role==='cashier'&&u.branch_id) { branchId=String(u.branch_id); } else if(window.appPermissions&&window.appPermissions.branch_id) { branchId=String(window.appPermissions.branch_id); } }catch(e){} if(!branchId){ showNotification('กรุณาเลือกสาขา', 'error'); return; } }
   if (lineItems.length === 0) { showNotification('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ', 'error'); return; }
 
   const validItems = [];
