@@ -3,8 +3,10 @@ let branches = [];
 let currentBranchId = null;
 let currentBranchName = '';
 let currentReportMonth = '';
+let currentDateMode = 'month';
 let currentDateFrom = '';
 let currentDateTo = '';
+let dateRangePending = false;
 let reportPermissions = null;
 
 const reportState = {
@@ -51,6 +53,7 @@ async function initReports() {
   setDefaultDailyExportDate();
   setDefaultTaxDates();
   bindEvents();
+  updateDateModeUI();
   updateScopeLabels();
   updateThaiFilterDisplay();
   setLoadingState();
@@ -62,10 +65,17 @@ async function initReports() {
 }
 
 function bindEvents() {
+  document.querySelectorAll('input[name="reportDateMode"]').forEach((input) => {
+    input.addEventListener('change', handleDateModeChange);
+  });
+
   document.getElementById('reportMonth')?.addEventListener('change', async function() {
     currentReportMonth = this.value || getCurrentMonthValue();
+    currentDateMode = 'month';
+    dateRangePending = false;
     clearDateRangeInputs();
     setDefaultTaxDates();
+    updateDateModeUI();
     updateScopeLabels();
     updateThaiFilterDisplay();
     await reloadAllReports();
@@ -88,13 +98,56 @@ function bindEvents() {
   document.addEventListener('click', handleReportActionClick);
 }
 
+function handleDateModeChange(event) {
+  const nextMode = event.target.value === 'custom' ? 'custom' : 'month';
+  if (nextMode === currentDateMode) {
+    return;
+  }
+
+  currentDateMode = nextMode;
+  dateRangePending = nextMode === 'custom';
+  updateDateModeUI();
+
+  if (nextMode === 'month') {
+    clearDateRangeInputs();
+    setDefaultTaxDates();
+    updateScopeLabels();
+    updateThaiFilterDisplay();
+    setLoadingState();
+    reloadAllReports();
+    return;
+  }
+
+  const from = document.getElementById('reportDateFrom')?.value || '';
+  const to = document.getElementById('reportDateTo')?.value || '';
+  if (from && to && from <= to) {
+    currentDateFrom = from;
+    currentDateTo = to;
+    dateRangePending = false;
+    setDefaultTaxDates();
+    updateScopeLabels();
+    updateThaiFilterDisplay();
+    setLoadingState();
+    reloadAllReports();
+    return;
+  }
+
+  // Keep the existing report visible until both custom dates are selected.
+  setDefaultTaxDates();
+  updateThaiFilterDisplay();
+}
+
 function handleDateRangeChange() {
+  if (currentDateMode !== 'custom') {
+    return;
+  }
+
   const fromInput = document.getElementById('reportDateFrom');
   const toInput = document.getElementById('reportDateTo');
   const from = fromInput?.value || '';
   const to = toInput?.value || '';
 
-  // อัปเดตแสดงไทยทันที
+  dateRangePending = !from || !to;
   updateThaiFilterDisplay();
 
   // รอให้ครบทั้ง 2 ฝั่งก่อน แล้วค่อยโหลด
@@ -104,10 +157,12 @@ function handleDateRangeChange() {
     alert('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด');
     if (fromInput) fromInput.value = currentDateFrom;
     if (toInput) toInput.value = currentDateTo;
+    dateRangePending = false;
     updateThaiFilterDisplay();
     return;
   }
 
+  dateRangePending = false;
   currentDateFrom = from;
   currentDateTo = to;
   setDefaultTaxDates();
@@ -118,8 +173,11 @@ function handleDateRangeChange() {
 }
 
 function clearDateRange() {
+  currentDateMode = 'month';
+  dateRangePending = false;
   clearDateRangeInputs();
   setDefaultTaxDates();
+  updateDateModeUI();
   updateScopeLabels();
   updateThaiFilterDisplay();
   setLoadingState();
@@ -129,6 +187,7 @@ function clearDateRange() {
 function clearDateRangeInputs() {
   currentDateFrom = '';
   currentDateTo = '';
+  dateRangePending = false;
   const fromInput = document.getElementById('reportDateFrom');
   const toInput = document.getElementById('reportDateTo');
   if (fromInput) fromInput.value = '';
@@ -244,36 +303,54 @@ function getCurrentMonthValue() {
   return `${now.getFullYear()}-${month}`;
 }
 
+function updateDateModeUI() {
+  const isCustom = currentDateMode === 'custom';
+  const monthField = document.getElementById('reportMonthField');
+  const rangeField = document.getElementById('reportDateRangeField');
+  const monthInput = document.getElementById('reportMonth');
+  const fromInput = document.getElementById('reportDateFrom');
+  const toInput = document.getElementById('reportDateTo');
+
+  if (monthField) monthField.hidden = isCustom;
+  if (rangeField) rangeField.hidden = !isCustom;
+  if (monthInput) monthInput.disabled = isCustom;
+  if (fromInput) fromInput.disabled = !isCustom;
+  if (toInput) toInput.disabled = !isCustom;
+
+  document.querySelectorAll('input[name="reportDateMode"]').forEach((input) => {
+    input.checked = input.value === currentDateMode;
+  });
+}
+
 function updateThaiFilterDisplay() {
-  const monthThai = document.getElementById('reportMonthThai');
-  if (monthThai) {
-    const val = document.getElementById('reportMonth')?.value || currentReportMonth;
-    if (val) {
-      const [y, m] = val.split('-').map(Number);
-      monthThai.textContent = formatMonthLabel(y, m - 1);
-    } else {
-      monthThai.textContent = '';
-    }
+  const status = document.getElementById('reportFilterStatus');
+  if (!status) {
+    return;
   }
-  const rangeThai = document.getElementById('reportDateRangeThai');
-  if (rangeThai) {
-    if (currentDateFrom && currentDateTo) {
-      rangeThai.textContent = `${formatDisplayDate(currentDateFrom)} ถึง ${formatDisplayDate(currentDateTo)}`;
-    } else if (currentReportMonth) {
-      const r = getMonthRange(currentReportMonth);
-      rangeThai.textContent = `${formatDisplayDate(r.dateFrom)} ถึง ${formatDisplayDate(r.dateTo)}`;
-    } else {
-      rangeThai.textContent = '';
-    }
+
+  status.classList.remove('is-warning');
+  if (currentDateMode === 'custom' && dateRangePending) {
+    const hasActiveCustomRange = currentDateFrom && currentDateTo;
+    status.textContent = hasActiveCustomRange
+      ? 'กำลังดูช่วงเดิม · เลือกวันที่ให้ครบทั้ง 2 ช่องเพื่อเปลี่ยนช่วง'
+      : 'กรุณาเลือกวันที่เริ่มต้นและวันที่สิ้นสุด';
+    status.classList.add('is-warning');
+    return;
   }
+
+  const activeRange = getActiveRange();
+  status.textContent = `กำลังดู: ${activeRange.label}`;
 }
 
 function setDefaultMonth() {
   const monthInput = document.getElementById('reportMonth');
+  currentDateMode = 'month';
+  dateRangePending = false;
   currentReportMonth = monthInput?.value || getCurrentMonthValue();
   if (monthInput) {
     monthInput.value = currentReportMonth;
   }
+  updateDateModeUI();
   updateThaiFilterDisplay();
 }
 
@@ -312,9 +389,9 @@ function getMonthRange(monthValue) {
   };
 }
 
-// ช่วงเวลาที่ใช้งานจริง: ถ้าผู้ใช้เลือกช่วงวันที่ -> ใช้ช่วงนั้น; ไม่งั้นใช้เดือน
+// ช่วงเวลาที่ใช้งานจริง: ใช้ช่วงวันที่เฉพาะเมื่อผู้ใช้เลือกโหมดนี้และกรอกครบ
 function getActiveRange() {
-  if (currentDateFrom && currentDateTo) {
+  if (currentDateMode === 'custom' && currentDateFrom && currentDateTo) {
     return {
       year: parseInt(currentDateFrom.slice(0, 4), 10),
       month: parseInt(currentDateFrom.slice(5, 7), 10),
