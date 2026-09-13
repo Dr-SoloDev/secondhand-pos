@@ -868,11 +868,12 @@ class ReportService
         $items = $this->db->fetchAll(
             "SELECT
                 DATE(po.created_at) AS purchase_date,
+                po.created_at AS purchase_datetime,
                 poi.item_name,
                 poi.category_id,
                 COALESCE(c.name, 'ไม่ระบุหมวด') AS category_name,
                 COALESCE(poi.unit, 'ชิ้น') AS unit,
-                COUNT(DISTINCT po.id) AS bill_count,
+                poi.price_tier AS price_tier,
                 COUNT(poi.id) AS line_count,
                 COALESCE(SUM(poi.quantity), 0) AS total_quantity,
                 COALESCE(SUM(poi.weight_deduction), 0) AS total_deduction,
@@ -906,12 +907,15 @@ class ReportService
                AND DATE(po.created_at) BETWEEN ? AND ?
                $branchFilter
              GROUP BY
+                po.id,
+                po.created_at,
                 DATE(po.created_at),
                 poi.category_id,
                 c.name,
                 poi.item_name,
-                poi.unit
-             ORDER BY purchase_date DESC, poi.item_name ASC, poi.unit ASC",
+                poi.unit,
+                poi.price_tier
+             ORDER BY po.created_at DESC, poi.item_name ASC, poi.unit ASC, poi.price_tier ASC",
             $params
         );
 

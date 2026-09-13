@@ -358,7 +358,7 @@ function updateScopeLabels() {
 function setLoadingState() {
   setSummaryLoading();
   showTableLoading('summaryBreakdownBody', 2, 4);
-  showTableLoading('purchaseItemsBody', 8, 5);
+  showTableLoading('purchaseItemsBody', 9, 5);
   showTableLoading('saleLotsBody', 8, 5);
   showTableLoading('employeesBody', 6, 5);
   showTableLoading('taxReportBody', 4, 5);
@@ -493,7 +493,7 @@ async function loadPurchaseItems(range) {
     renderPurchaseItems(data, range);
   } catch (error) {
     console.error('Failed to load purchase items:', error);
-    renderErrorRow('purchaseItemsBody', 8, 'โหลดสรุปการรับซื้อแยกสินค้าไม่สำเร็จ');
+    renderErrorRow('purchaseItemsBody', 9, 'โหลดสรุปการรับซื้อแยกสินค้าไม่สำเร็จ');
   }
 }
 
@@ -521,15 +521,15 @@ function renderPurchaseItems(data, range) {
 
   renderTableBody('purchaseItemsBody', items.map((item) => `
     <tr>
-      <td>${escapeHtml(formatDisplayDate(item.purchase_date || ''))}</td>
-      <td>${escapeHtml(formatTime(item.purchase_date || ''))}</td>
+      <td>${escapeHtml(formatDisplayDate(item.purchase_datetime || item.purchase_date || ''))}</td>
+      <td>${escapeHtml(formatTime(item.purchase_datetime || item.purchase_date || ''))}</td>
       <td>${escapeHtml(item.item_name || '-')}</td>
       <td>${escapeHtml(item.category_name || '-')}</td>
       <td class="text-right">${parseFloat(item.net_quantity || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
       <td class="text-right">${formatCurrency(item.weighted_avg_unit_price || 0)}</td>
       <td class="text-right">${formatCurrency(item.total_amount || 0)}</td>
       <td>${escapeHtml(item.unit || '-')}</td>
-      <td class="text-right">${parseInt(item.bill_count || 0, 10).toLocaleString('th-TH')}</td>
+      <td class="text-right">${escapeHtml(formatPurchaseTier(item.price_tier))}</td>
     </tr>
   `).join('') +
   // ✅ Total Row
@@ -539,7 +539,7 @@ function renderPurchaseItems(data, range) {
     <td class="text-right" style="padding:10px">${formatCurrency(weightedAvgPrice)}</td>
     <td class="text-right" style="padding:10px">${formatCurrency(totalAmount)}</td>
     <td></td>
-    <td class="text-right" style="padding:10px">${totalBills.toLocaleString('th-TH')} บิล</td>
+    <td></td>
   </tr>`
   );
 }
@@ -815,17 +815,17 @@ function exportReportCard(key) {
         ['สาขา', currentBranchName],
         ['ช่วงรายงาน', monthLabel],
         [],
-        ['วันที่', 'เวลา', 'สินค้า', 'หมวด', 'จำนวนสุทธิ', 'ราคาเฉลี่ย/หน่วย', 'ยอดรวม', 'หน่วย', 'จำนวนบิล'],
+        ['วันที่', 'เวลา', 'สินค้า', 'หมวด', 'จำนวนสุทธิ', 'ราคาเฉลี่ย/หน่วย', 'ยอดรวม', 'หน่วย', 'ระดับราคา'],
         ...reportState.purchaseItems.map((item) => [
-          formatDisplayDate(item.purchase_date || ''),
-          formatTime(item.purchase_date || ''),
+          formatDisplayDate(item.purchase_datetime || item.purchase_date || ''),
+          formatTime(item.purchase_datetime || item.purchase_date || ''),
           item.item_name || '',
           item.category_name || '',
           item.net_quantity || 0,
           item.weighted_avg_unit_price || 0,
           item.total_amount || 0,
           item.unit || '',
-          item.bill_count || 0,
+          formatPurchaseTier(item.price_tier),
         ]),
       ]);
       break;
@@ -1064,14 +1064,31 @@ function formatPaymentMethod(value) {
   return getStatusLabel(value);
 }
 
+function parseReportDate(value) {
+  if (!value) {
+    return null;
+  }
+
+  const raw = String(value).trim();
+  let normalized = raw;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    normalized = `${raw}T00:00:00`;
+  } else if (/^\d{4}-\d{2}-\d{2}\s+/.test(raw)) {
+    // MySQL DATETIME is returned as "YYYY-MM-DD HH:MM:SS".
+    normalized = raw.replace(/^([\d-]+)\s+/, '$1T');
+  }
+
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function formatDisplayDate(value) {
   if (!value) {
     return '-';
   }
 
-  const normalized = String(value).includes('T') ? String(value) : `${String(value).slice(0, 10)}T00:00:00`;
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) {
+  const date = parseReportDate(value);
+  if (!date) {
     return String(value).slice(0, 10);
   }
 
@@ -1083,9 +1100,12 @@ function formatDisplayDate(value) {
 
 // ✅ Format time only (HH:MM)
 function formatTime(value) {
-  if (!value) return '-';
-  const normalized = String(value).includes('T') ? String(value) : `${String(value).slice(0, 10)}T00:00:00`;
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return '-';
+  const date = parseReportDate(value);
+  if (!date) return '-';
   return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatPurchaseTier(value) {
+  const tier = Number(value);
+  return Number.isInteger(tier) && tier >= 1 && tier <= 3 ? `บิล ${tier}` : '-';
 }
