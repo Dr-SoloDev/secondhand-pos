@@ -29,8 +29,11 @@ class Branch extends Model
         if ($exists) {
             throw new Exception('รหัสสาขานี้ถูกใช้แล้ว');
         }
-        $costMethod = isset($data['cost_method']) && in_array($data['cost_method'], ['fifo', 'weighted'])
-            ? $data['cost_method'] : 'fifo';
+        // The business policy is FIFO for every branch.  Keep this invariant
+        // in the model as a second line of defence in addition to the DB enum.
+        if (isset($data['cost_method']) && $data['cost_method'] !== 'fifo') {
+            throw new Exception('ระบบกำหนดให้ทุกสาขาใช้ต้นทุนแบบ FIFO เท่านั้น');
+        }
         return $this->insert([
             'code' => $data['code'],
             'name' => $data['name'],
@@ -38,7 +41,7 @@ class Branch extends Model
             'phone' => $data['phone'] ?? null,
             'manager_name' => $data['manager_name'] ?? null,
             'status' => $data['status'] ?? 'active',
-            'cost_method' => $costMethod,
+            'cost_method' => 'fifo',
         ]);
     }
 

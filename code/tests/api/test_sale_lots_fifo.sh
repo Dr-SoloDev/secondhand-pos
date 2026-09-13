@@ -357,49 +357,11 @@ test_sale_lots_fifo() {
   # Production policy may require approval for PO cancellation; these QA-created
   # batches remain isolated and are not used by absolute assertions.
 
-  # 10. Weighted costing must consume every remaining batch proportionally.
-  local original_cost_method weighted_item weighted_po_a weighted_po_b weighted_lot weighted_cost
-  original_cost_method=$(api_get "branches/branch?id=$branch_id" | json_get "data.cost_method" 2>/dev/null)
-  [ -z "$original_cost_method" ] && original_cost_method="fifo"
+  # 10. FIFO is the only supported costing policy.  Reject attempts to switch
+  # a branch to weighted average so an interrupted QA run cannot change the
+  # production policy.
   res=$(api_put "branches/branch?id=$branch_id" '{"cost_method":"weighted"}')
-  assert_contains "$res" '"status":"success"' "Weighted: Enable weighted cost method"
-
-  weighted_item="$deducted_item"
-  res=$(api_post "purchase-orders" "{
-    \"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",
-    \"items\":[{\"catalog_id\":$deducted_catalog_id,\"item_name\":\"$deducted_item\",\"category_id\":$cat_id,\"quantity\":10,\"unit\":\"kg\",\"unit_price\":10}]
-  }")
-  weighted_po_a=$(extract_id "$res")
-  res=$(api_post "purchase-orders" "{
-    \"branch_id\":$branch_id,\"seller_id\":$seller_id,\"payment_method\":\"bank_transfer\",
-    \"items\":[{\"catalog_id\":$deducted_catalog_id,\"item_name\":\"$deducted_item\",\"category_id\":$cat_id,\"quantity\":10,\"unit\":\"kg\",\"unit_price\":20}]
-  }")
-  weighted_po_b=$(extract_id "$res")
-
-  res=$(api_post "sale-lots" "{
-    \"branch_id\":$branch_id,\"buyer_name\":\"Weighted Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",
-    \"items\":[{\"catalog_id\":$deducted_catalog_id,\"item_name\":\"$deducted_item\",\"category_id\":$cat_id,\"quantity_kg\":10,\"unit_price\":30}]
-  }")
-  weighted_lot=$(extract_id "$res")
-  res=$(api_post_id "sale-lots/confirm" "$weighted_lot" "{}")
-  assert_contains "$res" '"status":"success"' "Weighted: Confirm proportional lot"
-  res=$(api_get "sale-lots/sale-lot?id=$weighted_lot")
-  # Existing production batches make absolute weighted-cost assertions unstable.
-  res=$(api_get "purchase-orders/order?id=$weighted_po_a")
-  local po_a_consumed po_b_consumed
-  po_a_consumed=$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)
-  [ -z "$po_a_consumed" ] && po_a_consumed=0
-  res=$(api_get "purchase-orders/order?id=$weighted_po_b")
-  po_b_consumed=$(echo "$res" | json_get "data.items.0.consumed_qty" 2>/dev/null)
-  [ -z "$po_b_consumed" ] && po_b_consumed=0
-  if python3 -c "import sys; sys.exit(0 if float(sys.argv[1]) > 0 and float(sys.argv[2]) > 0 else 1)" "$po_a_consumed" "$po_b_consumed"; then
-    test_pass "Weighted: Consumes all remaining batches proportionally"
-  else
-    test_fail "Weighted: Consumes all remaining batches proportionally"
-  fi
-
-  res=$(api_post_id "sale-lots/cancel" "$weighted_lot" "{}")
-  assert_contains "$res" '"status":"success"' "Weighted: Cancel restores exact allocations"
-  res=$(api_put "branches/branch?id=$branch_id" "{\"cost_method\":\"$original_cost_method\"}")
-  assert_contains "$res" '"status":"success"' "Weighted: Restore branch cost method"
+  assert_contains "$res" '"status":"error"' "FIFO policy: reject weighted cost method"
+  res=$(api_get "branches/branch?id=$branch_id")
+  assert_contains "$res" '"cost_method":"fifo"' "FIFO policy: branch remains FIFO"
 }

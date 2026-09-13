@@ -65,6 +65,10 @@ class BranchesController extends Controller
         $this->validateRequiredFields($data, ['code', 'name']);
         $data = $this->sanitizeInput($data);
 
+        if (isset($data['cost_method']) && $data['cost_method'] !== 'fifo') {
+            Response::error('ระบบกำหนดให้ทุกสาขาใช้ต้นทุนแบบ FIFO เท่านั้น', 422);
+        }
+
         $model = new Branch();
         try {
             $id = $model->create($data);
@@ -85,11 +89,16 @@ class BranchesController extends Controller
         $data = array_intersect_key($data, array_flip([
             'code', 'name', 'address', 'phone', 'manager_name', 'status', 'cost_method'
         ]));
+        if (array_key_exists('cost_method', $data)) {
+            if ($data['cost_method'] !== 'fifo') {
+                Response::error('ระบบกำหนดให้ทุกสาขาใช้ต้นทุนแบบ FIFO เท่านั้น', 422);
+            }
+            // Keep an explicit FIFO write so this endpoint can also repair a
+            // legacy branch before migration 075 has been applied.
+            $data['cost_method'] = 'fifo';
+        }
         if (isset($data['status']) && !in_array($data['status'], ['active', 'inactive'], true)) {
             Response::error('Invalid branch status', 422);
-        }
-        if (isset($data['cost_method']) && !in_array($data['cost_method'], ['fifo', 'weighted'], true)) {
-            Response::error('Invalid cost method', 422);
         }
         $model = new Branch();
         try {
