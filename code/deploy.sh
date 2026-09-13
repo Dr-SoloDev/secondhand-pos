@@ -78,18 +78,24 @@ docker compose up -d --force-recreate --wait 2>/dev/null || {
 # Internal check inside the web container.  Apache listens on port 80 inside
 # the container; the host publishes it on 8080 (not localhost:80).
 # auth/verify returns 401 without token — that's OK, it proves PHP is working.
-HTTP_CODE=$(docker compose exec -T web sh -lc \
+if ! HTTP_CODE=$(docker compose exec -T web sh -lc \
   'curl -s -o /dev/null -w "%{http_code}" "http://localhost:80/api/index.php/auth/verify"' \
-  2>/dev/null || echo "000")
+  2>/dev/null); then
+  HTTP_CODE="000"
+fi
 
 # Fallback to the published host port if the container check fails.
 if [ "$HTTP_CODE" = "000" ]; then
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/api/index.php/auth/verify" 2>/dev/null || echo "000")
+  if ! HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/api/index.php/auth/verify" 2>/dev/null); then
+    HTTP_CODE="000"
+  fi
 fi
 
 # Final fallback to the configured public HTTPS endpoint.
 if [ "$HTTP_CODE" = "000" ]; then
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/api/index.php/auth/verify" 2>/dev/null || echo "000")
+  if ! HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/api/index.php/auth/verify" 2>/dev/null); then
+    HTTP_CODE="000"
+  fi
 fi
 
 # Accept 200 (authenticated) or 401 (unauthenticated — server still up)
