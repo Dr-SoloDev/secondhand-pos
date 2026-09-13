@@ -233,8 +233,8 @@ class FinancialController extends Controller
                 'beneficiary_name' => substr(trim((string)$body['beneficiary_name']), 0, 200),
                 'note' => isset($body['note']) ? substr(trim($body['note']), 0, 255) : null,
             ], $userId);
-            Logger::logActivity($userId, 'request_business_expense', "ขอเบิกค่าใช้จ่าย branch:{$branchId} {$body['category']} {$amount}บาท");
-            Response::success('ส่งคำขอรายจ่ายเพื่อรออนุมัติแล้ว', ['id' => $id, 'status' => 'pending']);
+            Logger::logActivity($userId, 'create_business_expense', "บันทึกค่าใช้จ่าย branch:{$branchId} {$body['category']} {$amount}บาท");
+            Response::success('บันทึกค่าใช้จ่ายแล้ว', ['id' => $id, 'status' => 'approved']);
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
         }

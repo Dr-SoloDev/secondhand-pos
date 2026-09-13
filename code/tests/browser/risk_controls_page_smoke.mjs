@@ -117,6 +117,7 @@ async function pageSnapshot(cdp, page) {
       user:document.querySelector('.user-name')?.textContent.trim() || '',
       adjustmentVisible:visible(document.querySelector('#adjustmentSection')),
       expenseBeneficiary:!!document.querySelector('#expBeneficiary'),
+      expenseSaveButton:!!document.querySelector('#saveExpenseBtn'),
       expenseReviewModal:!!document.querySelector('#expenseReviewModal'),
       poCancellationQueueVisible:visible(document.querySelector('#poCancellationQueue')),
       poCancellationModal:!!document.querySelector('#poCancellationModal'),
@@ -169,7 +170,8 @@ async function run() {
     const adminTransfer = snapshots.find(item => item.page === 'admin-desktop-stock-transfers');
     const adminLot = snapshots.find(item => item.page === 'admin-desktop-sale-lots');
     if (!adminCash?.adjustmentVisible) issues.push('Admin adjustment section is not visible');
-    if (!adminExpense?.expenseBeneficiary || !adminExpense?.expenseReviewModal) issues.push('Expense workflow controls are missing');
+    if (!adminExpense?.expenseBeneficiary || !adminExpense?.expenseSaveButton) issues.push('Expense entry controls are missing');
+    if (adminExpense?.expenseReviewModal) issues.push('Legacy expense approval modal should not be shown');
     if (!adminPO?.poCancellationQueueVisible || !adminPO?.poCancellationModal) issues.push('PO cancellation controls are missing');
     if (!adminTransfer?.reversalRequestModal || !adminTransfer?.reversalReviewModal) issues.push('Transfer reversal controls are missing');
     if (adminTransfer?.reversalReceive) issues.push('A reversal row exposes the normal receive action');

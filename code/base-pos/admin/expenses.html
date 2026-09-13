@@ -11,7 +11,7 @@
   <meta name="theme-color" content="#00D4D4">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="รักษ์สะอาด">
-  <link rel="stylesheet" href="../assets/css/main.css?v=20260815d">
+  <link rel="stylesheet" href="../assets/css/main.css?v=20260913a">
     <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16x16.png">
@@ -19,7 +19,7 @@
   <meta name="theme-color" content="#00D4D4">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="รักษ์สะอาด">
-  <link rel="stylesheet" href="../assets/css/components/expenses.css?v=20260815d">
+  <link rel="stylesheet" href="../assets/css/components/expenses.css?v=20260913a">
 </head>
 <body>
   <div class="app-container">
@@ -70,7 +70,7 @@
 
       <div class="card expense-request-card">
         <div class="card-header">
-          <h2 class="card-title">ส่งคำขอเบิกค่าใช้จ่าย</h2>
+          <h2 class="card-title">บันทึกค่าใช้จ่าย</h2>
         </div>
         <div class="card-body">
           <div class="expense-form-grid">
@@ -113,7 +113,7 @@
               <label for="expNote">รายละเอียดค่าใช้จ่าย</label>
               <input type="text" id="expNote" class="form-control" maxlength="255" placeholder="รายละเอียดเพิ่มเติม (ไม่บังคับ)">
             </div>
-            <button class="btn btn-success expense-submit" id="saveExpenseBtn" type="button" onclick="saveExpense()">ส่งคำขอ</button>
+            <button class="btn btn-success expense-submit" id="saveExpenseBtn" type="button" onclick="saveExpense()">บันทึกค่าใช้จ่าย</button>
           </div>
         </div>
       </div>
@@ -123,8 +123,8 @@
           <h2 class="card-title">รายการค่าใช้จ่าย</h2>
           <select id="filterStatus" class="form-control expense-filter-control">
             <option value="">ทุกสถานะ</option>
-            <option value="pending">รออนุมัติ</option>
-            <option value="approved">อนุมัติแล้ว</option>
+            <option value="pending">ค้างจากระบบเดิม</option>
+            <option value="approved">บันทึกแล้ว</option>
             <option value="rejected">ปฏิเสธ</option>
             <option value="cancelled">ยกเลิกคำขอ</option>
           </select>
@@ -154,19 +154,18 @@
                   <th>วิธีจ่าย</th>
                   <th class="text-right">จำนวนเงิน</th>
                   <th>สถานะ</th>
-                  <th>ผู้ขอ / ผู้พิจารณา</th>
+                  <th>ผู้บันทึก</th>
                   <th>รายละเอียด</th>
-                  <th>ดำเนินการ</th>
                 </tr>
               </thead>
               <tbody id="expenseBody">
-                <tr><td colspan="10" class="expense-empty">กำลังโหลด...</td></tr>
+                <tr><td colspan="9" class="expense-empty">กำลังโหลด...</td></tr>
               </tbody>
               <tfoot>
                 <tr>
-                  <td colspan="5" class="expense-total-label">รวมยอดที่อนุมัติแล้ว</td>
+                  <td colspan="5" class="expense-total-label">รวมยอดที่บันทึกแล้ว</td>
                   <td class="text-right expense-total" id="totalAmount">฿0.00</td>
-                  <td colspan="4"></td>
+                  <td colspan="3"></td>
                 </tr>
               </tfoot>
             </table>
@@ -177,33 +176,11 @@
     </div><!-- /.content-area -->
   </div><!-- /.app-container -->
 
-  <div class="modal" id="expenseReviewModal" role="dialog" aria-modal="true" aria-labelledby="expenseReviewTitle">
-    <div class="modal-content modal-sm">
-      <div class="modal-header">
-        <h2 id="expenseReviewTitle">พิจารณาคำขอ</h2>
-        <button class="close-modal" type="button" aria-label="ปิด" onclick="closeExpenseReviewModal()">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div id="expenseReviewSummary" class="expense-review-summary"></div>
-        <div class="form-group">
-          <label for="expenseReviewNote">หมายเหตุการพิจารณา</label>
-          <textarea id="expenseReviewNote" class="form-control" rows="3" maxlength="500" placeholder="ต้องระบุเมื่อปฏิเสธคำขอ"></textarea>
-        </div>
-        <p id="expenseReviewError" class="expense-review-error"></p>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" type="button" onclick="closeExpenseReviewModal()">ปิด</button>
-        <button class="btn btn-danger" id="rejectExpenseBtn" type="button" onclick="submitExpenseReview('reject')">ปฏิเสธ</button>
-        <button class="btn btn-success" id="approveExpenseBtn" type="button" onclick="submitExpenseReview('approve')">อนุมัติ</button>
-      </div>
-    </div>
-  </div>
-
   <div id="notification-container"></div>
 
-  <script src="../assets/js/config.js?v=20260815d"></script>
+  <script src="../assets/js/config.js?v=20260913a"></script>
   <script src="../assets/js/common.js?v=20260907e"></script>
-  <script src="../assets/js/expenses.js?v=20260815d"></script>
+  <script src="../assets/js/expenses.js?v=20260913a"></script>
 <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>
 </body>

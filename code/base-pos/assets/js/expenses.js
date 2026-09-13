@@ -1,13 +1,12 @@
-// Expense request and approval workflow.
+// บันทึกค่าใช้จ่ายทันที; รายการ pending เดิมแสดงแบบอ่านอย่างเดียว
 
 let branches = [];
 let currentUser = null;
 let expenseItems = [];
-let reviewExpenseId = null;
 
 const EXPENSE_STATUS = {
-  pending: ['รออนุมัติ', 'badge-warning'],
-  approved: ['อนุมัติแล้ว', 'badge-success'],
+  pending: ['ค้างจากระบบเดิม', 'badge-warning'],
+  approved: ['บันทึกแล้ว', 'badge-success'],
   rejected: ['ปฏิเสธ', 'badge-danger'],
   cancelled: ['ยกเลิกคำขอ', 'badge-secondary'],
 };
@@ -69,7 +68,7 @@ async function loadExpenses() {
   const params = new URLSearchParams({ period: 'month', year, month });
   if (branchId) params.set('branch_id', branchId);
 
-  showTableLoading('expenseBody', 10, 5);
+  showTableLoading('expenseBody', 9, 5);
   const response = await apiRequest(`financial/expenses?${params.toString()}`, 'GET');
   if (response.status !== 'success') {
     showNotification(response.message || 'โหลดค่าใช้จ่ายไม่สำเร็จ', 'error');
@@ -88,7 +87,7 @@ function renderTable() {
   const tbody = document.getElementById('expenseBody');
 
   if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="expense-empty">ไม่มีข้อมูล</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="expense-empty">ไม่มีข้อมูล</td></tr>';
     document.getElementById('totalAmount').textContent = formatCurrency(0);
     return;
   }
@@ -102,6 +101,9 @@ function renderTable() {
     const paymentText = expense.payment_method === 'bank_transfer' ? 'โอนธนาคาร' : 'เงินสด';
     const requesterText = escapeHtml(expense.requested_by_name || '-');
     const approverText = expense.approved_by_name ? escapeHtml(expense.approved_by_name) : '-';
+    const peopleText = expense.status === 'pending'
+      ? `ข้อมูลเดิม<br>ผู้บันทึก ${requesterText}`
+      : `บันทึกโดย ${approverText !== '-' ? approverText : requesterText}`;
     const detailLines = [expense.note, expense.review_note].filter(Boolean).map(escapeHtml);
 
     return `<tr>
@@ -112,33 +114,12 @@ function renderTable() {
       <td>${paymentText}</td>
       <td class="text-right">${formatCurrency(expense.amount)}</td>
       <td><span class="badge ${statusClass}">${escapeHtml(statusText)}</span></td>
-      <td class="expense-person-cell">ขอโดย ${requesterText}<br>พิจารณาโดย ${approverText}</td>
+      <td class="expense-person-cell">${peopleText}</td>
       <td class="expense-detail-cell">${detailLines.length ? detailLines.join('<br>') : '-'}</td>
-      <td><div class="expense-actions">${renderExpenseActions(expense)}</div></td>
     </tr>`;
   }).join('');
 
   document.getElementById('totalAmount').textContent = formatCurrency(approvedTotal);
-}
-
-function renderExpenseActions(expense) {
-  if (expense.status !== 'pending') return '';
-
-  const userId = Number(currentUser.user_id || currentUser.id);
-  const isRequester = Number(expense.requested_by) === userId;
-  if (isRequester) {
-    return `<button class="btn btn-sm btn-secondary" type="button" onclick="cancelExpense(${Number(expense.id)})">ยกเลิกคำขอ</button>`;
-  }
-
-  if (!canApproveAmount(Number(expense.amount))) return '';
-  return `<button class="btn btn-sm btn-primary" type="button" onclick="openExpenseReviewModal(${Number(expense.id)})">พิจารณา</button>`;
-}
-
-function canApproveAmount(amount) {
-  const role = currentUser.role;
-  if (amount <= 500) return ['manager', 'super_manager', 'admin'].includes(role);
-  if (amount <= 5000) return ['super_manager', 'admin'].includes(role);
-  return role === 'admin';
 }
 
 async function saveExpense() {
@@ -162,78 +143,17 @@ async function saveExpense() {
   try {
     const response = await apiRequest('financial/expenses', 'POST', payload);
     if (response.status !== 'success') {
-      showNotification(response.message || 'ส่งคำขอไม่สำเร็จ', 'error');
+      showNotification(response.message || 'บันทึกค่าใช้จ่ายไม่สำเร็จ', 'error');
       return;
     }
 
-    showNotification('ส่งคำขอรายจ่ายแล้ว', 'success');
+    showNotification('บันทึกค่าใช้จ่ายแล้ว', 'success');
     document.getElementById('expAmount').value = '';
     document.getElementById('expBeneficiary').value = '';
     document.getElementById('expNote').value = '';
     await loadExpenses();
   } finally {
     setButtonLoading(saveButton, false);
-  }
-}
-
-async function cancelExpense(id) {
-  if (!confirm('ยืนยันการยกเลิกคำขอนี้?')) return;
-  const response = await apiRequest(`financial/expenses?id=${id}`, 'DELETE');
-  if (response.status === 'success') {
-    showNotification('ยกเลิกคำขอแล้ว', 'success');
-    await loadExpenses();
-  } else {
-    showNotification(response.message || 'ยกเลิกคำขอไม่สำเร็จ', 'error');
-  }
-}
-
-function openExpenseReviewModal(id) {
-  const expense = expenseItems.find((item) => Number(item.id) === Number(id));
-  if (!expense) return;
-
-  reviewExpenseId = Number(id);
-  document.getElementById('expenseReviewSummary').innerHTML = `
-    <strong>${escapeHtml(expense.category)}</strong> ${formatCurrency(expense.amount)}<br>
-    ผู้รับเงิน: ${escapeHtml(expense.beneficiary_name || '-')}<br>
-    วิธีจ่าย: ${expense.payment_method === 'bank_transfer' ? 'โอนธนาคาร' : 'เงินสด'}
-  `;
-  document.getElementById('expenseReviewNote').value = '';
-  document.getElementById('expenseReviewError').textContent = '';
-  document.getElementById('expenseReviewModal').classList.add('show');
-  document.getElementById('expenseReviewNote').focus();
-}
-
-function closeExpenseReviewModal() {
-  reviewExpenseId = null;
-  document.getElementById('expenseReviewModal').classList.remove('show');
-}
-
-async function submitExpenseReview(action) {
-  if (!reviewExpenseId) return;
-  const note = document.getElementById('expenseReviewNote').value.trim();
-  const errorElement = document.getElementById('expenseReviewError');
-  if (action === 'reject' && !note) {
-    errorElement.textContent = 'กรุณาระบุเหตุผลที่ปฏิเสธ';
-    return;
-  }
-
-  const button = document.getElementById(action === 'approve' ? 'approveExpenseBtn' : 'rejectExpenseBtn');
-  setButtonLoading(button, true);
-  try {
-    const response = await apiRequest(`financial/expenses/${action}`, 'POST', {
-      id: reviewExpenseId,
-      review_note: note || null,
-    });
-    if (response.status !== 'success') {
-      errorElement.textContent = response.message || 'บันทึกผลการพิจารณาไม่สำเร็จ';
-      return;
-    }
-
-    showNotification(action === 'approve' ? 'อนุมัติและบันทึกการจ่ายแล้ว' : 'ปฏิเสธคำขอแล้ว', 'success');
-    closeExpenseReviewModal();
-    await loadExpenses();
-  } finally {
-    setButtonLoading(button, false);
   }
 }
 

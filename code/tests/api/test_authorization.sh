@@ -428,11 +428,12 @@ test_authorization() {
     \"payment_method\":\"bank_transfer\",\"beneficiary_name\":\"QA W5 recipient\"
   }")
   expense_cashier_a_id=$(auth_extract_id "$expense_cashier_a")
-  assert_contains "$expense_cashier_a" '"status":"success"' "AUTH-35: cashier-A requests Branch A expense"
+  assert_contains "$expense_cashier_a" '"status":"success"' "AUTH-35: cashier-A records Branch A expense immediately"
+  assert_contains "$expense_cashier_a" '"status":"approved"' "AUTH-35b: expense is recorded without approval"
   local manager_expense_approve
   manager_expense_approve=$(role_fixture_post "$AUTH_FIXTURE_MANAGER_A_COOKIE" "financial/expenses/approve" \
     "{\"id\":${expense_cashier_a_id:-0}}")
-  assert_contains "$manager_expense_approve" '"status":"success"' "AUTH-36: manager-A approves another user's Branch A expense"
+  assert_contains "$manager_expense_approve" '"status":"error"' "AUTH-36: recorded expense needs no approval"
 
   expense_cross=$(role_fixture_post "$AUTH_FIXTURE_CASHIER_A_COOKIE" "financial/expenses" "{
     \"branch_id\":$branch_a,\"expense_date\":\"$(date +%Y-%m-%d)\",\"category\":\"QA W5 cross expense\",\"amount\":16,
@@ -456,7 +457,7 @@ test_authorization() {
   local manager_self_expense
   manager_self_expense=$(role_fixture_post "$AUTH_FIXTURE_MANAGER_A_COOKIE" "financial/expenses/approve" \
     "{\"id\":${expense_manager_a_id:-0}}")
-  assert_contains "$manager_self_expense" '"status":"error"' "AUTH-38: manager-A cannot approve own expense request"
+  assert_contains "$manager_self_expense" '"status":"error"' "AUTH-38: manager-A cannot approve already-recorded expense"
   if [ -n "$expense_manager_a_id" ]; then
     role_fixture_post "$AUTH_FIXTURE_ADMIN_COOKIE" "financial/expenses/approve" \
       "{\"id\":$expense_manager_a_id}" >/dev/null
@@ -470,7 +471,20 @@ test_authorization() {
   expense_admin_self_id=$(auth_extract_id "$expense_admin_self")
   admin_self_expense=$(role_fixture_post "$AUTH_FIXTURE_ADMIN_COOKIE" "financial/expenses/approve" \
     "{\"id\":${expense_admin_self_id:-0}}")
-  assert_contains "$admin_self_expense" '"status":"success"' "AUTH-39: admin may self-approve expense"
+  assert_contains "$expense_admin_self" '"status":"approved"' "AUTH-39: admin records expense without approval"
+  assert_contains "$admin_self_expense" '"status":"error"' "AUTH-39b: recorded admin expense needs no approval"
+
+  local expense_super expense_super_id super_expense_review
+  expense_super=$(role_fixture_post "$AUTH_FIXTURE_SUPER_COOKIE" "financial/expenses" "{
+    \"branch_id\":$branch_b,\"expense_date\":\"$(date +%Y-%m-%d)\",\"category\":\"QA W5 super expense\",\"amount\":19,
+    \"payment_method\":\"bank_transfer\",\"beneficiary_name\":\"QA W5 super recipient\"
+  }")
+  expense_super_id=$(auth_extract_id "$expense_super")
+  assert_contains "$expense_super" '"status":"success"' "AUTH-39c: super-manager records expense without approval"
+  assert_contains "$expense_super" '"status":"approved"' "AUTH-39d: super-manager expense is immediately approved"
+  super_expense_review=$(role_fixture_post "$AUTH_FIXTURE_ADMIN_COOKIE" "financial/expenses/approve" \
+    "{\"id\":${expense_super_id:-0}}")
+  assert_contains "$super_expense_review" '"status":"error"' "AUTH-39e: immediately recorded super-manager expense cannot be approved again"
 
   # AUTH-40/41: session review respects branch scope and requester guard.
   local close_a close_a_id manager_b_close manager_a_close

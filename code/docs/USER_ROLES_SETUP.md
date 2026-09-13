@@ -67,7 +67,7 @@ The POS system has **4 user roles**, arranged in hierarchy from least to most pr
 | Approve | ❌ | ❌ | ❌ | ✅ Only |
 | **Business Expenses** | | | | |
 | Create | ✅ | ✅ | ✅ | ✅ |
-| Approve | ❌ | ✅ Own branch | ✅ All | ✅ All |
+| Review legacy pending | ❌ | ✅ Own branch | ✅ All | ✅ All |
 | View | ✅ Own | ✅ Own branch | ✅ All | ✅ All |
 | **Reports & Analytics** | | | | |
 | Daily summary | ❌ | ✅ Own branch | ✅ All | ✅ All |
@@ -277,7 +277,7 @@ Process:
 2. Responsibilities explained:
    ✅ PO approvals (up to ฿5,000)
    ✅ Cash session reconciliation
-   ✅ Expense approvals
+   ✅ Review legacy pending expenses (รายการใหม่บันทึกได้ทันที)
    ✅ Can view advanced reports
    
 3. Training: 1 day with super-manager
@@ -735,4 +735,3 @@ See `DATA_SECURITY_GUIDE.md` for:
 - Test data cleanup before production
 - Backup security
 - Compliance (PDPA, local regulations)
-

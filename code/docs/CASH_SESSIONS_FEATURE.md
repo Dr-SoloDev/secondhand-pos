@@ -548,7 +548,7 @@ bash run.sh cash_sessions
 
 - **Purchase Orders** — Payment method triggers cash movements
 - **Sale Lots** — Revenue payment method + date tracking
-- **Business Expenses** — Payment method + approval workflow
+- **Business Expenses** — บันทึกได้ทันทีทุกสิทธิ์; รายการ `pending` เดิมยังรองรับการพิจารณาย้อนหลัง
 - **Stock Transfers** — PO source_type validation
 - **Financial Reports** — Excludes pending sessions, includes only closed
 

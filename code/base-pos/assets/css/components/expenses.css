@@ -63,28 +63,6 @@
   line-height: 1.5;
 }
 
-.expense-actions {
-  display: flex;
-  gap: 6px;
-  min-width: max-content;
-}
-
-.expense-review-summary {
-  margin-bottom: 16px;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-background);
-  line-height: 1.7;
-}
-
-.expense-review-error {
-  min-height: 20px;
-  margin: 8px 0 0;
-  color: var(--color-danger);
-  font-size: 13px;
-}
-
 @media (max-width: 1200px) {
   .expense-form-grid {
     grid-template-columns: repeat(3, minmax(160px, 1fr));

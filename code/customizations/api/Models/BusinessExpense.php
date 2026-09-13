@@ -66,6 +66,14 @@ class BusinessExpense extends Model
         if (($data['expense_date'] ?? '') !== date('Y-m-d')) {
             throw new Exception('รายจ่ายข้ามวันต้องบันทึกด้วยเอกสารปรับปรุงโดยผู้ดูแลระบบ');
         }
+        $amount = round((float)($data['amount'] ?? 0), 2);
+        if (!is_finite($amount) || $amount <= 0) {
+            throw new Exception('จำนวนเงินรายจ่ายไม่ถูกต้อง');
+        }
+        $category = trim((string)($data['category'] ?? ''));
+        if ($category === '') {
+            throw new Exception('กรุณาระบุประเภทรายจ่าย');
+        }
         $paymentMethod = $data['payment_method'] ?? '';
         if (!in_array($paymentMethod, ['cash', 'bank_transfer'], true)) {
             throw new Exception('วิธีจ่ายเงินไม่ถูกต้อง');
@@ -82,14 +90,44 @@ class BusinessExpense extends Model
             }
             $stmt = $this->db->prepare(
                 "INSERT INTO business_expenses
-                   (branch_id,expense_date,category,amount,payment_method,beneficiary_name,note,status,created_by,requested_by)
-                 VALUES (?,?,?,?,?,?,?,'pending',?,?)"
+                   (branch_id,expense_date,category,amount,payment_method,beneficiary_name,note,status,
+                    created_by,requested_by,approved_by,approved_at)
+                 VALUES (?,?,?,?,?,?,?,'approved',?,?,?,NOW())"
             );
             $this->db->execute($stmt, [
-                (int)$data['branch_id'], $data['expense_date'], $data['category'], round((float)$data['amount'], 2),
-                $paymentMethod, substr($beneficiary, 0, 200), $data['note'] ?? null, $requesterId, $requesterId,
+                (int)$data['branch_id'], $data['expense_date'], substr($category, 0, 50), round($amount, 2),
+                $paymentMethod, substr($beneficiary, 0, 200), $data['note'] ?? null,
+                $requesterId, $requesterId, $requesterId,
             ]);
             $id = (int)$this->db->lastInsertId();
+
+            // บันทึกการจ่ายทันทีที่คีย์รายการ ไม่ต้องรอผู้อนุมัติ
+            // โดยยังใช้ cash ledger เดิมเพื่อให้ยอดเงินสดและประวัติสัมพันธ์กัน
+            $cashSession = new CashSession();
+            if ($paymentMethod === 'cash') {
+                $cashSession->recordMovement(
+                    (int)$data['branch_id'], 'out', 'business_expense', $amount,
+                    'business_expense', $id,
+                    'จ่ายเงินสด ' . $data['category'] . ' ให้ ' . $beneficiary,
+                    $requesterId
+                );
+            } elseif ($paymentMethod === 'bank_transfer') {
+                // รายการโอนไม่กระทบลิ้นชัก แต่ถ้ามีรอบวันนี้ให้เก็บไว้ใน ledger
+                // เพื่อให้ยอดธนาคารสัมพันธ์กับประวัติการเงิน โดยไม่บังคับให้เปิดลิ้นชักก่อนคีย์
+                $hasCurrentSession = $this->db->fetchColumn(
+                    "SELECT id FROM cash_sessions
+                     WHERE branch_id=? AND business_date=CURDATE()
+                       AND status IN ('open','pending_close') LIMIT 1",
+                    [(int)$data['branch_id']]
+                );
+                if ($hasCurrentSession) {
+                    $cashSession->recordBankMovement(
+                        (int)$data['branch_id'], 'out', $amount, 'bank_business_expense',
+                        $id, 'จ่ายเงินโอน ' . $data['category'] . ' ให้ ' . $beneficiary,
+                        $requesterId
+                    );
+                }
+            }
             $this->db->commit();
             return $id;
         } catch (Exception $e) {
@@ -136,11 +174,20 @@ class BusinessExpense extends Model
                     $approverId
                 );
             } elseif ($expense['payment_method'] === 'bank_transfer') {
-                $cashSession->recordBankMovement(
-                    (int)$expense['branch_id'], 'out', $amount, 'bank_business_expense',
-                    $id, 'จ่ายเงินโอน ' . $expense['category'] . ' ให้ ' . $expense['beneficiary_name'],
-                    $approverId
+                // รายการโอนเก่าควรอนุมัติได้แม้ไม่มีรอบเงินสดของวันนี้
+                $hasCurrentSession = $this->db->fetchColumn(
+                    "SELECT id FROM cash_sessions
+                     WHERE branch_id=? AND business_date=CURDATE()
+                       AND status IN ('open','pending_close') LIMIT 1",
+                    [(int)$expense['branch_id']]
                 );
+                if ($hasCurrentSession) {
+                    $cashSession->recordBankMovement(
+                        (int)$expense['branch_id'], 'out', $amount, 'bank_business_expense',
+                        $id, 'จ่ายเงินโอน ' . $expense['category'] . ' ให้ ' . $expense['beneficiary_name'],
+                        $approverId
+                    );
+                }
             }
             $this->db->commit();
         } catch (Exception $e) {

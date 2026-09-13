@@ -60,32 +60,34 @@ test_cash_sessions() {
 
   expense=$(api_post "financial/expenses" "{\"branch_id\":$branch_id,\"expense_date\":\"$(date +%Y-%m-%d)\",\"category\":\"ค่าดำเนินการ\",\"amount\":50,\"payment_method\":\"cash\",\"beneficiary_name\":\"QA Recipient\",\"note\":\"Small expense approval\"}")
   expense_id=$(echo "$expense" | json_get "data.id" 2>/dev/null)
-  assert_contains "$expense" '"status":"success"' "Expense: Submit cash expense request"
+  assert_contains "$expense" '"status":"success"' "Expense: Record cash expense immediately"
+  assert_contains "$expense" '"status":"approved"' "Expense: Immediate record is approved"
   before=$after
   after=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
-  if float_eq "$before" "$after"; then test_pass "Expense: Pending request does not affect drawer"; else test_fail "Expense: Pending request does not affect drawer"; fi
+  expected=$(awk -v n="$before" 'BEGIN { printf "%.2f", n - 50 }')
+  if float_eq "$expected" "$after"; then test_pass "Expense: Immediate cash expense deducts drawer"; else test_fail "Expense: Immediate cash expense deducts drawer"; fi
 
   res=$(curl -s -b "$manager_cookie" "$API_BASE/financial/expenses/approve" \
     -X POST -H 'Content-Type: application/json' -d "{\"id\":$expense_id}")
-  assert_contains "$res" '"status":"success"' "Expense: Manager approves amount up to 500"
+  assert_contains "$res" '"status":"error"' "Expense: Already-recorded expense needs no approval"
   after=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
-  expected=$(awk -v n="$before" 'BEGIN { printf "%.2f", n - 50 }')
-  if float_eq "$expected" "$after"; then test_pass "Expense: Approved cash expense deducts drawer"; else test_fail "Expense: Approved cash expense deducts drawer"; fi
+  if float_eq "$expected" "$after"; then test_pass "Expense: Approval attempt does not double-deduct drawer"; else test_fail "Expense: Approval attempt does not double-deduct drawer"; fi
 
+  before=$after
   large_expense=$(curl -s -b "$manager_cookie" "$API_BASE/financial/expenses" \
     -X POST -H 'Content-Type: application/json' \
     -d "{\"branch_id\":$branch_id,\"expense_date\":\"$(date +%Y-%m-%d)\",\"category\":\"ค่าขนส่ง\",\"amount\":600,\"payment_method\":\"cash\",\"beneficiary_name\":\"QA Carrier\"}")
   large_expense_id=$(echo "$large_expense" | json_get "data.id" 2>/dev/null)
-  assert_contains "$large_expense" '"status":"success"' "Expense: Manager submits amount above 500"
+  assert_contains "$large_expense" '"status":"success"' "Expense: Manager records amount above 500 immediately"
+  assert_contains "$large_expense" '"status":"approved"' "Expense: Large immediate record is approved"
   res=$(curl -s -b "$manager_cookie" "$API_BASE/financial/expenses/approve" \
     -X POST -H 'Content-Type: application/json' -d "{\"id\":$large_expense_id}")
-  assert_contains "$res" '"status":"error"' "Expense: Requester cannot approve own request"
+  assert_contains "$res" '"status":"error"' "Expense: Already-recorded expense cannot be approved"
   res=$(api_post "financial/expenses/approve" "{\"id\":$large_expense_id}")
-  assert_contains "$res" '"status":"success"' "Expense: Admin approves amount 501-5000"
-  before=$after
+  assert_contains "$res" '"status":"error"' "Expense: Already-recorded large expense needs no approval"
   after=$(api_get "cash-sessions/current?branch_id=$branch_id" | json_get "data.current_expected_cash" 2>/dev/null)
   expected=$(awk -v n="$before" 'BEGIN { printf "%.2f", n - 600 }')
-  if float_eq "$expected" "$after"; then test_pass "Expense: Approved large cash expense deducts drawer"; else test_fail "Expense: Approved large cash expense deducts drawer"; fi
+  if float_eq "$expected" "$after"; then test_pass "Expense: Immediate large cash expense deducts drawer"; else test_fail "Expense: Immediate large cash expense deducts drawer"; fi
 
   bank_lot=$(api_post "sale-lots" "{\"branch_id\":$branch_id,\"buyer_name\":\"QA Bank Buyer\",\"sale_date\":\"$(date +%Y-%m-%d)\",\"items\":[{\"catalog_id\":$catalog_id,\"item_name\":\"$item_name\",\"category_id\":$cat_id,\"quantity_kg\":0.2,\"unit_price\":30}]}")
   bank_lot_id=$(echo "$bank_lot" | json_get "data.id" 2>/dev/null)
