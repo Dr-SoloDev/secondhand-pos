@@ -5,6 +5,33 @@ set -euo pipefail
 # Usage: bash deploy.sh
 # Must be run from code/ directory
 
+# SAFETY: Only deploy from a clean checkout of main.
+# Local changes must be committed and pushed to origin/main before deploy.
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "ERROR: Not inside a git repository"; exit 1
+fi
+
+if [ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then
+  echo "ERROR: Deploy is allowed only from the 'main' branch"; exit 1
+fi
+
+if [ -n "$(git status --short)" ]; then
+  echo "ERROR: Working tree is not clean. Commit/push first, or run 'git stash' manually."
+  echo "       Uncommitted changes will NOT be deployed by this script."
+  git status --short
+  exit 1
+fi
+
+LOCAL_HEAD=$(git rev-parse HEAD)
+REMOTE_HEAD=$(git rev-parse origin/main 2>/dev/null || echo "")
+if [ -z "$REMOTE_HEAD" ]; then
+  echo "ERROR: Cannot read origin/main"; exit 1
+fi
+if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
+  echo "ERROR: Local main is not in sync with origin/main. Run 'git pull' / 'git push' first."
+  exit 1
+fi
+
 # Source environment variables
 if [ -f .env ]; then
   set -a; source .env; set +a
@@ -13,6 +40,7 @@ else
 fi
 
 echo "=== Production Deploy ==="
+echo "Deploying commit: ${LOCAL_HEAD}"
 
 # 1. Health check: Server resources
 MEM_TOTAL=$(free -m | awk '/^Mem:/{print $2}')
@@ -52,8 +80,8 @@ if [ -z "${CI:-}" ]; then
     exit 0
   fi
 fi
-# Stash local changes to avoid pull conflicts
-git stash push -m "auto-stash-before-deploy-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+# SAFETY: never stash local changes automatically.
+# Clean checkout was already enforced above.
 git pull origin main
 
 # 4. Build + start containers

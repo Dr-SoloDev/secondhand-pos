@@ -1,0 +1,46 @@
+#!/bin/bash
+# Pre-commit safety hook for scrap-pos
+# Prevents accidental commits that mix unrelated production-risky files.
+#
+# Install with: git config core.hooksPath .githooks
+
+set -euo pipefail
+
+# Only block if multiple files are being committed.
+STAGED_COUNT=$(git diff --cached --name-only | wc -l)
+if [ "$STAGED_COUNT" -le 1 ]; then
+  exit 0
+fi
+
+# Risky production areas that should normally be reviewed separately.
+RISK_PATTERNS=(
+  "customizations/api/Controllers/"
+  "customizations/api/Models/"
+  "print-server/"
+  "customizations/database/migrations/"
+)
+
+RISKY_FILES=$(git diff --cached --name-only | grep -E "$(printf '%s|' "${RISK_PATTERNS[@]}" | sed 's/|$//')" || true)
+if [ -z "$RISKY_FILES" ]; then
+  exit 0
+fi
+
+RISKY_COUNT=$(echo "$RISKY_FILES" | grep -c . || true)
+if [ "$RISKY_COUNT" -le 1 ]; then
+  exit 0
+fi
+
+cat <<EOF >&2
+ERROR: This commit touches multiple risky production files.
+Pre-commit hook blocked it to prevent an accidental deploy.
+
+Risky files detected:
+$RISKY_FILES
+
+If you are SURE these changes belong together and are tested, you can bypass
+this hook with:
+  git commit --no-verify
+
+Otherwise, commit them separately so each change can be reviewed/deployed safely.
+EOF
+exit 1
