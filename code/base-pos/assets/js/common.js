@@ -331,7 +331,7 @@ function formatNumber(value, fractionDigits = 2) {
   });
 }
 
-// Format currency
+// Format currency (rounded, for totals / bill summaries)
 function formatCurrency(amount) {
   return new Intl.NumberFormat('th-TH', {
     style: 'currency',
@@ -339,6 +339,11 @@ function formatCurrency(amount) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(Math.round(amount));
+}
+
+// Format unit price without rounding — preserves decimals (e.g. 10.55 -> 10.55)
+function formatPrice(amount) {
+  return formatNumber(amount, 2);
 }
 
 

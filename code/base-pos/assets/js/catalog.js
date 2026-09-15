@@ -101,9 +101,9 @@ function renderCatalogItems(items) {
       <td>${escapeHtml(item.code)}</td>
       <td>${escapeHtml(item.name)}</td>
       <td>${escapeHtml(item.category_name || 'ไม่มีหมวด')}</td>
-      <td>${tier1.price != null ? formatCurrency(tier1.price) : '-'}</td>
-      <td>${tier2.price != null ? formatCurrency(tier2.price) : '-'}</td>
-      <td>${tier3.price != null ? formatCurrency(tier3.price) : '-'}</td>
+      <td>${tier1.price != null ? formatPrice(tier1.price) : '-'}</td>
+      <td>${tier2.price != null ? formatPrice(tier2.price) : '-'}</td>
+      <td>${tier3.price != null ? formatPrice(tier3.price) : '-'}</td>
       <td>${escapeHtml(item.default_unit || 'กก.')}</td>
       <td>
         <span class="badge ${item.is_active ? 'badge-success' : 'badge-danger'}">
