@@ -15,9 +15,9 @@ if [ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then
   echo "ERROR: Deploy is allowed only from the 'main' branch"; exit 1
 fi
 
-if [ -n "$(git status --short)" ]; then
-  echo "ERROR: Working tree is not clean. Commit/push first, or run 'git stash' manually."
-  echo "       Uncommitted changes will NOT be deployed by this script."
+if [ -n "$(git diff --name-only)" ] || [ -n "$(git diff --cached --name-only)" ]; then
+  echo "ERROR: Tracked files have uncommitted or staged changes. Commit/push first."
+  echo "       Untracked files are ignored because git pull never deploys them."
   git status --short
   exit 1
 fi

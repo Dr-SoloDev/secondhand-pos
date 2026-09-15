@@ -143,14 +143,15 @@ function renderCashSession() {
   cashEl('latestVariance').className = `cash-stat-value ${Number(variance) === 0 ? '' : 'danger'}`;
   if (MVP_SIMPLE) {
     // แสดงเงินในลิ้นชัก = ยอดเปิด + เติม − ซื้อ − ค่าใช้จ่าย
-    const drawerVal = cashSession?.current_expected_cash ?? 0;
+    // ถ้าปิดยอดแล้ว เงินในลิ้นชักต้องเป็นยอดปิด (closing_actual) ไม่ใช่ยอดก่อนปิด
+    let drawerVal = 0;
     if (cashSession && cashSession.status) {
-      cashEl('drawerBalance').textContent = cashMoney(drawerVal);
-      cashEl('drawerStat').classList.remove('hidden');
-    } else {
-      cashEl('drawerBalance').textContent = cashMoney(0);
-      cashEl('drawerStat').classList.remove('hidden');
+      drawerVal = cashSession.status === 'closed'
+        ? (cashSession.closing_actual ?? 0)
+        : (cashSession?.current_expected_cash ?? 0);
     }
+    cashEl('drawerBalance').textContent = cashMoney(drawerVal);
+    cashEl('drawerStat').classList.remove('hidden');
   }
   renderSessionAction();
   renderCashHistory(cashSession);
@@ -319,53 +320,53 @@ async function requestCashDeposit() {
 }
 
 function renderCashHistory(session) {
-  const movements = session?.movements || [];
-  const events = session?.events || [];
+  const movements = (session?.movements || []).map(m => ({ ...m, _sortTime: m.created_at || '', _kind: 'movement' }));
+  const events = (session?.events || []).map(e => ({ ...e, _sortTime: e.created_at || '', _kind: 'event' }));
 
-  const eventRows = events.map(evt => {
-    const type = evt.event_type || '';
-    const time = cashEscape((evt.created_at || '').slice(11, 16));
-    const actor = cashEscape(evt.actor_name || '-');
-    const reviewer = evt.reviewer_name ? ` โดย ${cashEscape(evt.reviewer_name)}` : '';
-    const expected = evt.expected_amount !== null ? cashMoney(evt.expected_amount) : null;
-    const actual = evt.actual_amount !== null ? cashMoney(evt.actual_amount) : null;
-    const variance = evt.variance_amount !== null ? cashMoney(evt.variance_amount) : null;
+  const labels = {
+    opened: 'เปิดยอด',
+    open_approved: 'อนุมัติเปิดยอด',
+    open_rejected: 'ปฏิเสธเปิดยอด',
+    close_requested: 'ขอปิดยอด',
+    closed: 'ปิดยอด',
+    close_approved: 'อนุมัติปิดยอด',
+    close_rejected: 'ปฏิเสธปิดยอด',
+    reopened: 'เปิดรอบใหม่',
+  };
 
-    const labels = {
-      opened: 'เปิดยอด',
-      open_approved: 'อนุมัติเปิดยอด',
-      open_rejected: 'ปฏิเสธเปิดยอด',
-      close_requested: 'ขอปิดยอด',
-      closed: 'ปิดยอด',
-      close_approved: 'อนุมัติปิดยอด',
-      close_rejected: 'ปฏิเสธปิดยอด',
-      reopened: 'เปิดรอบใหม่',
-    };
+  const rows = [...events, ...movements].sort((a, b) => a._sortTime.localeCompare(b._sortTime)).map(item => {
+    if (item._kind === 'event') {
+      const evt = item;
+      const type = evt.event_type || '';
+      const time = cashEscape((evt.created_at || '').slice(11, 16));
+      const actor = cashEscape(evt.actor_name || '-');
+      const reviewer = evt.reviewer_name ? ` โดย ${cashEscape(evt.reviewer_name)}` : '';
+      const expected = evt.expected_amount !== null ? cashMoney(evt.expected_amount) : null;
+      const actual = evt.actual_amount !== null ? cashMoney(evt.actual_amount) : null;
+      const variance = evt.variance_amount !== null ? cashMoney(evt.variance_amount) : null;
 
-    let desc = labels[type] || type;
-    let amountHtml = '';
-    if (type === 'opened' || type === 'open_approved' || type === 'reopened') {
-      desc += actual ? ` ยอดเปิด ${actual}` : '';
-      amountHtml = `<span class="text-right" style="color:var(--color-success)">+${actual}</span>`;
-    } else if (type === 'closed' || type === 'close_approved' || type === 'close_requested') {
-      desc += actual ? ` ยอดปิด ${actual}` : '';
-      if (expected) desc += ` (ควรมี ${expected})`;
-      if (variance) desc += ` ส่วนต่าง ${variance}`;
-      amountHtml = `<span class="text-right" style="color:var(--color-danger)">-${actual}</span>`;
+      let desc = labels[type] || type;
+      let amountHtml = '';
+      if (type === 'opened' || type === 'open_approved' || type === 'reopened') {
+        desc += actual ? ` ยอดเปิด ${actual}` : '';
+        amountHtml = `<span class="text-right" style="color:var(--color-success)">+${actual}</span>`;
+      } else if (type === 'closed' || type === 'close_approved' || type === 'close_requested') {
+        desc += actual ? ` ยอดปิด ${actual}` : '';
+        if (expected) desc += ` (ควรมี ${expected})`;
+        if (variance) desc += ` ส่วนต่าง ${variance}`;
+        amountHtml = `<span class="text-right" style="color:var(--color-danger)">-${actual}</span>`;
+      }
+      if (evt.reason) desc += ` — ${cashEscape(evt.reason)}`;
+      return `<tr><td>${time}</td><td><span class="cash-direction event">กิจกรรม</span></td><td>${desc}${reviewer}</td><td>${actor}</td><td class="text-right">${amountHtml}</td></tr>`;
     }
-    if (evt.reason) desc += ` — ${cashEscape(evt.reason)}`;
 
-    return `<tr><td>${time}</td><td><span class="cash-direction event">กิจกรรม</span></td><td>${desc}${reviewer}</td><td>${actor}</td><td class="text-right">${amountHtml}</td></tr>`;
+    const m = item;
+    const isBank = String(m.movement_type || '').startsWith('bank_');
+    const dirLabel = isBank ? 'โอนธนาคาร' : (m.direction === 'in' ? 'เข้า' : 'ออก');
+    const dirClass = isBank ? 'bank' : m.direction;
+    return `<tr><td>${cashEscape((m.created_at || '').slice(11,16))}</td><td><span class="cash-direction ${dirClass}">${dirLabel}</span></td><td>${cashEscape(m.description)}</td><td>${cashEscape(m.recorded_by_name || '-')}</td><td class="text-right" style="color:${isBank ? '#1e40af' : (m.direction === 'in' ? 'var(--color-success)' : 'var(--color-danger)')}">${m.direction === 'in' ? '+' : '-'}${cashMoney(m.amount)}</td></tr>`;
   });
 
-  const movementRows = movements.map(item => {
-    const isBank = String(item.movement_type || '').startsWith('bank_');
-    const dirLabel = isBank ? 'โอนธนาคาร' : (item.direction === 'in' ? 'เข้า' : 'ออก');
-    const dirClass = isBank ? 'bank' : item.direction;
-    return `<tr><td>${cashEscape((item.created_at || '').slice(11,16))}</td><td><span class="cash-direction ${dirClass}">${dirLabel}</span></td><td>${cashEscape(item.description)}</td><td>${cashEscape(item.recorded_by_name || '-')}</td><td class="text-right" style="color:${isBank ? '#1e40af' : (item.direction === 'in' ? 'var(--color-success)' : 'var(--color-danger)')}">${item.direction === 'in' ? '+' : '-'}${cashMoney(item.amount)}</td></tr>`;
-  });
-
-  const rows = [...eventRows, ...movementRows];
   cashEl('movementBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" class="cash-empty">ยังไม่มีรายการเงินสด</td></tr>';
 }
 
