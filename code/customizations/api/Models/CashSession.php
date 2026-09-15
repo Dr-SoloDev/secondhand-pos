@@ -39,6 +39,7 @@ class CashSession extends Model
             $row['ledger_total'] = $this->movementTotal((int)$row['id']);
             $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
             $row['drawer_balance'] = $row['current_expected_cash'];
+            $row['events'] = $this->getEvents((int)$row['id']);
         }
         unset($row);
         return $rows;
@@ -65,6 +66,7 @@ class CashSession extends Model
                 $row['ledger_total'] = $this->movementTotal((int)$row['id']);
                 $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
                 $row['movements'] = $this->getMovements((int)$row['id']);
+                $row['events'] = $this->getEvents((int)$row['id']);
                 $row = $this->applyPositionFields($row);
                 $row['is_stale'] = true;
                 return $row;
@@ -89,23 +91,13 @@ class CashSession extends Model
             ];
             return $this->applyPositionFields($result);
         }
-        // After close: return blank state (ไม่แสดงตัวเลขเก่า)
+        // After close: return the closed session so history (events) is visible
         if (($row['status'] ?? '') === 'closed') {
-            $branchName = $row['branch_name'] ?? null;
-            $result = [
-                'id' => null,
-                'branch_id' => $branchId,
-                'branch_name' => $branchName,
-                'business_date' => date('Y-m-d'),
-                'status' => null,
-                'opening_expected' => 0,
-                'opening_actual' => null,
-                'opening_variance' => null,
-                'ledger_total' => 0,
-                'current_expected_cash' => 0,
-                'movements' => [],
-            ];
-            return $this->applyPositionFields($result);
+            $row['ledger_total'] = $this->movementTotal((int)$row['id']);
+            $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
+            $row['movements'] = $this->getMovements((int)$row['id']);
+            $row['events'] = $this->getEvents((int)$row['id']);
+            return $this->applyPositionFields($row);
         }
 
         $row['ledger_total'] = $this->movementTotal((int)$row['id']);
@@ -516,8 +508,9 @@ class CashSession extends Model
         if ($existing) return (int)$existing;
         $session = $this->db->fetch(
             "SELECT id FROM cash_sessions
-             WHERE branch_id=? AND status IN ('open','pending_close')
-             ORDER BY business_date DESC LIMIT 1",
+             WHERE branch_id=? AND business_date=CURDATE()
+               AND status IN ('open','pending_close')
+             LIMIT 1",
             [$branchId]
         );
         if (!$session) {
@@ -750,6 +743,20 @@ class CashSession extends Model
             "SELECT cm.*, u.full_name AS recorded_by_name
              FROM cash_movements cm LEFT JOIN users u ON u.id=cm.recorded_by
              WHERE cm.cash_session_id=? ORDER BY cm.id ASC",
+            [$sessionId]
+        ) ?: [];
+    }
+
+    public function getEvents(int $sessionId): array
+    {
+        return $this->db->fetchAll(
+            "SELECT cse.*,
+                    actor.full_name AS actor_name,
+                    reviewer.full_name AS reviewer_name
+             FROM cash_session_events cse
+             LEFT JOIN users actor ON actor.id = cse.actor_id
+             LEFT JOIN users reviewer ON reviewer.id = cse.reviewer_id
+             WHERE cse.cash_session_id=? ORDER BY cse.id ASC",
             [$sessionId]
         ) ?: [];
     }

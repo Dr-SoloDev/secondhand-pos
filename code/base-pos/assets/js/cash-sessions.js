@@ -153,7 +153,7 @@ function renderCashSession() {
     }
   }
   renderSessionAction();
-  renderCashMovements(cashSession?.movements || []);
+  renderCashHistory(cashSession);
   cashEl('requestDepositBtn').disabled = cashSession?.status !== 'open';
   if (cashEl('createAdjustmentBtn')) cashEl('createAdjustmentBtn').disabled = cashSession?.status !== 'open';
 }
@@ -318,13 +318,55 @@ async function requestCashDeposit() {
   if (res.status === 'success') { cashEl('depositAmount').value=''; cashEl('depositSource').value=''; cashEl('depositReason').value=''; loadCashPage(); }
 }
 
-function renderCashMovements(items) {
-  cashEl('movementBody').innerHTML = items.length ? items.map(item => {
+function renderCashHistory(session) {
+  const movements = session?.movements || [];
+  const events = session?.events || [];
+
+  const eventRows = events.map(evt => {
+    const type = evt.event_type || '';
+    const time = cashEscape((evt.created_at || '').slice(11, 16));
+    const actor = cashEscape(evt.actor_name || '-');
+    const reviewer = evt.reviewer_name ? ` โดย ${cashEscape(evt.reviewer_name)}` : '';
+    const expected = evt.expected_amount !== null ? cashMoney(evt.expected_amount) : null;
+    const actual = evt.actual_amount !== null ? cashMoney(evt.actual_amount) : null;
+    const variance = evt.variance_amount !== null ? cashMoney(evt.variance_amount) : null;
+
+    const labels = {
+      opened: 'เปิดยอด',
+      open_approved: 'อนุมัติเปิดยอด',
+      open_rejected: 'ปฏิเสธเปิดยอด',
+      close_requested: 'ขอปิดยอด',
+      closed: 'ปิดยอด',
+      close_approved: 'อนุมัติปิดยอด',
+      close_rejected: 'ปฏิเสธปิดยอด',
+      reopened: 'เปิดรอบใหม่',
+    };
+
+    let desc = labels[type] || type;
+    let amountHtml = '';
+    if (type === 'opened' || type === 'open_approved' || type === 'reopened') {
+      desc += actual ? ` ยอดเปิด ${actual}` : '';
+      amountHtml = `<span class="text-right" style="color:var(--color-success)">+${actual}</span>`;
+    } else if (type === 'closed' || type === 'close_approved' || type === 'close_requested') {
+      desc += actual ? ` ยอดปิด ${actual}` : '';
+      if (expected) desc += ` (ควรมี ${expected})`;
+      if (variance) desc += ` ส่วนต่าง ${variance}`;
+      amountHtml = `<span class="text-right" style="color:var(--color-danger)">-${actual}</span>`;
+    }
+    if (evt.reason) desc += ` — ${cashEscape(evt.reason)}`;
+
+    return `<tr><td>${time}</td><td><span class="cash-direction event">กิจกรรม</span></td><td>${desc}${reviewer}</td><td>${actor}</td><td class="text-right">${amountHtml}</td></tr>`;
+  });
+
+  const movementRows = movements.map(item => {
     const isBank = String(item.movement_type || '').startsWith('bank_');
     const dirLabel = isBank ? 'โอนธนาคาร' : (item.direction === 'in' ? 'เข้า' : 'ออก');
     const dirClass = isBank ? 'bank' : item.direction;
     return `<tr><td>${cashEscape((item.created_at || '').slice(11,16))}</td><td><span class="cash-direction ${dirClass}">${dirLabel}</span></td><td>${cashEscape(item.description)}</td><td>${cashEscape(item.recorded_by_name || '-')}</td><td class="text-right" style="color:${isBank ? '#1e40af' : (item.direction === 'in' ? 'var(--color-success)' : 'var(--color-danger)')}">${item.direction === 'in' ? '+' : '-'}${cashMoney(item.amount)}</td></tr>`;
-  }).join('') : '<tr><td colspan="5" class="cash-empty">ยังไม่มีรายการเงินสด</td></tr>';
+  });
+
+  const rows = [...eventRows, ...movementRows];
+  cashEl('movementBody').innerHTML = rows.length ? rows.join('') : '<tr><td colspan="5" class="cash-empty">ยังไม่มีรายการเงินสด</td></tr>';
 }
 
 function renderCashDeposits(items) {
