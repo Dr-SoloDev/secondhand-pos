@@ -255,7 +255,7 @@ class Router
         $this->routes[] = ['route' => 'cash-sessions/open-reject',   'controller' => 'CashSessionsController', 'method' => 'rejectOpen',   'verb' => 'POST'];
         $this->routes[] = ['route' => 'cash-sessions/close-approve', 'controller' => 'CashSessionsController', 'method' => 'approveClose', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'cash-sessions/close-reject',  'controller' => 'CashSessionsController', 'method' => 'rejectClose',  'verb' => 'POST'];
-        $this->routes[] = ['route' => 'cash-sessions/reopen',        'controller' => 'CashSessionsController', 'method' => 'reopen',       'verb' => 'POST'];
+        $this->routes[] = ['route' => 'cash-sessions/reopen',        'controller' => 'CashSessionsController', 'method' => 'reopen',       'verb' => 'POST']; // deprecated 410 — เหลือแค่ เปิด/เติม/ปิด
         $this->routes[] = ['route' => 'cash-sessions/initialize-position', 'controller' => 'CashSessionsController', 'method' => 'initializePosition', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'cash-sessions/deposits',        'controller' => 'CashSessionsController', 'method' => 'listDeposits',    'verb' => 'GET'];
         $this->routes[] = ['route' => 'cash-sessions/deposit-request', 'controller' => 'CashSessionsController', 'method' => 'requestDeposit',  'verb' => 'POST'];

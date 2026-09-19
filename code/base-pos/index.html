@@ -6,6 +6,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>รักษ์สะอาดรีไซเคิล - เข้าสู่ระบบ</title>
   <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/icons/icon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/icons/icon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#00D4D4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="รักษ์สะอาด">
+  <meta name="msapplication-TileColor" content="#00D4D4">
+  <meta name="msapplication-config" content="/browserconfig.xml">
   <link rel="icon" type="image/svg+xml" href="assets/images/logo-icon.svg">
 </head>
 
@@ -44,6 +53,7 @@
   <div id="notification-container"></div>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/login.js"></script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>
 </body>
 
 </html>

@@ -843,7 +843,11 @@ def _draw_receipt_pil_image(po_data, include_stub=True):
 
     main_image = make_section('main')
     if not include_stub:
-        return main_image
+        # เผื่อพื้นที่ขาวท้ายบิล ป้องกันตัวอักษรบรรทัดสุดท้ายถูกฉีกขาด
+        footer_height = 24
+        with_footer = Image.new('1', (width, main_image.height + footer_height), 1)
+        with_footer.paste(main_image, (0, 0))
+        return with_footer
 
     stub_image = make_section('stub')
     gap_height = 42
@@ -879,7 +883,7 @@ def _draw_receipt_pil_image(po_data, include_stub=True):
     return combined
 
 
-def render_receipt_image(po_data, include_stub=True):
+def render_receipt_image(po_data, include_stub=False):
     """
     วาดใบเสร็จเป็นรูปภาพด้วย Pillow โดยตรง (ต้นขั้ว 1:1)
 
@@ -947,7 +951,7 @@ def render_receipt_image(po_data, include_stub=True):
     return bytes(escpos)
 
 
-def render_receipt_image_as_png(po_data, include_stub=True):
+def render_receipt_image_as_png(po_data, include_stub=False):
     """
     วาดใบเสร็จด้วยฟังก์ชันกลาง แล้วส่งคืนเป็น base64 PNG สำหรับ preview
     """

@@ -64,8 +64,8 @@ class CashSessionsController extends Controller
                 $userId
             );
             Logger::logActivity($userId, 'close_cash_session', "Close branch cash session branch:{$branchId} status:{$result['status']}");
-            $message = $result['status'] === 'pending_close' ? 'ส่งยอดปิดวันเพื่อรออนุมัติแล้ว' : 'ปิดยอดประจำวันแล้ว';
-            Response::success($message, $result);
+            // Drawer becomes 0 immediately after close — no approval needed
+            Response::success('ปิดยอดประจำวันแล้ว', $result);
         } catch (Exception $e) {
             Response::error($e->getMessage(), 400);
         }
@@ -142,17 +142,8 @@ class CashSessionsController extends Controller
 
     public function reopen()
     {
-        $this->requireAuth(['admin']);
-        $data = $this->getRequestData() ?? [];
-        $id = (int)($data['id'] ?? 0);
-        $reason = trim((string)($data['reason'] ?? ''));
-        if (!$id || $reason === '') Response::error('กรุณาระบุรอบและเหตุผล', 400);
-        try {
-            (new CashSession())->reopenSameDay($id, $reason, $this->userId());
-            Response::success('เปิดรอบประจำวันใหม่แล้ว');
-        } catch (Exception $e) {
-            Response::error($e->getMessage(), 400);
-        }
+        // ตัดฟีเจอร์เปิดรอบใหม่ — ระบบเหลือแค่ เปิด/เติม/ปิด
+        Response::error('ฟีเจอร์เปิดรอบใหม่ถูกยกเลิก — ปิดยอดแล้วจบวัน ถ้าปิดผิดให้ใช้เอกสารปรับปรุง', 410);
     }
 
     public function initializePosition()

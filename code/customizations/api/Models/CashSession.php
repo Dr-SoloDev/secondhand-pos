@@ -37,9 +37,23 @@ class CashSession extends Model
         ) ?: [];
         foreach ($rows as &$row) {
             $row['ledger_total'] = $this->movementTotal((int)$row['id']);
-            $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
-            $row['drawer_balance'] = $row['current_expected_cash'];
+            $isClosed = ($row['status'] ?? '') === 'closed';
+            if ($isClosed) {
+                // Drawer becomes 0 immediately after close — only history remains
+                $row['current_expected_cash'] = 0;
+                $row['drawer_balance'] = 0;
+            } else {
+                $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
+                $row['drawer_balance'] = $row['current_expected_cash'];
+            }
             $row['events'] = $this->getEvents((int)$row['id']);
+            // Enrich with position fields (reserve/bank) for v2 branches
+            $row = $this->applyPositionFields($row);
+            // Re-apply closed override after position enrichment (position drawer must also be 0)
+            if ($isClosed) {
+                $row['current_expected_cash'] = 0;
+                $row['drawer_balance'] = 0;
+            }
         }
         unset($row);
         return $rows;
@@ -91,13 +105,16 @@ class CashSession extends Model
             ];
             return $this->applyPositionFields($result);
         }
-        // After close: return the closed session so history (events) is visible
+        // After close: return the closed session so history is visible, but drawer is 0
         if (($row['status'] ?? '') === 'closed') {
             $row['ledger_total'] = $this->movementTotal((int)$row['id']);
-            $row['current_expected_cash'] = round((float)$row['opening_actual'] + $row['ledger_total'], 2);
             $row['movements'] = $this->getMovements((int)$row['id']);
             $row['events'] = $this->getEvents((int)$row['id']);
-            return $this->applyPositionFields($row);
+            $row = $this->applyPositionFields($row);
+            // Drawer becomes 0 immediately after close — only history remains
+            $row['current_expected_cash'] = 0;
+            $row['drawer_balance'] = 0;
+            return $row;
         }
 
         $row['ledger_total'] = $this->movementTotal((int)$row['id']);
@@ -314,7 +331,8 @@ class CashSession extends Model
     }
 
     /**
-     * Simple daily drawer close: record variance, no auto-transfer.
+     * Simple daily drawer close: record closing amount as history, drawer becomes 0 immediately.
+     * No approval, no audit reason required — just save what was counted.
      */
     public function closeDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
@@ -339,23 +357,17 @@ class CashSession extends Model
             $expected = round((float)$session['opening_actual'] + $this->movementTotal((int)$session['id']), 2);
             $actualCash = round($actualCash, 2);
             $variance = round($actualCash - $expected, 2);
-            if (abs($variance) > 0.009 && $reason === null) {
-                throw new Exception('ยอดเงินจริงไม่ตรงยอดในระบบ กรุณาระบุเหตุผล');
-            }
-            $requiresApproval = abs($variance) > self::VARIANCE_APPROVAL_THRESHOLD;
-            $status = $requiresApproval ? 'pending_close' : 'closed';
+            // No approval, no reason required — close immediately and drawer becomes 0 (logical)
+            $status = 'closed';
             $this->db->query(
                 "UPDATE cash_sessions
                  SET status=?, closing_expected=?, closing_actual=?, closing_reason=?, closing_requested_by=?,
                      closed_by=?, closed_at=? WHERE id=?",
-                [$status, $expected, $actualCash, $reason, $userId,
-                 $requiresApproval ? null : $userId,
-                 $requiresApproval ? null : date('Y-m-d H:i:s'), (int)$session['id']]
+                [$status, $expected, $actualCash, $reason, $userId, $userId, date('Y-m-d H:i:s'), (int)$session['id']]
             );
-            $this->addEvent((int)$session['id'], $requiresApproval ? 'close_requested' : 'closed',
-                $expected, $actualCash, $variance, $reason, $userId);
+            $this->addEvent((int)$session['id'], 'closed', $expected, $actualCash, $variance, $reason, $userId);
             $this->db->commit();
-            return ['id' => (int)$session['id'], 'status' => $status, 'expected_cash' => $expected, 'variance' => $variance];
+            return ['id' => (int)$session['id'], 'status' => $status, 'expected_cash' => $expected, 'variance' => $variance, 'closing_actual' => $actualCash];
         } catch (Exception $e) {
             $this->db->rollBack();
             throw $e;
@@ -405,34 +417,8 @@ class CashSession extends Model
 
     public function reopenSameDay(int $sessionId, string $reason, int $adminId): void
     {
-        $reason = $this->normalizeReason($reason);
-        if ($reason === null) {
-            throw new Exception('กรุณาระบุเหตุผลที่เปิดยอดใหม่');
-        }
-        $this->db->beginTransaction();
-        try {
-            $session = $this->db->fetch("SELECT * FROM cash_sessions WHERE id=? FOR UPDATE", [$sessionId]);
-            if (!$session || $session['status'] !== 'closed') {
-                throw new Exception('เปิดใหม่ได้เฉพาะรอบที่ปิดแล้ว');
-            }
-            if ($session['business_date'] !== date('Y-m-d')) {
-                throw new Exception('เปิดยอดใหม่ได้เฉพาะวันเดียวกัน หลังเปลี่ยนวันให้ใช้เอกสารปรับปรุง');
-            }
-            $this->db->query(
-                "UPDATE cash_sessions
-                 SET status='open', closing_expected=NULL, closing_actual=NULL, closing_reason=NULL,
-                     closing_requested_by=NULL, closed_by=NULL, closed_at=NULL,
-                     last_reviewed_by=?, last_reviewed_at=NOW(), last_review_note=?
-                 WHERE id=?",
-                [$adminId, $reason, $sessionId]
-            );
-            $this->addEvent($sessionId, 'reopened', (float)$session['closing_expected'],
-                (float)$session['closing_actual'], (float)$session['closing_variance'], $reason, $adminId, $adminId);
-            $this->db->commit();
-        } catch (Exception $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
+        // ตัดฟีเจอร์เปิดรอบใหม่ — ระบบเหลือแค่ เปิด/เติม/ปิด (ปิดแล้วจบวัน)
+        throw new Exception('ฟีเจอร์เปิดรอบใหม่ถูกยกเลิก — ปิดยอดแล้วจบวัน ถ้าปิดผิดให้ใช้เอกสารปรับปรุง');
     }
 
     public function assertOpen(int $branchId): array
@@ -627,7 +613,7 @@ class CashSession extends Model
 
     /**
      * Simple daily drawer close for position model branches.
-     * Records variance only, no auto-transfer to safe.
+     * Records closing_actual as history, drawer becomes 0 immediately. No approval, no reason required.
      */
     private function closePositionDay(int $branchId, float $actualCash, ?string $reason, int $userId): array
     {
@@ -643,27 +629,20 @@ class CashSession extends Model
             $expected = round((float)$session['opening_actual'] + $this->movementTotal((int)$session['id']), 2);
             $actualCash = round($actualCash, 2);
             $variance = round($actualCash - $expected, 2);
-            if (abs($variance) > 0.009 && $reason === null) {
-                throw new Exception('ยอดเงินจริงไม่ตรงยอดในลิ้นชัก กรุณาระบุเหตุผล');
-            }
-            $requiresApproval = abs($variance) > self::VARIANCE_APPROVAL_THRESHOLD;
-            $status = $requiresApproval ? 'pending_close' : 'closed';
+            // No approval, no reason required — close immediately, drawer becomes 0 (logical)
+            $status = 'closed';
             $this->db->query(
                 "UPDATE cash_sessions
                  SET status=?, cash_model_version=2, closing_expected=?, closing_actual=?, closing_reason=?,
                       closing_requested_by=?, closed_by=?, closed_at=?
                  WHERE id=?",
-                [$status, $expected, $actualCash, $reason, $userId,
-                 $requiresApproval ? null : $userId,
-                 $requiresApproval ? null : date('Y-m-d H:i:s'),
-                 (int)$session['id']]
+                [$status, $expected, $actualCash, $reason, $userId, $userId, date('Y-m-d H:i:s'), (int)$session['id']]
             );
-            $this->addEvent((int)$session['id'], $requiresApproval ? 'close_requested' : 'closed',
-                $expected, $actualCash, $variance, $reason, $userId);
+            $this->addEvent((int)$session['id'], 'closed', $expected, $actualCash, $variance, $reason, $userId);
             $this->db->commit();
             return [
                 'id' => (int)$session['id'], 'status' => $status,
-                'expected_cash' => $expected, 'variance' => $variance,
+                'expected_cash' => $expected, 'variance' => $variance, 'closing_actual' => $actualCash,
             ];
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -714,17 +693,30 @@ class CashSession extends Model
 
     private function applyPositionFields(array $row): array
     {
+        $isClosed = ($row['status'] ?? '') === 'closed';
         $ledgerTotal = !empty($row['id']) ? $this->movementTotal((int)$row['id']) : 0;
-        $expectedCash = round((float)($row['opening_actual'] ?? 0) + $ledgerTotal, 2);
-        $row['current_expected_cash'] = $expectedCash;
-        // Simple daily drawer: drawer_balance = current_expected_cash
-        $row['drawer_balance'] = $expectedCash;
+        // If drawer has no row id (no session yet), keep expected as provided or 0
+        $hasRow = !empty($row['id']);
+        if ($isClosed) {
+            // Drawer becomes 0 immediately after close — history kept in closing_actual
+            $row['current_expected_cash'] = 0;
+            $row['drawer_balance'] = 0;
+        } else {
+            $expectedCash = $hasRow ? round((float)($row['opening_actual'] ?? 0) + $ledgerTotal, 2) : (float)($row['current_expected_cash'] ?? 0);
+            $row['current_expected_cash'] = $expectedCash;
+            $row['drawer_balance'] = $expectedCash;
+        }
         if ($this->hasPositionModel((int)($row['branch_id'] ?? 0))) {
             $row['cash_model_version'] = 2;
             $positions = $this->getPositionBalances((int)$row['branch_id']);
             $row['reserve_balance'] = $positions['reserve_balance'];
             $row['bank_balance'] = $positions['bank_balance'] ?? 0.0;
             $row['business_total_cash'] = $positions['business_total_cash'];
+            // Even for position model, closed drawer is 0 (logical), reserve/bank unchanged
+            if ($isClosed) {
+                $row['drawer_balance'] = 0;
+                $row['current_expected_cash'] = 0;
+            }
         }
         return $row;
     }

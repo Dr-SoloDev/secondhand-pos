@@ -129,14 +129,17 @@ class Employee extends Model
 
         $note = "เงินเดือน: {$emp['full_name']} ({$emp['position']}) - {$salaryDate}";
         $stmt = $this->db->prepare(
-            "INSERT INTO business_expenses (branch_id, expense_date, category, amount, note, created_by)
-             VALUES (?, ?, 'salary', ?, ?, ?)"
+            "INSERT INTO business_expenses
+               (branch_id, expense_date, category, amount, note, status, created_by, requested_by, approved_by, approved_at)
+             VALUES (?, ?, 'salary', ?, ?, 'approved', ?, ?, ?, NOW())"
         );
         $this->db->execute($stmt, [
             $emp['branch_id'],
             $salaryDate,
             $amount,
             $note,
+            $createdBy,
+            $createdBy,
             $createdBy,
         ]);
         return $this->db->lastInsertId();
@@ -149,14 +152,17 @@ class Employee extends Model
 
         $note = "ประกันสังคม (นายจ้าง): {$emp['full_name']} - {$salaryDate}";
         $stmt = $this->db->prepare(
-            "INSERT INTO business_expenses (branch_id, expense_date, category, amount, note, created_by)
-             VALUES (?, ?, 'social_security', ?, ?, ?)"
+            "INSERT INTO business_expenses
+               (branch_id, expense_date, category, amount, note, status, created_by, requested_by, approved_by, approved_at)
+             VALUES (?, ?, 'social_security', ?, ?, 'approved', ?, ?, ?, NOW())"
         );
         $this->db->execute($stmt, [
             $emp['branch_id'],
             $salaryDate,
             $ssoAmount,
             $note,
+            $createdBy,
+            $createdBy,
             $createdBy,
         ]);
         return $this->db->lastInsertId();

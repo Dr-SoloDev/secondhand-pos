@@ -195,10 +195,13 @@ class EmployeesController extends Controller
         }
         $this->assertEmployeeBranchAccess($employee);
 
+        $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+
         $expenseId = $model->autoCreateSalaryExpense(
             $data['employee_id'],
             $data['salary_date'],
-            $data['amount']
+            $data['amount'],
+            $userId
         );
 
         if (!$expenseId) {
@@ -223,10 +226,13 @@ class EmployeesController extends Controller
         }
         $this->assertEmployeeBranchAccess($employee);
 
+        $userId = (int)($this->user['user_id'] ?? $this->user['id']);
+
         $expenseId = $model->autoCreateSSOExpense(
             $data['employee_id'],
             $data['salary_date'],
-            $data['amount']
+            $data['amount'],
+            $userId
         );
 
         if (!$expenseId) {

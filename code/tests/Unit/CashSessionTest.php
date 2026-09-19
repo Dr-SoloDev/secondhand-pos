@@ -13,14 +13,14 @@ use stdClass;
 /**
  * Unit tests for CashSession daily cash-cycle logic.
  *
- * Simple daily drawer model:
+ * Simple daily drawer model (v2026-09: ปิดทันที ลิ้นชัก 0, ไม่ต้องอนุมัติ/เหตุผล):
  * - เปิดวัน = ใส่เท่าไหร่ = ลิ้นชักเท่านั้น (ไม่ยกยอดวันก่อน)
  * - ระหว่างวัน = ซื้อ = ตัดลิ้นชัก / เติมเงิน = เพิ่มลิ้นชัก
- * - ปิดยอด = นับจริง vs ยอดตามระบบ = variance, ไม่ย้ายเงิน
+ * - ปิดยอด = บันทึก closing_actual ตามจริง → status closed ทันที, ลิ้นชัก = 0, เหลือแค่ประวัติ
  * - เช้าใหม่ = เริ่มใหม่ ไม่เก็บยอดปิด
- * - variance ต้องมีเหตุผล / เกิน threshold 100 → pending approval
+ * - ปิดไม่ต้องเหตุผล/อนุมัติ แม้ variance เกิน 100
  * - idempotency ของ movement insert
- * - ห้าม self-approval
+ * - ห้าม self-approval (เฉพาะ open)
  *
  * Strategy: ห้ามแก้ production code → subclass injection ผ่าน Reflection
  * (Model::$db เป็น protected และไม่มี type hint → FakeDb ใส่ตรง ๆ ได้)
@@ -141,26 +141,42 @@ class CashSessionTest extends TestCase
 
     public function testClosePositionDayRequiresReasonOnVariance(): void
     {
+        // ปิดทันที ไม่ต้องเหตุผล — แม้ variance ก็ปิดได้เลย (requirement 2026-09)
         $db = new FakeCashSessionDb();
         $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open', 'opening_actual' => 800.0])
            ->onFetchColumn('SUM(CASE', 0);
         $session = $this->makeSession($db);
 
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('ยอดเงินจริงไม่ตรงยอดในลิ้นชัก');
-        $this->invokePrivate($session, 'closePositionDay', [1, 750.0, null, 9]);
+        $result = $this->invokePrivate($session, 'closePositionDay', [1, 750.0, null, 9]);
+        $this->assertSame('closed', $result['status']);
+        $this->assertSame(-50.0, $result['variance']);
+        $this->assertSame(750.0, $result['closing_actual']);
     }
 
     public function testClosePositionDayLargeVarianceRequiresApprovalBeforeClosing(): void
     {
+        // ปิดทันทีแม้ variance >100 — ไม่ต้อง pending (requirement 2026-09)
         $db = new FakeCashSessionDb();
         $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open', 'opening_actual' => 800.0])
            ->onFetchColumn('SUM(CASE', 0);
         $session = $this->makeSession($db);
 
         $result = $this->invokePrivate($session, 'closePositionDay', [1, 600.0, 'เหตุผลที่ยอดขาด', 9]);
-        $this->assertSame('pending_close', $result['status']);
+        $this->assertSame('closed', $result['status']);
         $this->assertSame(-200.0, $result['variance']);
+        $this->assertSame(600.0, $result['closing_actual']);
+    }
+
+    public function testClosePositionDayDrawerBecomesZeroAfterClose(): void
+    {
+        // ปิดแล้ว getCurrent ต้องโชว์ drawer 0 แต่ประวัติ closing_actual ยังอยู่
+        $db = new FakeCashSessionDb();
+        $db->onFetch("AND status='open'", ['id' => 10, 'branch_id' => 1, 'status' => 'open', 'opening_actual' => 500.0])
+           ->onFetchColumn('SUM(CASE', 0);
+        $session = $this->makeSession($db);
+        $result = $this->invokePrivate($session, 'closePositionDay', [1, 23000.0, null, 9]);
+        $this->assertSame('closed', $result['status']);
+        $this->assertSame(23000.0, $result['closing_actual']);
     }
 
     // ---------- approval guards ----------

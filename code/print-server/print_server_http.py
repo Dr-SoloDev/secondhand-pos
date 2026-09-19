@@ -151,7 +151,7 @@ class PrintHandler(BaseHTTPRequestHandler):
                         self._send_json(400, {'status': 'error', 'message': 'Missing receipt data'})
                         return
 
-                    image_base64 = render_receipt_image_as_png(po_data, include_stub=True)
+                    image_base64 = render_receipt_image_as_png(po_data, include_stub=False)
                     self._send_json(200, {
                         'status': 'success',
                         'image_base64': image_base64,
@@ -176,7 +176,7 @@ class PrintHandler(BaseHTTPRequestHandler):
 
             if mode == 'image' and po_data:
                 # Image mode: วาดใบเสร็จเป็นรูปภาพ (รองรับทุกภาษา 100%)
-                raw_data = render_receipt_image(po_data, include_stub=True)
+                raw_data = render_receipt_image(po_data, include_stub=False)
                 result = print_raw(raw_data, printer_name=PRINTER_NAME)
 
             elif po_data:

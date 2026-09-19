@@ -260,7 +260,9 @@ class SellersController extends Controller
                     b.name AS branch_name
              FROM purchase_orders po
              LEFT JOIN branches b ON b.id = po.branch_id
-             WHERE po.seller_id = ? AND po.status = 'completed'
+             WHERE po.seller_id = ?
+               AND po.status = 'completed'
+               AND COALESCE(po.source_type, 'manual') = 'manual'
              ORDER BY po.created_at DESC LIMIT 50",
             [$id]
         );
@@ -302,6 +304,7 @@ class SellersController extends Controller
              LEFT JOIN branches b ON po.branch_id = b.id
              LEFT JOIN users u ON po.user_id = u.id
              WHERE po.seller_id = ?
+               AND COALESCE(po.source_type, 'manual') = 'manual'
              ORDER BY po.created_at DESC",
             [$id]
         );
@@ -316,6 +319,7 @@ class SellersController extends Controller
              JOIN purchase_orders po ON poi.purchase_order_id = po.id
              LEFT JOIN categories c ON poi.category_id = c.id
              WHERE po.seller_id = ?
+               AND COALESCE(po.source_type, 'manual') = 'manual'
              ORDER BY po.created_at DESC, poi.id ASC",
             [$id]
         );
@@ -326,6 +330,7 @@ class SellersController extends Controller
              FROM purchase_order_photos pop
              JOIN purchase_orders po ON pop.purchase_order_id = po.id
              WHERE po.seller_id = ?
+               AND COALESCE(po.source_type, 'manual') = 'manual'
              ORDER BY pop.created_at ASC",
             [$id]
         );

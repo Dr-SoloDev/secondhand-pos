@@ -96,13 +96,20 @@ async function loadCashPage() {
   const requests = [
     apiRequest(`cash-sessions/current?branch_id=${branchId}`),
     apiRequest(`cash-sessions/deposits?branch_id=${branchId}`),
+    apiRequest(`cash-sessions?branch_id=${branchId}`),
   ];
   if (hasAppPermission('actions.adjustments.manage', cashPermissions)) requests.push(apiRequest(`adjustment-documents?branch_id=${branchId}`));
-  const [currentRes, depositRes, adjustmentRes] = await Promise.all(requests);
+  const [currentRes, depositRes, historyRes, adjustmentRes] = await Promise.all(requests);
   cashSession = currentRes.status === 'success' ? currentRes.data : null;
   renderCashSession();
-  renderCashDeposits(depositRes.status === 'success' ? (depositRes.data?.items || []) : []);
-  if (hasAppPermission('actions.adjustments.manage', cashPermissions)) renderAdjustmentDocuments(adjustmentRes?.status === 'success' ? (adjustmentRes.data?.items || []) : []);
+  const deposits = depositRes.status === 'success' ? (depositRes.data?.items || []) : [];
+  renderCashDeposits(deposits);
+  const sessions = historyRes && historyRes.status === 'success' ? (historyRes.data?.items || historyRes.data || []) : [];
+  renderHistory(sessions, deposits);
+  if (hasAppPermission('actions.adjustments.manage', cashPermissions)) {
+    const adj = adjustmentRes && adjustmentRes.status === 'success' ? (adjustmentRes.data?.items || []) : [];
+    renderAdjustmentDocuments(adj);
+  }
 }
 
 function renderCashSession() {
@@ -142,16 +149,26 @@ function renderCashSession() {
   cashEl('latestVariance').textContent = cashMoney(variance);
   cashEl('latestVariance').className = `cash-stat-value ${Number(variance) === 0 ? '' : 'danger'}`;
   if (MVP_SIMPLE) {
-    // แสดงเงินในลิ้นชัก = ยอดเปิด + เติม − ซื้อ − ค่าใช้จ่าย
-    // ถ้าปิดยอดแล้ว เงินในลิ้นชักต้องเป็นยอดปิด (closing_actual) ไม่ใช่ยอดก่อนปิด
+    // ปิดยอดแล้วลิ้นชัก = 0 ทันที — เก็บแค่ประวัติ (ยอดปิด) ไว้ดู
+    // เปิด/ระหว่างวัน: ลิ้นชัก = current_expected_cash, ปิดแล้ว: 0
     let drawerVal = 0;
+    let closedActual = null;
     if (cashSession && cashSession.status) {
-      drawerVal = cashSession.status === 'closed'
-        ? (cashSession.closing_actual ?? 0)
-        : (cashSession?.current_expected_cash ?? 0);
+      if (cashSession.status === 'closed') {
+        drawerVal = 0;
+        closedActual = cashSession.closing_actual;
+      } else {
+        drawerVal = cashSession?.current_expected_cash ?? 0;
+      }
     }
     cashEl('drawerBalance').textContent = cashMoney(drawerVal);
     cashEl('drawerStat').classList.remove('hidden');
+    // แสดงยอดปิดเป็นประวัติเมื่อปิดแล้ว
+    const drawerLabel = document.querySelector('#drawerStat .cash-stat-label');
+    if (drawerLabel) {
+      drawerLabel.textContent = cashSession?.status === 'closed' && closedActual !== null
+        ? `เงินในลิ้นชัก (ปิดยอด ${cashMoney(closedActual)})` : 'เงินในลิ้นชัก';
+    }
   }
   renderSessionAction();
   renderCashHistory(cashSession);
@@ -174,28 +191,46 @@ function renderSessionAction() {
     bindCashCountForm('close');
     return;
   }
-  if (cashSession.status === 'pending_open' || cashSession.status === 'pending_close') {
-    const isOpen = cashSession.status === 'pending_open';
-    const expected = isOpen ? cashSession.opening_expected : cashSession.closing_expected;
-    const actual = isOpen ? cashSession.opening_actual : cashSession.closing_actual;
-    const reason = isOpen ? cashSession.opening_reason : cashSession.closing_reason;
-    title.textContent = isOpen ? 'คำขอเปิดยอด' : 'คำขอปิดยอด';
+  if (cashSession.status === 'pending_open') {
+    const expected = cashSession.opening_expected;
+    const actual = cashSession.opening_actual;
+    const reason = cashSession.opening_reason;
+    title.textContent = 'คำขอเปิดยอด';
     body.innerHTML = `<div class="cash-approval-box">
       <div>ยอดตามระบบ <strong>${cashMoney(expected)}</strong></div><div>ยอดนับจริง <strong>${cashMoney(actual)}</strong></div>
       <div>ส่วนต่าง <strong>${cashMoney(Number(actual)-Number(expected))}</strong></div><div>${cashEscape(reason || '-')}</div>
       ${canReviewCash() ? `<div class="cash-approval-actions"><button class="btn btn-success" id="approveSessionBtn">อนุมัติ</button><button class="btn btn-danger" id="rejectSessionBtn">ปฏิเสธ</button></div>` : ''}
     </div>`;
     if (canReviewCash()) {
-      cashEl('approveSessionBtn').onclick = () => reviewCashSession(isOpen, true);
-      cashEl('rejectSessionBtn').onclick = () => reviewCashSession(isOpen, false);
+      cashEl('approveSessionBtn').onclick = () => reviewCashSession(true, true);
+      cashEl('rejectSessionBtn').onclick = () => reviewCashSession(true, false);
+    }
+    return;
+  }
+  if (cashSession.status === 'pending_close') {
+    // Legacy pending_close (ควรไม่มีอีกหลัง deploy นี้) — แสดงประวัติแล้วให้ admin ปิด/ปฏิเสธได้
+    const expected = cashSession.closing_expected;
+    const actual = cashSession.closing_actual;
+    const reason = cashSession.closing_reason;
+    title.textContent = 'รออนุมัติปิดยอด (เดิม)';
+    body.innerHTML = `<div class="cash-approval-box">
+      <div>ยอดตามระบบ <strong>${cashMoney(expected)}</strong></div><div>ยอดนับจริง <strong>${cashMoney(actual)}</strong></div>
+      <div>ส่วนต่าง <strong>${cashMoney(Number(actual)-Number(expected))}</strong></div><div>${cashEscape(reason || '-')}</div>
+      <div style="margin-top:8px;color:#6b7280;font-size:13px">ระบบใหม่ปิดยอดทันที ไม่ต้องอนุมัติ — รายการนี้ค้างจากก่อนอัปเดต</div>
+      ${canReviewCash() ? `<div class="cash-approval-actions"><button class="btn btn-success" id="approveSessionBtn">อนุมัติ (ปิด)</button><button class="btn btn-danger" id="rejectSessionBtn">ปฏิเสธ (เปิดต่อ)</button></div>` : ''}
+    </div>`;
+    if (canReviewCash()) {
+      cashEl('approveSessionBtn').onclick = () => reviewCashSession(false, true);
+      cashEl('rejectSessionBtn').onclick = () => reviewCashSession(false, false);
     }
     return;
   }
   title.textContent = 'รอบประจำวัน';
-  body.innerHTML = cashSession.status === 'closed' && hasAppPermission('actions.cash_sessions.reopen', cashPermissions)
-    ? '<div class="cash-action-row"><button class="btn btn-primary" id="reopenSessionBtn">เปิดรอบใหม่</button></div>'
+  // ตัดฟีเจอร์เปิดรอบใหม่ — เหลือแค่ เปิด/เติม/ปิด ปิดแล้วจบวัน
+  const closedActual = cashSession.closing_actual;
+  body.innerHTML = cashSession.status === 'closed'
+    ? `<div class="cash-empty">ปิดยอดแล้ว — ลิ้นชัก 0<br><small>ยอดปิดวันนี้ ${cashMoney(closedActual)} (ประวัติ) — เปิดใหม่ได้วันถัดไป</small></div>`
     : '<div class="cash-empty">ปิดยอดแล้ว</div>';
-  if (cashEl('reopenSessionBtn')) cashEl('reopenSessionBtn').onclick = reopenCashSession;
 }
 
 function cashCountForm(mode) {
@@ -207,9 +242,9 @@ function cashCountForm(mode) {
     </div>`;
   }
   return `<div class="cash-form-grid">
-    <div class="full" style="text-align:center;background:#f8fafc;padding:10px;border-radius:6px">ยอดที่ควรมี <strong>${cashMoney(expected)}</strong> (เปิดวัน + เติมเงิน − ซื้อของ − ค่าใช้จ่าย)</div>
-    <div class="full"><label for="cashActual">นับเงินในลิ้นชักได้เท่าไหร่</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">กรอกยอดที่นับได้จริง</div></div>
-    <div class="full"><label for="cashReason">เหตุผล (ถ้ายอดไม่ตรง)</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="เช่น นับเกิน/ขาด เพราะ..."></textarea></div>
+    <div class="full" style="text-align:center;background:#f8fafc;padding:10px;border-radius:6px">ยอดที่ควรมี <strong>${cashMoney(expected)}</strong> (เปิดวัน + เติมเงิน − ซื้อของ − ค่าใช้จ่าย) — ปิดแล้วลิ้นชักจะเป็น 0</div>
+    <div class="full"><label for="cashActual">นับเงินในลิ้นชักได้เท่าไหร่</label><input id="cashActual" type="number" min="0" step="0.01" class="form-control" placeholder="0.00" value="" style="font-size:18px;text-align:center"><div id="closeVarianceHint" style="font-size:13px;text-align:center;margin-top:6px;color:#6b7280">กรอกยอดที่นับได้จริง — ปิดทันที ลิ้นชักจะเหลือ 0</div></div>
+    <div class="full"><label for="cashReason">เหตุผล (ถ้ามี)</label><textarea id="cashReason" rows="2" maxlength="500" class="form-control" placeholder="ไม่บังคับ — ใส่ได้ถ้ามีเหตุผล"></textarea></div>
   </div>
   <div class="cash-action-row" style="justify-content:center"><button class="btn btn-primary" id="submitCashCount" style="padding:10px 24px;font-size:16px">🌙 ปิดยอดวันนี้</button></div>`;
 }
@@ -235,32 +270,28 @@ function bindCashCountForm(mode) {
       const actual = Number(actualInput.value);
       if (MVP_SIMPLE) {
         if (!actualInput.value || !Number.isFinite(actual)) {
-          h.textContent = 'กรอกยอดที่นับได้จริง';
+          h.textContent = 'กรอกยอดที่นับได้จริง — ปิดแล้วลิ้นชักจะเป็น 0';
           h.style.color = '#6b7280';
           return;
         }
         const variance = actual - expected;
         const absV = Math.abs(variance);
-        if (absV < 0.01) { h.textContent = '✅ ยอดตรงกัน'; h.style.color = '#16a34a'; }
-        else if (absV <= 100) { h.textContent = `ℹ️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ใส่เหตุผลด้วย`; h.style.color = '#2563eb'; }
-        else { h.textContent = `⚠️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ต้องใส่เหตุผล`; h.style.color = '#d97706'; }
+        if (absV < 0.01) { h.textContent = '✅ ยอดตรงกัน — ปิดแล้วลิ้นชัก 0'; h.style.color = '#16a34a'; }
+        else { h.textContent = `ℹ️ ต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ปิดได้ทันที ลิ้นชักจะเหลือ 0`; h.style.color = '#2563eb'; }
         return;
       }
       if (!actualInput.value || !Number.isFinite(actual)) {
-        h.textContent = '💡 ส่วนต่างเกิน ฿100 ต้องรออนุมัติจากผู้จัดการ';
+        h.textContent = 'กรอกยอดที่นับได้จริง — ปิดทันที ลิ้นชักจะเป็น 0';
         h.style.color = '#6b7280';
         return;
       }
       const variance = actual - expected;
       const absV = Math.abs(variance);
-      if (absV > 100) {
-        h.textContent = `⚠️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ต้องรออนุมัติ`;
-        h.style.color = '#d97706';
-      } else if (absV > 0.009) {
-        h.textContent = `ℹ️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ต้องระบุเหตุผล`;
+      if (absV > 0.009) {
+        h.textContent = `ℹ️ ส่วนต่าง ${variance > 0 ? '+' : ''}฿${Math.round(Math.abs(variance)).toString()} — ปิดได้ทันที ลิ้นชักจะเหลือ 0`;
         h.style.color = '#2563eb';
       } else {
-        h.textContent = '✅ ยอดตรงกัน';
+        h.textContent = '✅ ยอดตรงกัน — ปิดแล้วลิ้นชัก 0';
         h.style.color = '#16a34a';
       }
     };
@@ -293,13 +324,7 @@ async function reviewCashSession(isOpen, approve) {
   if (res.status === 'success') loadCashPage();
 }
 
-async function reopenCashSession() {
-  const reason = prompt('เหตุผลที่เปิดรอบใหม่') || '';
-  if (!reason.trim()) return;
-  const res = await apiRequest('cash-sessions/reopen', 'POST', { id:Number(cashSession.id), reason });
-  showNotification(res.message, res.status === 'success' ? 'success' : 'error');
-  if (res.status === 'success') loadCashPage();
-}
+// reopenCashSession removed — ระบบเหลือแค่ เปิด/เติม/ปิด (ปิดแล้วจบวัน)
 
 async function requestCashDeposit() {
   const amount = Number(cashEl('depositAmount').value);
@@ -378,6 +403,58 @@ function renderCashDeposits(items) {
     const badge = cls ? `<span class="badge badge-${cls}">${label}</span>` : cashEscape(item.status);
     return `<tr><td>${cashEscape(item.requested_at || '-')}</td><td>${cashEscape(item.requested_by_name || '-')}</td><td>${cashEscape(item.source_name)}</td><td>${cashEscape(item.reason)}</td><td class="text-right">${cashMoney(item.amount)}</td><td>${badge}</td><td>${actions}</td></tr>`;
   }).join('') : '<tr><td colspan="7" class="cash-empty">ไม่มีคำขอเติมเงินสด</td></tr>';
+}
+
+function renderHistory(sessions, deposits) {
+  const body = cashEl('historyBody');
+  if (!body) return;
+  const rows = [];
+  // เปิด/ปิด จาก cash_sessions — เก็บถาวรแยกสาขา
+  (sessions || []).forEach(s => {
+    const branch = cashEscape(s.branch_name || '');
+    if (s.opening_actual !== null && s.opening_actual !== undefined) {
+      rows.push({
+        time: s.opened_at || s.created_at || s.business_date || '',
+        type: 'เปิดยอด',
+        user: cashEscape(s.opening_requested_by_name || s.branch_name || '-'),
+        detail: `สาขา ${branch} วันที่ ${cashEscape(s.business_date || '')}`,
+        amount: Number(s.opening_actual),
+        sort: s.opened_at || s.created_at || s.business_date || '',
+      });
+    }
+    // เติมเงินที่อนุมัติแล้ว — เอาจาก deposits ที่ approved (กันซ้ำกับตารางบน แต่รวมไว้ให้ดูถาวร)
+    // ปิดยอด — มีเฉพาะเมื่อ closed
+    if (s.status === 'closed' && s.closing_actual !== null && s.closing_actual !== undefined) {
+      rows.push({
+        time: s.closed_at || s.updated_at || s.business_date || '',
+        type: 'ปิดยอด',
+        user: cashEscape(s.closing_requested_by_name || '-'),
+        detail: `สาขา ${branch} วันที่ ${cashEscape(s.business_date || '')}`,
+        amount: Number(s.closing_actual),
+        sort: s.closed_at || s.updated_at || s.business_date || '',
+      });
+    }
+  });
+  // เติมเงิน — จาก deposits ที่อนุมัติแล้ว รวมไว้ในประวัติถาวรด้วย
+  (deposits || []).filter(d => d.status === 'approved').forEach(d => {
+    rows.push({
+      time: d.reviewed_at || d.requested_at || '',
+      type: 'เติมเงิน',
+      user: cashEscape(d.requested_by_name || '-'),
+      detail: `${cashEscape(d.source_name || '')} — ${cashEscape(d.reason || '')}`,
+      amount: Number(d.amount),
+      sort: d.reviewed_at || d.requested_at || '',
+    });
+  });
+  rows.sort((a, b) => String(b.sort).localeCompare(String(a.sort)));
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="5" class="cash-empty">ยังไม่มีประวัติ เปิด/เติม/ปิด ในสาขานี้</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(r => {
+    const typeBadge = r.type === 'เปิดยอด' ? 'success' : r.type === 'ปิดยอด' ? 'danger' : 'warning';
+    return `<tr><td>${cashEscape((r.time || '').slice(0,16).replace('T',' '))}</td><td><span class="badge badge-${typeBadge}">${r.type}</span></td><td>${r.user}</td><td>${r.detail}</td><td class="text-right">${cashMoney(r.amount)}</td></tr>`;
+  }).join('');
 }
 
 async function reviewDeposit(id, approve) {

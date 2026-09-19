@@ -34,10 +34,12 @@ class Seller extends Model
                     notes, tier_level,
                     total_transactions, total_amount,
                     last_transaction_at, created_at, updated_at
-                  FROM {$this->table}";
+                  FROM {$this->table}
+                  WHERE NOT (full_name = 'โอนสต็อกระหว่างสาขา'
+                             AND notes = 'system placeholder สำหรับ stock transfer')";
         
         if (!$includeBlacklisted) {
-            $query .= " WHERE is_blacklisted = 0";
+            $query .= " AND is_blacklisted = 0";
         }
         
         $query .= " ORDER BY created_at DESC";
@@ -98,7 +100,9 @@ class Seller extends Model
                          total_amount,
                          last_transaction_at
                   FROM {$this->table}
-                  WHERE (full_name LIKE ? OR phone LIKE ?";
+                  WHERE NOT (full_name = 'โอนสต็อกระหว่างสาขา'
+                             AND notes = 'system placeholder สำหรับ stock transfer')
+                    AND (full_name LIKE ? OR phone LIKE ?";
         $params = ["%{$keyword}%", "%{$keyword}%"];
         $digits = preg_replace('/\D/', '', $keyword);
         if (strlen($digits) === 13) {
