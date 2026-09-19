@@ -94,7 +94,7 @@ class CashSessionTest extends TestCase
     {
         // เปิดได้ครั้งเดียวต่อวัน — เปิดซ้ำต้องถูกปฏิเสธ ให้ใช้เติมเงินแทน (ห้ามล้าง movement)
         $db = new FakeCashSessionDb();
-        $db->onFetch('business_date=CURDATE()', ['id' => 99, 'status' => 'open']);
+        $db->onFetch('business_date=', ['id' => 99, 'status' => 'open']);
         $session = $this->makeSession($db);
 
         $this->expectException(\Exception::class);
@@ -106,7 +106,7 @@ class CashSessionTest extends TestCase
     {
         // เปิดวัน = ใส่เท่าไหร่ = ลิ้นชักเท่านั้น ไม่ยกยอด ไม่ reserve/capital
         $db = new FakeCashSessionDb();
-        $db->onFetch('business_date=CURDATE()', null)
+        $db->onFetch('business_date=', null)
            ->onFetchColumn('SUM(CASE', 0);
         $session = $this->makeSession($db);
 
@@ -297,13 +297,28 @@ class FakeCashSessionDb
     {
         return array_map(static function (array $row): array {
             $p = $row['params'];
-            return [
-                'session_id' => (int)$p[0], 'branch_id' => (int)$p[1],
-                'direction' => $p[2], 'source' => $p[3], 'destination' => $p[4], 'effect' => $p[5],
-                'amount' => (float)$p[6], 'excess' => (float)$p[7], 'type' => $p[8],
-                'reference_type' => $p[9], 'reference_id' => (int)$p[10],
-                'description' => $p[11], 'user_id' => (int)$p[12],
-            ];
+            // New 14-col (with business_date) vs old 13-col
+            $isPosition = str_contains($row['sql'], 'source_location');
+            if ($isPosition) {
+                $hasBusinessDate = count($p) === 14;
+                if ($hasBusinessDate) {
+                    return [
+                        'session_id' => (int)$p[0], 'branch_id' => (int)$p[1],
+                        'direction' => $p[2], 'source' => $p[3], 'destination' => $p[4], 'effect' => $p[5],
+                        'amount' => (float)$p[7], 'excess' => (float)$p[8], 'type' => $p[9],
+                        'reference_type' => $p[10], 'reference_id' => (int)$p[11],
+                        'description' => $p[12], 'user_id' => (int)$p[13],
+                    ];
+                }
+                return [
+                    'session_id' => (int)$p[0], 'branch_id' => (int)$p[1],
+                    'direction' => $p[2], 'source' => $p[3], 'destination' => $p[4], 'effect' => $p[5],
+                    'amount' => (float)$p[6], 'excess' => (float)$p[7], 'type' => $p[8],
+                    'reference_type' => $p[9], 'reference_id' => (int)$p[10],
+                    'description' => $p[11], 'user_id' => (int)$p[12],
+                ];
+            }
+            return $row;
         }, $this->insertedMovements);
     }
 
@@ -312,10 +327,12 @@ class FakeCashSessionDb
     {
         return array_map(static function (array $row): array {
             $p = $row['params'];
-            // 14-col position INSERT: movement_type = $p[8], direction = $p[2], amount = $p[6]
-            // 9-col legacy INSERT: movement_type = $p[3], direction = $p[2], amount = $p[4]
             $isPosition = str_contains($row['sql'], 'source_location');
             if ($isPosition) {
+                $hasBusinessDate = count($p) === 14;
+                if ($hasBusinessDate) {
+                    return ['type' => $p[9], 'direction' => $p[2], 'amount' => (float)$p[7]];
+                }
                 return ['type' => $p[8], 'direction' => $p[2], 'amount' => (float)$p[6]];
             }
             return ['type' => $p[3], 'direction' => $p[2], 'amount' => (float)$p[4]];

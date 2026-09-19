@@ -4,6 +4,20 @@ class CashSession extends Model
     protected $table = 'cash_sessions';
     private const VARIANCE_APPROVAL_THRESHOLD = 100.0;
 
+    /**
+     * วันธุรกิจเริ่ม 05:00 (Asia/Bangkok) — ก่อน 05:00 ถือเป็นวันก่อนหน้า
+     * ใช้แทน CURDATE() ทุกจุด เพื่อให้พนักงานทดสอบเปิดได้ทั้งวัน แต่ตัดวันตอน 05:00
+     */
+    private function businessDate(?string $now = null): string
+    {
+        $tz = new DateTimeZone('Asia/Bangkok');
+        $dt = $now ? new DateTime($now, $tz) : new DateTime('now', $tz);
+        if ($dt->format('H:i') < '05:00') {
+            $dt->modify('-1 day');
+        }
+        return $dt->format('Y-m-d');
+    }
+
     public function getAll(array $filters = []): array
     {
         $where = [];
@@ -61,11 +75,12 @@ class CashSession extends Model
 
     public function getCurrent(int $branchId): ?array
     {
+        $businessDate = $this->businessDate();
         $row = $this->db->fetch(
             "SELECT cs.*, b.name AS branch_name
              FROM cash_sessions cs JOIN branches b ON b.id = cs.branch_id
-             WHERE cs.branch_id = ? AND cs.business_date = CURDATE()",
-            [$branchId]
+             WHERE cs.branch_id = ? AND cs.business_date = ?",
+            [$branchId, $businessDate]
         );
         if (!$row) {
             $row = $this->db->fetch(
@@ -94,7 +109,7 @@ class CashSession extends Model
                 'id' => null,
                 'branch_id' => $branchId,
                 'branch_name' => $branchName ?: null,
-                'business_date' => date('Y-m-d'),
+                'business_date' => $businessDate,
                 'status' => null,
                 'opening_expected' => 0,
                 'opening_actual' => null,
@@ -245,10 +260,11 @@ class CashSession extends Model
         try {
             $actualCash = round($actualCash, 2);
 
+            $businessDate = $this->businessDate();
             $existing = $this->db->fetch(
                 "SELECT id, status FROM cash_sessions
-                 WHERE branch_id = ? AND business_date = CURDATE() FOR UPDATE",
-                [$branchId]
+                 WHERE branch_id = ? AND business_date = ? FOR UPDATE",
+                [$branchId, $businessDate]
             );
             if ($existing && ($existing['status'] ?? '') !== 'rejected') {
                 throw new Exception('สาขานี้เปิดยอดประจำวันนี้ไปแล้ว ถ้าเงินสดไม่พอให้ใช้ "เติมเงินเข้าลิ้นชัก"');
@@ -272,10 +288,10 @@ class CashSession extends Model
                     "INSERT INTO cash_sessions
                        (branch_id,business_date,status,opening_expected,opening_actual,opening_reason,
                         opening_requested_by,opened_by,opened_at)
-                     VALUES (?,CURDATE(),'open',?,?,?,?,?,?)"
+                     VALUES (?,?,'open',?,?,?,?,?,?)"
                 );
                 $this->db->execute($stmt, [
-                    $branchId, 0, $actualCash, $reason, $userId, $userId, date('Y-m-d H:i:s'),
+                    $branchId, $businessDate, 0, $actualCash, $reason, $userId, $userId, date('Y-m-d H:i:s'),
                 ]);
                 $sessionId = (int)$this->db->lastInsertId();
             }
@@ -423,10 +439,11 @@ class CashSession extends Model
 
     public function assertOpen(int $branchId): array
     {
+        $businessDate = $this->businessDate();
         $session = $this->db->fetch(
             "SELECT * FROM cash_sessions
-             WHERE branch_id=? AND business_date=CURDATE() FOR UPDATE",
-            [$branchId]
+             WHERE branch_id=? AND business_date=? FOR UPDATE",
+            [$branchId, $businessDate]
         );
         if (!$session || $session['status'] !== 'open') {
             throw new Exception('สาขานี้ยังไม่ได้เปิดยอดประจำวัน หรือกำลังรออนุมัติ');
@@ -492,12 +509,13 @@ class CashSession extends Model
             [$movementType, $referenceType, $referenceId]
         );
         if ($existing) return (int)$existing;
+        $businessDate = $this->businessDate();
         $session = $this->db->fetch(
             "SELECT id FROM cash_sessions
-             WHERE branch_id=? AND business_date=CURDATE()
+             WHERE branch_id=? AND business_date=?
                AND status IN ('open','pending_close')
              LIMIT 1",
-            [$branchId]
+            [$branchId, $businessDate]
         );
         if (!$session) {
             throw new Exception('สาขานี้ยังไม่ได้เปิดยอดประจำวัน');
@@ -506,11 +524,11 @@ class CashSession extends Model
             "INSERT INTO cash_movements
              (cash_session_id,branch_id,direction,source_location,destination_location,balance_effect,
                 business_date,amount,movement_type,reference_type,reference_id,description,recorded_by)
-             VALUES (?,?,?,?,?,?,CURDATE(),?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $this->db->execute($stmt, [
             (int)$session['id'], $branchId, $direction, 'external', 'external', $effect,
-            $amount, substr($movementType, 0, 40), substr($referenceType, 0, 40),
+            $businessDate, $amount, substr($movementType, 0, 40), substr($referenceType, 0, 40),
             $referenceId, substr($description, 0, 500), $userId,
         ]);
         return (int)$this->db->lastInsertId();
@@ -561,10 +579,11 @@ class CashSession extends Model
         try {
             $actualCash = round($actualCash, 2);
 
+            $businessDate = $this->businessDate();
             $existing = $this->db->fetch(
                 "SELECT id, status FROM cash_sessions
-                 WHERE branch_id=? AND business_date=CURDATE() FOR UPDATE",
-                [$branchId]
+                 WHERE branch_id=? AND business_date=? FOR UPDATE",
+                [$branchId, $businessDate]
             );
             if ($existing && ($existing['status'] ?? '') !== 'rejected') {
                 throw new Exception('สาขานี้เปิดยอดประจำวันนี้ไปแล้ว ถ้าเงินสดไม่พอให้ใช้ "เติมเงินเข้าลิ้นชัก"');
@@ -588,10 +607,10 @@ class CashSession extends Model
                     "INSERT INTO cash_sessions
                        (branch_id,business_date,status,cash_model_version,opening_expected,opening_actual,
                         opening_reason,opening_requested_by,opened_by,opened_at)
-                     VALUES (?,CURDATE(),'open',2,0,?,?,?,?,NOW())"
+                     VALUES (?,?,'open',2,0,?,?,?,?,NOW())"
                 );
                 $this->db->execute($stmt, [
-                    $branchId, $actualCash, $reason, $userId, $userId,
+                    $branchId, $businessDate, $actualCash, $reason, $userId, $userId,
                 ]);
                 $sessionId = (int)$this->db->lastInsertId();
             }
@@ -677,15 +696,16 @@ class CashSession extends Model
             [$type, $referenceType, $referenceId]
         );
         if ($existing) return (int)$existing;
+        $businessDate = $this->businessDate();
         $stmt = $this->db->prepare(
             "INSERT INTO cash_movements
              (cash_session_id,branch_id,direction,source_location,destination_location,balance_effect,
                 business_date,amount,excess_amount,movement_type,reference_type,reference_id,description,recorded_by)
-             VALUES (?,?,?,?,?,?,CURDATE(),?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $this->db->execute($stmt, [
             $sessionId, $branchId, $direction, $source, $destination, $effect,
-            round($amount, 2), round($excess, 2), substr($type, 0, 50), substr($referenceType, 0, 40),
+            $businessDate, round($amount, 2), round($excess, 2), substr($type, 0, 50), substr($referenceType, 0, 40),
             $referenceId, substr(trim($description), 0, 500), $userId,
         ]);
         return (int)$this->db->lastInsertId();
