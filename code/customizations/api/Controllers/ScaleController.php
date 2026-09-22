@@ -186,4 +186,16 @@ class ScaleController extends Controller
             'devices' => $devices,
         ]);
     }
+
+    private function assertReadBranchAccess($branchId, $message)
+    {
+        $role = $this->user['role'] ?? '';
+        if (in_array($role, ['admin', 'super_manager'], true)) {
+            return;
+        }
+        $userBranch = intval($this->user['branch_id'] ?? 0);
+        if (!$userBranch || (int)$branchId !== $userBranch) {
+            Response::error($message, 403);
+        }
+    }
 }
