@@ -288,6 +288,16 @@ class Router
         $this->routes[] = ['route' => 'employees/salary-expense',     'controller' => 'EmployeesController', 'method' => 'createSalaryExpense', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'employees/sso-expense',       'controller' => 'EmployeesController', 'method' => 'createSSOExpense',    'verb' => 'POST'];
 
+        // Scale routes — Tiger TI-01 RS232 (Phase 2)
+        $this->routes[] = ['route' => 'scale/devices',   'controller' => 'ScaleController', 'method' => 'getDevices',   'verb' => 'GET'];
+        $this->routes[] = ['route' => 'scale/devices',   'controller' => 'ScaleController', 'method' => 'createDevice','verb' => 'POST'];
+        $this->routes[] = ['route' => 'scale/device',    'controller' => 'ScaleController', 'method' => 'getDevice',    'verb' => 'GET'];
+        $this->routes[] = ['route' => 'scale/device',    'controller' => 'ScaleController', 'method' => 'updateDevice', 'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'scale/device',    'controller' => 'ScaleController', 'method' => 'deleteDevice', 'verb' => 'DELETE'];
+        $this->routes[] = ['route' => 'scale/mode',      'controller' => 'ScaleController', 'method' => 'updateMode',   'verb' => 'PUT'];
+        $this->routes[] = ['route' => 'scale/health',    'controller' => 'ScaleController', 'method' => 'health',       'verb' => 'GET'];
+        $this->routes[] = ['route' => 'scale/readings',  'controller' => 'ScaleController', 'method' => 'getReadings',  'verb' => 'GET'];
+
         // Import routes
         $this->routes[] = ['route' => 'import/upload',   'controller' => 'ImportController', 'method' => 'upload',   'verb' => 'POST'];
         $this->routes[] = ['route' => 'import/process',  'controller' => 'ImportController', 'method' => 'process',  'verb' => 'POST'];

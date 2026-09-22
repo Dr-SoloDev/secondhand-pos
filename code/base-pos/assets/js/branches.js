@@ -48,6 +48,11 @@ function renderBranchesTable() {
       ? `<span class="badge badge-info" title="เครื่องพิมพ์ความร้อนของสาขานี้">🖨️ ${escapeHtml(b.print_server_host)}${b.print_server_port ? ':' + escapeHtml(b.print_server_port) : ''}</span>`
       : '<span class="text-muted">ยังไม่ตั้งค่า</span>';
 
+    const scaleMode = b.scale_mode || 'disabled';
+    const scaleBadge = scaleMode === 'auto'
+      ? `<span class="badge badge-success" title="ตาชั่ง Tiger TI-01 — auto">⚖️ auto${b.scale_device_count ? ` (${b.scale_device_count})` : ''}</span>`
+      : (scaleMode === 'required' ? '<span class="badge badge-warning">⚖️ required</span>' : '<span class="text-muted">⚪ คีย์มือ</span>');
+
     return `
       <tr>
         <td>${escapeHtml(b.code)}</td>
@@ -56,7 +61,7 @@ function renderBranchesTable() {
         <td>${escapeHtml(b.phone || '-')}</td>
         <td>${escapeHtml(b.manager_name || '-')}</td>
         <td>${statusBadge}</td>
-        <td>${printServer}</td>
+        <td>${printServer}<br>${scaleBadge}</td>
         <td>${editBtn}</td>
       </tr>
     `;
@@ -88,6 +93,14 @@ function openEditModal(branchId) {
   document.getElementById('branchManager').value = branch.manager_name || '';
   document.getElementById('printServerHost').value = branch.print_server_host || '';
   document.getElementById('printServerPort').value = branch.print_server_port || '';
+  document.getElementById('branchScaleMode').value = branch.scale_mode || 'disabled';
+  const devList = document.getElementById('scaleDevicesList');
+  if (devList) {
+    const devs = branch.scale_devices || [];
+    devList.innerHTML = devs.length
+      ? devs.map(d => `⚖️ ${escapeHtml(d.code)} — ${escapeHtml(d.model)} ${d.serial_no ? '('+escapeHtml(d.serial_no)+')' : ''} [${d.port||'auto'} @${d.baud_rate}]`).join('<br>')
+      : '<span style="color:#999">ยังไม่มีเครื่องชั่ง — เพิ่มได้ที่ API /scale/devices (Phase 2)</span>';
+  }
 
   document.getElementById('modalTitle').textContent = 'แก้ไขข้อมูลสาขา';
   document.getElementById('branchModal').classList.add('show');
@@ -107,11 +120,13 @@ async function saveBranch() {
     return;
   }
 
+  const scaleMode = document.getElementById('branchScaleMode')?.value || 'disabled';
   const data = {
     name: branchName,
     address: document.getElementById('branchAddress').value.trim() || null,
     phone: document.getElementById('branchPhone').value.trim() || null,
     manager_name: document.getElementById('branchManager').value.trim() || null,
+    scale_mode: scaleMode,
   };
 
   const printServerHost = document.getElementById('printServerHost').value.trim();

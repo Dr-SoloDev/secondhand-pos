@@ -117,14 +117,25 @@
               <input type="text" id="itemUnit" value="กก." readonly tabindex="-1">
             </div>
           </div>
+          <!-- Scale status bar — Tiger TI-01 (Web Serial) -->
+          <div id="scaleStatusBar" style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;font-size:13px;flex-wrap:wrap">
+            <span id="scaleLiveWrap" style="display:flex;align-items:center;gap:6px">⚖️ <strong id="scaleLiveWeight" style="font-size:18px">—</strong> กก.</span>
+            <span id="scaleStatusBadge" style="font-size:12px">⚪ คีย์มือ</span>
+            <span id="scaleCapturedDisplay" style="font-size:12px;color:#999">—</span>
+            <button id="scaleConnectBtn" type="button" class="btn btn-sm btn-primary" style="padding:4px 10px;font-size:12px">🔌 เชื่อมตาชั่ง</button>
+            <button id="scaleDisconnectBtn" type="button" class="btn btn-sm btn-secondary" style="padding:4px 8px;font-size:11px;display:none">ยกเลิกเชื่อม</button>
+            <button id="scaleCaptureBtn" type="button" class="btn btn-sm btn-success" style="padding:4px 10px;font-size:12px" disabled>จับน้ำหนัก</button>
+            <button id="scaleClearBtn" type="button" class="btn btn-sm btn-secondary" style="padding:4px 8px;font-size:11px;display:none">ล้าง</button>
+            <span style="margin-left:auto;font-size:11px;color:#888">Tiger TI-01 • Web Serial • auto-capture 1.5วิ</span>
+          </div>
           <!-- แถว 2: น้ำหนัก + หักน้ำหนัก + ราคา + รวม + ถ่ายรูป + เพิ่ม -->
           <div class="po-field-row po-measure-row">
             <div class="po-field po-field-weight">
-              <label>น้ำหนัก (กก.)</label>
+              <label>น้ำหนัก (กก.) <span id="scaleLockHint" style="font-size:10px;color:#16a34a;display:none">🔒 ตาชั่ง</span></label>
               <input type="number" id="itemQuantity" step="0.01" min="0" placeholder="0.00" tabindex="2">
             </div>
             <div class="po-field po-field-deduct">
-              <label>หักน้ำหนัก (กก.)</label>
+              <label>หักน้ำหนัก (กก.) <span style="font-size:10px;color:#888">(พิมพ์มือ)</span></label>
               <input type="number" id="itemWeightDeduct" step="0.01" min="0" placeholder="0.00" tabindex="3">
             </div>
             <div class="po-field po-field-price-display">
@@ -575,7 +586,8 @@
   <script src="../assets/js/config.js?v=20260815d"></script>
   <script src="../assets/js/common.js?v=20260907e"></script>
   <script src="../assets/js/vendor/qrcode.min.js?v=20260815d"></script>
-  <script src="../assets/js/purchase-orders.js?v=20260907i"></script>
+  <script src="../assets/js/scale-bridge.js?v=20260922a"></script>
+  <script src="../assets/js/purchase-orders.js?v=20260922a"></script>
   <script src="../assets/js/animations.js?v=20260815d"></script>
 <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>

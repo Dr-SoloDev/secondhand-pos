@@ -6,9 +6,10 @@ class BranchesController extends Controller
         $this->requireAuth();
         $model = new Branch();
         $branches = $model->getAll();
-        // แนบ print server (เครื่องพิมพ์ความร้อน) ของแต่ละสาขา
+        // แนบ print server + scale devices ของแต่ละสาขา
         if ($branches) {
             $settingModel = new BranchSetting();
+            $scaleModel = new ScaleDevice();
             foreach ($branches as &$b) {
                 $s = $settingModel->getByBranch(
                     (int)$b['id'],
@@ -16,6 +17,13 @@ class BranchesController extends Controller
                 );
                 $b['print_server_host'] = $s['print_server_host'] ?? '';
                 $b['print_server_port'] = $s['print_server_port'] ?? '';
+                // scale_mode อาจยังไม่มี column ก่อน migration 076
+                $b['scale_mode'] = $b['scale_mode'] ?? 'disabled';
+                try {
+                    $devices = $scaleModel->getByBranch((int)$b['id'], 'active');
+                    $b['scale_device_count'] = count($devices);
+                    $b['scale_devices'] = $devices;
+                } catch (Exception $e) { $b['scale_device_count'] = 0; $b['scale_devices'] = []; }
             }
             unset($b);
         }
@@ -86,6 +94,14 @@ class BranchesController extends Controller
         if (!$id) Response::error('Branch ID is required', 400);
         $data = $this->getRequestData();
         $data = $this->sanitizeInput($data);
+        // scale_mode แยกจัดการ — ไม่ให้ update ผ่าน field ทั่วไปโดยตรง
+        $scaleMode = null;
+        if (array_key_exists('scale_mode', $data)) {
+            $scaleMode = trim((string)$data['scale_mode']);
+            if (!in_array($scaleMode, ['disabled','auto','required'], true)) {
+                Response::error('scale_mode ต้องเป็น disabled, auto หรือ required', 422);
+            }
+        }
         $data = array_intersect_key($data, array_flip([
             'code', 'name', 'address', 'phone', 'manager_name', 'status', 'cost_method'
         ]));
@@ -93,8 +109,6 @@ class BranchesController extends Controller
             if ($data['cost_method'] !== 'fifo') {
                 Response::error('ระบบกำหนดให้ทุกสาขาใช้ต้นทุนแบบ FIFO เท่านั้น', 422);
             }
-            // Keep an explicit FIFO write so this endpoint can also repair a
-            // legacy branch before migration 075 has been applied.
             $data['cost_method'] = 'fifo';
         }
         if (isset($data['status']) && !in_array($data['status'], ['active', 'inactive'], true)) {
@@ -102,7 +116,16 @@ class BranchesController extends Controller
         }
         $model = new Branch();
         try {
-            $model->update($id, $data);
+            if (!empty($data)) $model->update($id, $data);
+            if ($scaleMode !== null) {
+                try {
+                    Database::getInstance()->query("UPDATE branches SET scale_mode = ? WHERE id = ?", [$scaleMode, (int)$id]);
+                } catch (Exception $e) {
+                    // column ยังไม่มีก่อน migration 076
+                    error_log('scale_mode update failed: '.$e->getMessage());
+                }
+                Logger::logActivity($this->user['user_id'], 'update_branch_scale_mode', "Updated branch {$id} scale_mode → {$scaleMode}");
+            }
             Logger::logActivity($this->user['user_id'], 'update_branch', "Updated branch ID: {$id}");
             Response::success('Branch updated');
         } catch (Exception $e) {

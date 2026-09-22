@@ -102,16 +102,31 @@ class PurchaseOrder extends Model
         );
         if (!$po) return null;
         $this->decryptSellerIdCard($po);
-        $po['items'] = $this->db->fetchAll(
-            "SELECT poi.*, ic.name AS condition_name, ic.code AS condition_code,
-                     c.name AS category_name, c.requires_precious_receipt
-              FROM purchase_order_items poi
-              LEFT JOIN item_conditions ic ON poi.condition_id = ic.id /* DEPRECATED — legacy PO view only */
-              LEFT JOIN categories c ON poi.category_id = c.id
-             WHERE poi.purchase_order_id = ?
-             ORDER BY poi.id ASC",
-            [$id]
-        );
+        try {
+            $po['items'] = $this->db->fetchAll(
+                "SELECT poi.*, ic.name AS condition_name, ic.code AS condition_code,
+                          c.name AS category_name, c.requires_precious_receipt,
+                          poi.weight_source, poi.scale_device_id, poi.scale_raw_kg, poi.scale_stable, poi.captured_at, poi.override_reason
+                   FROM purchase_order_items poi
+                   LEFT JOIN item_conditions ic ON poi.condition_id = ic.id /* DEPRECATED — legacy PO view only */
+                   LEFT JOIN categories c ON poi.category_id = c.id
+                  WHERE poi.purchase_order_id = ?
+                  ORDER BY poi.id ASC",
+                [$id]
+            );
+        } catch (Exception $e) {
+            // Fallback before migration 079
+            $po['items'] = $this->db->fetchAll(
+                "SELECT poi.*, ic.name AS condition_name, ic.code AS condition_code,
+                          c.name AS category_name, c.requires_precious_receipt
+                   FROM purchase_order_items poi
+                   LEFT JOIN item_conditions ic ON poi.condition_id = ic.id
+                   LEFT JOIN categories c ON poi.category_id = c.id
+                  WHERE poi.purchase_order_id = ?
+                  ORDER BY poi.id ASC",
+                [$id]
+            );
+        }
         return $po;
     }
 
@@ -336,7 +351,14 @@ class PurchaseOrder extends Model
                 $categoryId = (int)$catalog['category_id'];
                 $itemName = trim((string)$catalog['name']);
 
-                $this->db->insert('purchase_order_items', [
+                // Ensure scale columns exist (backward compat before migration 079)
+                $hasScaleCols = false;
+                try {
+                    $this->db->fetchColumn("SELECT weight_source FROM purchase_order_items LIMIT 0");
+                    $hasScaleCols = true;
+                } catch (Exception $e) { $hasScaleCols = false; }
+
+                $insertData = [
                     'purchase_order_id' => $poId,
                     'product_id' => $item['product_id'] ?? null,
                     'catalog_id' => $catalogId ?: null,
@@ -351,13 +373,41 @@ class PurchaseOrder extends Model
                     'price_tier' => $item['price_tier'] ?? null,
                     'photo_path' => $item['photo_path'] ?? null,
                     'notes' => $item['notes'] ?? null,
-                ]);
+                ];
+                if ($hasScaleCols) {
+                    $insertData['weight_source'] = $item['weight_source'] ?? 'manual';
+                    $insertData['scale_device_id'] = !empty($item['scale_device_id']) ? (int)$item['scale_device_id'] : null;
+                    $insertData['scale_raw_kg'] = isset($item['scale_raw_kg']) ? (float)$item['scale_raw_kg'] : null;
+                    $insertData['scale_stable'] = isset($item['scale_stable']) ? (int)!!$item['scale_stable'] : null;
+                    $insertData['captured_at'] = !empty($item['captured_at']) ? (string)$item['captured_at'] : null;
+                    $insertData['override_reason'] = isset($item['override_reason']) ? substr(trim((string)$item['override_reason']),0,500) : null;
+                }
+
+                $this->db->insert('purchase_order_items', $insertData);
 
                 $itemId = (int)$this->db->lastInsertId();
                 $itemMappings[] = [
                     'id' => $itemId,
                     'client_key' => $item['client_key'] ?? null,
                 ];
+
+                // Audit scale reading if scale source
+                if ($hasScaleCols && in_array($insertData['weight_source'], ['scale','manual_override'], true)) {
+                    try {
+                        $this->db->insert('scale_readings', [
+                            'device_id' => $insertData['scale_device_id'],
+                            'branch_id' => (int)$data['branch_id'],
+                            'purchase_order_id' => (int)$poId,
+                            'purchase_order_item_id' => $itemId,
+                            'weight_kg' => (float)$qty,
+                            'raw_value' => $insertData['scale_raw_kg'] !== null ? (string)$insertData['scale_raw_kg'] : null,
+                            'stable' => $insertData['scale_stable'] ?? 0,
+                            'weight_source' => $insertData['weight_source'],
+                            'captured_at' => $insertData['captured_at'] ?? date('Y-m-d H:i:s'),
+                            'created_by' => (int)$userId,
+                        ]);
+                    } catch (Exception $e) { error_log('scale_readings log failed: '.$e->getMessage()); }
+                }
 
                 // ── Branch Stock: UPSERT per-branch per-item (ADD-001) ──
                 if ($categoryId) {

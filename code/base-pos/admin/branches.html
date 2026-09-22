@@ -142,6 +142,17 @@
             </div>
             <small class="form-text">ถ้าสาขานี้ยังไม่มีเครื่องพิมพ์ความร้อน ปล่อยว่างไว้ — ระบบจะพิมพ์ผ่านเครื่องกลางตามเดิม</small>
           </div>
+
+          <div class="form-group" style="margin-top:16px;padding-top:14px;border-top:1px dashed #e2e8f0;">
+            <label>⚖️ ตาชั่งดิจิตอล Tiger TI-01</label>
+            <select id="branchScaleMode" class="form-control" style="max-width:280px">
+              <option value="disabled">⚪ คีย์มือ — ไม่ใช้ตาชั่ง (แท็บเล็ต)</option>
+              <option value="auto">🟢 Auto — เจอตาชั่งล็อค/ไม่เจอคีย์มือ (แนะนำ)</option>
+              <option value="required">🔴 บังคับตาชั่ง — ต้องมาจากตาชั่งเท่านั้น</option>
+            </select>
+            <small class="form-text">auto = วางของ → นิ่ง 1.5วิ → จับอัตโนมัติ, ไม่เจอตาชั่ง (localhost:9130) จะ fallback คีย์มือทันที — แท็บเล็ต pos.mkxmeme.xyz จะอยู่โหมดนี้ตลอด</small>
+            <div id="scaleDevicesList" style="margin-top:8px;font-size:12px;color:#555"></div>
+          </div>
         </form>
       </div>
       <div class="modal-footer">

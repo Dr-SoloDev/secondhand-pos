@@ -162,6 +162,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('viewPOModalClose').addEventListener('click', () =>
     document.getElementById('viewPOModal').classList.remove('show')
   );
+
+  // Scale bridge — Tiger TI-01 (Phase 2, Web Serial)
+  if (window.scaleBridge) {
+    window.scaleBridge.init();
+    document.getElementById('scaleCaptureBtn')?.addEventListener('click', () => window.scaleBridge.capture());
+    document.getElementById('scaleClearBtn')?.addEventListener('click', () => window.scaleBridge.clear());
+    document.getElementById('scaleConnectBtn')?.addEventListener('click', () => window.scaleBridge.connect());
+    document.getElementById('scaleDisconnectBtn')?.addEventListener('click', () => window.scaleBridge.disconnect());
+  }
 });
 
 function debounce(fn, ms) {
@@ -494,6 +503,15 @@ function addItemToCart() {
 
   const isPrecious = currentCatalogItem?.requiresPreciousReceipt || false;
   const isIdCard = currentCatalogItem?.requiresIdCard || false;
+  // Scale provenance — Tiger TI-01
+  let scaleProv = { weight_source: 'manual', scale_device_id: null, scale_raw_kg: null, scale_stable: null, captured_at: null, override_reason: null };
+  try { if (window.scaleBridge) scaleProv = window.scaleBridge.getCapture(); } catch (e) {}
+  // If manual_override but no reason yet — ask once (block in required mode)
+  if (scaleProv.weight_source === 'manual_override' && !scaleProv.override_reason) {
+    const reason = prompt('สาขานี้ต่อตาชั่งอยู่ — กรุณาระบุเหตุผลที่คีย์มือแทนตาชั่ง');
+    if (!reason || !reason.trim()) { showNotification('ต้องระบุเหตุผลเมื่อคีย์มือตอนต่อตาชั่ง', 'error'); focusItemName(); return; }
+    scaleProv.override_reason = reason.trim().slice(0, 500);
+  }
   cart.push({
     _tempId: tempId,
     catalog_id: parsedCatalogId,
@@ -509,6 +527,12 @@ function addItemToCart() {
     requires_precious_receipt: isPrecious ? 1 : 0,
     requires_id_card: isIdCard ? 1 : 0,
     notes: '',
+    weight_source: scaleProv.weight_source,
+    scale_device_id: scaleProv.scale_device_id,
+    scale_raw_kg: scaleProv.scale_raw_kg,
+    scale_stable: scaleProv.scale_stable,
+    captured_at: scaleProv.captured_at,
+    override_reason: scaleProv.override_reason,
   });
 
   // reset form item (คง globalTier ไว้)
@@ -518,7 +542,15 @@ function addItemToCart() {
   document.getElementById('itemCategoryId').value = '';
   document.getElementById('itemCategorySelect').value = '';
   document.getElementById('itemUnitPrice').value = '0';
-  document.getElementById('itemQuantity').value = '1';
+  // ถ้าต่อตาชั่งอยู่ ให้ล้าง captured และ field จะถูกล็อคต่อ — ถ้าไม่ต่อให้ reset 1
+  try {
+    if (window.scaleBridge && window.scaleBridge.isConnected()) {
+      window.scaleBridge.clear();
+      document.getElementById('itemQuantity').value = '';
+    } else {
+      document.getElementById('itemQuantity').value = '1';
+    }
+  } catch (e) { document.getElementById('itemQuantity').value = '1'; }
   document.getElementById('itemWeightDeduct').value = '0';
   document.getElementById('itemTotalPreview').textContent = 'เลือกสินค้าจากแคตาล็อก';
   document.getElementById('itemTotalPreview').style.color = '#999';
@@ -566,9 +598,10 @@ function renderCart() {
       const net = it.net_quantity ?? Math.max(0, (it.quantity || 0) - (it.weight_deduction || 0));
       const hasPhoto = pendingItemPhotos[it._tempId];
       console.log('[RenderCart] Item', i, '- tempId:', it._tempId, '- hasPhoto:', !!hasPhoto);
+      const scaleBadge = it.weight_source === 'scale' ? '<span title="ตาชั่ง Tiger TI-01" style="font-size:10px;background:#dcfce7;color:#166534;padding:1px 4px;border-radius:4px">⚖️</span>' : (it.weight_source === 'manual_override' ? '<span title="คีย์มือ override" style="font-size:10px;background:#fef3c7;color:#92400e;padding:1px 4px;border-radius:4px">⚠️</span>' : '');
       return `<tr>
         <td style="color:#999">${i + 1}</td>
-        <td style="font-weight:500">${escapeHtml(it.item_name)}</td>
+        <td style="font-weight:500">${escapeHtml(it.item_name)} ${scaleBadge}</td>
         <td class="text-right">${it.quantity.toFixed(2)}</td>
         <td class="text-right" style="color:#dc3545">${it.weight_deduction > 0 ? it.weight_deduction.toFixed(2) : '-'}</td>
         <td class="text-right">${net.toFixed(2)}</td>
@@ -789,6 +822,12 @@ async function savePurchaseOrder() {
       price_tier: it.price_tier,
       notes: it.notes,
       client_key: it._tempId,
+      weight_source: it.weight_source || 'manual',
+      scale_device_id: it.scale_device_id || null,
+      scale_raw_kg: it.scale_raw_kg ?? null,
+      scale_stable: it.scale_stable ?? null,
+      captured_at: it.captured_at || null,
+      override_reason: it.override_reason || null,
     })),
     idempotency_key: idempotencyKey,
   };

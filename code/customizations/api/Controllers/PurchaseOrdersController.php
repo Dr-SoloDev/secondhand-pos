@@ -225,6 +225,13 @@ class PurchaseOrdersController extends Controller
             'vehicle_plate' => !empty($data['vehicle_plate']) ? trim((string)$data['vehicle_plate']) : null,
         ];
 
+        // ── Scale provenance: fetch branch scale_mode for validation ──
+        $branchScaleMode = 'disabled';
+        try {
+            $branchRow = $this->db->fetch("SELECT scale_mode FROM branches WHERE id = ?", [$branchId]);
+            if ($branchRow && isset($branchRow['scale_mode'])) $branchScaleMode = $branchRow['scale_mode'];
+        } catch (Exception $e) { /* column not yet migrated → disabled */ }
+
         $cleanItems = [];
         foreach ($data['items'] as $item) {
             if (empty($item['item_name'])) {
@@ -250,6 +257,41 @@ class PurchaseOrdersController extends Controller
                 return;
             }
             $netQty = $qty - $deduct;
+
+            // ── Scale provenance per item ──
+            $weightSource = trim((string)($item['weight_source'] ?? 'manual'));
+            if (!in_array($weightSource, ['manual','scale','manual_override'], true)) $weightSource = 'manual';
+            $scaleDeviceId = !empty($item['scale_device_id']) ? intval($item['scale_device_id']) : null;
+            $scaleRawKg = isset($item['scale_raw_kg']) ? floatval($item['scale_raw_kg']) : null;
+            $scaleStable = isset($item['scale_stable']) ? (int)!!$item['scale_stable'] : null;
+            $capturedAt = !empty($item['captured_at']) ? trim((string)$item['captured_at']) : null;
+            $overrideReason = isset($item['override_reason']) ? substr(trim((string)$item['override_reason']), 0, 500) : null;
+
+            // required mode: ต้องเป็น scale เท่านั้น — ยกเว้น manager/super_manager override
+            if ($branchScaleMode === 'required' && $weightSource !== 'scale') {
+                if ($weightSource === 'manual_override') {
+                    if (!in_array(($this->user['role'] ?? ''), ['admin','manager','super_manager'], true)) {
+                        Response::error('สาขานี้บังคับใช้ตาชั่ง — ต้องให้ผู้จัดการอนุมัติคีย์มือ', 403);
+                    }
+                    if ($overrideReason === '' || $overrideReason === null) {
+                        Response::error('ต้องระบุเหตุผลเมื่อคีย์มือในสาขาที่บังคับตาชั่ง', 422);
+                    }
+                } else {
+                    Response::error('สาขานี้บังคับใช้ตาชั่ง — น้ำหนักต้องมาจากตาชั่งเท่านั้น', 422);
+                }
+            }
+            // manual_override ต้องมีเหตุผลเสมอ
+            if ($weightSource === 'manual_override' && ($overrideReason === '' || $overrideReason === null)) {
+                Response::error('ต้องระบุเหตุผลเมื่อคีย์มือแบบ override', 422);
+            }
+            // scale ต้องมี raw และ stable
+            if ($weightSource === 'scale') {
+                if ($scaleRawKg === null || !is_finite($scaleRawKg) || $scaleRawKg <= 0) {
+                    Response::error('ข้อมูลตาชั่งไม่ครบ — กรุณาจับน้ำหนักใหม่', 422);
+                }
+                // อนุโลม stable=0 ได้ (บางรุ่นไม่มี flag) แต่ log ไว้
+            }
+
             $cleanItems[] = [
                 'catalog_id' => $catalogId,
                 'item_name' => trim((string)$item['item_name']),
@@ -264,6 +306,13 @@ class PurchaseOrdersController extends Controller
                 'price_tier' => !empty($item['price_tier']) ? intval($item['price_tier']) : null,
                 'notes' => isset($item['notes']) ? trim((string)$item['notes']) : null,
                 'client_key' => $item['client_key'] ?? null,
+                // Scale provenance
+                'weight_source' => $weightSource,
+                'scale_device_id' => $scaleDeviceId,
+                'scale_raw_kg' => $scaleRawKg,
+                'scale_stable' => $scaleStable,
+                'captured_at' => $capturedAt,
+                'override_reason' => $overrideReason,
             ];
         }
 
