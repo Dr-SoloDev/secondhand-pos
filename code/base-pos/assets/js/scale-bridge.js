@@ -41,6 +41,66 @@ let scalePollTimer = null;
 let scaleBranchMode = 'disabled'; // disabled|auto|required — โหลดจาก /scale/health (default auto แบบเสียบแล้วเปิด)
 let scaleDevices = [];
 
+// ── Modal — ครั้งแรกบังคับเห็น แต่ไม่บล็อคคีย์มือ ──
+const SCALE_MODAL_SESSION_KEY = 'scale_modal_dismissed';
+
+function ensureScaleConnectModal() {
+  if (document.getElementById('scaleConnectModal')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'scaleConnectModal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'เชื่อมตาชั่ง');
+  overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div id="scaleConnectModalCard" style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:24px 20px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;font-family:inherit;">
+      <div style="font-size:40px;margin-bottom:8px;">⚖️</div>
+      <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;color:#1e293b;">เชื่อมตาชั่ง Tiger TI-01</h3>
+      <p style="margin:0 0 16px;font-size:13px;color:#64748b;line-height:1.6;">เสียบสาย USB-RS232 แล้วกด <b style="color:#1e293b;">เชื่อมตาชั่ง</b><br>Chrome จะขอเลือก COM port ครั้งเดียว<br>ครั้งต่อไปเสียบแล้วเปิดเอง — ไม่ต่อก็คีย์มือได้ปกติ</p>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button id="scaleModalConnectBtn" type="button" style="flex:1;max-width:160px;padding:10px 16px;border-radius:10px;border:none;background:#D97706;color:#fff;font-weight:700;font-size:14px;cursor:pointer;">เชื่อมตาชั่ง</button>
+        <button id="scaleModalLaterBtn" type="button" style="flex:1;max-width:130px;padding:10px 16px;border-radius:10px;border:1px solid #e2e8f0;background:#fff;color:#475569;font-weight:600;font-size:14px;cursor:pointer;">ไว้ทีหลัง</button>
+      </div>
+      <p style="margin:12px 0 0;font-size:11px;color:#94a3b8;">กด Esc หรือแตะพื้นหลังเพื่อปิด — คีย์มือได้ปกติแม้ไม่เชื่อม</p>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // คลิกพื้นหลังปิด (ไม่บล็อคคีย์มือ)
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) hideScaleConnectModal(true);
+  });
+  overlay.querySelector('#scaleModalConnectBtn').addEventListener('click', async () => {
+    await requestSerialPort();
+    // ถ้าต่อสำเร็จ requestSerialPort จะ set connected → ปิด modal เอง
+    if (scaleState.connected) hideScaleConnectModal(false);
+  });
+  overlay.querySelector('#scaleModalLaterBtn').addEventListener('click', () => hideScaleConnectModal(true));
+}
+
+function showScaleConnectModal() {
+  if (scaleState.connected) return;
+  if (sessionStorage.getItem(SCALE_MODAL_SESSION_KEY) === '1') return;
+  if (scaleBranchMode === 'disabled') return;
+  if (!isWebSerialSupported()) return;
+  ensureScaleConnectModal();
+  const el = document.getElementById('scaleConnectModal');
+  if (!el) return;
+  el.style.display = 'flex';
+  // โฟกัสปุ่มเชื่อมเพื่อ Tab → Enter ได้
+  setTimeout(() => document.getElementById('scaleModalConnectBtn')?.focus(), 50);
+}
+
+function hideScaleConnectModal(markDismissed) {
+  const el = document.getElementById('scaleConnectModal');
+  if (el) el.style.display = 'none';
+  if (markDismissed) {
+    try { sessionStorage.setItem(SCALE_MODAL_SESSION_KEY, '1'); } catch {}
+  } else {
+    // ต่อสำเร็จ → ไม่ต้องเด้งซ้ำใน session นี้เช่นกัน
+    try { sessionStorage.setItem(SCALE_MODAL_SESSION_KEY, '1'); } catch {}
+  }
+}
+
 // ── Web Serial ──
 let serialPort = null;
 let serialReader = null;
@@ -95,6 +155,8 @@ async function openSerialPort(port) {
   scaleState.connected = true;
   serialKeepReading = true;
   updateScaleUI();
+  // ต่อสำเร็จ → ปิด modal ครั้งแรกถ้ายังเปิดอยู่
+  hideScaleConnectModal(false);
   readSerialLoop(port);
   // ฟัง disconnect
   port.addEventListener('disconnect', () => {
@@ -246,6 +308,14 @@ async function initScaleBridge() {
   // ลอง auto-connect serial ที่เคยอนุญาตไว้
   const autoOk = await tryAutoConnectSerial();
 
+  // ถ้า auto ไม่ได้และยังไม่เคยปิด modal ใน session → เด้ง modal บังคับเห็นครั้งแรก (ไม่บล็อคคีย์มือ)
+  if (!autoOk && !scaleState.connected) {
+    // ให้ UI วาดก่อนแล้วค่อยเด้ง เพื่อไม่กระพริบ
+    updateScaleUI();
+    // หน่วงเล็กน้อยให้ badge/ปุ่มเดิมขึ้นก่อน
+    setTimeout(() => showScaleConnectModal(), 400);
+  }
+
   // ไม่ว่า serial จะต่อได้หรือไม่ ให้ poll agent เป็น fallback (+ สำหรับแท็บเล็ตจะ fallback เป็น manual)
   startAgentPoll();
 
@@ -262,18 +332,31 @@ async function initScaleBridge() {
     updateScaleUI();
   });
 
+  // Esc ปิด modal (ไม่บล็อคคีย์มือ)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const m = document.getElementById('scaleConnectModal');
+      if (m && m.style.display !== 'none') hideScaleConnectModal(true);
+    }
+  });
+
   // ฟัง serial connect/disconnect ของ browser (เสียบสายใหม่)
   if (isWebSerialSupported()) {
     navigator.serial.addEventListener('connect', async (e) => {
       console.log('[Scale] Serial connect event', e);
       showNotification('พบตาชั่งเสียบใหม่ — กำลังเชื่อม...', 'info');
-      try { await openSerialPort(e.target); } catch (err) { console.error(err); }
+      try {
+        await openSerialPort(e.target);
+        // ต่อสำเร็จ → ปิด modal ถ้ายังเปิดอยู่
+        hideScaleConnectModal(false);
+      } catch (err) { console.error(err); }
     });
     navigator.serial.addEventListener('disconnect', () => {
       console.log('[Scale] Serial disconnect event');
       scaleState.connected = false;
       scaleState.mode = 'manual';
       updateScaleUI();
+      // ถอดสายไม่เด้ง modal ซ้ำใน session เดิม (กันรำคาญ — ให้กดปุ่มเดิมที่ badge ได้)
     });
   }
 
@@ -460,4 +543,6 @@ window.scaleBridge = {
   isConnected: isScaleConnected,
   getMode: () => scaleBranchMode,
   isSerialSupported: isWebSerialSupported,
+  showModal: showScaleConnectModal,
+  hideModal: hideScaleConnectModal,
 };
