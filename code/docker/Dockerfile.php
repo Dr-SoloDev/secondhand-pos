@@ -32,6 +32,9 @@ WORKDIR /var/www/html
 RUN mkdir -p /var/www/html/uploads /var/www/html/backups /var/www/html/temp \
     && chown -R www-data:www-data /var/www/html
 
+# Font ไทยสำหรับ watermark รูปบัตรประชาชน (ImageWatermark, imagettftext อ่าน path ตรงๆ)
+COPY fonts/NotoSansThai-Regular.ttf /usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf
+
 # Entrypoint: fix uploads ownership then start Apache
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
