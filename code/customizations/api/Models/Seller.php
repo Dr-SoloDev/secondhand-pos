@@ -23,6 +23,24 @@ class Seller extends Model
     }
 
     /**
+     * ทำความสะอาดค่า retain_until — ว่าง/null = ไม่กำหนด, ต้องเป็น YYYY-MM-DD ที่ถูกต้อง
+     */
+    private static function cleanRetainDate($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $value = (string)$value;
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+            throw new Exception('รูปแบบวันที่กำหนดลบต้องเป็น YYYY-MM-DD');
+        }
+        if (!checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
+            throw new Exception('วันที่กำหนดลบไม่ถูกต้อง');
+        }
+        return $value;
+    }
+
+    /**
      * ดึงผู้ขายทั้งหมด
      */
     public function getAll($includeBlacklisted = false)
@@ -32,6 +50,7 @@ class Seller extends Model
                     full_name, phone, address, vehicle_plate, vehicle_type,
                     id_card_photo, is_blacklisted, blacklist_reason, blacklisted_at,
                     notes, tier_level,
+                    retain_until, retain_reason,
                     total_transactions, total_amount,
                     last_transaction_at, created_at, updated_at
                   FROM {$this->table}
@@ -184,6 +203,8 @@ class Seller extends Model
             'notes' => !empty($data['notes']) ? $data['notes'] : null,
             'tier_level' => !empty($data['tier_level']) ? (int)$data['tier_level'] : 1,
             'is_blacklisted' => $data['is_blacklisted'] ?? 0,
+            'retain_until' => self::cleanRetainDate($data['retain_until'] ?? null),
+            'retain_reason' => !empty($data['retain_reason']) ? mb_substr((string)$data['retain_reason'], 0, 255) : null,
         ]);
     }
 
@@ -235,6 +256,14 @@ class Seller extends Model
         if (isset($data['vehicle_type'])) $updateData['vehicle_type'] = $data['vehicle_type'];
         if (isset($data['notes'])) $updateData['notes'] = $data['notes'];
         if (isset($data['tier_level'])) $updateData['tier_level'] = (int)$data['tier_level'];
+        // Retention (data minimisation) — '' หรือ null = ล้างกำหนดลบ
+        if (array_key_exists('retain_until', $data)) {
+            $updateData['retain_until'] = self::cleanRetainDate($data['retain_until']);
+        }
+        if (array_key_exists('retain_reason', $data)) {
+            $updateData['retain_reason'] = $data['retain_reason']
+                ? mb_substr((string)$data['retain_reason'], 0, 255) : null;
+        }
         // is_blacklisted/blacklist_reason ต้องใช้ผ่าน endpoint blacklist/unblacklist เท่านั้น
 
         if (!empty($updateData)) {
