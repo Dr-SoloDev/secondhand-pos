@@ -98,6 +98,14 @@
                 </div>
                 <div class="form-row">
                   <div class="form-col">
+                    <label for="scrapLicenseNo">เลขใบอนุญาตค้าของเก่า</label>
+                    <input type="text" id="scrapLicenseNo" name="scrap_license_no" class="form-control" placeholder="เช่น สฎ 1234/2567">
+                    <small class="form-hint">ใบเดียวทั้งกิจการ — แสดงบนชุดหลักฐานผู้ขายที่ส่งเจ้าหน้าที่</small>
+                  </div>
+                  <div class="form-col"></div>
+                </div>
+                <div class="form-row">
+                  <div class="form-col">
                     <label for="taxRate">อัตราภาษีเริ่มต้น (%)</label>
                     <input type="number" id="taxRate" name="tax_rate" class="form-control" min="0" max="100" step="0.01" placeholder="7.00">
                   </div>
@@ -239,7 +247,7 @@
 
   <script src="../assets/js/config.js?v=20260815d"></script>
   <script src="../assets/js/common.js?v=20260907e"></script>
-  <script src="../assets/js/settings.js?v=20260815d"></script>
+  <script src="../assets/js/settings.js?v=20260926a"></script>
 <div class="footer-powered">Powered by <strong>SoloCorp OS</strong> &mdash; Secondhand POS System</div>
 <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>
 </body>

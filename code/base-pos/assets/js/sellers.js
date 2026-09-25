@@ -1,5 +1,6 @@
 let sellers = [];
 let currentSeller = null;
+let currentViewSellerId = null; // ผู้ขายที่เปิดใน view modal (ใช้กับชุดหลักฐาน/disclosure)
 let pendingSellerIdPhoto = null; // File | null
 let sellerPermissions = null;
 
@@ -188,6 +189,7 @@ function editSeller(id) {
 }
 
 async function viewSeller(id) {
+    currentViewSellerId = id;
     // Show modal with loading state — clear stale data first
     document.getElementById('viewSellerName').textContent = 'กำลังโหลด...';
     document.getElementById('viewSellerBlacklistBadge').style.display = 'none';
@@ -230,6 +232,13 @@ async function viewSeller(id) {
     document.getElementById('viewSellerVehicleType').textContent = seller.vehicle_type || '-';
     document.getElementById('viewSellerAddress').textContent = seller.address || '-';
     document.getElementById('viewSellerNotes').textContent = seller.notes || '-';
+
+    // Disclosure log — เห็นเฉพาะ manager+ (ตรงกับ backend gating)
+    const dcBtn = document.getElementById('disclosureFormBtn');
+    if (dcBtn) dcBtn.style.display = canManageDisclosure() ? '' : 'none';
+    const epBtn = document.getElementById('evidencePackBtn');
+    if (epBtn) epBtn.style.display = canManageDisclosure() ? '' : 'none';
+    loadDisclosures(id);
 
     // tier_level display
     const tierLabels = { 1: 'บิล 1 (ทั่วไป)', 2: 'บิล 2', 3: 'บิล 3' };
@@ -410,6 +419,125 @@ function closeViewSellerModal() {
     document.getElementById('viewSellerModal').classList.remove('show');
     // Reset transaction list for next open
     document.getElementById('viewSellerTransactionList').innerHTML = '';
+    currentViewSellerId = null;
+    // ปิดฟอร์ม disclosure ด้วยกันค้างรอบหน้า
+    const dcBox = document.getElementById('disclosureFormBox');
+    if (dcBox) dcBox.style.display = 'none';
+}
+
+// ===== Evidence Pack (ชุดหลักฐาน) =====
+function openEvidencePack() {
+    if (!currentViewSellerId) return;
+    if (!canManageDisclosure()) {
+        showNotification('ส่วนนี้สำหรับผู้จัดการขึ้นไป', 'error');
+        return;
+    }
+    window.open(`evidence-pack.html?id=${encodeURIComponent(currentViewSellerId)}`, '_blank');
+}
+
+// ===== PDPA Disclosure Log =====
+function toggleDisclosureForm(forceClose = false) {
+    const box = document.getElementById('disclosureFormBox');
+    if (!box) return;
+    const willShow = !forceClose && box.style.display === 'none';
+    box.style.display = willShow ? 'block' : 'none';
+    if (willShow) {
+        document.getElementById('dcRecipient').value = '';
+        document.getElementById('dcPurpose').value = '';
+        document.getElementById('dcLegalBasis').value = '';
+        document.getElementById('dcNotes').value = '';
+        document.querySelectorAll('.dcItem').forEach(c => c.checked = false);
+        document.getElementById('dcRecipient').focus();
+    }
+}
+
+async function saveDisclosure() {
+    if (!currentViewSellerId) return;
+    const recipient = document.getElementById('dcRecipient').value.trim();
+    const purpose = document.getElementById('dcPurpose').value.trim();
+    if (!recipient || !purpose) {
+        showNotification('กรุณากรอก "ผู้รับข้อมูล" และ "วัตถุประสงค์"', 'error');
+        return;
+    }
+    const items = Array.from(document.querySelectorAll('.dcItem:checked')).map(c => c.value);
+    const payload = {
+        seller_id: currentViewSellerId,
+        recipient,
+        purpose,
+        method: document.getElementById('dcMethod').value,
+        items,
+        legal_basis: document.getElementById('dcLegalBasis').value.trim() || null,
+        notes: document.getElementById('dcNotes').value.trim() || null,
+    };
+    const res = await apiRequest('sellers/disclosure-log', 'POST', payload);
+    if (res.status === 'success') {
+        showNotification('บันทึกการเปิดเผยข้อมูลสำเร็จ', 'success');
+        toggleDisclosureForm(true);
+        loadDisclosures(currentViewSellerId);
+    } else {
+        showNotification(res.message || 'บันทึกไม่สำเร็จ', 'error');
+    }
+}
+
+// สิทธิ์ disclosure/evidence-pack — ตรงกับ backend requireAuth roles
+function canManageDisclosure() {
+    try {
+        const u = JSON.parse(localStorage.getItem('posUser') || '{}');
+        return ['admin', 'manager', 'super_manager'].includes(u.role);
+    } catch (e) { return false; }
+}
+
+async function loadDisclosures(sellerId) {
+    const listEl = document.getElementById('viewSellerDisclosureList');
+    if (!listEl) return;
+    if (!canManageDisclosure()) {
+        listEl.innerHTML = '<div class="seller-view-empty" style="font-size:13px;color:#64748b;padding:4px 0">ส่วนนี้สำหรับผู้จัดการขึ้นไป</div>';
+        return;
+    }
+    listEl.innerHTML = '<div class="seller-view-loading">กำลังโหลด...</div>';
+    const res = await apiRequest(`sellers/disclosure-log?id=${encodeURIComponent(sellerId)}`);
+    if (res.status !== 'success') {
+        listEl.innerHTML = '<div class="seller-view-error">โหลดรายการเปิดเผยข้อมูลไม่สำเร็จ</div>';
+        return;
+    }
+    const items = (res.data && res.data.items) || [];
+    if (!items.length) {
+        listEl.innerHTML = '<div class="seller-view-empty" style="font-size:13px;color:#64748b;padding:4px 0">ยังไม่มีการเปิดเผยข้อมูลให้บุคคลภายนอก</div>';
+        return;
+    }
+    const methodLabels = {
+        in_person: 'มาที่ร้าน',
+        electronic: 'อิเล็กทรอนิกส์',
+        api: 'ระบบ/API',
+        other: 'อื่นๆ',
+    };
+    const itemLabels = {
+        id_card: 'เลขบัตร', id_card_photo: 'รูปบัตร', phone: 'เบอร์โทร',
+        address: 'ที่อยู่', transactions: 'ธุรกรรม', other: 'อื่นๆ',
+    };
+    listEl.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead>
+                <tr style="background:#f1f5f9;color:#475569;font-size:11px">
+                    <th style="text-align:left;padding:6px 8px">วันเวลา</th>
+                    <th style="text-align:left;padding:6px 8px">ผู้รับข้อมูล</th>
+                    <th style="text-align:left;padding:6px 8px">วัตถุประสงค์</th>
+                    <th style="text-align:left;padding:6px 8px">ข้อมูลที่เปิดเผย</th>
+                    <th style="text-align:left;padding:6px 8px">ผู้ดำเนินการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map((x, i) => `
+                    <tr style="background:${i % 2 === 0 ? '#fff' : '#f8fafc'};border-top:1px solid #e2e8f0">
+                        <td style="padding:6px 8px;white-space:nowrap">${escapeHtml(x.disclosed_at)}</td>
+                        <td style="padding:6px 8px">${escapeHtml(x.recipient)}</td>
+                        <td style="padding:6px 8px">${escapeHtml(x.purpose)}${x.legal_basis ? ` <span style="color:#64748b">(${escapeHtml(x.legal_basis)})</span>` : ''}</td>
+                        <td style="padding:6px 8px">${(x.items || []).map(it => itemLabels[it] || escapeHtml(it)).join(', ') || '-'}
+                            <span style="color:#94a3b8">· ${methodLabels[x.method] || escapeHtml(x.method)}</span></td>
+                        <td style="padding:6px 8px">${escapeHtml(x.disclosed_by_name || '-')}</td>
+                    </tr>`).join('')}
+            </tbody>
+        </table>`;
 }
 
 function safeDate(str) {

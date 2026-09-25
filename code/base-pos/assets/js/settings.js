@@ -78,7 +78,7 @@ async function setupSettingsScope() {
 
 function applySettingsPermissions() {
   const canGlobal = hasAppPermission('actions.settings.global', settingsPermissions);
-  ['storeName', 'taxId', 'taxRate', 'currencySymbol', 'dateFormat', 'timeZone', 'language']
+  ['storeName', 'taxId', 'taxRate', 'currencySymbol', 'scrapLicenseNo', 'dateFormat', 'timeZone', 'language']
     .forEach(id => {
       const field = document.getElementById(id);
       if (field) field.disabled = !canGlobal;
@@ -120,6 +120,7 @@ function populateStoreSettings(settings) {
   document.getElementById('storePhone').value = settings.store_phone || '';
   document.getElementById('storeAddress').value = settings.store_address || '';
   document.getElementById('taxId').value = settings.tax_id || '';
+  document.getElementById('scrapLicenseNo').value = settings.scrap_license_no || '';
   document.getElementById('receiptWelcomeMessage').value = settings.receipt_welcome_message || '';
   document.getElementById('taxRate').value = settings.tax_rate || '7.00';
   document.getElementById('currencySymbol').value = settings.currency_symbol || '฿';
@@ -151,6 +152,7 @@ async function saveStoreSettings() {
     if (hasAppPermission('actions.settings.global', settingsPermissions)) {
       settingsData.store_name = formData.get('store_name');
       settingsData.tax_id = formData.get('tax_id');
+      settingsData.scrap_license_no = formData.get('scrap_license_no');
       settingsData.tax_rate = formData.get('tax_rate');
       settingsData.currency_symbol = formData.get('currency_symbol');
     } else {

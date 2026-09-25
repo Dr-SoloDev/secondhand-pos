@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ชุดหลักฐานผู้ขาย</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: #f0f0f0;
+      font-size: 13px;
+      color: #111;
+    }
+
+    /* ======== Print Controls ======== */
+    #printControls {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 100;
+      font-size: 13px;
+    }
+    #printControls button {
+      padding: 6px 18px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    #btnPrint { background: #22c55e; color: #fff; }
+    #btnClose { background: #64748b; color: #fff; }
+    #printControls .meta { color: #94a3b8; font-size: 12px; margin-left: 8px; }
+
+    #pageWrapper { padding: 70px 20px 20px; }
+
+    .a4-sheet {
+      width: 210mm;
+      min-height: 297mm;
+      background: #fff;
+      margin: 0 auto;
+      padding: 12mm 14mm;
+      border: 1px solid #ccc;
+      display: none;
+    }
+
+    /* ======== Header ======== */
+    .doc-header {
+      border: 2px solid #111;
+      padding: 8px 12px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .doc-header .title { font-size: 17px; font-weight: 800; }
+    .doc-header .sub { font-size: 12px; color: #333; }
+    .doc-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #444;
+      margin-bottom: 10px;
+    }
+
+    /* ======== Sections ======== */
+    .section {
+      border: 1.5px solid #333;
+      border-radius: 3px;
+      margin-bottom: 8px;
+      page-break-inside: avoid;
+    }
+    .section-title {
+      background: #eef2f7;
+      border-bottom: 1.5px solid #333;
+      padding: 4px 10px;
+      font-weight: 800;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .section-body { padding: 8px 10px; }
+
+    .kv-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 18px;
+      font-size: 13px;
+    }
+    .kv { display: flex; gap: 6px; }
+    .kv .k { color: #555; min-width: 128px; font-weight: 600; }
+    .kv .v { font-weight: 700; }
+    .kv.full { grid-column: 1 / -1; }
+
+    /* ID photo */
+    .identity-wrap { display: flex; gap: 14px; }
+    .identity-wrap .kv-grid { flex: 1; }
+    #idPhoto {
+      width: 150px;
+      height: 100px;
+      object-fit: cover;
+      border: 1.5px solid #333;
+      border-radius: 3px;
+      background: #fafafa;
+      flex-shrink: 0;
+    }
+    .photo-caption { font-size: 10px; text-align: center; color: #555; margin-top: 2px; }
+
+    /* shop header (ฝ่ายร้าน + ใบอนุญาต) */
+    .shop-header {
+      text-align: center;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #111;
+    }
+    .shop-header .shop-name { font-size: 16px; font-weight: 800; }
+    .shop-header .shop-sub { font-size: 11.5px; color: #333; }
+    .shop-header .shop-license { font-size: 12px; font-weight: 700; }
+
+    /* per-PO blocks + item thumbnails */
+    .po-block { border-top: 1px solid #bbb; }
+    .po-block:first-child { border-top: none; }
+    .po-head {
+      padding: 5px 10px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 12px;
+    }
+    .item-thumb {
+      width: 32mm;
+      max-height: 24mm;
+      object-fit: cover;
+      border: 1px solid #999;
+    }
+    .thumb-cap { font-size: 9px; color: #555; margin-top: 2px; line-height: 1.5; }
+
+    /* certification strip */
+    .cert-strip {
+      border: 1.5px dashed #555;
+      border-radius: 3px;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      margin-bottom: 8px;
+      background: #fafafa;
+    }
+
+    /* tables */
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+    }
+    table.data th, table.data td {
+      border: 1px solid #999;
+      padding: 3px 6px;
+      text-align: left;
+    }
+    table.data th { background: #f3f4f6; font-weight: 700; }
+    table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.data td.center { text-align: center; }
+    .empty-note { font-size: 12px; color: #777; padding: 4px 0; }
+
+    /* integrity badge */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .badge.ok { background: #16a34a; }
+    .badge.bad { background: #dc2626; }
+    .hash { font-family: monospace; font-size: 10px; }
+
+    /* summary strip */
+    .summary-strip {
+      display: flex;
+      gap: 18px;
+      padding: 6px 10px;
+      background: #f8fafc;
+      border-top: 1px solid #ccc;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* signature */
+    .signatures {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+      font-size: 12px;
+      text-align: center;
+    }
+    .signatures .sig { width: 40%; }
+    .signatures .line { border-bottom: 1px solid #111; height: 40px; margin-bottom: 4px; }
+
+    .blacklist-warn { color: #dc2626; font-weight: 800; }
+
+    #loadingState, #errorState {
+      text-align: center;
+      padding: 80px 20px;
+      font-size: 15px;
+      color: #444;
+    }
+    #errorState { color: #dc2626; font-weight: 700; }
+
+    /* ======== @media print ======== */
+    @media print {
+      body { background: #fff; }
+      #printControls { display: none !important; }
+      #pageWrapper { padding: 0; }
+      .a4-sheet {
+        display: block !important;
+        width: 100%;
+        min-height: auto;
+        border: none;
+        margin: 0;
+        padding: 8mm 10mm;
+      }
+      #loadingState, #errorState { display: none !important; }
+      /* ฉบับพิมพ์: ขยายรูปบัตรให้เห็นลายน้ำ (จอคงขนาดเดิม) */
+      #idPhoto { width: 85mm; height: auto; max-height: 60mm; }
+      @page {
+        size: A4;
+        margin: 8mm;
+        @bottom-right {
+          content: "หน้า " counter(page) " / " counter(pages);
+          font-size: 9px;
+          font-family: 'Sarabun', sans-serif;
+        }
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="printControls">
+    <button id="btnPrint" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+    <button id="btnClose" onclick="window.close()">ปิด</button>
+    <span class="meta" id="metaLine">กำลังโหลด...</span>
+  </div>
+
+  <div id="pageWrapper">
+    <div id="loadingState">กำลังโหลดชุดหลักฐาน...</div>
+    <div id="errorState" style="display:none"></div>
+    <div class="a4-sheet" id="sheet"></div>
+  </div>
+
+  <script src="../assets/js/config.js"></script>
+  <script>
+    const esc = (s) => String(s ?? '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const fmtMoney = (n) => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const shortHash = (h) => h ? h.slice(0, 16) + '…' + h.slice(-8) : '';
+
+    function sellerSection(d) {
+      const s = d.seller;
+      const photo = s.id_card_photo
+        ? `<div><img id="idPhoto" src="${esc(s.id_card_photo)}" alt="รูปบัตรประชาชน"><div class="photo-caption">รูปบัตรประชาชน (มีลายน้ำระบุวัตถุประสงค์)</div></div>`
+        : `<div><div id="idPhoto" style="display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">ไม่มีรูป</div><div class="photo-caption">ไม่มีรูปบัตร</div></div>`;
+      const blacklist = s.is_blacklisted
+        ? `<span class="blacklist-warn">ใช่ — ${esc(s.blacklist_reason || '-')}</span>` : 'ไม่ใช่';
+      return `
+      <div class="section">
+        <div class="section-title"><span>1. ข้อมูลผู้ขาย</span></div>
+        <div class="section-body">
+          <div class="identity-wrap">
+            <div class="kv-grid">
+              <div class="kv"><span class="k">ชื่อ-นามสกุล</span><span class="v">${esc(s.full_name)}</span></div>
+              <div class="kv"><span class="k">เลขบัตร ป.ป.ช.</span><span class="v">${esc(s.id_card) || '-'}</span></div>
+              <div class="kv"><span class="k">เบอร์โทร</span><span class="v">${esc(s.phone) || '-'}</span></div>
+              <div class="kv"><span class="k">ทะเบียนรถ</span><span class="v">${esc(s.vehicle_plate) || '-'}${s.vehicle_type ? ' (' + esc(s.vehicle_type) + ')' : ''}</span></div>
+              <div class="kv full"><span class="k">ที่อยู่</span><span class="v">${esc(s.address) || '-'}</span></div>
+              <div class="kv"><span class="k">วันที่ลงทะเบียน</span><span class="v">${esc(s.created_at) || '-'}</span></div>
+              <div class="kv"><span class="k">ยินยอม PDPA</span><span class="v">${esc(s.pdpa_consented_at) || 'ยังไม่ได้ให้'}</span></div>
+              <div class="kv"><span class="k">ขึ้นบัญชีดำ</span><span class="v">${blacklist}</span></div>
+              <div class="kv full"><span class="k">บันทึก</span><span class="v">${esc(s.notes) || '-'}</span></div>
+            </div>
+            ${photo}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function integritySection(d) {
+      const it = d.integrity || {};
+      const ok = !!it.valid;
+      const badge = ok
+        ? '<span class="badge ok">✓ ไม่ถูกดัดแปลง</span>'
+        : `<span class="badge bad">✗ พบการแก้ไข (จุดที่ ${esc(it.broken_at)}: ${esc(it.reason)})</span>`;
+      const rows = (it.chain || []).map(r => `
+        <tr>
+          <td class="center">${r.seq}</td>
+          <td>${esc(r.action)}${r.reason ? ' <small>(' + esc(r.reason) + ')</small>' : ''}</td>
+          <td>${esc(r.actor) || '-'}</td>
+          <td>${esc(r.created_at)}</td>
+          <td class="hash">${esc(shortHash(r.chain_hash))}</td>
+        </tr>`).join('');
+      return `
+      <div class="section">
+        <div class="section-title">
+          <span>2. ความถูกต้องของบันทึก (Tamper-Evidence Hash Chain)</span>
+          ${badge}
+        </div>
+        <div class="section-body">
+          <div style="font-size:12px;margin-bottom:6px;">
+            ตรวจสอบ ${it.entries || 0} รายการบันทึก
+            ${ok ? '— ทุกช่วงต่อกันถูกต้อง ไม่มีการแก้/ลบย้อนหลัง' : ''}
+          </div>
+          ${rows ? `
+          <table class="data">
+            <thead><tr><th style="width:30px">#</th><th>เหตุการณ์</th><th>ผู้กระทำ</th><th>เวลา</th><th>Chain Hash</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>` : '<div class="empty-note">ยังไม่มีบันทึกใน chain</div>'}
+        </div>
+      </div>`;
+    }
+
+    function txSection(d) {
+      // รายบิล: หัวบิล + ตารางรายการของพร้อมรูป thumbnail สีต่อแถว
+      const blocks = (d.transactions || []).map(t => {
+        const itemRows = (t.items || []).map(it => {
+          const extraPhotos = (it.photo_count || 0) > 1
+            ? `<div class="thumb-cap">รูปทั้งหมด ${it.photo_count} รูป ดูฉบับเต็มในระบบ</div>` : '';
+          const thumb = it.photo
+            ? `<img class="item-thumb" src="${esc(it.photo)}" alt="รูปของ">`
+              + `<div class="thumb-cap">${esc(t.reference_no)} · ${esc(t.created_at)} · ${esc(t.processed_by)}</div>`
+              + extraPhotos
+            : '<span style="color:#999;font-size:11px">ไม่มีรูป</span>';
+          return `<tr>
+            <td class="center" style="width:38mm">${thumb}</td>
+            <td>${esc(it.item_name)}${it.category ? ` <span style="color:#64748b;font-size:11px">(${esc(it.category)})</span>` : ''}</td>
+            <td class="num" style="white-space:nowrap">${esc(String(it.quantity))} ${esc(it.unit || '')}</td>
+            <td class="num">${fmtMoney(it.unit_price)}</td>
+            <td class="num">${fmtMoney(it.total_price)}</td>
+          </tr>`;
+        }).join('');
+        return `
+        <div class="po-block">
+          <div class="po-head"><strong>${esc(t.reference_no)}</strong> · ${esc(t.status)} · ${esc(t.branch_name)} · ${esc(t.processed_by)} · ${esc(t.created_at)}<span style="float:right">รวม <strong>฿ ${fmtMoney(t.total_amount)}</strong></span></div>
+          ${itemRows ? `<table class="data"><thead><tr><th style="width:38mm">รูปของ</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">รวม (฿)</th></tr></thead><tbody>${itemRows}</tbody></table>` : '<div class="empty-note" style="padding:4px 10px">ไม่มีรายการของในบิลนี้</div>'}
+        </div>`;
+      }).join('');
+      const sum = d.summary || {};
+      return `
+      <div class="section">
+        <div class="section-title"><span>3. ประวัติธุรกรรม (พร้อมรูปของกลาง)</span></div>
+        <div class="section-body" style="padding:0">
+          ${blocks || '<div class="empty-note" style="padding:8px 10px">ไม่มีธุรกรรม</div>'}
+          <div class="summary-strip">
+            <span>รายการที่สำเร็จ: ${sum.total_pos || 0} ครั้ง</span>
+            <span>รวมยอด: ฿ ${fmtMoney(sum.total_amount)}</span>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function disclosureSection(d) {
+      const methodLabels = { in_person: 'มาที่ร้าน', electronic: 'อิเล็กทรอนิกส์', api: 'ระบบ/API', other: 'อื่นๆ' };
+      const rows = (d.disclosures || []).map(x => `
+        <tr>
+          <td>${esc(x.disclosed_at)}</td>
+          <td>${esc(x.recipient)}</td>
+          <td>${esc(x.purpose)}</td>
+          <td class="center">${esc(methodLabels[x.method] || x.method)}</td>
+          <td>${esc(x.disclosed_by_name) || '-'}</td>
+          <td>${esc(x.legal_basis) || '-'}</td>
+        </tr>`).join('');
+      return `
+      <div class="section">
+        <div class="section-title"><span>4. บันทึกการเปิดเผยข้อมูล (PDPA Disclosure Log)</span></div>
+        <div class="section-body" style="padding:0">
+          ${rows ? `
+          <table class="data">
+            <thead><tr>
+              <th style="width:120px">วันเวลา</th><th>ผู้รับข้อมูล</th><th>วัตถุประสงค์</th>
+              <th style="width:70px">วิธี</th><th>ผู้ดำเนินการ</th><th>ฐานกฎหมาย</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>` : '<div class="empty-note" style="padding:8px 10px">ไม่มีการเปิดเผยข้อมูลให้บุคคลภายนอก</div>'}
+        </div>
+      </div>`;
+    }
+
+    function render(d) {
+      document.getElementById('loadingState').style.display = 'none';
+      const sheet = document.getElementById('sheet');
+      const shop = d.shop || {};
+      const shopAddr = [shop.store_address, shop.store_phone ? 'โทร ' + shop.store_phone : ''].filter(Boolean).join(' · ');
+      sheet.innerHTML = `
+        <div class="shop-header">
+          <div class="shop-name">${esc(shop.store_name) || 'ร้านรับซื้อของเก่า'}</div>
+          ${shopAddr ? `<div class="shop-sub">${esc(shopAddr)}</div>` : ''}
+          ${shop.scrap_license_no ? `<div class="shop-license">ใบอนุญาตค้าของเก่าเลขที่ ${esc(shop.scrap_license_no)}</div>` : ''}
+        </div>
+        <div class="doc-header">
+          <div class="title">ชุดหลักฐานข้อมูลผู้ขาย</div>
+          <div class="sub">เอกสารสำหรับยืนยันตัวตนและที่มาของของเก่าที่รับซื้อ — ใช้เป็นหลักฐานส่งมอบเจ้าหน้าที่</div>
+        </div>
+        <div class="doc-meta">
+          <span>รหัสผู้ขาย: #${d.seller.id}</span>
+          <span>ออกเมื่อ ${esc(d.generated_at)} โดย ${esc(d.generated_by)}</span>
+        </div>
+        ${sellerSection(d)}
+        ${integritySection(d)}
+        ${txSection(d)}
+        ${disclosureSection(d)}
+        <div class="cert-strip">เอกสารชุดนี้พิมพ์จากระบบ POS ของร้าน ${esc(shop.store_name) || ''} ประกอบด้วยข้อมูลผู้ขาย ประวัติธุรกรรมพร้อมรูปของกลาง บันทึกความถูกต้อง และบันทึกการเปิดเผยข้อมูล (เลขหน้าอยู่ท้ายกระดาษทุกแผ่น)</div>
+        <div class="signatures">
+          <div class="sig"><div class="line"></div>ผู้จัดทำเอกสาร (ลายมือชื่อ)</div>
+          <div class="sig"><div class="line"></div>ผู้รับรองเอกสาร (ลายมือชื่อ/ตราประทับ)</div>
+        </div>`;
+      sheet.style.display = 'block';
+      document.getElementById('metaLine').textContent = `ผู้ขาย: ${d.seller.full_name} | ออกเมื่อ ${d.generated_at}`;
+      document.title = `ชุดหลักฐาน #${d.seller.id} ${d.seller.full_name}`;
+
+      if (new URLSearchParams(window.location.search).get('auto') === '1') {
+        document.fonts.ready.then(() => window.print());
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loadingState').style.display = 'none';
+      const el = document.getElementById('errorState');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    async function loadAndRender() {
+      const id = new URLSearchParams(window.location.search).get('id');
+      if (!id) { showError('ไม่พบ id ผู้ขาย'); return; }
+      try {
+        const res = await fetch(`${window.apiPath}/sellers/evidence-pack?id=${encodeURIComponent(id)}`, {
+          credentials: 'include'
+        });
+        if (res.status === 401) { window.location.href = '../index.html'; return; }
+        if (res.status === 403) { showError('ส่วนนี้สำหรับผู้จัดการขึ้นไป กรุณาให้ผู้จัดการเปิดเอกสาร'); return; }
+        const data = await res.json();
+        if (!res.ok || data.status !== 'success') {
+          showError(data.message || 'โหลดข้อมูลไม่สำเร็จ');
+          return;
+        }
+        render(data.data);
+      } catch (e) {
+        showError('ไม่สามารถโหลดชุดหลักฐานได้ กรุณาลองใหม่');
+      }
+    }
+
+    loadAndRender();
+  </script>
+  <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js");}</script>
+</body>
+</html>
