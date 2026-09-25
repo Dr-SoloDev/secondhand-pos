@@ -120,7 +120,10 @@ class SellersController extends Controller
 
         try {
             $sellerId = $sellerModel->create($data);
-            
+
+            // Tamper-evidence chain — บันทึก hash หลังสร้างสำเร็จ
+            $this->appendSellerIntegrity($sellerId, 'create');
+
             // Log activity
             Logger::logActivity(
                 $this->user['user_id'],
@@ -209,6 +212,9 @@ class SellersController extends Controller
         try {
             $sellerModel->update($id, $data);
 
+            // Tamper-evidence chain
+            $this->appendSellerIntegrity((int)$id, 'update');
+
             // Audit log — tier change
             $tierChanged = isset($data['tier_level']) && (int)$data['tier_level'] !== (int)($current['tier_level'] ?? 1);
             if ($tierChanged && isset($oldLabel, $newLabel)) {
@@ -267,6 +273,312 @@ class SellersController extends Controller
             [$id]
         );
         Response::success('สำเร็จ', ['items' => $items ?: []]);
+    }
+
+    /**
+     * POST /api/sellers/disclosure-log — บันทึกการเปิดเผยข้อมูลผู้ขายให้บุคคลภายนอก (PDPA)
+     * append-only: สร้างอย่างเดียว ไม่มีแก้/ลบ
+     */
+    public function createDisclosureLog()
+    {
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
+
+        $data = $this->getRequestData();
+        $sellerId = intval($data['seller_id'] ?? 0);
+        if (!$sellerId) {
+            Response::error('กรุณาระบุ seller_id', 400);
+            return;
+        }
+
+        $sellerModel = new Seller();
+        if (!$sellerModel->getById($sellerId)) {
+            Response::error('ไม่พบผู้ขายนี้', 404);
+            return;
+        }
+
+        $recipient = trim((string)($data['recipient'] ?? ''));
+        $purpose = trim((string)($data['purpose'] ?? ''));
+        if ($recipient === '' || $purpose === '') {
+            Response::error('ต้องระบุ "ผู้รับข้อมูล" และ "วัตถุประสงค์"', 400);
+            return;
+        }
+
+        $method = $data['method'] ?? 'other';
+        if (!in_array($method, ['in_person', 'electronic', 'api', 'other'], true)) {
+            $method = 'other';
+        }
+
+        // items: รายการข้อมูลที่เปิดเผย (array ของ key)
+        $allowedItems = ['id_card', 'id_card_photo', 'phone', 'address', 'transactions', 'other'];
+        $items = $data['items'] ?? [];
+        if (!is_array($items)) $items = [];
+        $items = array_values(array_intersect($items, $allowedItems));
+
+        $db = Database::getInstance();
+        $newId = $db->insert('disclosure_logs', [
+            'seller_id'     => $sellerId,
+            'disclosed_at'  => !empty($data['disclosed_at']) ? (string)$data['disclosed_at'] : date('Y-m-d H:i:s'),
+            'disclosed_by'  => $this->user['user_id'],
+            'recipient'     => mb_substr($recipient, 0, 255),
+            'purpose'       => mb_substr($purpose, 0, 255),
+            'method'        => $method,
+            'items'         => $items ? json_encode($items, JSON_UNESCAPED_UNICODE) : null,
+            'legal_basis'   => !empty($data['legal_basis']) ? mb_substr((string)$data['legal_basis'], 0, 255) : null,
+            'notes'         => !empty($data['notes']) ? mb_substr((string)$data['notes'], 0, 1000) : null,
+        ]);
+
+        Logger::logActivity(
+            $this->user['user_id'],
+            'create_disclosure_log',
+            "Disclosed seller ID: {$sellerId} data to {$recipient}",
+            [
+                'actor' => $this->user,
+                'module' => 'sellers',
+                'entity_type' => 'seller',
+                'entity_id' => $sellerId,
+                'recipient' => $recipient,
+                'purpose' => $purpose,
+                'items' => $items,
+            ]
+        );
+
+        Response::success('บันทึกการเปิดเผยข้อมูลสำเร็จ', ['id' => $newId]);
+    }
+
+    /**
+     * GET /api/sellers/disclosure-log?id=X — รายการเปิดเผยข้อมูลของผู้ขาย
+     */
+    public function getDisclosureLogs()
+    {
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $id = intval($_GET['id'] ?? 0);
+        if (!$id) { Response::error('ไม่พบ id', 400); return; }
+
+        $db = Database::getInstance();
+        $rows = $db->fetchAll(
+            "SELECT d.id, d.disclosed_at, d.recipient, d.purpose, d.method, d.items,
+                    d.legal_basis, d.notes, u.full_name AS disclosed_by_name
+             FROM disclosure_logs d
+             LEFT JOIN users u ON d.disclosed_by = u.id
+             WHERE d.seller_id = ?
+             ORDER BY d.disclosed_at DESC",
+            [$id]
+        );
+        foreach ($rows as &$row) {
+            $row['items'] = $row['items'] ? (json_decode($row['items'], true) ?: []) : [];
+        }
+        unset($row);
+
+        Response::success('สำเร็จ', ['items' => $rows]);
+    }
+
+    /**
+     * GET /api/sellers/evidence-pack?id=X — ชุดหลักฐานผู้ขายสำหรับพิมพ์/ส่งให้ จนท.
+     * ประกอบด้วย: ข้อมูลผู้ขาย+รูปบัตร, ธุรกรรม, hash chain verify, disclosure log, retention
+     * การดึงข้อมูลนี้ถูก audit (เห็นเลข บัตร 13 หลัก = ต้องมี log เสมอ)
+     */
+    public function getEvidencePack()
+    {
+        $this->requireAuth(['admin', 'manager', 'super_manager']);
+        $id = intval($_GET['id'] ?? 0);
+        if (!$id) { Response::error('ไม่พบ id', 400); return; }
+
+        $db = Database::getInstance();
+        $sellerModel = new Seller();
+        $seller = $sellerModel->getById($id);
+        if (!$seller) {
+            Response::error('ไม่พบผู้ขายนี้', 404);
+            return;
+        }
+
+        // 0. ข้อมูลร้าน + เลขใบอนุญาตค้าของเก่า (global settings)
+        $shopSettings = (new Setting())->getSettingsByKeys([
+            'store_name', 'store_phone', 'store_address', 'tax_id', 'scrap_license_no',
+        ]);
+        $shop = [
+            'store_name'       => $shopSettings['store_name'] ?? '',
+            'store_phone'      => $shopSettings['store_phone'] ?? '',
+            'store_address'    => $shopSettings['store_address'] ?? '',
+            'tax_id'           => $shopSettings['tax_id'] ?? '',
+            'scrap_license_no' => $shopSettings['scrap_license_no'] ?? '',
+        ];
+
+        // 1. ธุรกรรมพร้อมรายการของ + รูปหลักต่อรายการ (สำหรับพิมพ์ส่งเจ้าหน้าที่)
+        $pos = $db->fetchAll(
+            "SELECT po.*,
+                    b.name AS branch_name,
+                    u.full_name AS processed_by_name
+             FROM purchase_orders po
+             LEFT JOIN branches b ON po.branch_id = b.id
+             LEFT JOIN users u ON po.user_id = u.id
+             WHERE po.seller_id = ?
+               AND COALESCE(po.source_type, 'manual') = 'manual'
+             ORDER BY po.created_at DESC",
+            [$id]
+        );
+
+        $allItems = $db->fetchAll(
+            "SELECT poi.*,
+                    po.id AS po_id,
+                    c.name AS category_name
+             FROM purchase_order_items poi
+             JOIN purchase_orders po ON poi.purchase_order_id = po.id
+             LEFT JOIN categories c ON poi.category_id = c.id
+             WHERE po.seller_id = ?
+               AND COALESCE(po.source_type, 'manual') = 'manual'
+             ORDER BY po.created_at DESC, poi.id ASC",
+            [$id]
+        );
+
+        $allPhotos = $db->fetchAll(
+            "SELECT pop.id, pop.purchase_order_id, pop.purchase_order_item_id, pop.is_primary
+             FROM purchase_order_photos pop
+             JOIN purchase_orders po ON pop.purchase_order_id = po.id
+             WHERE po.seller_id = ?
+               AND COALESCE(po.source_type, 'manual') = 'manual'
+             ORDER BY pop.created_at ASC",
+            [$id]
+        );
+
+        // จัดกลุ่มรูปตาม item (เลือกรูปหลักก่อน) + นับรูปตาม PO
+        $photosByItem = [];
+        $photoCountByPo = [];
+        foreach ($allPhotos as $photo) {
+            $poId = (int)$photo['purchase_order_id'];
+            $photoCountByPo[$poId] = ($photoCountByPo[$poId] ?? 0) + 1;
+            $itemId = $photo['purchase_order_item_id'];
+            if ($itemId) {
+                $itemId = (int)$itemId;
+                if (!isset($photosByItem[$itemId])) $photosByItem[$itemId] = [];
+                $photosByItem[$itemId][] = $photo;
+            }
+        }
+
+        $itemsByPo = [];
+        foreach ($allItems as $item) {
+            $poId = (int)$item['po_id'];
+            $itemId = (int)$item['id'];
+            $photos = $photosByItem[$itemId] ?? [];
+            // รูปหลัก (is_primary) ก่อน ไม่งั้นรูปแรก
+            $primary = null;
+            foreach ($photos as $p) {
+                if (!empty($p['is_primary'])) { $primary = $p; break; }
+            }
+            if ($primary === null && $photos) $primary = $photos[0];
+            if (!isset($itemsByPo[$poId])) $itemsByPo[$poId] = [];
+            $itemsByPo[$poId][] = [
+                'item_name'   => $item['item_name'],
+                'quantity'    => $item['quantity'],
+                'unit'        => $item['unit'],
+                'unit_price'  => $item['unit_price'],
+                'total_price' => $item['total_price'],
+                'category'    => $item['category_name'] ?? '',
+                // ส่งแค่รูปหลัก 1 รูปต่อรายการ (กัน payload ใหญ่) + จำนวนรูปทั้งหมด
+                'photo'       => $primary
+                    ? $this->protectedPurchasePhotoUrl((int)$primary['id']) : null,
+                'photo_count' => count($photos),
+            ];
+        }
+
+        $transactions = [];
+        $totalAmount = 0.0;
+        $totalPos = 0;
+        foreach ($pos as $po) {
+            $amount = floatval($po['total_amount']);
+            $poId = (int)$po['id'];
+            $transactions[] = [
+                'reference_no'  => $po['reference_no'],
+                'status'        => $po['status'],
+                'total_amount'  => $amount,
+                'total_items'   => intval($po['total_items']),
+                'payment_method'=> $po['payment_method'],
+                'branch_name'   => $po['branch_name'] ?? '',
+                'processed_by'  => $po['processed_by_name'] ?? '',
+                'created_at'    => $po['created_at'],
+                'items'         => $itemsByPo[$poId] ?? [],
+                'photo_count'   => $photoCountByPo[$poId] ?? 0,
+            ];
+            if ($po['status'] === 'completed') {
+                $totalPos++;
+                $totalAmount += $amount;
+            }
+        }
+
+        // 2. Integrity chain + verify
+        $chain = $db->fetchAll(
+            "SELECT seq, action, reason, actor, created_at, chain_hash, prev_hash
+             FROM record_integrity
+             WHERE entity_type = 'seller' AND entity_id = ?
+             ORDER BY seq ASC",
+            [$id]
+        );
+        $integrity = IntegrityService::verify('seller', $id);
+        $integrity['chain'] = array_map(static function ($row) {
+            return [
+                'seq'         => (int)$row['seq'],
+                'action'      => $row['action'],
+                'reason'      => $row['reason'],
+                'actor'       => $row['actor'],
+                'created_at'  => $row['created_at'],
+                'chain_hash'  => $row['chain_hash'],
+            ];
+        }, $chain);
+
+        // 3. Disclosure log
+        $disclosures = $db->fetchAll(
+            "SELECT d.disclosed_at, d.recipient, d.purpose, d.method, d.items,
+                    d.legal_basis, d.notes, u.full_name AS disclosed_by_name
+             FROM disclosure_logs d
+             LEFT JOIN users u ON d.disclosed_by = u.id
+             WHERE d.seller_id = ?
+             ORDER BY d.disclosed_at DESC",
+            [$id]
+        );
+
+        // 4. Audit — ดึงหลักฐาน/เห็นเลข บัตร ต้องมี log เสมอ
+        Logger::logActivity(
+            $this->user['user_id'],
+            'view_evidence_pack',
+            "Viewed evidence pack seller ID: {$id}",
+            [
+                'actor' => $this->user,
+                'module' => 'sellers',
+                'entity_type' => 'seller',
+                'entity_id' => $id,
+            ]
+        );
+
+        Response::success('สำเร็จ', [
+            'shop' => $shop,
+            'seller' => [
+                'id'                => $seller['id'],
+                'full_name'         => $seller['full_name'],
+                'id_card'           => $seller['id_card'] ?? '',
+                'phone'             => $seller['phone'] ?? '',
+                'address'           => $seller['address'] ?? '',
+                'vehicle_plate'     => $seller['vehicle_plate'] ?? '',
+                'vehicle_type'      => $seller['vehicle_type'] ?? '',
+                'id_card_photo'     => !empty($seller['id_card_photo'])
+                    ? $this->protectedSellerPhotoUrl((int)$seller['id'])
+                    : '',
+                'pdpa_consented_at' => $seller['pdpa_consented_at'] ?? null,
+                'is_blacklisted'    => (int)($seller['is_blacklisted'] ?? 0),
+                'blacklist_reason'  => $seller['blacklist_reason'] ?? '',
+                'notes'             => $seller['notes'] ?? '',
+                'created_at'        => $seller['created_at'] ?? null,
+                'retain_until'      => $seller['retain_until'] ?? null,
+                'retain_reason'     => $seller['retain_reason'] ?? null,
+            ],
+            'transactions' => $transactions,
+            'summary' => [
+                'total_pos'    => $totalPos,
+                'total_amount' => $totalAmount,
+            ],
+            'integrity' => $integrity,
+            'disclosures' => $disclosures,
+            'generated_at' => date('Y-m-d H:i:s'),
+            'generated_by' => $this->user['full_name'] ?? ($this->user['username'] ?? ''),
+        ]);
     }
 
     /**
@@ -460,6 +772,8 @@ class SellersController extends Controller
                 'blacklist_reason'   => $seller['blacklist_reason'] ?? '',
                 'notes'              => $seller['notes'] ?? '',
                 'tier_level'         => $tierLevel,
+                'retain_until'       => $seller['retain_until'] ?? null,
+                'retain_reason'      => $seller['retain_reason'] ?? null,
                 'total_transactions' => $seller['total_transactions'] ?? 0,
                 'total_amount'       => $seller['total_amount'] ?? 0,
                 'last_transaction_at'=> $seller['last_transaction_at'] ?? null,
@@ -495,6 +809,9 @@ class SellersController extends Controller
 
         try {
             $sellerModel->blacklist($id, $reason);
+
+            // Tamper-evidence chain
+            $this->appendSellerIntegrity((int)$id, 'blacklist', is_string($reason) ? $reason : null);
 
             Logger::logActivity(
                 $this->user['user_id'],
@@ -535,6 +852,9 @@ class SellersController extends Controller
 
         try {
             $sellerModel->unblacklist($id);
+
+            // Tamper-evidence chain
+            $this->appendSellerIntegrity((int)$id, 'unblacklist');
 
             Logger::logActivity(
                 $this->user['user_id'],
@@ -642,6 +962,9 @@ class SellersController extends Controller
         $db = Database::getInstance();
         $db->query('UPDATE sellers SET id_card_photo = ? WHERE id = ?', [$urlPath, $id]);
 
+        // Tamper-evidence chain — รูปบัตรเปลี่ยน
+        $this->appendSellerIntegrity($id, 'update', 'photo_upload');
+
         Logger::logActivity(
             $this->user['user_id'],
             'upload_seller_photo',
@@ -699,6 +1022,28 @@ class SellersController extends Controller
     /**
      * resize รูปภาพและบันทึกเป็น JPEG (max 1920px)
      */
+    /**
+     * ต่อ hash chain ของผู้ขาย — fail-open (chain พังห้ามทำให้ API พัง)
+     */
+    private function appendSellerIntegrity(int $sellerId, string $action, ?string $reason = null): void
+    {
+        try {
+            $snapshot = (new Seller())->getById($sellerId);
+            if ($snapshot) {
+                IntegrityService::append(
+                    'seller',
+                    $sellerId,
+                    $action,
+                    $snapshot,
+                    $reason,
+                    $this->user['username'] ?? null
+                );
+            }
+        } catch (Throwable $e) {
+            error_log("appendSellerIntegrity failed (seller {$sellerId}): " . $e->getMessage());
+        }
+    }
+
     private function saveResizedImage(string $srcPath, string $destPath): bool
     {
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -735,6 +1080,11 @@ class SellersController extends Controller
             imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $w, $h);
             imagedestroy($src);
             $src = $dst;
+        }
+
+        // Watermark รูปบัตรประชาชน (bake ลงไฟล์) — fail-open: ไม่ให้อัปโหลดล้มเหลวถ้า gd/font ไม่พร้อม
+        if (class_exists('ImageWatermark') && !ImageWatermark::apply($src)) {
+            error_log('[Watermark] skipped for ' . $destPath);
         }
 
         $ok = imagejpeg($src, $destPath, 85);
