@@ -187,6 +187,9 @@ class Router
         $this->routes[] = ['route' => 'sellers/unblacklist', 'controller' => 'SellersController', 'method' => 'unblacklistSeller', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'sellers/history', 'controller' => 'SellersController', 'method' => 'getSellerHistory', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'sellers/data-center', 'controller' => 'SellersController', 'method' => 'getSellerDataCenter', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sellers/evidence-pack', 'controller' => 'SellersController', 'method' => 'getEvidencePack', 'verb' => 'GET'];
+        $this->routes[] = ['route' => 'sellers/disclosure-log', 'controller' => 'SellersController', 'method' => 'createDisclosureLog', 'verb' => 'POST'];
+        $this->routes[] = ['route' => 'sellers/disclosure-log', 'controller' => 'SellersController', 'method' => 'getDisclosureLogs', 'verb' => 'GET'];
         $this->routes[] = ['route' => 'sellers/photo', 'controller' => 'SellersController', 'method' => 'uploadPhoto', 'verb' => 'POST'];
         $this->routes[] = ['route' => 'sellers/photo-view', 'controller' => 'SellersController', 'method' => 'viewPhoto', 'verb' => 'GET'];
 

@@ -6,7 +6,7 @@ class SettingsController extends Controller
         'store_phone', 'store_address', 'receipt_footer', 'receipt_welcome_message'
     ];
     private const GLOBAL_STORE_KEYS = [
-        'store_name', 'tax_id', 'tax_rate', 'currency_symbol'
+        'store_name', 'tax_id', 'tax_rate', 'currency_symbol', 'scrap_license_no'
     ];
     private const BRANCH_SYSTEM_KEYS = ['low_stock_threshold'];
     private const GLOBAL_SYSTEM_KEYS = ['date_format', 'time_zone', 'language'];
@@ -23,6 +23,7 @@ class SettingsController extends Controller
             'tax_id',
             'tax_rate',
             'currency_symbol',
+            'scrap_license_no',
             'receipt_footer',
             'receipt_welcome_message'
         ];
@@ -61,6 +62,9 @@ class SettingsController extends Controller
             'tax_id' => $data['tax_id'] ?? null,
             'tax_rate' => $data['tax_rate'] ?? null,
             'currency_symbol' => $data['currency_symbol'] ?? null,
+            // ใบอนุญาตค้าของเก่า — ใบเดียวทั้งกิจการ (global only)
+            'scrap_license_no' => !empty($data['scrap_license_no'])
+                ? mb_substr(trim((string)$data['scrap_license_no']), 0, 100) : null,
             'receipt_footer' => $data['receipt_footer'] ?? null,
             'receipt_welcome_message' => $data['receipt_welcome_message'] ?? null
         ];
