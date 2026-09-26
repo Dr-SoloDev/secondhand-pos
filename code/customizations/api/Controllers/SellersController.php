@@ -391,6 +391,17 @@ class SellersController extends Controller
             return;
         }
 
+        // เลือกเฉพาะบิลที่เป็นคดี (fairness: ไม่เหมารวมทุกบิล กันตีต่างกรรมต่างวาระเกินจริง)
+        // po_ids=1,2,3 — ไม่ส่ง = ทั้งหมด (backward compat)
+        $poFilter = [];
+        if (!empty($_GET['po_ids'])) {
+            foreach (explode(',', (string)$_GET['po_ids']) as $part) {
+                $pid = intval(trim($part));
+                if ($pid > 0) $poFilter[] = $pid;
+            }
+            $poFilter = array_values(array_unique($poFilter));
+        }
+
         // 0. ข้อมูลร้าน + เลขใบอนุญาตค้าของเก่า (global settings)
         $shopSettings = (new Setting())->getSettingsByKeys([
             'store_name', 'store_phone', 'store_address', 'tax_id', 'scrap_license_no',
@@ -440,6 +451,20 @@ class SellersController extends Controller
             [$id]
         );
 
+        // กรองเฉพาะบิลที่เลือก (ทุก query ถูก scope ด้วย seller_id อยู่แล้ว)
+        if ($poFilter) {
+            $allowed = array_flip($poFilter);
+            $pos = array_values(array_filter($pos, static function ($po) use ($allowed) {
+                return isset($allowed[(int)$po['id']]);
+            }));
+            $allItems = array_values(array_filter($allItems, static function ($it) use ($allowed) {
+                return isset($allowed[(int)$it['po_id']]);
+            }));
+            $allPhotos = array_values(array_filter($allPhotos, static function ($ph) use ($allowed) {
+                return isset($allowed[(int)$ph['purchase_order_id']]);
+            }));
+        }
+
         // จัดกลุ่มรูปตาม item (เลือกรูปหลักก่อน) + นับรูปตาม PO
         $photosByItem = [];
         $photoCountByPo = [];
@@ -483,10 +508,13 @@ class SellersController extends Controller
         $transactions = [];
         $totalAmount = 0.0;
         $totalPos = 0;
+        $includedRefs = [];
         foreach ($pos as $po) {
             $amount = floatval($po['total_amount']);
             $poId = (int)$po['id'];
+            $includedRefs[] = $po['reference_no'];
             $transactions[] = [
+                'id'            => $poId,
                 'reference_no'  => $po['reference_no'],
                 'status'        => $po['status'],
                 'total_amount'  => $amount,
@@ -535,21 +563,25 @@ class SellersController extends Controller
             [$id]
         );
 
-        // 4. Audit — ดึงหลักฐาน/เห็นเลข บัตร ต้องมี log เสมอ
+        // 4. Audit — ดึงหลักฐาน/เห็นเลข บัตร ต้องมี log เสมอ (บันทึกบิลที่รวมในชุดด้วย)
         Logger::logActivity(
             $this->user['user_id'],
             'view_evidence_pack',
-            "Viewed evidence pack seller ID: {$id}",
+            "Viewed evidence pack seller ID: {$id} ["
+                . ($includedRefs ? implode(',', $includedRefs) : ($poFilter ? 'none' : 'all')) . "]",
             [
                 'actor' => $this->user,
                 'module' => 'sellers',
                 'entity_type' => 'seller',
                 'entity_id' => $id,
+                'after' => ['po_filter' => $poFilter, 'included_refs' => $includedRefs],
             ]
         );
 
         Response::success('สำเร็จ', [
             'shop' => $shop,
+            'po_filter' => $poFilter,
+            'included_refs' => $includedRefs,
             'seller' => [
                 'id'                => $seller['id'],
                 'full_name'         => $seller['full_name'],

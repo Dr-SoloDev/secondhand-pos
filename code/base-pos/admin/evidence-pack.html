@@ -152,6 +152,54 @@
       background: #fafafa;
     }
 
+    /* PO selection (screen only — ซ่อนตอนพิมพ์) */
+    .po-select {
+      border: 1.5px solid #b45309;
+      border-radius: 3px;
+      margin-bottom: 8px;
+      background: #fffbeb;
+    }
+    .po-select-title {
+      padding: 4px 10px;
+      font-weight: 800;
+      font-size: 13px;
+      border-bottom: 1px solid #fcd34d;
+    }
+    .po-select-warn {
+      padding: 6px 10px;
+      font-size: 12px;
+      color: #92400e;
+      background: #fef3c7;
+      border-bottom: 1px solid #fcd34d;
+    }
+    .po-check-list { padding: 6px 10px; max-height: 180px; overflow-y: auto; }
+    .po-check-list label {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 12.5px;
+      border-bottom: 1px dotted #e5e7eb;
+      cursor: pointer;
+    }
+    .po-select-actions {
+      display: flex;
+      gap: 8px;
+      padding: 8px 10px;
+      border-top: 1px solid #fcd34d;
+    }
+    .po-select-actions button {
+      padding: 5px 14px;
+      border-radius: 5px;
+      border: 1px solid #d1d5db;
+      cursor: pointer;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      background: #fff;
+    }
+    #btnApplyPo { background: #2563eb; border-color: #2563eb; color: #fff; }
+
     /* tables */
     table.data {
       width: 100%;
@@ -216,7 +264,7 @@
     /* ======== @media print ======== */
     @media print {
       body { background: #fff; }
-      #printControls { display: none !important; }
+      #printControls, #poSelectBlock { display: none !important; }
       #pageWrapper { padding: 0; }
       .a4-sheet {
         display: block !important;
@@ -390,11 +438,61 @@
       </div>`;
     }
 
+    let currentSellerId = null;
+    let allPos = []; // บิลทั้งหมดของผู้ขาย (สำหรับ checklist) — เก็บจากครั้งแรกที่โหลดแบบไม่กรอง
+
+    function poSelectSection(loadedIds) {
+      const loaded = new Set((loadedIds || []).map(Number));
+      const rows = allPos.map(p => `
+        <label>
+          <input type="checkbox" class="poCheck" value="${p.id}" ${loaded.has(Number(p.id)) ? 'checked' : ''}>
+          <span><strong>${esc(p.reference_no)}</strong> · ${esc(p.status)} · ${esc(p.branch_name)} · ${esc(p.created_at)} · ฿ ${fmtMoney(p.total_amount)}</span>
+        </label>`).join('');
+      return `
+      <div id="poSelectBlock" class="po-select">
+        <div class="po-select-title">☑ เลือกบิลที่รวมในชุดหลักฐาน (<span id="poSelectedCount">${loaded.size}</span>/${allPos.length} ฉบับ)</div>
+        <div class="po-select-warn">⚖️ ใส่เฉพาะบิลที่เป็นคดี — อย่าเหมารวมทุกบิล เพราะศาลอาจนับต่างกรรมต่างวาระแยกกันทุกบิล ทำให้ผู้ขายรับโทษเกินความผิดจริง</div>
+        <div class="po-check-list">${rows || '<div class="empty-note">ไม่มีบิล</div>'}</div>
+        <div class="po-select-actions">
+          <button id="btnSelectAll" type="button">เลือกทั้งหมด</button>
+          <button id="btnClearAll" type="button">ล้าง</button>
+          <button id="btnApplyPo" type="button">โหลดชุดที่เลือก</button>
+        </div>
+      </div>`;
+    }
+
+    function selectedPoIds() {
+      return Array.from(document.querySelectorAll('.poCheck:checked')).map(c => c.value);
+    }
+
+    function wirePoSelect() {
+      document.querySelectorAll('.poCheck').forEach(c => c.addEventListener('change', () => {
+        document.getElementById('poSelectedCount').textContent = selectedPoIds().length;
+      }));
+      document.getElementById('btnSelectAll').onclick = () => {
+        document.querySelectorAll('.poCheck').forEach(c => c.checked = true);
+        document.getElementById('poSelectedCount').textContent = selectedPoIds().length;
+      };
+      document.getElementById('btnClearAll').onclick = () => {
+        document.querySelectorAll('.poCheck').forEach(c => c.checked = false);
+        document.getElementById('poSelectedCount').textContent = '0';
+      };
+      document.getElementById('btnApplyPo').onclick = () => {
+        const ids = selectedPoIds();
+        if (!ids.length && !confirm('ไม่ได้เลือกบิลเลย — โหลดชุดว่างเปล่า?')) return;
+        fetchPack(ids);
+      };
+    }
+
     function render(d) {
       document.getElementById('loadingState').style.display = 'none';
       const sheet = document.getElementById('sheet');
       const shop = d.shop || {};
       const shopAddr = [shop.store_address, shop.store_phone ? 'โทร ' + shop.store_phone : ''].filter(Boolean).join(' · ');
+      const refs = d.included_refs || [];
+      const refsText = refs.length
+        ? `ครอบคลุมบิล ${refs.map(esc).join(', ')} (รวม ${refs.length} ฉบับ)`
+        : 'ไม่รวมบิลใดในชุดนี้';
       sheet.innerHTML = `
         <div class="shop-header">
           <div class="shop-name">${esc(shop.store_name) || 'ร้านรับซื้อของเก่า'}</div>
@@ -406,20 +504,22 @@
           <div class="sub">เอกสารสำหรับยืนยันตัวตนและที่มาของของเก่าที่รับซื้อ — ใช้เป็นหลักฐานส่งมอบเจ้าหน้าที่</div>
         </div>
         <div class="doc-meta">
-          <span>รหัสผู้ขาย: #${d.seller.id}</span>
+          <span>รหัสผู้ขาย: #${d.seller.id} · บิลในชุดนี้ ${(d.transactions || []).length} ฉบับ</span>
           <span>ออกเมื่อ ${esc(d.generated_at)} โดย ${esc(d.generated_by)}</span>
         </div>
         ${sellerSection(d)}
         ${integritySection(d)}
+        ${poSelectSection((d.transactions || []).map(t => t.id))}
         ${txSection(d)}
         ${disclosureSection(d)}
-        <div class="cert-strip">เอกสารชุดนี้พิมพ์จากระบบ POS ของร้าน ${esc(shop.store_name) || ''} ประกอบด้วยข้อมูลผู้ขาย ประวัติธุรกรรมพร้อมรูปของกลาง บันทึกความถูกต้อง และบันทึกการเปิดเผยข้อมูล (เลขหน้าอยู่ท้ายกระดาษทุกแผ่น)</div>
+        <div class="cert-strip">เอกสารชุดนี้พิมพ์จากระบบ POS ของร้าน ${esc(shop.store_name) || ''} ประกอบด้วยข้อมูลผู้ขาย ประวัติธุรกรรมพร้อมรูปของกลาง บันทึกความถูกต้อง และบันทึกการเปิดเผยข้อมูล — ${refsText} (เลขหน้าอยู่ท้ายกระดาษทุกแผ่น)</div>
         <div class="signatures">
           <div class="sig"><div class="line"></div>ผู้จัดทำเอกสาร (ลายมือชื่อ)</div>
           <div class="sig"><div class="line"></div>ผู้รับรองเอกสาร (ลายมือชื่อ/ตราประทับ)</div>
         </div>`;
       sheet.style.display = 'block';
-      document.getElementById('metaLine').textContent = `ผู้ขาย: ${d.seller.full_name} | ออกเมื่อ ${d.generated_at}`;
+      wirePoSelect();
+      document.getElementById('metaLine').textContent = `ผู้ขาย: ${d.seller.full_name} | บิล ${(d.transactions || []).length} ฉบับ | ออกเมื่อ ${d.generated_at}`;
       document.title = `ชุดหลักฐาน #${d.seller.id} ${d.seller.full_name}`;
 
       if (new URLSearchParams(window.location.search).get('auto') === '1') {
@@ -434,11 +534,15 @@
       el.style.display = 'block';
     }
 
-    async function loadAndRender() {
-      const id = new URLSearchParams(window.location.search).get('id');
-      if (!id) { showError('ไม่พบ id ผู้ขาย'); return; }
+    async function fetchPack(poIds) {
+      const q = new URLSearchParams({ id: currentSellerId });
+      if (poIds && poIds.length) q.set('po_ids', poIds.join(','));
+      history.replaceState(null, '', `${location.pathname}?${q.toString()}`);
+      document.getElementById('loadingState').style.display = 'block';
+      document.getElementById('sheet').style.display = 'none';
+      document.getElementById('errorState').style.display = 'none';
       try {
-        const res = await fetch(`${window.apiPath}/sellers/evidence-pack?id=${encodeURIComponent(id)}`, {
+        const res = await fetch(`${window.apiPath}/sellers/evidence-pack?${q.toString()}`, {
           credentials: 'include'
         });
         if (res.status === 401) { window.location.href = '../index.html'; return; }
@@ -448,9 +552,31 @@
           showError(data.message || 'โหลดข้อมูลไม่สำเร็จ');
           return;
         }
+        if (!allPos.length) {
+          // เก็บรายชื่อบิลทั้งหมดจากครั้งแรกที่โหลดแบบไม่กรอง (ไว้สร้าง checklist)
+          allPos = (data.data.transactions || []).map(t => ({
+            id: t.id, reference_no: t.reference_no, status: t.status,
+            branch_name: t.branch_name, created_at: t.created_at, total_amount: t.total_amount,
+          }));
+        }
         render(data.data);
       } catch (e) {
         showError('ไม่สามารถโหลดชุดหลักฐานได้ กรุณาลองใหม่');
+      }
+    }
+
+    async function loadAndRender() {
+      const params = new URLSearchParams(window.location.search);
+      currentSellerId = params.get('id');
+      if (!currentSellerId) { showError('ไม่พบ id ผู้ขาย'); return; }
+      await fetchPack([]); // โหลดทั้งหมดก่อน (checklist + มุมมองตั้งต้น)
+      if (!document.querySelector('.poCheck')) return; // โหลดล้มเหลว
+      const initialFilter = (params.get('po_ids') || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (initialFilter.length) {
+        // deep-link: ติ๊กตาม URL แล้วโหลดชุดนั้น (audit จะบันทึกชุดที่เลือก)
+        document.querySelectorAll('.poCheck').forEach(c => c.checked = initialFilter.includes(c.value));
+        document.getElementById('poSelectedCount').textContent = selectedPoIds().length;
+        await fetchPack(initialFilter);
       }
     }
 
