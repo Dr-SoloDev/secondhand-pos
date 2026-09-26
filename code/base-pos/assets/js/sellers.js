@@ -169,9 +169,16 @@ function editSeller(id) {
     document.getElementById('blacklistReasonGroup').classList.toggle('show', bl);
 
     const pdpaCheck = document.getElementById('pdpaConsent');
-    pdpaCheck.checked = true;
-    pdpaCheck.disabled = true;
-    document.getElementById('pdpaConsentText').textContent = 'ให้ความยินยอมแล้ว';
+    if (currentSeller.pdpa_consented_at) {
+        pdpaCheck.checked = true;
+        pdpaCheck.disabled = true;
+        document.getElementById('pdpaConsentText').textContent = 'ให้ความยินยอมแล้ว';
+    } else {
+        // ผู้ขายเก่าที่ยังไม่มียินยอม — เปิดให้ติ๊กเพื่อบันทึกย้อนหลังตอนกดบันทึก
+        pdpaCheck.checked = false;
+        pdpaCheck.disabled = false;
+        document.getElementById('pdpaConsentText').textContent = 'ผู้ขายยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชน เพื่อปฏิบัติตามกฎหมายรับซื้อของเก่า (ม.357) เท่านั้น — ติ๊กเพื่อบันทึกความยินยอม';
+    }
 
     // Show existing ID card photo if available
     resetSellerPhoto();
@@ -262,6 +269,9 @@ async function viewSeller(id) {
         pdpaEl.textContent = '-';
         pdpaEl.className = '';
     }
+    // ปุ่มบันทึกยินยอมย้อนหลัง — โชว์เฉพาะคนที่ยังไม่มี
+    const pdpaBtn = document.getElementById('recordPdpaBtn');
+    if (pdpaBtn) pdpaBtn.style.display = seller.pdpa_consented_at ? 'none' : '';
 
     // ---- ID CARD PHOTO ----
     const photoImg = document.getElementById('sellerDcIdPhoto');
@@ -474,6 +484,19 @@ async function saveDisclosure() {
         showNotification('บันทึกการเปิดเผยข้อมูลสำเร็จ', 'success');
         toggleDisclosureForm(true);
         loadDisclosures(currentViewSellerId);
+    } else {
+        showNotification(res.message || 'บันทึกไม่สำเร็จ', 'error');
+    }
+}
+
+// บันทึกความยินยอม PDPA ย้อนหลัง (stamp ครั้งเดียวฝั่ง backend + ต่อ hash chain)
+async function recordPdpaConsent() {
+    if (!currentViewSellerId) return;
+    if (!confirm('ยืนยันว่าผู้ขายยินยอมให้ร้านเก็บข้อมูลส่วนบุคคลและรูปบัตรประชาชนแล้ว?')) return;
+    const res = await apiRequest('sellers/seller', 'PUT', { id: currentViewSellerId, pdpa_consent: true });
+    if (res.status === 'success') {
+        showNotification('บันทึกความยินยอมสำเร็จ', 'success');
+        viewSeller(currentViewSellerId);
     } else {
         showNotification(res.message || 'บันทึกไม่สำเร็จ', 'error');
     }

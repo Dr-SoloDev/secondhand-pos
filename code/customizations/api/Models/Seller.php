@@ -50,7 +50,7 @@ class Seller extends Model
                     full_name, phone, address, vehicle_plate, vehicle_type,
                     id_card_photo, is_blacklisted, blacklist_reason, blacklisted_at,
                     notes, tier_level,
-                    retain_until, retain_reason,
+                    retain_until, retain_reason, pdpa_consented_at,
                     total_transactions, total_amount,
                     last_transaction_at, created_at, updated_at
                   FROM {$this->table}
@@ -263,6 +263,10 @@ class Seller extends Model
         if (array_key_exists('retain_reason', $data)) {
             $updateData['retain_reason'] = $data['retain_reason']
                 ? mb_substr((string)$data['retain_reason'], 0, 255) : null;
+        }
+        // PDPA consent stamp — controller ตั้งครั้งเดียวตอนยัง null เท่านั้น (ย้อนหลังได้)
+        if (!empty($data['pdpa_consented_at'])) {
+            $updateData['pdpa_consented_at'] = $data['pdpa_consented_at'];
         }
         // is_blacklisted/blacklist_reason ต้องใช้ผ่าน endpoint blacklist/unblacklist เท่านั้น
 
