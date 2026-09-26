@@ -75,7 +75,6 @@
       border: 1.5px solid #333;
       border-radius: 3px;
       margin-bottom: 8px;
-      page-break-inside: avoid;
     }
     .section-title {
       background: #eef2f7;
@@ -275,8 +274,17 @@
         padding: 8mm 10mm;
       }
       #loadingState, #errorState { display: none !important; }
+      /* ฉบับพิมพ์: กระชับช่องไฟท้ายเอกสาร กันลายเซ็นหล่นไปหน้าสุดท้ายคนเดียว */
+      .signatures { margin-top: 12px; }
       /* ฉบับพิมพ์: ขยายรูปบัตรให้เห็นลายน้ำ (จอคงขนาดเดิม) */
       #idPhoto { width: 85mm; height: auto; max-height: 60mm; }
+      /* ตัดหน้าแบบต่อเนื่อง ไม่เว้นว่าง: ตารางตัดได้แต่หัวตารางซ้ำทุกหน้า */
+      table.data thead { display: table-header-group; }
+      table.data tr { break-inside: avoid; }
+      .po-block { break-inside: auto; }
+      .po-head, .section-title { break-after: avoid; break-inside: avoid; }
+      .signatures, .cert-strip, .shop-header, .doc-header { break-inside: avoid; }
+      #idPhoto, .item-thumb { break-inside: avoid; }
       @page {
         size: A4;
         margin: 8mm;
@@ -294,6 +302,7 @@
     <button id="btnPrint" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
     <button id="btnClose" onclick="window.close()">ปิด</button>
     <span class="meta" id="metaLine">กำลังโหลด...</span>
+    <span class="meta" id="printHint" style="color:#fbbf24">ตอนพิมพ์: ติ๊ก ☑ Background graphics เพื่อให้สี/ตราแสดงครบ</span>
   </div>
 
   <div id="pageWrapper">
