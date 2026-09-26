@@ -1,5 +1,7 @@
 # Seller ID Encryption Runbook
 
+> ⚠️ Key นี้มีผล 2 ทาง (ตั้งแต่ ก.ย. 2569): (1) เข้ารหัส/ถอดรหัสเลขบัตรประชาชน (2) เป็นต้นทาง derive key ของ **IntegrityService hash chain** (`integrity-v1` domain) — ทำ key หาย = อ่านบัตรเก่าไม่ได้ + verify chain เก่าไม่ได้ ห้าม rotate โดยไม่มีแผน migration
+
 ## Preconditions
 
 - Set a dedicated `SELLER_ID_ENCRYPTION_KEY` generated with `openssl rand -hex 32`.

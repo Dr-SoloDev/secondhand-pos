@@ -113,7 +113,11 @@ Logout (clears cookie + blocklists token).
 | POST | `/sellers/unblacklist?id=` | manager+ | Unblacklist seller |
 | GET | `/sellers/history?id=` | any | Seller purchase history |
 | GET | `/sellers/data-center?id=` | any | Seller datacenter (summary + all data) |
-| POST | `/sellers/photo?id=` | any | Upload seller photo |
+| POST | `/sellers/photo?id=` | any | Upload seller photo (ID card watermark baked 45°) |
+| GET | `/sellers/photo-view?id=` | any | Serve protected seller photo (auth required) |
+| GET | `/sellers/evidence-pack?id=&po_ids=` | manager+ | Evidence pack for officers (shop header + license, seller, items w/ photos, integrity verify, disclosure log; `po_ids` selects case bills only, audited) |
+| POST | `/sellers/disclosure-log` | manager+ | Record PDPA disclosure to third party (append-only) |
+| GET | `/sellers/disclosure-log?id=` | manager+ | List disclosures for seller |
 
 ### 2.5 Purchase Orders
 
@@ -260,7 +264,7 @@ Sale lot response includes:
 | DELETE | `/users/user?id=` | admin | Delete user |
 | POST | `/users/change-password?id=` | admin | Change any user's password |
 | GET | `/users/activity-log` | admin | Activity log |
-| POST | `/settings/store` | admin | Save store settings |
+| POST | `/settings/store` | admin | Save store settings (incl. `scrap_license_no` — single old-goods license no. for the business, shown on evidence pack) |
 | GET | `/settings/store` | any | Get store settings |
 | POST | `/settings/system` | admin | Save system settings |
 | GET | `/settings/system` | admin | Get system settings |
@@ -312,7 +316,9 @@ branches ──┬── purchase_orders ──┬── purchase_order_items
 | Table | Rows | Purpose |
 |-------|------|---------|
 | `branches` | 4 | Branch configuration (code, name, cost_method) |
-| `sellers` | ~24 | Sellers (id_card, phone, vehicle_plate, blacklist, pdpa_consent) |
+| `sellers` | ~24 | Sellers (id_card, phone, vehicle_plate, blacklist, pdpa_consent, retain_until) |
+| `record_integrity` | — | Append-only tamper-evidence hash chain per entity (080) |
+| `disclosure_logs` | — | PDPA disclosure register, append-only, no FK (081) |
 | `categories` | 13 | Product categories (stock_kg, alert_threshold, requires_precious_receipt) |
 | `purchase_orders` | ~72 | Purchase receipts (reference_no, status, amounts) |
 | `purchase_order_items` | ~53 | PO line items (quantity, unit_price, consumed_qty, fifo_cost) |
@@ -339,12 +345,16 @@ Total: **81 indexes** across 29 tables.
 
 ### 3.4 Migration Files
 
-48 migrations in `customizations/database/migrations/001-048`:
+82 migrations in `customizations/database/migrations/001-082`:
 - 001-010: Core tables (branches, sellers, POs, sale lots, catalog)
 - 011-020: Indexes + atomic stock column + JSON expenses
 - 021-030: Cost methods, stock transfers, catalog improvements
 - 031-040: Business expenses, precious metals, employees, security
 - 041-048: Idempotency, PDPA, seller search indexes, performance index
+- 049-068: Catalog defaults, stock, cash control, transfers, auth, audit log expansion
+- 069-075: Seller ID encryption, import jobs, cash ledger, FIFO enforcement
+- 076-079: Scale devices/readings (Tiger TI-01), scale fields on PO items
+- 080-082: Seller legal pack — `record_integrity` (tamper-evidence chain), `disclosure_logs`, `sellers.retain_until`
 
 ---
 

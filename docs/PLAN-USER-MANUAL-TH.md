@@ -13,22 +13,25 @@
 - `code/base-pos/` = core framework (goragodwiriya/pos-system) — แก้เมื่อจำเป็น
 - Routes ทั้งหมดใน `code/base-pos/api/Router.php`
 - Auth: `POST /auth/login` → httpOnly cookie `posToken` + fallback `Bearer`
-- Migrations: `customizations/database/migrations/NNN_*.sql` ห้ามแก้ `base-pos/database/pos_system.sql`
-- Server ร้าน: `ragsaaadserver` (Tailscale `100.91.242.99`, user `ragsaaad_v1`, path `~/secondhand-pos`)
-- Tunnel: `cloudflared tunnel run` → `https://POS.mkxmeme.xyz` (Cloudflare cache 4 ชม.)
-- Local dev: `~/projects/scrap-pos/code` → `http://localhost:8080`
+- Migrations: `customizations/database/migrations/NNN_*.sql` (ล่าสุด 082) ห้ามแก้ `base-pos/database/pos_system.sql` — รันด้วย `customizations/database/run-migrations.sh --migrations-only` (prod รันผ่าน `deploy.sh`)
+- Server ร้าน: `ragsaaadserver` (Tailscale `100.91.242.99`, user `ragsaaad_v1`, path `~/secondhand-pos`, `code/` คือ compose root)
+- Tunnel: `cloudflared tunnel run` → `https://pos.mkxmeme.xyz` (Cloudflare cache 4 ชม.)
+- Local dev: `/home/drsolodev/projects_on_ssd/scrap-pos/code` → `http://localhost:8080`
+- Deploy: `code/deploy.sh` (gate: main สะอาด + sync origin + backup + migrate + healthcheck) — อ่าน `DEPLOY_SAFELIST.md` ก่อนทุกครั้ง
 
-## 3. สถานะปัจจุบัน (2026-08-28)
-- **Commit ล่าสุด:** `c701d67 feat(ui): premium polish — บิลเรียบหรู + ต้นขั้ว + preview cards + thermal + import` — push แล้ว, deploy บน `ragsaaadserver` แล้ว, `import_jobs` (074) สร้างแล้ว
-- **DB:** `pos_system` — ล้างธุรกรรมแล้ว เหลือ `catalog 210 / categories 13 / branches 2 (BR01, BR02)` พร้อมเริ่มใหม่คลีนๆ (`reset-keep-catalog.sql`)
-- **งานเสร็จ:**
-  - บิลรับซื้อเรียบหรู (slate+amber, meta bar, seller card, table สลับสี, hero amber, ต้นขั้วฉีกเก็บ)
-  - Preview 6 cards (sale-lots) + wrapper cards (purchase-orders, sellers)
-  - Thermal 80mm: `print-receipt-thermal.html` + `print_receipt.py` (GS v0 raster, supersample 3x)
-  - Reports Total Row + maskIdCard/Phone + XSS fix
-  - Import Excel (074) Skeleton
-  - Test suite 440/440 บน fresh DB
-- **ค้าง:** คู่มือภาษาไทย (แผนนี้)
+## 3. สถานะปัจจุบัน (2026-09-26)
+
+- **Commit ล่าสุด:** `da4be69 feat(sellers): record PDPA consent retroactively` — push + deploy บน `ragsaaadserver` แล้ว
+- **Migrations:** ถึง 082 (`record_integrity`, `disclosure_logs`, `sellers.retain_until`) — prod apply ครบ
+- **งานเสร็จ (เฟสผู้ขาย ก.ย. 69):**
+  - Watermark รูปบัตร 45° 2 บรรทัด bake ลงไฟล์ (`ImageWatermark` + ฟอนต์ Noto Sans Thai ใน image) + backfill รูปเก่า
+  - Evidence Pack A4 (`evidence-pack.html` + `GET sellers/evidence-pack`): หัวร้าน+เลขใบอนุญาต (`scrap_license_no` ใน settings), รายการของ+รูปสี, เลือกเฉพาะบิลคดีได้ (`po_ids`), ประโยครับรอง+เลขหน้า — เปิดได้เฉพาะ manager+
+  - Disclosure log (`sellers/disclosure-log` POST/GET, append-only) + ฟอร์มใน modal ผู้ขาย
+  - Integrity hash chain (`IntegrityService`, HMAC) คลุมผู้ขาย: สร้าง/แก้/บัญชีดำ/เปลี่ยนรูป/consent + backfill + verify ใน pack
+  - บันทึกยินยอม PDPA ย้อนหลัง (ปุ่มใน modal / ฟอร์มแก้ไข, stamp ครั้งเดียว)
+  - ช่องกำหนดลบ (`retain_until`) เอาออกจากจอตามคำสั่งเจ้าของ — ไม่ทำ purge ในเฟสนี้
+- **งานเก่าที่ยังอยู่:** บิลรับซื้อ/ต้นขั้ว/thermal/import (074)/reports/maskIdCard ฯลฯ (ดู git log)
+- **ค้าง:** คู่มือภาษาไทย (แผนนี้) + งานตาชั่ง phase 2 (อีกสายงาน)
 
 ## 4. เป้าหมายคู่มือ
 - ให้แคชเชียร์/เจ้าของ/แอดมิน ใช้งานได้โดยไม่ต้องถาม dev
@@ -46,7 +49,7 @@
 1. เข้าสู่ระบบ + เปลี่ยนรหัส (2 หน้า)
 2. รับซื้อของเก่า — ค้นผู้ขาย → เลือกของ → ชั่ง → จ่ายเงิน → พิมพ์บิล A4/80mm + ต้นขั้ว (6 หน้า) ⭐
 3. ขาย Lot — สร้าง Lot → FIFO → พิมพ์บิล (4 หน้า)
-4. จัดการผู้ขาย + ประวัติ (2 หน้า)
+4. จัดการผู้ขาย + ประวัติ + บันทึกยินยอม PDPA ย้อนหลัง + ชุดหลักฐานส่งเจ้าหน้าที่ (เลือกบิลคดี/พิมพ์ A4/ลง disclosure) (3 หน้า)
 5. สต็อก & โอนสต็อก (2 หน้า)
 6. รายงาน — รับซื้อ/ขาย/กำไร/พนักงาน (3 หน้า)
 7. ปิดยอดประจำวัน — เทียบต้นขั้ว ↔ ระบบ (2 หน้า) ⭐
@@ -76,15 +79,14 @@
 
 ## 10. คำสั่งสำคัญ (สำหรับ Agent ใหม่)
 ```bash
-# ดูสถานะ
-cd ~/secondhand-pos && git log --oneline -1 && git status --short
+# ดูสถานะ (บนเครื่อง dev)
+cd /home/drsolodev/projects_on_ssd/scrap-pos && git log --oneline -1 && git status --short
 docker ps --format "{{.Names}} {{.Status}}" | grep scrap
 curl -s http://localhost:8080/api/index.php/auth/verify -w " HTTP:%{http_code}\n"
 
-# Deploy (เมื่อมี commit ใหม่)
-cd ~/secondhand-pos && git pull origin main
-docker exec -i scrap-pos-db mysql -u root -p"$MYSQL_ROOT_PASSWORD" pos_system < customizations/database/migrations/0XX_*.sql  # ถ้ามี migration ใหม่
-docker compose -f code/docker-compose.yml restart web
+# Deploy ขึ้นร้าน (อ่าน DEPLOY_SAFELIST.md ก่อน — commit แยกก้อนตามกฎ)
+git push origin main
+ssh ragsaaad_v1@100.91.242.99 "cd ~/secondhand-pos/code && CI=true bash deploy.sh"
 ```
 
 ## 11. ไฟล์อ้างอิง
