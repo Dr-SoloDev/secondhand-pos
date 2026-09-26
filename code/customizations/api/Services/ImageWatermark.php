@@ -18,8 +18,12 @@ class ImageWatermark
     ];
 
     const FONT_MIN_PX = 10;
-    const FONT_MAX_PX = 72;
+    const FONT_MAX_PX = 160;
     const ROTATE_DEG = 45;      // องศาแนวทแยง (imagerotate บวก = ทวนเข็ม = ลาย "/")
+    const FIT_MARGIN = 0.98;    // ใช้พื้นที่รูปได้ถึง 98% (ขยายลายสุดขอบ)
+    const PAD_FACTOR = 1.2;     // padding รวมแนวนอน = 1.2×font
+    const LINE_FACTOR = 1.2;    // ระยะบรรทัด = 1.2×font (บีบสุดที่ยังอ่านออก)
+    const PAD_BOTTOM_FACTOR = 1.0;
 
     /** ตรวจว่า runtime พร้อมวาดลายไหม (gd + imagettftext + ไฟล์ฟอนต์) */
     public static function available(): bool
@@ -77,25 +81,19 @@ class ImageWatermark
             }
 
             $fontPath = self::fontPath();
-            $diag = sqrt($w * $w + $h * $h);
-            $longChars = mb_strlen(self::LINES[1], 'UTF-8');
 
-            // ---- หา font size ที่พอดี (ประมาณก่อน แล้ววัดจริงย่อจน fit) ----
-            $font = (int)floor(min(0.035 * $w, $diag / (0.55 * max($longChars, 1))));
-            $font = max(self::FONT_MIN_PX, min(self::FONT_MAX_PX, $font));
-
-            $metrics = self::measure($font, $fontPath);
-            $tries = 0;
-            while ($tries++ < 40 && $font > self::FONT_MIN_PX
-                && !self::blockFits($metrics['textW'], $metrics['blockH'], $w, $h)) {
-                $font = max(self::FONT_MIN_PX, (int)floor($font * 0.9));
-                $metrics = self::measure($font, $fontPath);
+            // ---- หาฟอนต์ใหญ่สุดที่พอดีรูป (วัดจริงแบบ binary search) ----
+            $font = self::maxFittingFont($w, $h, $fontPath);
+            if ($font < self::FONT_MIN_PX) {
+                return false; // รูปเล็กเกินไป ไม่วาด (ลายจะบังข้อมูลบัตร)
             }
 
+            $metrics = self::measure($font, $fontPath);
+
             // ---- วาดบล็อกข้อความบน canvas โปร่งใส ----
-            $lineH = (int)round($font * 1.3);
-            $blockW = $metrics['textW'] + $font * 2;   // padding รอบขอบ
-            $blockH = $lineH * 2 + (int)round($font * 1.2);
+            $lineH = (int)round($font * self::LINE_FACTOR);
+            $blockW = $metrics['textW'] + (int)round($font * self::PAD_FACTOR);
+            $blockH = $lineH * 2 + (int)round($font * self::PAD_BOTTOM_FACTOR);
 
             $canvas = imagecreatetruecolor($blockW, $blockH);
             imagealphablending($canvas, false);
@@ -104,16 +102,19 @@ class ImageWatermark
             imagefilledrectangle($canvas, 0, 0, $blockW - 1, $blockH - 1, $transparent);
             imagealphablending($canvas, true);
 
-            $outline = imagecolorallocatealpha($canvas, 20, 20, 20, 32);   // เส้นขอบเข้ม ~75% ทึบ
-            $main = imagecolorallocatealpha($canvas, 255, 255, 255, 64);   // ขาว ~50% ทึบ
+            $outline = imagecolorallocatealpha($canvas, 20, 20, 20, 16);   // เส้นขอบเข้ม ~87% ทึบ
+            $main = imagecolorallocatealpha($canvas, 255, 255, 255, 48);    // ขาว ~62% ทึบ
 
+            // ขอบหนา 2px (วงใน 8 ทิศ + วงนอก 4 ทิศ) ให้อ่านชัดแม้รูปเล็ก
+            $offsets = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1],
+                        [-2, 0], [2, 0], [0, -2], [0, 2]];
             foreach (self::LINES as $i => $line) {
                 $bbox = imagettfbbox($font, 0, $fontPath, $line);
                 $lineW = abs($bbox[2] - $bbox[0]);
                 $x = (int)(($blockW - $lineW) / 2);
                 $y = (int)($font * 1.1) + $i * $lineH;
-                // outline: วาดสีเข้มถ่วง 8 ทิศก่อน (1px)
-                foreach ([[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]] as $off) {
+                // outline: วาดสีเข้มถ่วงรอบตัวอักษรก่อน
+                foreach ($offsets as $off) {
                     imagettftext($canvas, $font, 0, $x + $off[0], $y + $off[1], $outline, $fontPath, $line);
                 }
                 imagettftext($canvas, $font, 0, $x, $y, $main, $fontPath, $line);
@@ -141,28 +142,51 @@ class ImageWatermark
         }
     }
 
-    /** วัดความกว้างบล็อกจริงจากฟอนต์ */
+    /** วัดความกว้างบล็อกจริงจากฟอนต์ (ใช้บรรทัดที่กว้างสุด) */
     private static function measure(int $font, string $fontPath): array
     {
-        $bbox = imagettfbbox($font, 0, $fontPath, self::LINES[1]);
-        $textW = abs($bbox[2] - $bbox[0]);
-        $lineH = (int)round($font * 1.3);
+        $textW = 0;
+        foreach (self::LINES as $line) {
+            $bbox = imagettfbbox($font, 0, $fontPath, $line);
+            $textW = max($textW, abs($bbox[2] - $bbox[0]));
+        }
+        $lineH = (int)round($font * self::LINE_FACTOR);
         return [
             'textW'  => $textW,
-            'blockH' => $lineH * 2 + (int)round($font * 1.2),
+            'blockH' => $lineH * 2 + (int)round($font * self::PAD_BOTTOM_FACTOR),
         ];
     }
 
     /**
-     * บล็อกหมุน 45° แล้วยังอยู่ในรูปไหม (เผื่อ margin 5%)
-     * extent = textW*cos45 + blockH*sin45 ทั้งแกนนอน/ตั้ง (cos45 = sin45)
+     * หาฟอนต์ใหญ่สุดที่บล็อกหมุน 45° แล้วยังอยู่ในรูป (รวม padding แล้ว)
+     * extent แนวนอน/ตั้งของกรอบที่หมุน = blockW*cos + blockH*sin (45° เท่ากันทั้ง 2 แกน)
      */
-    private static function blockFits(int $textW, int $blockH, int $w, int $h): bool
+    private static function maxFittingFont(int $w, int $h, string $fontPath): int
     {
+        if (self::fitsAt(self::FONT_MAX_PX, $w, $h, $fontPath)) {
+            return self::FONT_MAX_PX;
+        }
+        $lo = self::FONT_MIN_PX - 1; // ไม่ fit (หรือไม่ถึงขั้นต่ำ)
+        $hi = self::FONT_MAX_PX;     // ไม่ fit
+        while ($hi - $lo > 1) {
+            $mid = (int)(($lo + $hi) / 2);
+            if (self::fitsAt($mid, $w, $h, $fontPath)) {
+                $lo = $mid;
+            } else {
+                $hi = $mid;
+            }
+        }
+        return $lo;
+    }
+
+    private static function fitsAt(int $font, int $w, int $h, string $fontPath): bool
+    {
+        $m = self::measure($font, $fontPath);
+        $blockW = $m['textW'] + (int)round($font * self::PAD_FACTOR);
         $s = sin(deg2rad(self::ROTATE_DEG));
         $c = cos(deg2rad(self::ROTATE_DEG));
-        $extentX = $textW * $c + $blockH * $s;
-        $extentY = $textW * $s + $blockH * $c;
-        return $extentX <= $w * 0.95 && $extentY <= $h * 0.95;
+        $extentX = $blockW * $c + $m['blockH'] * $s;
+        $extentY = $blockW * $s + $m['blockH'] * $c;
+        return $extentX <= $w * self::FIT_MARGIN && $extentY <= $h * self::FIT_MARGIN;
     }
 }
