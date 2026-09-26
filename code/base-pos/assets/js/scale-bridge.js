@@ -9,19 +9,43 @@ const SCALE_POLL_MS = 500;
 const SCALE_STABLE_MS = 1500;
 const SCALE_CONNECT_THRESHOLD = 3;
 const SCALE_DISCONNECT_THRESHOLD = 3;
+const SCALE_BAUD_RATES = [9600, 4800, 2400, 19200, 115200];
+const SCALE_BAUD_STORAGE_KEY = 'scale_baud';
+let scaleCurrentBaud = 0;
+let scaleBaudFailCount = 0;
+let scaleRawLog = [];
+let scaleBaudAutoTried = new Set();
 
-// ── Parser — เหมือน scale_agent.py (Tiger TI-01 generic) ──
+// ── Parser — เหมือน scale_agent.py (Tiger TI-01 generic) + ทน control chars ──
 function parseScaleLine(raw) {
-  const s = (raw || '').trim();
-  if (!s) return null;
+  const cleaned = (raw || '').replace(/[\x00-\x1F\x7F]/g, ' ').trim();
+  if (!cleaned) return null;
+  const s = cleaned;
   const upper = s.toUpperCase();
   let stableHint = upper.includes('ST') && !upper.includes('US');
   if (upper.includes('US') && !upper.includes('STABLE')) stableHint = false;
+  // Tiger บางเฟิร์มแวร์ส่ง "=" นำหน้า เช่น "=  12.34" — regex เดิมรับได้อยู่แล้ว แต่ strip control ก่อน
   const m = s.match(/(-?\d+[.,]\d+)|(-?\d+)/);
   if (!m) return null;
   const w = parseFloat(m[0].replace(',', '.'));
   if (!isFinite(w) || w < -10 || w > 99999) return null;
   return { weight: w, stableHint, raw: s };
+}
+
+function getPreferredBaud() {
+  const fromDevice = scaleDevices[0]?.baud_rate ? parseInt(scaleDevices[0].baud_rate, 10) : 0;
+  if (fromDevice) return fromDevice;
+  const saved = parseInt(localStorage.getItem(SCALE_BAUD_STORAGE_KEY) || '0', 10);
+  if (saved) return saved;
+  return 9600;
+}
+
+function pushRawLog(raw) {
+  const t = new Date().toLocaleTimeString('th-TH', { hour12: false });
+  scaleRawLog.unshift(`[${t}] ${raw}`);
+  if (scaleRawLog.length > 20) scaleRawLog.pop();
+  // expose for console debug
+  try { window.__scaleRawLog = scaleRawLog; } catch {}
 }
 
 let scaleState = {
@@ -35,6 +59,7 @@ let scaleState = {
   stableSince: null,
   autoCaptured: false,
   mode: 'serial', // 'serial' | 'agent' | 'manual'
+  currentBaud: 0,
 };
 
 let scalePollTimer = null;
@@ -113,14 +138,13 @@ function isWebSerialSupported() {
 }
 
 async function tryAutoConnectSerial() {
-  // ลองต่อ port ที่เคยอนุญาตไว้แล้ว (ไม่ต้องขอใหม่)
   if (!isWebSerialSupported()) return false;
   try {
     const ports = await navigator.serial.getPorts();
     if (ports.length > 0) {
       serialPort = ports[0];
       await openSerialPort(serialPort);
-      console.log('[Scale] Auto-connected Web Serial', serialPort);
+      console.log('[Scale] Auto-connected Web Serial', serialPort, '@', scaleCurrentBaud);
       return true;
     }
   } catch (e) { console.log('[Scale] autoConnect failed', e); }
@@ -135,7 +159,7 @@ async function requestSerialPort() {
   try {
     serialPort = await navigator.serial.requestPort();
     await openSerialPort(serialPort);
-    showNotification('เชื่อมตาชั่งสำเร็จ — พร้อมชั่ง', 'success');
+    // openSerialPort จะ showNotification เองเมื่อสำเร็จ
   } catch (e) {
     if (e.name !== 'NotFoundError') {
       console.error('[Scale] requestPort failed', e);
@@ -144,34 +168,63 @@ async function requestSerialPort() {
   }
 }
 
-async function openSerialPort(port) {
+function getNextBaud(current) {
+  const idx = SCALE_BAUD_RATES.indexOf(current);
+  if (idx === -1) return SCALE_BAUD_RATES[0];
+  return SCALE_BAUD_RATES[(idx + 1) % SCALE_BAUD_RATES.length];
+}
+
+async function openSerialPort(port, baudOverride) {
+  const baud = baudOverride || getPreferredBaud();
+  scaleCurrentBaud = baud;
+  scaleBaudFailCount = 0;
+  scaleBaudAutoTried.clear();
   try {
-    await port.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' });
+    // ปิดก่อนถ้าเปิดค้าง (เช่น ลอง baud ใหม่)
+    try { if (port.readable || port.writable) await port.close(); } catch {}
+  } catch {}
+  try {
+    await port.open({ baudRate: baud, dataBits: 8, stopBits: 1, parity: 'none' });
+    console.log(`[Scale] open @ ${baud} baud`);
   } catch (e) {
-    // อาจเปิดอยู่แล้ว
-    if (!e.message.includes('already open')) throw e;
+    if (e.message && e.message.includes('already open')) {
+      console.log('[Scale] port already open, reuse');
+    } else {
+      console.error(`[Scale] open @ ${baud} failed`, e);
+      throw e;
+    }
   }
   scaleState.mode = 'serial';
   scaleState.connected = true;
+  scaleState.currentBaud = baud;
   serialKeepReading = true;
+  scaleBaudFailCount = 0;
+  serialBuffer = '';
+  _weightHistory = [];
   updateScaleUI();
-  // ต่อสำเร็จ → ปิด modal ครั้งแรกถ้ายังเปิดอยู่
   hideScaleConnectModal(false);
   readSerialLoop(port);
-  // ฟัง disconnect
-  port.addEventListener('disconnect', () => {
+  // ฟัง disconnect (กันซ้ำ)
+  try { port.removeEventListener('disconnect', port._scaleDisconnectHandler); } catch {}
+  port._scaleDisconnectHandler = () => {
     console.log('[Scale] Serial disconnected');
     serialKeepReading = false;
     scaleState.connected = false;
     scaleState.mode = 'manual';
     scaleState.stableSince = null;
+    scaleCurrentBaud = 0;
     updateScaleUI();
-  });
+  };
+  port.addEventListener('disconnect', port._scaleDisconnectHandler);
+  showNotification(`เชื่อมตาชั่ง @ ${baud} baud — รอน้ำหนัก...`, 'info');
 }
+
+let _lastRawLogTime = 0;
 
 async function readSerialLoop(port) {
   const decoder = new TextDecoder();
-  // Web Serial readable stream
+  let consecutiveValid = 0;
+  let lastWeightTime = Date.now();
   while (serialKeepReading && port.readable) {
     try {
       serialReader = port.readable.getReader();
@@ -179,25 +232,87 @@ async function readSerialLoop(port) {
         const { value, done } = await serialReader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
+        // debug — log ทุก chunk ที่ไม่ใช่ control ล้วน
+        if (chunk.trim()) {
+          const now = Date.now();
+          if (now - _lastRawLogTime > 300) {
+            console.log('[Scale] chunk', JSON.stringify(chunk.slice(0, 80)));
+            _lastRawLogTime = now;
+          }
+        }
         serialBuffer += chunk;
-        // แยกบรรทัดด้วย \n หรือ \r
+        // แยกบรรทัดด้วย \n หรือ \r — ถ้าไม่มี EOL เกิน 800ms ให้ flush ลอง parse ทั้งก้อน
         let lines = serialBuffer.split(/[\r\n]+/);
-        serialBuffer = lines.pop(); // ค้างไว้
+        // ถ้าไม่มี newline แต่ buffer ยาว >12 และมีเลข → ลอง parse
+        if (lines.length === 1 && serialBuffer.length > 12 && Date.now() - lastWeightTime > 800) {
+          const probe = parseScaleLine(serialBuffer);
+          if (probe) {
+            lines = [serialBuffer, ''];
+            serialBuffer = '';
+          }
+        } else {
+          serialBuffer = lines.pop();
+        }
         for (const line of lines) {
+          if (!line.trim()) continue;
+          pushRawLog(line.trim());
+          console.log('[Scale] raw→', JSON.stringify(line), 'len', line.length);
           const parsed = parseScaleLine(line);
           if (parsed) {
+            console.log('[Scale] parsed', parsed.weight, 'stableHint', parsed.stableHint);
+            consecutiveValid++;
+            lastWeightTime = Date.now();
+            scaleBaudFailCount = 0;
+            if (consecutiveValid === 2) {
+              // เจอน้ำหนักจริง 2 ครั้งติด → baud นี้ถือว่าใช่ จำไว้
+              try { localStorage.setItem(SCALE_BAUD_STORAGE_KEY, String(scaleCurrentBaud)); } catch {}
+              scaleState.currentBaud = scaleCurrentBaud;
+            }
             onScaleWeight(parsed.weight, parsed.stableHint, parsed.raw, 'serial');
-          } else if (line.trim()) {
-            // เก็บ raw ไว้ debug
+          } else {
             scaleState.raw = line.trim();
+            console.log('[Scale] no parse for', JSON.stringify(line));
             updateScaleUI();
           }
         }
       }
-      serialReader.releaseLock();
+      try { serialReader.releaseLock(); } catch {}
+      serialReader = null;
     } catch (e) {
-      console.error('[Scale] read error', e);
-      try { serialReader?.releaseLock(); } catch {}
+      const name = e.name || e.message || '';
+      const isBaudError = /Break|Framing|Parity|Frame/i.test(name) || /Break|Framing/i.test(String(e));
+      if (isBaudError) {
+        scaleBaudFailCount++;
+        console.warn(`[Scale] baud error @ ${scaleCurrentBaud} (${scaleBaudFailCount}/5)`, e.name || e.message);
+        // อย่าสแปม console ทุกครั้ง — throttle
+        if (scaleBaudFailCount >= 5) {
+          const nextBaud = getNextBaud(scaleCurrentBaud);
+          if (!scaleBaudAutoTried.has(nextBaud) && scaleBaudAutoTried.size < SCALE_BAUD_RATES.length) {
+            scaleBaudAutoTried.add(scaleCurrentBaud);
+            console.warn(`[Scale] Auto-switch baud ${scaleCurrentBaud} → ${nextBaud}`);
+            showNotification(`Baud ${scaleCurrentBaud} ไม่ตรง — ลอง ${nextBaud}...`, 'warning');
+            try { serialReader?.releaseLock(); } catch {}
+            try { await port.close(); } catch {}
+            serialReader = null;
+            // หน่วงก่อนลอง baud ใหม่
+            await new Promise(r => setTimeout(r, 600));
+            // recursive open with next baud
+            try {
+              await openSerialPort(port, nextBaud);
+            } catch (err) {
+              console.error('[Scale] auto-switch failed', err);
+            }
+            return;
+          } else {
+            console.error('[Scale] ทุก baud ลองแล้วไม่ตรง — ตรวจสอบสาย/เครื่อง');
+            showNotification('ลองทุก baud แล้วไม่เจอน้ำหนัก — ตรวจสอบสายและเครื่อง Tiger', 'error');
+          }
+        }
+      } else {
+        console.error('[Scale] read error', e);
+      }
+      try { try { serialReader?.releaseLock(); } catch {} } catch {}
+      serialReader = null;
       await new Promise(r => setTimeout(r, 500));
     }
   }
@@ -207,14 +322,18 @@ async function readSerialLoop(port) {
 
 async function disconnectSerial() {
   serialKeepReading = false;
-  try { serialReader?.cancel(); } catch {}
-  try { serialReader?.releaseLock(); } catch {}
-  try { await serialPort?.close(); } catch {}
-  serialPort = null;
+  // cancel ต้องมาก่อน releaseLock และต้องเช็คว่า lock ยังถืออยู่
+  if (serialReader) {
+    try { await serialReader.cancel(); } catch (e) { console.log('[Scale] cancel ignored', e.message); }
+    try { serialReader.releaseLock(); } catch {}
+  }
   serialReader = null;
+  try { if (serialPort?.readable || serialPort?.writable) await serialPort.close(); } catch (e) { console.log('[Scale] close ignored', e.message); }
+  serialPort = null;
   scaleState.connected = false;
   scaleState.mode = 'manual';
   scaleState.stableSince = null;
+  scaleCurrentBaud = 0;
   updateScaleUI();
   showNotification('ยกเลิกเชื่อมตาชั่งแล้ว — กลับเป็นคีย์มือ', 'info');
 }
@@ -470,8 +589,9 @@ function updateScaleUI() {
       const stableIcon = scaleState.stable ? '●นิ่ง' : '○รอ';
       const color = scaleState.stable ? '#16a34a' : '#d97706';
       const via = scaleState.mode === 'serial' ? 'Web Serial' : 'Agent';
-      badge.innerHTML = `<span style="color:${color};font-weight:700">🟢 ตาชั่ง ${scaleState.weight.toFixed(2)} กก. ${stableIcon}</span> <span style="font-size:10px;color:#888">(${via})</span>`;
-      badge.title = `Raw: ${scaleState.raw} | Mode: ${scaleState.mode}`;
+      const baudTag = scaleCurrentBaud ? ` @${scaleCurrentBaud}` : '';
+      badge.innerHTML = `<span style="color:${color};font-weight:700">🟢 ตาชั่ง ${scaleState.weight.toFixed(2)} กก. ${stableIcon}</span> <span style="font-size:10px;color:#888">(${via}${baudTag})</span>`;
+      badge.title = `Raw: ${scaleState.raw} | Mode: ${scaleState.mode} | Baud: ${scaleCurrentBaud || scaleState.currentBaud || '-'}`;
     } else {
       if (hasSerial) {
         badge.innerHTML = '<span style="color:#888">⚪ คีย์มือ — <a href="#" onclick="window.scaleBridge.connect();return false" style="color:#2563eb;text-decoration:underline">กดเชื่อมตาชั่ง</a> ถ้าเสียบสายแล้ว</span>';
@@ -487,9 +607,11 @@ function updateScaleUI() {
     if (scaleState.connected) {
       liveEl.textContent = scaleState.weight.toFixed(2);
       liveEl.style.color = scaleState.stable ? '#16a34a' : '#d97706';
+      liveEl.title = `baud ${scaleCurrentBaud || scaleState.currentBaud || '?'} raw: ${scaleState.raw}`;
     } else {
       liveEl.textContent = '—';
       liveEl.style.color = '#999';
+      liveEl.title = '';
     }
   }
 
@@ -532,7 +654,7 @@ function updateScaleUI() {
   }
 }
 
-// Expose for purchase-orders.js
+// Expose for purchase-orders.js + debug
 window.scaleBridge = {
   init: initScaleBridge,
   connect: requestSerialPort,
@@ -545,4 +667,11 @@ window.scaleBridge = {
   isSerialSupported: isWebSerialSupported,
   showModal: showScaleConnectModal,
   hideModal: hideScaleConnectModal,
+  // debug helpers — ใช้ใน Console หน้าร้าน
+  getState: () => ({ ...scaleState, currentBaud: scaleCurrentBaud, rawLog: scaleRawLog.slice(0, 5) }),
+  getRawLog: () => scaleRawLog.slice(),
+  getBaud: () => scaleCurrentBaud,
+  setBaud: (b) => { try { localStorage.setItem(SCALE_BAUD_STORAGE_KEY, String(b)); } catch {} return getPreferredBaud(); },
 };
+// global for quick console: window.__scaleState
+try { window.__scaleState = scaleState; window.__scaleRawLog = scaleRawLog; } catch {}
